@@ -63,10 +63,10 @@ class ApiInitTestCase(test_base.BaseTestCase):
         self.assertEqual(200, res.status_code)
         self.assertEqual('text/xml', res.content_type)
         expected_xml = fakes.XML_RESULT_TEMPLATE % {
-                'action': 'FakeAction',
-                'api_version': 'fake_v1',
-                'request_id': self.fake_context.request_id,
-                'data': '<fakeTag>fake_data</fakeTag>'}
+            'action': 'FakeAction',
+            'api_version': 'fake_v1',
+            'request_id': self.fake_context.request_id,
+            'data': '<fakeTag>fake_data</fakeTag>'}
         self.assertThat(res.body, matchers.XMLMatches(expected_xml))
         self.controller.fake_action.assert_called_once_with(self.fake_context,
                                                             param='fake_param')
@@ -81,12 +81,12 @@ class ApiInitTestCase(test_base.BaseTestCase):
             self.assertEqual(status, res.status_code)
             self.assertEqual('text/xml', res.content_type)
             expected_xml = fakes.XML_ERROR_TEMPLATE % {
-                    'code': code,
-                    'message': message,
-                    'request_id': self.fake_context.request_id}
+                'code': code,
+                'message': message,
+                'request_id': self.fake_context.request_id}
             self.assertThat(res.body, matchers.XMLMatches(expected_xml))
             self.controller.fake_action.assert_called_once_with(
-                    self.fake_context, param='fake_param')
+                self.fake_context, param='fake_param')
 
         do_check(exception.EC2Exception('fake_msg'), 500,
                  'EC2Exception', 'Unknown error occurred.')
@@ -97,7 +97,7 @@ class ApiInitTestCase(test_base.BaseTestCase):
 
     def test_execute_proxy(self):
         self.controller_class.return_value = mock.create_autospec(
-                cloud.CloudController, instance=True)
+            cloud.CloudController, instance=True)
         # NOTE(ft): recreate APIRequest to use mock with autospec
         ec2_request = apirequest.APIRequest('FakeAction', 'fake_v1',
                                             {'Param': 'fake_param'})
@@ -119,8 +119,8 @@ class ApiInitTestCase(test_base.BaseTestCase):
 
     def test_execute_proxy_error(self):
         self.controller.fake_action.side_effect = exception.EC2ServerError(
-                {'status': 400, 'content-type': 'fake_type'},
-                'fake_content')
+            {'status': 400, 'content-type': 'fake_type'},
+            'fake_content')
 
         res = self.request.send(self.application)
 

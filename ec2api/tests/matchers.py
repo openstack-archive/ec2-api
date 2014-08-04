@@ -22,6 +22,7 @@ from testtools import content
 
 
 class DictKeysMismatch(object):
+
     def __init__(self, d1only, d2only):
         self.d1only = d1only
         self.d2only = d2only
@@ -35,6 +36,7 @@ class DictKeysMismatch(object):
 
 
 class DictMismatch(object):
+
     def __init__(self, key, d1_value, d2_value):
         self.key = key
         self.d1_value = d1_value
@@ -106,6 +108,7 @@ class DictMatches(object):
 
 
 class ListLengthMismatch(object):
+
     def __init__(self, len1, len2):
         self.len1 = len1
         self.len2 = len2
@@ -147,6 +150,7 @@ class DictListMatches(object):
 
 
 class SubDictMismatch(object):
+
     def __init__(self,
                  key=None,
                  sub_value=None,
@@ -212,6 +216,7 @@ class FunctionCallMatcher(object):
 
 
 class XMLMismatch(object):
+
     """Superclass for XML mismatch."""
 
     def __init__(self, state):
@@ -230,6 +235,7 @@ class XMLMismatch(object):
 
 
 class XMLTagMismatch(XMLMismatch):
+
     """XML tags don't match."""
 
     def __init__(self, state, idx, expected_tag, actual_tag):
@@ -245,6 +251,7 @@ class XMLTagMismatch(XMLMismatch):
 
 
 class XMLAttrKeysMismatch(XMLMismatch):
+
     """XML attribute keys don't match."""
 
     def __init__(self, state, expected_only, actual_only):
@@ -259,6 +266,7 @@ class XMLAttrKeysMismatch(XMLMismatch):
 
 
 class XMLAttrValueMismatch(XMLMismatch):
+
     """XML attribute values don't match."""
 
     def __init__(self, state, key, expected_value, actual_value):
@@ -274,6 +282,7 @@ class XMLAttrValueMismatch(XMLMismatch):
 
 
 class XMLTextValueMismatch(XMLMismatch):
+
     """XML text values don't match."""
 
     def __init__(self, state, expected_text, actual_text):
@@ -288,6 +297,7 @@ class XMLTextValueMismatch(XMLMismatch):
 
 
 class XMLUnexpectedChild(XMLMismatch):
+
     """Unexpected child present in XML."""
 
     def __init__(self, state, tag, idx):
@@ -301,6 +311,7 @@ class XMLUnexpectedChild(XMLMismatch):
 
 
 class XMLExpectedChild(XMLMismatch):
+
     """Expected child not present in XML."""
 
     def __init__(self, state, tag, idx):
@@ -314,6 +325,7 @@ class XMLExpectedChild(XMLMismatch):
 
 
 class XMLMatchState(object):
+
     """Maintain some state for matching.
 
     Tracks the XML node path and saves the expected and actual full
@@ -354,6 +366,7 @@ class XMLMatchState(object):
 
 
 class XMLMatches(object):
+
     """Compare XML strings.  More complete than string comparison."""
 
     def __init__(self, expected):

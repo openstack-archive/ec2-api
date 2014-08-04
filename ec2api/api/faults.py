@@ -67,6 +67,7 @@ def ec2_error_response(request_id, code, message, status=500):
 
 
 class Fault(webob.exc.HTTPException):
+
     """Captures exception and return REST Response."""
 
     def __init__(self, exception):

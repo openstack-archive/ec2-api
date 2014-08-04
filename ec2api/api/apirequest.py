@@ -47,6 +47,7 @@ def _database_to_isoformat(datetimeobj):
 
 
 class APIRequest(object):
+
     def __init__(self, action, version, args):
         self.action = action
         self.version = version
@@ -87,7 +88,8 @@ class APIRequest(object):
 
         response_el = xml.createElement(self.action + 'Response')
         response_el.setAttribute('xmlns',
-                             'http://ec2.amazonaws.com/doc/%s/' % self.version)
+                                 'http://ec2.amazonaws.com/doc/%s/'
+                                 % self.version)
         request_id_el = xml.createElement('requestId')
         request_id_el.appendChild(xml.createTextNode(request_id))
         response_el.appendChild(request_id_el)
@@ -136,7 +138,7 @@ class APIRequest(object):
             data_el.appendChild(xml.createTextNode(str(data).lower()))
         elif isinstance(data, datetime.datetime):
             data_el.appendChild(
-                  xml.createTextNode(_database_to_isoformat(data)))
+                xml.createTextNode(_database_to_isoformat(data)))
         elif data is not None:
             data_el.appendChild(xml.createTextNode(str(data)))
 

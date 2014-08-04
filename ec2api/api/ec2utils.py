@@ -14,10 +14,14 @@
 
 import re
 
+from ec2api import context
+from ec2api.db import api as db_api
 from ec2api import exception
+from ec2api import novadb
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 from ec2api.openstack.common import timeutils
+from ec2api.openstack.common import uuidutils
 
 LOG = logging.getLogger(__name__)
 
@@ -184,3 +188,106 @@ def ec2_id_to_id(ec2_id):
 def id_to_ec2_id(instance_id, template='i-%08x'):
     """Convert an instance ID (int) to an ec2 ID (i-[base 16 number])."""
     return template % int(instance_id)
+
+
+def id_to_ec2_inst_id(instance_id):
+    """Get or create an ec2 instance ID (i-[base 16 number]) from uuid."""
+    if instance_id is None:
+        return None
+    elif uuidutils.is_uuid_like(instance_id):
+        ctxt = context.get_admin_context()
+        int_id = get_int_id_from_instance_uuid(ctxt, instance_id)
+        return id_to_ec2_id(int_id)
+    else:
+        return id_to_ec2_id(instance_id)
+
+
+def ec2_inst_id_to_uuid(context, ec2_id):
+    """"Convert an instance id to uuid."""
+    int_id = ec2_id_to_id(ec2_id)
+    return get_instance_uuid_from_int_id(context, int_id)
+
+
+def get_instance_uuid_from_int_id(context, int_id):
+    return novadb.get_instance_uuid_by_ec2_id(context, int_id)
+
+
+def get_int_id_from_instance_uuid(context, instance_uuid):
+    if instance_uuid is None:
+        return
+    try:
+        return novadb.get_ec2_instance_id_by_uuid(context, instance_uuid)
+    except exception.NotFound:
+        return novadb.ec2_instance_create(context, instance_uuid)['id']
+
+
+# NOTE(ft): extra functions to use in vpc specific code or instead of
+# malformed existed functions
+
+
+def get_ec2_id(obj_id, kind):
+    # TODO(ft): move to standard conversion function
+    if not isinstance(obj_id, int) and not isinstance(obj_id, long):
+        raise TypeError('obj_id must be int')
+    elif obj_id < 0 or obj_id > 0xffffffff:
+        raise OverflowError('obj_id must be non negative integer')
+    return '%(kind)s-%(id)08x' % {'kind': kind, 'id': obj_id}
+
+
+_NOT_FOUND_EXCEPTION_MAP = {
+    'vpc': exception.InvalidVpcIDNotFound,
+    'igw': exception.InvalidInternetGatewayIDNotFound,
+    'subnet': exception.InvalidSubnetIDNotFound,
+    'eni': exception.InvalidNetworkInterfaceIDNotFound,
+    'dopt': exception.InvalidDhcpOptionsIDNotFound,
+    'eipalloc': exception.InvalidAllocationIDNotFound,
+    'sg': exception.InvalidSecurityGroupIDNotFound,
+    'rtb': exception.InvalidRouteTableIDNotFound,
+}
+
+
+def get_db_item(context, kind, ec2_id):
+    db_id = ec2_id_to_id(ec2_id)
+    item = db_api.get_item_by_id(context, kind, db_id)
+    if item is None:
+        params = {'%s_id' % kind: ec2_id}
+        raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
+    return item
+
+
+def get_db_items(context, kind, ec2_ids):
+    if ec2_ids is not None:
+        db_ids = [ec2_id_to_id(id) for id in ec2_ids]
+        items = db_api.get_items_by_ids(context, kind, db_ids)
+        if items is None or items == []:
+            params = {'%s_id' % kind: ec2_ids[0]}
+            raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
+    else:
+        items = db_api.get_items(context, kind)
+    return items
+
+
+_cidr_re = re.compile("^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")
+
+
+def validate_cidr(cidr, parameter_name):
+    invalid_format_exception = exception.InvalidParameterValue(
+        value=cidr,
+        parameter=parameter_name,
+        reason='This is not a valid CIDR block.')
+    if not _cidr_re.match(cidr):
+        raise invalid_format_exception
+    address, size = cidr.split("/")
+    octets = address.split(".")
+    if any(int(octet) > 255 for octet in octets):
+        raise invalid_format_exception
+    size = int(size)
+    if size > 32:
+        raise invalid_format_exception
+
+
+def validate_vpc_cidr(cidr, invalid_cidr_exception_class):
+    validate_cidr(cidr, 'cidrBlock')
+    size = int(cidr.split("/")[-1])
+    if size > 28 or size < 16:
+        raise invalid_cidr_exception_class(cidr_block=cidr)

@@ -47,7 +47,6 @@ class EC2ServerError(Exception):
 
 
 class EC2Exception(Exception):
-
     """Base EC2 Exception
 
     To correctly use this class, inherit from it and define
@@ -201,6 +200,11 @@ class InvalidRouteNotFound(EC2NotFound):
                 '%(destination_cidr_block)s in route table %(route_table_id)s')
 
 
+class InvalidSecurityGroupIDNotFound(EC2NotFound):
+    ec2_code = 'InvalidSecurityGroupID.NotFound'
+    msg_fmt = _("The securityGroup ID '%(sg_id)s' does not exist")
+
+
 class InvalidGroupNotFound(EC2NotFound):
     ec2_code = 'InvalidGroup.NotFound'
     msg_fmg = _("The security group ID '%(sg_id)s' does not exist")
@@ -267,6 +271,9 @@ class InvalidNetworkInterfaceInUse(Invalid):
 
 class InvalidInstanceId(Invalid):
     ec2_code = 'InvalidInstanceID'
+    msg_fmt = _("There are multiple interfaces attached to instance "
+                "'%(instance_id)s'. Please specify an interface ID for "
+                "the operation instead.")
 
 
 class InvalidIPAddressInUse(Invalid):

@@ -56,6 +56,7 @@ CONF.import_opt('use_forwarded_for', 'ec2api.api.auth')
 
 # Fault Wrapper around all EC2 requests #
 class FaultWrapper(wsgi.Middleware):
+
     """Calls the middleware stack, captures any exceptions into faults."""
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
@@ -68,6 +69,7 @@ class FaultWrapper(wsgi.Middleware):
 
 
 class RequestLogging(wsgi.Middleware):
+
     """Access-Log akin logging for all EC2 API requests."""
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
@@ -103,6 +105,7 @@ class RequestLogging(wsgi.Middleware):
 
 
 class EC2KeystoneAuth(wsgi.Middleware):
+
     """Authenticate an EC2 request with keystone and convert to context."""
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
@@ -179,7 +182,8 @@ class EC2KeystoneAuth(wsgi.Middleware):
 
         headers["X-Auth-Token"] = token_id
         o = urlparse.urlparse(CONF.keystone_url
-            + ("/users/%s/credentials/OS-EC2/%s" % (user_id, access)))
+                              + ("/users/%s/credentials/OS-EC2/%s"
+                                 % (user_id, access)))
         if o.scheme == "http":
             conn = httplib.HTTPConnection(o.netloc)
         else:
@@ -226,8 +230,9 @@ class Requestify(wsgi.Middleware):
                     'SignatureVersion', 'Version', 'Timestamp']
         args = dict(req.params)
         try:
-            expired = ec2utils.is_ec2_timestamp_expired(req.params,
-                            expires=CONF.ec2_timestamp_expiry)
+            expired = ec2utils.is_ec2_timestamp_expired(
+                req.params,
+                expires=CONF.ec2_timestamp_expiry)
             if expired:
                 msg = _("Timestamp failed validation.")
                 LOG.exception(msg)

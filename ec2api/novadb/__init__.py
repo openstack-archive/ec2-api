@@ -12,32 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-
 """
-Cloud Controller: Implementation of EC2 REST API calls, which are
-dispatched to other nodes via AMQP RPC. State is via distributed
-datastore.
+DB abstraction for Nova
 """
 
-from oslo.config import cfg
-
-from ec2api.openstack.common import log as logging
-
-CONF = cfg.CONF
-LOG = logging.getLogger(__name__)
-
-
-class CloudController(object):
-
-    """Cloud Controller
-
-        Provides the critical dispatch between
-        inbound API calls through the endpoint and messages
-        sent to the other nodes.
-    """
-
-    def __init__(self):
-        pass
-
-    def __str__(self):
-        return 'CloudController'
+from ec2api.novadb.api import *  # noqa

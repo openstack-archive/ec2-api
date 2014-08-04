@@ -92,8 +92,8 @@ DICT_FAKE_RESULT_DATA = {
 }
 DICT_FAKE_RESULT = {
     'FakeActionResponse': tools.update_dict(
-            DICT_FAKE_RESULT_DATA,
-            {'requestId': None})
+        DICT_FAKE_RESULT_DATA,
+        {'requestId': None})
 }
 
 XML_SINGLE_RESULT = '''
@@ -199,7 +199,7 @@ DICT_RESULT_SET = {
             'imageType': 'kernel',
             'name': 'cirros-0.3.2-x86_64-uec-kernel',
         },
-        {
+            {
             'description': None,
             'imageOwnerId': '77dcabaee8ea4a8fbae697ddc09afdaf',
             'isPublic': True,
@@ -212,7 +212,7 @@ DICT_RESULT_SET = {
             'imageType': 'ramdisk',
             'name': 'cirros-0.3.2-x86_64-uec-ramdisk',
         },
-        {
+            {
             'name': 'cirros-0.3.2-x86_64-uec',
             'imageOwnerId': '77dcabaee8ea4a8fbae697ddc09afdaf',
             'isPublic': True,
@@ -227,7 +227,7 @@ DICT_RESULT_SET = {
             'imageType': 'machine',
             'description': None,
         },
-        {
+            {
             'description': None,
             'imageOwnerId': '77dcabaee8ea4a8fbae697ddc09afdaf',
             'isPublic': True,
