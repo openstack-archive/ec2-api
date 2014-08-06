@@ -15,6 +15,8 @@ PasteDeploy>=1.5.0
 pbr>=0.6,!=0.7,<1.0
 pyasn1
 python-keystoneclient>=0.9.0
+python-neutronclient>=2.3.6,<3
+python-novaclient>=2.17.0
 Routes>=1.12.3,!=2.0
 six>=1.7.0
 SQLAlchemy>=0.8.4,!=0.9.5,<=0.9.99
