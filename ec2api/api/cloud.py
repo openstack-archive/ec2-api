@@ -23,6 +23,7 @@ from oslo.config import cfg
 
 from ec2api.api import internet_gateway
 from ec2api.api import route_table
+from ec2api.api import subnet
 from ec2api.api import vpc
 from ec2api.openstack.common import log as logging
 
@@ -180,6 +181,67 @@ class CloudController(object):
         """
         return internet_gateway.describe_internet_gateways(context,
                                                           internet_gateway_id)
+
+    def create_subnet(self, context, vpc_id, cidr_block,
+                      availability_zone=None):
+        """Creates a subnet in an existing VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            vpc_id (str): The ID of the VPC.
+            cidr_block (str): The CIDR block for the subnet.
+                For example, 10.0.0.0/24.
+            availability_zone (str): The Availability Zone for the subnet.
+                If None or empty EC2 selects one for you.
+
+        Returns:
+            Information about the subnet.
+
+        The subnet's CIDR block can be the same as the VPC's CIDR block,
+        or a subset of the VPC's CIDR block. If you create more than one subnet
+        in a VPC, the subnets' CIDR blocks must not overlap. The smallest
+        subnet you can create uses a /28 netmask (16 IP addresses),
+        and the largest uses a /16 netmask.
+
+        EC2 reserves both the first four and the last IP address
+        in each subnet's CIDR block. They're not available for use.
+
+        If you add more than one subnet to a VPC, they're set up
+        in a star topology with a logical router in the middle.
+        """
+        return subnet.create_subnet(context, vpc_id,
+                                    cidr_block, availability_zone)
+
+    def delete_subnet(self, context, subnet_id):
+        """Deletes the specified subnet.
+
+        Args:
+            context (RequestContext): The request context.
+            subnet_id (str): The ID of the subnet.
+
+        Returns:
+            true if the request succeeds.
+
+        You must terminate all running instances in the subnet before
+        you can delete the subnet.
+        """
+        return subnet.delete_subnet(context, subnet_id)
+
+    def describe_subnets(self, context, subnet_id=None, filter=None):
+        """Describes one or more of your subnets.
+
+
+        Args:
+            context (RequestContext): The request context.
+            subnet_id (list of str): One or more subnet IDs.
+                Default: Describes all your subnets.
+            filter (list of filter dict): You can specify filters so that
+                the response includes information for only certain subnets.
+
+        Returns:
+            A list of subnets.
+        """
+        return subnet.describe_subnets(context, subnet_id, filter)
 
     def create_route_table(self, context, vpc_id):
         """Creates a route table for the specified VPC.
