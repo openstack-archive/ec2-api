@@ -21,6 +21,7 @@ datastore.
 
 from oslo.config import cfg
 
+from ec2api.api import internet_gateway
 from ec2api.api import route_table
 from ec2api.api import vpc
 from ec2api.openstack.common import log as logging
@@ -96,6 +97,89 @@ class CloudController(object):
             A list of VPCs.
         """
         return vpc.describe_vpcs(context, vpc_id, filter)
+
+    def create_internet_gateway(self, context):
+        """Creates an Internet gateway for use with a VPC.
+
+        Args:
+            context (RequestContext): The request context.
+
+        Returns:
+            Information about the Internet gateway.
+        """
+        return internet_gateway.create_internet_gateway(context)
+
+    def attach_internet_gateway(self, context, internet_gateway_id, vpc_id):
+        """Attaches an Internet gateway to a VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            internet_gateway_id (str): The ID of the Internet gateway.
+            vpc_id (str): The ID of the VPC.
+
+        Returns:
+            Returns true if the request succeeds.
+
+        Attaches an Internet gateway to a VPC, enabling connectivity between
+        the Internet and the VPC.
+        """
+        return internet_gateway.attach_internet_gateway(context,
+                                                       internet_gateway_id,
+                                                       vpc_id)
+
+    def detach_internet_gateway(self, context, internet_gateway_id, vpc_id):
+        """Detaches an Internet gateway from a VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            internet_gateway_id (str): The ID of the Internet gateway.
+            vpc_id (str): The ID of the VPC.
+
+        Returns:
+            Returns true if the request succeeds.
+
+        Detaches an Internet gateway from a VPC, disabling connectivity between
+        the Internet and the VPC. The VPC must not contain any running
+        instances with Elastic IP addresses.
+        """
+        return internet_gateway.detach_internet_gateway(context,
+                                                       internet_gateway_id,
+                                                       vpc_id)
+
+    def delete_internet_gateway(self, context, internet_gateway_id):
+        """Deletes the specified Internet gateway.
+
+        Args:
+            context (RequestContext): The request context.
+            internet_gateway_id (str): The ID of the Internet gateway.
+
+        Returns:
+            Returns true if the request succeeds.
+
+        You must detach the Internet gateway from the VPC before you can
+        delete it.
+        """
+        return internet_gateway.delete_internet_gateway(context,
+                                                       internet_gateway_id)
+
+    def describe_internet_gateways(self, context, internet_gateway_id=None,
+                                   filter=None):
+        """Describes one or more of your Internet gateways.
+
+        Args:
+            context (RequestContext): The request context.
+            internet_gateway_id (list of str): One or more Internet gateway
+                IDs.
+                Default: Describes all your Internet gateways.
+            filter (list of filter dict): You can specify filters so that the
+                response includes information for only certain Internet
+                gateways.
+
+        Returns:
+            A list of Internet gateways.
+        """
+        return internet_gateway.describe_internet_gateways(context,
+                                                          internet_gateway_id)
 
     def create_route_table(self, context, vpc_id):
         """Creates a route table for the specified VPC.
