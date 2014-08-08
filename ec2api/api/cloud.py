@@ -21,6 +21,7 @@ datastore.
 
 from oslo.config import cfg
 
+from ec2api.api import dhcp_options
 from ec2api.api import internet_gateway
 from ec2api.api import route_table
 from ec2api.api import subnet
@@ -424,3 +425,72 @@ class CloudController(object):
         """
         return route_table.describe_route_tables(context, route_table_id=None,
                                                  filter=None)
+
+    def create_dhcp_options(self, context, dhcp_configuration):
+        """Creates a set of DHCP options for your VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            dhcp_configuration (list of dict): Dict can contain
+                'key' (str) and
+                'value' (str) for each option.
+                You can specify the following options:
+                - domain-name-servers: up to 4 DNS servers,
+                    IPs are in value separated by commas
+                - domain-name: domain name
+                - ntp-servers: up to 4 NTP servers
+                - netbios-name-servers: up to 4 NetBIOS name servers
+                - netbios-node-type: the NetBIOS node type (1,2,4 or 8)
+        Returns:
+            A set of DHCP options
+
+        """
+        return dhcp_options.create_dhcp_options(context, dhcp_configuration)
+
+    def describe_dhcp_options(self, context, dhcp_options_id=None,
+                              filter=None):
+        """Describes the specified DHCP options.
+
+
+        Args:
+            context (RequestContext): The request context.
+            dhcp_options_id: DHCP options id.
+            filter (list of filter dict): You can specify filters so that
+                the response includes information for only certain DHCP
+                options.
+
+        Returns:
+            DHCP options.
+        """
+        return dhcp_options.describe_dhcp_options(context, dhcp_options_id,
+                                                  filter)
+
+    def delete_dhcp_options(self, context, dhcp_options_id):
+        """Deletes the specified set of DHCP options
+
+        Args:
+            context (RequestContext): The request context.
+            dhcp_options_id (str): DHCP options id
+
+        Returns:
+            true if the request succeeds
+
+        You must disassociate the set of DHCP options before you can delete it.
+        You can disassociate the set of DHCP options by associating either a
+        new set of options or the default set of options with the VPC.
+        """
+        return dhcp_options.delete_dhcp_options(context, dhcp_options_id)
+
+    def associate_dhcp_options(self, context, dhcp_options_id, vpc_id):
+        """Associates a set of DHCP options with the specified VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            dhcp_options_id (str): DHCP options id or "default" to associate no
+                DHCP options with the VPC
+
+        Returns:
+            true if the request succeeds
+        """
+        return dhcp_options.associate_dhcp_options(context, dhcp_options_id,
+                                                   vpc_id)
