@@ -23,6 +23,7 @@ from oslo.config import cfg
 
 from ec2api.api import address
 from ec2api.api import dhcp_options
+from ec2api.api import instance
 from ec2api.api import internet_gateway
 from ec2api.api import network_interface
 from ec2api.api import route_table
@@ -961,3 +962,105 @@ class CloudController(object):
         return network_interface.detach_network_interface(context,
                                                          attachment_id,
                                                          force)
+
+    def run_instances(self, context, image_id, min_count, max_count,
+                     subnet_id=None, private_ip_address=None,
+                     network_interface=None, security_group=None,
+                     security_group_id=None, **kwargs):
+        """Launches the specified number of instances using an AMI.
+
+        Args:
+            context (RequestContext): The request context.
+            image_id (str): The ID of the AMI.
+            min_count (int): The minimum number of instances to launch.
+                If you specify a minimum that is more instances than EC2 can
+                launch in the target Availability Zone, EC2 launches no
+                instances.
+            max_count (int): The maximum number of instances to launch.
+                If you specify more instances than EC2 can launch in the target
+                Availability Zone, EC2 launches the largest possible number
+                of instances above max_count.
+            subnet_id (str): The ID of the subnet to launch the instance into.
+            private_ip_address (str): The primary IP address.
+                You must specify a value from the IP address range
+                of the subnet.
+            network_interface (list of dicts): Dict can contain:
+                network_interface_id (str): An existing interface to attach
+                    to a single instance. Requires n=1 instances.
+                device_index (int): The device index. If you are specifying
+                    a network interface in the request, you must provide the
+                    device index.
+                subnet_id (str): The subnet ID. Applies only when creating
+                    a network interface.
+                description (str): A description. Applies only when creating
+                    a network interface.
+                private_ip_address (str): The primary private IP address.
+                    Applies only when creating a network interface.
+                    Requires n=1 network interfaces in launch.
+                security_group_id (str): The ID of the security group.
+                    Applies only when creating a network interface.
+                delete_on_termination (str): Indicates whether to delete
+                    the network interface on instance termination.
+                private_ip_addresses (list of dicts): Dict can contain:
+                    private_ip_address (str): The private IP address.
+                    primary (boolean): Indicates whether the private IP address
+                        is the primary private IP address.
+                    secondary_private_ip_address_count (int): The number of
+                        private IP addresses to assign to the network
+                        interface. For a single network interface, you can't
+                        specify this option and specify more than one private
+                        IP address using private_ip_address.
+                associate_public_ip_address (boolean): Indicates whether
+                    to assign a public IP address to an instance in a VPC.
+            security_group (list of str): One or more security group names.
+                For a nondefault VPC, you must use security_group_id.
+            security_group_id (list of str): One or more security group IDs.
+            kwargs: Other arguments supported by AWS EC2.
+
+        Returns:
+            The instance reservation that was created.
+
+        If you don't specify a security group when launching an instance, EC2
+        uses the default security group.
+        """
+        return instance.run_instances(context, image_id, min_count, max_count,
+                                      subnet_id, private_ip_address,
+                                      network_interface, security_group,
+                                      security_group_id, **kwargs)
+
+    def terminate_instances(self, context, instance_id):
+        """Shuts down one or more instances.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (list of str): One or more instance IDs.
+
+        Returns:
+            A list of instance state changes.
+
+        This operation is idempotent; if you terminate an instance more than
+        once, each call succeeds.
+        """
+        return instance.terminate_instances(context, instance_id)
+
+    def describe_instances(self, context, instance_id=None, filter=None,
+                           **kwargs):
+        """Describes one or more of your instances.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (list of str): One or more instance IDs.
+            filter (list of filter dict): You can specify filters so that the
+                response includes information for only certain instances.
+
+        Returns:
+            A list of reservations.
+
+        If you specify one or more instance IDs, Amazon EC2 returns information
+        for those instances. If you do not specify instance IDs, you receive
+        information for all relevant instances. If you specify an invalid
+        instance ID, you receive an error. If you specify an instance that you
+        don't own, we don't include it in the results.
+        """
+        return instance.describe_instances(context, instance_id, filter,
+                                           **kwargs)
