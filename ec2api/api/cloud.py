@@ -24,7 +24,9 @@ from oslo.config import cfg
 from ec2api.api import address
 from ec2api.api import dhcp_options
 from ec2api.api import internet_gateway
+from ec2api.api import network_interface
 from ec2api.api import route_table
+from ec2api.api import security_group
 from ec2api.api import subnet
 from ec2api.api import vpc
 from ec2api.openstack.common import log as logging
@@ -615,3 +617,347 @@ class CloudController(object):
         """
         return address.describe_addresses(context, public_ip, allocation_id,
                                              filter)
+
+    def describe_security_groups(self, context, group_name=None, group_id=None,
+                                 filter=None):
+        """Describes one or more of your security groups.
+
+        Args:
+            context (RequestContext): The request context.
+            group_name (list of str): One or more security group names.
+            group_id (list of str): One or more security group IDs.
+            filter (list of filter dict): You can specify filters so that the
+                response includes information for only certain security groups.
+
+        Returns:
+            A list of security groups.
+        """
+        return security_group.describe_security_groups(context, group_name,
+                                                       group_id, filter)
+
+    def create_security_group(self, context, group_name=None,
+                              group_description=None, vpc_id=None):
+        """Creates a security group.
+
+        Args:
+            context (RequestContext): The request context.
+            group_name (str): The name of the security group.
+            group_description (str): A description for the security group.
+            vpc_id (str): [EC2-VPC] The ID of the VPC.
+
+        Returns:
+            true if the requests succeeds.
+            The ID of the security group.
+
+        You can have a security group for use in EC2-Classic with the same name
+        as a security group for use in a VPC. However, you can't have two
+        security groups for use in EC2-Classic with the same name or two
+        security groups for use in a VPC with the same name.
+        You have a default security group for use in EC2-Classic and a default
+        security group for use in your VPC. If you don't specify a security
+        group when you launch an instance, the instance is launched into the
+        appropriate default security group. A default security group includes
+        a default rule that grants instances unrestricted network access to
+        each other.
+        group_name and group_description restrictions:
+        up to 255 characters in length,
+        EC2-Classic: ASCII characters,
+        EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+        """
+        return security_group.create_security_group(context, group_name,
+                                                    group_description, vpc_id)
+
+    def delete_security_group(self, context, group_name=None, group_id=None):
+        """Deletes a security group.
+
+        Args:
+            context (RequestContext): The request context.
+            group_name (str): The name of the security group.
+            group_id (str): The ID of the security group.
+
+        Returns:
+            true if the requests succeeds.
+
+        [EC2-Classic, default VPC] You can specify either GroupName or GroupId
+        If you attempt to delete a security group that is associated with an
+        instance, or is referenced by another security group, the operation
+        fails.
+        """
+        return security_group.delete_security_group(context, group_name,
+                                                    group_id)
+
+    def authorize_security_group_ingress(self, context, group_id=None,
+                                         group_name=None, ip_permissions=None):
+        """Adds one or more ingress rules to a security group.
+
+        Args:
+            context (RequestContext): The request context.
+            group_id (str): The ID of the security group.
+            group_name (str): [EC2-Classic, default VPC] The name of the
+                security group.
+            ip_permissions (list of dicts): Dict can contain:
+                ip_protocol (str): The IP protocol name or number.
+                    Use -1 to specify all.
+                    For EC2-Classic, security groups can have rules only for
+                    TCP, UDP, and ICMP.
+                from_port (str): The start of port range for the TCP and UDP
+                    protocols, or an ICMP type number. For the ICMP type
+                    number, you can use -1 to specify all ICMP types.
+                to_port (str): The end of port range for the TCP and UDP
+                    protocols, or an ICMP code number. For the ICMP code
+                    number, you can use -1 to specify all ICMP codes for the
+                    ICMP type.
+                groups (list of dicts): Dict can contain:
+                    group_id (str): The ID of the source security group. You
+                        can't specify a source security group and a CIDR IP
+                        address range.
+                    user_id (str): [EC2-Classic] The ID of the AWS account that
+                        owns the source security group, if it's not the current
+                        AWS account.
+                    cidr_ip (str): The CIDR IP address range. You can't specify
+                    this parameter when specifying a source security group.
+
+        Returns:
+            true if the requests succeeds.
+        """
+        return security_group.authorize_security_group_ingress(
+                                                context, group_id,
+                                                group_name, ip_permissions)
+
+    def authorize_security_group_egress(self, context, group_id,
+                                        ip_permissions=None):
+        """Adds one or more egress rules to a security group for use with a VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            group_id (str): The ID of the security group.
+            ip_permissions (list of dicts): See
+                authorize_security_group_ingress
+
+        Returns:
+            true if the requests succeeds.
+
+        This action doesn't apply to security groups for use in EC2-Classic.
+        """
+        return security_group.authorize_security_group_egress(
+                                                context, group_id,
+                                                ip_permissions)
+
+    def revoke_security_group_ingress(self, context, group_id=None,
+                                         group_name=None, ip_permissions=None):
+        """Removes one or more ingress rules from a security group.
+
+        Args:
+            context (RequestContext): The request context.
+            group_id (str): The ID of the security group.
+            group_name (str): [EC2-Classic, default VPC] The name of the
+                security group.
+            ip_permissions (list of dicts): See
+                authorize_security_group_ingress
+
+        Returns:
+            true if the requests succeeds.
+
+        The values that you specify in the revoke request (for example, ports)
+        must match the existing rule's values for the rule to be removed.
+        """
+        return security_group.revoke_security_group_ingress(
+                                                context, group_id,
+                                                group_name, ip_permissions)
+
+    def revoke_security_group_egress(self, context, group_id,
+                                        ip_permissions=None):
+        """Removes one or more egress rules from a security group for EC2-VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            group_id (str): The ID of the security group.
+            ip_permissions (list of dicts): See
+                authorize_security_group_ingress
+
+        Returns:
+            true if the requests succeeds.
+
+        The values that you specify in the revoke request (for example, ports)
+        must match the existing rule's values for the rule to be revoked.
+        This action doesn't apply to security groups for use in EC2-Classic.
+        """
+        return security_group.revoke_security_group_egress(
+                                                context, group_id,
+                                                ip_permissions)
+
+    def create_network_interface(self, context, subnet_id,
+                                 private_ip_address=None,
+                                 private_ip_addresses=None,
+                                 secondary_private_ip_address_count=None,
+                                 description=None,
+                                 security_group_id=None):
+        """Creates a network interface in the specified subnet.
+
+        Args:
+            subnet_id (str): The ID of the subnet to associate with the
+                network interface.
+            private_ip_address (str): The primary private IP address of the
+                network interface. If you don't specify an IP address,
+                EC2 selects one for you from the subnet range.
+            private_ip_addresses (list of dict): Dict can contain
+                'private_ip_address' (str) and
+                'primary' (boolean) for each address.
+                The private IP addresses of the specified network interface and
+                indicators which one is primary. Only one private IP address
+                can be designated as primary.
+                You can't specify this parameter when
+                private_ip_addresses['primary'] is true if you specify
+                private_ip_address.
+            secondary_private_ip_address_count (integer): The number of
+                secondary private IP addresses to assign to a network
+                interface. EC2 selects these IP addresses within the subnet
+                range. For a single network interface, you can't specify this
+                option and specify more than one private IP address using
+                private_ip_address and/or private_ip_addresses.
+            description (str): A description for the network interface.
+            security_group_id (str): The list of security group IDs for the
+                network interface.
+
+        Returns:
+            The network interface that was created.
+        """
+        return network_interface.create_network_interface(context, subnet_id,
+                    private_ip_address, private_ip_addresses,
+                    secondary_private_ip_address_count, description,
+                    security_group_id)
+
+    def delete_network_interface(self, context, network_interface_id):
+        """Deletes the specified network interface.
+
+
+        Args:
+            context (RequestContext): The request context.
+            network_interface_id (str): The ID of the network interface.
+
+        Returns:
+            true if the request succeeds.
+
+        You must detach the network interface before you can delete it.
+        """
+        return network_interface.delete_network_interface(context,
+                                                         network_interface_id)
+
+    def describe_network_interfaces(self, context, network_interface_id=None,
+                                    filter=None):
+        """Describes one or more of your network interfaces.
+
+
+        Args:
+            context (RequestContext): The request context.
+            network_interface_id (list of str): One or more network interface
+                IDs.
+                Default: Describes all your network interfaces.
+            filter (list of filter dict): You can specify filters so that
+                the response includes information for only certain interfaces.
+
+        Returns:
+            A list of network interfaces.
+        """
+        return network_interface.describe_network_interfaces(context,
+                                                network_interface_id, filter)
+
+    def describe_network_interface_attribute(self, context,
+                                             network_interface_id,
+                                             attribute):
+        """Describes the specified attribute of the specified network interface.
+
+
+        Args:
+            context (RequestContext): The request context.
+            network_interface_id: Network interface ID.
+            attribute: The attribute of the network interface.
+
+        Returns:
+            Specified attribute.
+
+        You can specify only one attribute at a time.
+        """
+        return network_interface.describe_network_interface_attribute(
+                context, network_interface_id, attribute)
+
+    def modify_network_interface_attribute(self, context,
+                                             network_interface_id,
+                                             description=None,
+                                             source_dest_check=None,
+                                             security_group_id=None):
+        """Modifies the specified attribute of the specified network interface.
+
+
+        Args:
+            context (RequestContext): The request context.
+            network_interface_id: Network interface ID.
+            description: New description.
+            source_dest_check: Indicates whether source/destination checking is
+                enabled. A value of true means checking is enabled, and false
+                means checking is disabled.
+                This value must be false for a NAT instance to perform NAT.
+            security_group_id [list of str]: List of secuirity groups to attach
+
+        Returns:
+            true if the request succeeds.
+
+        You can specify only one attribute at a time.
+        """
+        return network_interface.modify_network_interface_attribute(context,
+                                            network_interface_id, description,
+                                            source_dest_check,
+                                            security_group_id)
+
+    def reset_network_interface_attribute(self, context,
+                                             network_interface_id,
+                                             attribute):
+        """Resets the specified attribute of the specified network interface.
+
+
+        Args:
+            context (RequestContext): The request context.
+            network_interface_id: Network interface ID.
+            attribute: The attribute to reset. Valid values "SourceDestCheck"
+                (reset to True)
+
+        Returns:
+            true if the request succeeds.
+        """
+        return network_interface.reset_network_interface_attribute(context,
+                                            network_interface_id, attribute)
+
+    def attach_network_interface(self, context, network_interface_id,
+                                 instance_id, device_index):
+        """Attach a network interface to an instance.
+
+        Args:
+            context (RequestContext): The request context.
+            network_interface_id (str): The ID of the network interface.
+            instance_id (str): The ID of the instance.
+            device_index (int): The index of the device for the network
+                interface attachment.
+
+        Returns:
+            Attachment Id
+        """
+        return network_interface.attach_network_interface(context,
+                                                          network_interface_id,
+                                                          instance_id,
+                                                          device_index)
+
+    def detach_network_interface(self, context, attachment_id,
+                                 force=None):
+        """Detach a network interface from an instance.
+
+        Args:
+            context (RequestContext): The request context.
+            attachment_id (str): The ID of the attachment.
+            force (boolean): Specifies whether to force a detachment
+
+        Returns:
+            true if the request succeeds.
+        """
+        return network_interface.detach_network_interface(context,
+                                                         attachment_id,
+                                                         force)
