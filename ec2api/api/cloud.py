@@ -21,6 +21,7 @@ datastore.
 
 from oslo.config import cfg
 
+from ec2api.api import address
 from ec2api.api import dhcp_options
 from ec2api.api import internet_gateway
 from ec2api.api import route_table
@@ -494,3 +495,123 @@ class CloudController(object):
         """
         return dhcp_options.associate_dhcp_options(context, dhcp_options_id,
                                                    vpc_id)
+
+    def allocate_address(self, context, domain=None):
+        """Acquires an Elastic IP address.
+
+        Args:
+            context (RequestContext): The request context.
+            domain (str): Set to vpc to allocate the address for use with
+                instances in a VPC.
+                Default: The address is for use in EC2-Classic.
+                Valid values: vpc
+
+        Returns:
+            The Elastic IP address information.
+
+        An Elastic IP address is for use either in the EC2-Classic platform
+        or in a VPC.
+        """
+        return address.allocate_address(context, domain)
+
+    def associate_address(self, context, public_ip=None, instance_id=None,
+                          allocation_id=None, network_interface_id=None,
+                          private_ip_address=None, allow_reassociation=False):
+        """Associates an Elastic IP with an instance or a network interface.
+
+        Args:
+            context (RequestContext): The request context.
+            public_ip (str): The Elastic IP address.
+                Required for Elastic IP addresses for use with instances
+                in EC2-Classic.
+            instance_id (str): The ID of the instance.
+                The operation fails if you specify an instance ID unless
+                exactly one network interface is attached.
+                Required for EC2-Classic.
+            allocation_id (str): The allocation ID.
+                Required for EC2-VPC.
+            network_interface_id (str): The ID of the network interface.
+            private_ip_address (str): The primary or secondary private IP.
+            allow_reassociation (boolean): Allows an Elastic IP address that is
+                already associated to be re-associated.
+                Otherwise, the operation fails.
+
+        Returns:
+            true if the request succeeds.
+            [EC2-VPC] The ID that represents the association of the Elastic IP.
+
+        For a VPC, you can specify either instance_id or network_interface_id,
+        but not both.
+        If the instance has more than one network interface, you must specify
+        a network interface ID.
+        If no private IP address is specified, the Elastic IP address
+        is associated with the primary private IP address.
+        [EC2-Classic, default VPC] If the Elastic IP address is already
+        associated with a different instance, it is disassociated from that
+        instance and associated with the specified instance.
+        This is an idempotent operation.
+        """
+        return address.associate_address(
+                context, public_ip, instance_id, allocation_id,
+                network_interface_id, private_ip_address, allow_reassociation)
+
+    def disassociate_address(self, context, public_ip=None,
+                             association_id=None):
+        """Disassociates an Elastic IP address.
+
+        Args:
+            context (RequestContext): The request context.
+            public_ip (str): The Elastic IP address.
+                Required for EC2-Classic.
+            assossiation_id (str): The association ID.
+                Required for EC2-VPC
+
+        Returns:
+            true if the request succeeds.
+
+        Disassociates an Elastic IP address from the instance or network
+        interface it's associated with.
+        This is an idempotent action.
+        """
+        return address.disassociate_address(context, public_ip,
+                                               association_id)
+
+    def release_address(self, context, public_ip=None, allocation_id=None):
+        """Releases the specified Elastic IP address.
+
+        Args:
+            context (RequestContext): The request context.
+            public_ip (str): The Elastic IP address.
+            allocation_id (str): The allocation ID.
+
+        Returns:
+            true if the requests succeeds.
+
+        If you attempt to release an Elastic IP address that you already
+        released, you'll get an AuthFailure error if the address is already
+        allocated to another AWS account.
+        [EC2-Classic, default VPC] Releasing an Elastic IP address
+        automatically disassociates it from any instance that it's associated
+        with.
+        [Nondefault VPC] You must use DisassociateAddress to disassociate the
+        Elastic IP address before you try to release it.
+        """
+        return address.release_address(context, public_ip, allocation_id)
+
+    def describe_addresses(self, context, public_ip=None, allocation_id=None,
+                           filter=None):
+        """Describes one or more of your Elastic IP addresses.
+
+        Args:
+            context (RequestContext): The request context.
+            public_ip (list of str): One or more Elastic IP addresses.
+            allocation_id (list of str): One or more allocation IDs.
+            filter (list of filter dict): You can specify filters so that the
+                response includes information for only certain Elastic IP
+                addresses.
+
+        Returns:
+            A list of Elastic IP addresses.
+        """
+        return address.describe_addresses(context, public_ip, allocation_id,
+                                             filter)
