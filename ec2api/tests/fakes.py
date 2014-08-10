@@ -183,7 +183,16 @@ IP_ADDRESS_1 = '192.168.1.100'
 IP_ADDRESS_2 = '192.168.1.200'
 
 
-# route tatble constants
+# security group constants
+ID_DB_SECURITY_GROUP_1 = random_db_id()
+ID_DB_SECURITY_GROUP_2 = random_db_id()
+ID_EC2_SECURITY_GROUP_1 = ec2utils.get_ec2_id(ID_DB_SECURITY_GROUP_1, 'sg')
+ID_EC2_SECURITY_GROUP_2 = ec2utils.get_ec2_id(ID_DB_SECURITY_GROUP_2, 'sg')
+ID_OS_SECURITY_GROUP_1 = random_os_id()
+ID_OS_SECURITY_GROUP_2 = random_os_id()
+
+
+# route table constants
 ID_DB_ROUTE_TABLE_1 = random_db_id()
 ID_DB_ROUTE_TABLE_2 = random_db_id()
 ID_EC2_ROUTE_TABLE_1 = ec2utils.get_ec2_id(ID_DB_ROUTE_TABLE_1, 'rtb')
@@ -562,6 +571,111 @@ OS_FLOATING_IP_2 = {
     'floating_ip_address': IP_ADDRESS_2,
     'fixed_port_id': ID_OS_PORT_2,
     'fixed_ip_address': IP_NETWORK_INTERFACE_2,
+}
+
+
+# security group objects
+DB_SECURITY_GROUP_1 = {
+    'id': ID_DB_SECURITY_GROUP_1,
+    'os_id': ID_OS_SECURITY_GROUP_1,
+    'vpc_id': ID_DB_VPC_1,
+}
+DB_SECURITY_GROUP_2 = {
+    'id': ID_DB_SECURITY_GROUP_2,
+    'os_id': ID_OS_SECURITY_GROUP_2,
+    'vpc_id': ID_DB_VPC_1,
+}
+OS_SECURITY_GROUP_RULE_1 = {
+    'direction': 'ingress',
+    'ethertype': 'IPv4',
+    'id': random_os_id(),
+    'port_range_min': 10,
+    'port_range_max': 10,
+    'protocol': 'tcp',
+    'remote_group_id': None,
+    'remote_ip_prefix': '192.168.1.0/24',
+    'security_group_id': ID_OS_SECURITY_GROUP_2
+}
+OS_SECURITY_GROUP_RULE_2 = {
+    'direction': 'egress',
+    'ethertype': 'IPv4',
+    'id': random_os_id(),
+    'port_range_min': 10,
+    'port_range_max': None,
+    'protocol': 100,
+    'remote_group_id': ID_OS_SECURITY_GROUP_1,
+    'remote_ip_prefix': None,
+    'security_group_id': ID_OS_SECURITY_GROUP_2
+}
+OS_SECURITY_GROUP_1 = {
+    'id': ID_OS_SECURITY_GROUP_1,
+    'name': 'groupname',
+    'security_group_rules':
+    [{'remote_group_id': None,
+      'direction': 'egress',
+      'remote_ip_prefix': None,
+      'protocol': None,
+      'port_range_max': None,
+      'security_group_id': ID_OS_SECURITY_GROUP_1,
+      'port_range_min': None,
+      'ethertype': 'IPv4',
+      'id': random_os_id()},
+     {'remote_group_id': None,
+      'direction': 'egress',
+      'remote_ip_prefix': None,
+      'protocol': None,
+      'port_range_max': None,
+      'security_group_id': ID_OS_SECURITY_GROUP_1,
+      'port_range_min': None,
+      'ethertype': 'IPv6',
+      'id': random_os_id()}],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
+OS_SECURITY_GROUP_2 = {
+    'id': ID_OS_SECURITY_GROUP_2,
+    'name': 'groupname',
+    'security_group_rules': [
+        OS_SECURITY_GROUP_RULE_1,
+        OS_SECURITY_GROUP_RULE_2
+    ],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
+EC2_SECURITY_GROUP_1 = {
+    'vpcId': ID_EC2_VPC_1,
+    'groupDescription': 'Group description',
+    'ipPermissions': None,
+    'groupName': 'groupname',
+    'ipPermissionsEgress':
+    [{'toPort': -1,
+      'ipProtocol': -1,
+      'fromPort': -1}],
+    'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_1
+}
+EC2_SECURITY_GROUP_2 = {
+    'vpcId': ID_EC2_VPC_1,
+    'groupDescription': 'Group description',
+    'ipPermissions':
+    [{'toPort': 10,
+      'ipProtocol': 'tcp',
+      'fromPort': 10,
+      'ipRanges':
+      [{'cidrIp': '192.168.1.0/24'}]
+      }],
+    'groupName': 'groupname',
+    'ipPermissionsEgress':
+    [{'toPort': -1,
+      'ipProtocol': 100,
+      'fromPort': 10,
+      'groups':
+      [{'groupId': ID_EC2_SECURITY_GROUP_1,
+        'groupName': 'groupname',
+        'userId': ID_OS_PROJECT}]
+      }],
+    'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_2
 }
 
 

@@ -69,17 +69,20 @@ def delete_security_group(context, group_name=None, group_id=None):
     security_group = ec2utils.get_db_item(context, 'sg', group_id)
     # TODO(Alex) Check dependencies - instances and other security groups
     neutron = clients.neutron(context)
-    with utils.OnCrashCleaner() as cleaner:
-        db_api.delete_item(context, security_group['id'])
-        cleaner.addCleanup(db_api.restore_item, context, 'sg', security_group)
-        try:
-            neutron.delete_security_group(security_group['os_id'])
-        except neutron_exception.NeutronClientException:
-            # TODO(Alex): do log error
-            # TODO(Alex): adjust caught exception classes to catch:
-            # the port doesn't exist
-            # port is in use
-            pass
+    try:
+        neutron.delete_security_group(security_group['os_id'])
+    except neutron_exception.Conflict as ex:
+        # TODO(Alex): Instance ID is unknown here, report exception message
+        # in its place - looks readable.
+        raise exception.DependencyViolation(
+                    obj1_id=group_id,
+                    obj2_id=ex.message)
+    except neutron_exception.NeutronClientException as ex:
+        # TODO(Alex): do log error
+        # TODO(Alex): adjust caught exception classes to catch:
+        # the port doesn't exist
+        pass
+    db_api.delete_item(context, security_group['id'])
     return True
 
 
@@ -97,7 +100,8 @@ def describe_security_groups(context, group_name=None, group_id=None,
             continue
         formatted_security_groups.append(
             _format_security_group(context, security_group,
-                                   os_security_group, os_security_groups))
+                                   os_security_group, os_security_groups,
+                                   security_groups))
     return {'securityGroupInfo': formatted_security_groups}
 
 
@@ -121,8 +125,11 @@ def authorize_security_group_egress(context, group_id, ip_permissions):
 def _authorize_security_group(context, group_id, ip_permissions, direction):
     rule_body = _build_rule(context, group_id, ip_permissions, direction)
     neutron = clients.neutron(context)
-    os_security_group_rule = neutron.create_security_group_rule(
-        {'security_group_rule': rule_body})['security_group_rule']
+    try:
+        os_security_group_rule = neutron.create_security_group_rule(
+            {'security_group_rule': rule_body})['security_group_rule']
+    except neutron_exception.Conflict as ex:
+        raise exception.RuleAlreadyExists()
     return True
 
 
@@ -221,7 +228,7 @@ def _format_security_groups_ids_names(context):
 
 
 def _format_security_group(context, security_group, os_security_group,
-                           os_security_groups):
+                           os_security_groups, security_groups):
     ec2_security_group = {}
     if security_group is not None:
         ec2_security_group['groupId'] = (
@@ -246,7 +253,15 @@ def _format_security_group(context, security_group, os_security_group,
                     else os_rule['port_range_max']}
         remote_group_id = os_rule['remote_group_id']
         if remote_group_id is not None:
-            ec2_remote_group = {'groupId': remote_group_id}
+            db_remote_group = next((g for g in security_groups
+                                    if g['os_id'] == remote_group_id), None)
+            if db_remote_group is not None:
+                ec2_remote_group = {
+                    'groupId': ec2utils.get_ec2_id(db_remote_group['id'],
+                                                   'sg')}
+            else:
+                # TODO(Alex) Log absence of remote_group
+                pass
             os_remote_group = next((g for g in os_security_groups
                                     if g['id'] == remote_group_id), None)
             if os_remote_group is not None:

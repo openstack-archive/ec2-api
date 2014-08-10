@@ -284,3 +284,8 @@ class InvalidIPAddressInUse(Invalid):
 class RouteAlreadyExists(Invalid):
     msg_fmt = _('The route identified by %(destination_cidr_block)s '
                 'already exists.')
+
+
+# TODO(Alex) Change next class with the real AWS exception
+class RuleAlreadyExists(Invalid):
+    msg_fmt = _('The rule already exists.')
