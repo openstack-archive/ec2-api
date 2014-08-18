@@ -253,12 +253,12 @@ def _format_security_group(context, security_group, os_security_group,
                     else os_rule['port_range_max']}
         remote_group_id = os_rule['remote_group_id']
         if remote_group_id is not None:
+            ec2_remote_group = {}
             db_remote_group = next((g for g in security_groups
                                     if g['os_id'] == remote_group_id), None)
             if db_remote_group is not None:
-                ec2_remote_group = {
-                    'groupId': ec2utils.get_ec2_id(db_remote_group['id'],
-                                                   'sg')}
+                ec2_remote_group['groupId'] = ec2utils.get_ec2_id(
+                    db_remote_group['id'], 'sg')
             else:
                 # TODO(Alex) Log absence of remote_group
                 pass
