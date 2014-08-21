@@ -34,6 +34,11 @@ LOG = logging.getLogger(__name__)
 """
 
 
+FILTER_MAP = {'cidr': 'cidrBlock',
+              'state': 'state',
+              'vpc-id': 'vpcId'}
+
+
 def create_vpc(context, cidr_block, instance_tenancy='default'):
     ec2utils.validate_vpc_cidr(cidr_block, exception.InvalidVpcRange)
     neutron = clients.neutron(context)
@@ -98,7 +103,9 @@ def describe_vpcs(context, vpc_id=None, filter=None):
     vpcs = ec2utils.get_db_items(context, 'vpc', vpc_id)
     formatted_vpcs = []
     for vpc in vpcs:
-        formatted_vpcs.append(_format_vpc(vpc))
+        formatted_vpc = _format_vpc(vpc)
+        if not utils.filtered_out(formatted_vpc, filter, FILTER_MAP):
+            formatted_vpcs.append(formatted_vpc)
     return {'vpcSet': formatted_vpcs}
 
 

@@ -13,6 +13,9 @@
 #    under the License.
 
 
+from ec2api import exception
+
+
 class OnCrashCleaner(object):
 
     def __init__(self):
@@ -41,3 +44,27 @@ class OnCrashCleaner(object):
             except Exception:
                 # TODO(ft): log the error
                 pass
+
+
+def filtered_out(item, filters, filter_map):
+    if filters is None:
+        return False
+    for filter in filters:
+        filter_name = filter_map.get(filter['name'])
+        if filter_name is None:
+            raise exception.InvalidParameterValue(
+                value=filter['name'], parameter='filter',
+                reason='invalid filter')
+        if type(filter_name) is list:
+            value_set = item.get(filter_name[0])
+            if value_set is not None:
+                values = [value[filter_name[1]] for value in value_set]
+        else:
+            values = [item.get(filter_name)]
+        if not values:
+            return True
+        filter_values = filter['value'].values()
+        for filter_value in filter_values:
+            if filter_value in values:
+                return False
+    return True

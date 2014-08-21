@@ -35,6 +35,12 @@ LOG = logging.getLogger(__name__)
 """
 
 
+FILTER_MAP = {'cidr': 'cidrBlock',
+              'subnet-id': 'id',
+              'state': 'state',
+              'vpc-id': 'vpcId'}
+
+
 def create_subnet(context, vpc_id, cidr_block,
                   availability_zone=None):
     ec2utils.validate_vpc_cidr(cidr_block, exception.InvalidSubnetRange)
@@ -49,8 +55,10 @@ def create_subnet(context, vpc_id, cidr_block,
     # check availability zone
     # choose default availability zone
     gateway_ip = str(netaddr.IPAddress(subnet_ipnet.first + 1))
-    start_ip = str(netaddr.IPAddress(subnet_ipnet.first + 4))
-    end_ip = str(netaddr.IPAddress(subnet_ipnet.last - 1))
+    # NOTE(Alex): AWS takes 4 first addresses (.1 - .4) but for
+    # OpenStack we decided not to support this as compatibility.
+    # start_ip = str(netaddr.IPAddress(subnet_ipnet.first + 4))
+    # end_ip = str(netaddr.IPAddress(subnet_ipnet.last - 1))
     main_route_table = db_api.get_item_by_id(context, 'rtb',
                                              vpc['route_table_id'])
     host_routes = route_table_api._get_subnet_host_routes(
@@ -63,8 +71,8 @@ def create_subnet(context, vpc_id, cidr_block,
         os_subnet_body = {'subnet': {'network_id': os_network['id'],
                                      'ip_version': '4',
                                      'cidr': cidr_block,
-                                     'allocation_pools': [{'start': start_ip,
-                                                           'end': end_ip}],
+                                     # 'allocation_pools': [{'start': start_ip,
+                                     #                       'end': end_ip}],
                                      'host_routes': host_routes}}
         os_subnet = neutron.create_subnet(os_subnet_body)['subnet']
         cleaner.addCleanup(neutron.delete_subnet, os_subnet['id'])
@@ -84,8 +92,9 @@ def create_subnet(context, vpc_id, cidr_block,
                                {'network': {'name': ec2_subnet_id}})
         neutron.update_subnet(os_subnet['id'],
                               {'subnet': {'name': ec2_subnet_id}})
+    os_ports = neutron.list_ports()['ports']
     return {'subnet': _format_subnet(context, subnet, os_subnet,
-                                          os_network)}
+                                          os_network, os_ports)}
 
 
 def delete_subnet(context, subnet_id):
@@ -129,6 +138,7 @@ def describe_subnets(context, subnet_id=None, filter=None):
     neutron = clients.neutron(context)
     os_subnets = neutron.list_subnets()['subnets']
     os_networks = neutron.list_networks()['networks']
+    os_ports = neutron.list_ports()['ports']
     subnets = ec2utils.get_db_items(context, 'subnet', subnet_id)
     formatted_subnets = []
     for subnet in subnets:
@@ -140,16 +150,26 @@ def describe_subnets(context, subnet_id=None, filter=None):
                            if n['id'] == os_subnet['network_id']),
                           None)
         if os_network:
-            formatted_subnets.append(_format_subnet(
-                    context, subnet, os_subnet, os_network))
+            formatted_subnet = _format_subnet(
+                context, subnet, os_subnet, os_network, os_ports)
+            if not utils.filtered_out(formatted_subnet, filter, FILTER_MAP):
+                formatted_subnets.append(formatted_subnet)
     return {'subnetSet': formatted_subnets}
 
 
-def _format_subnet(context, subnet, os_subnet, os_network):
+def _format_subnet(context, subnet, os_subnet, os_network, os_ports):
     status_map = {'ACTIVE': 'available',
                   'BUILD': 'pending',
                   'DOWN': 'available',
                   'ERROR': 'available'}
+    range = int(os_subnet['cidr'].split('/')[1])
+    # NOTE(Alex) First and last IP addresses are system ones.
+    ip_count = pow(2, 32 - range) - 2
+    # TODO(Alex): Probably performance-killer. Will have to optimize.
+    for port in os_ports:
+        for fixed_ip in port.get('fixed_ips', []):
+            if fixed_ip['subnet_id'] == os_subnet['id']:
+                ip_count -= 1
     return {
         'subnetId': ec2utils.get_ec2_id(subnet['id'], 'subnet'),
         'state': status_map.get(os_network['status'], 'available'),
@@ -158,5 +178,5 @@ def _format_subnet(context, subnet, os_subnet, os_network):
         'defaultForAz': 'false',
         'mapPublicIpOnLaunch': 'false',
         # 'availabilityZone' = 'nova' # TODO(Alex) implement
-        # 'availableIpAddressCount' = 20 # TODO(Alex) implement
+        'availableIpAddressCount': ip_count
     }

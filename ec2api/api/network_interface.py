@@ -171,7 +171,8 @@ def describe_network_interfaces(context, network_interface_id=None,
     # TODO(Alex): implement filters
     neutron = clients.neutron(context)
     os_ports = neutron.list_ports()['ports']
-    network_interfaces = db_api.get_items(context, 'eni')
+    network_interfaces = ec2utils.get_db_items(context, 'eni',
+                                               network_interface_id)
     os_floating_ips = neutron.list_floatingips()['floatingips']
     os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
     addresses = collections.defaultdict(list)

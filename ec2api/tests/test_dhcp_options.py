@@ -49,7 +49,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                     gen_ec2_param_dhcp_options(ec2_fake))
             self.assertEqual(200, resp['status'])
             self.assertThat(ec2_fake, matchers.DictMatches(
-                    resp['dhcpOptions']))
+                    resp['dhcpOptions'], orderless_lists=True))
             self.db_api.add_item.called_once_with(
                     mock.ANY, 'dhcp_options',
                     tools.purge_dict(db_fake, ('id',)))
@@ -98,8 +98,9 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         resp = self.execute('DescribeDhcpOptions', {})
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['dhcpOptionsSet'],
-                        matchers.DictListMatches([fakes.EC2_DHCP_OPTIONS_1,
-                                                  fakes.EC2_DHCP_OPTIONS_2]))
+                        matchers.ListMatches([fakes.EC2_DHCP_OPTIONS_1,
+                                              fakes.EC2_DHCP_OPTIONS_2],
+                                             orderless_lists=True))
 
     def test_associate_dhcp_options(self):
         self.db_api.get_item_by_id.side_effect = (
@@ -154,8 +155,8 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                      {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_2,
                       'vpcId': fakes.ID_EC2_VPC_1})
 
-        self.neutron.update_port.assert_any_call(
-                fakes.ID_OS_PORT_1,
-                {'port': fakes.OS_DHCP_OPTIONS_1})
+        self._assert_any_call(self.neutron.update_port,
+                              fakes.ID_OS_PORT_1,
+                              {'port': fakes.OS_DHCP_OPTIONS_1})
         self.db_api.update_item.assert_any_call(
                 mock.ANY, vpc)

@@ -185,7 +185,8 @@ class CloudController(object):
             A list of Internet gateways.
         """
         return internet_gateway.describe_internet_gateways(context,
-                                                          internet_gateway_id)
+                                                          internet_gateway_id,
+                                                          filter)
 
     def create_subnet(self, context, vpc_id, cidr_block,
                       availability_zone=None):

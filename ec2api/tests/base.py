@@ -19,6 +19,7 @@ from oslotest import base as test_base
 import ec2api.api.apirequest
 from ec2api.api import ec2client
 from ec2api.tests import fakes
+from ec2api.tests import matchers
 import ec2api.wsgi
 
 
@@ -102,3 +103,11 @@ class ApiTestCase(test_base.BaseTestCase):
             self.assertEqual(2, len(body['Error']))
         body['status'] = response.status_code
         return body
+
+    def _assert_any_call(self, func, *args, **kwargs):
+        calls = func.mock_calls
+        for call in calls:
+            call_args = call[1]
+            if matchers.ListMatches(call_args, args, orderless_lists=True):
+                return
+        self.assertEqual(False, True)

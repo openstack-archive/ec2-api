@@ -241,7 +241,7 @@ _NOT_FOUND_EXCEPTION_MAP = {
     'eni': exception.InvalidNetworkInterfaceIDNotFound,
     'dopt': exception.InvalidDhcpOptionsIDNotFound,
     'eipalloc': exception.InvalidAllocationIDNotFound,
-    'sg': exception.InvalidSecurityGroupIDNotFound,
+    'sg': exception.InvalidGroupNotFound,
     'rtb': exception.InvalidRouteTableIDNotFound,
 }
 

@@ -700,7 +700,7 @@ class RouteTableTestCase(base.ApiTestCase):
         resp = self.execute('DescribeRouteTables', {})
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['routeTableSet'],
-                        matchers.DictListMatches([fakes.EC2_ROUTE_TABLE_1,
+                        matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1,
                                                   fakes.EC2_ROUTE_TABLE_2]))
 
     def test_describe_route_tables_variations(self):
@@ -787,7 +787,7 @@ class RouteTableTestCase(base.ApiTestCase):
                 'subnetId': fakes.ID_EC2_SUBNET_2,
                 'main': False}]
         self.assertThat(resp['routeTableSet'],
-                        matchers.DictListMatches([ec2_route_table_1,
+                        matchers.ListMatches([ec2_route_table_1,
                                                   ec2_route_table_2]))
 
     def test_get_subnet_host_routes(self):
@@ -803,7 +803,7 @@ class RouteTableTestCase(base.ApiTestCase):
             mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.IP_GATEWAY_SUBNET_1)
 
         self.assertThat(host_routes,
-                        matchers.DictListMatches([
+                        matchers.ListMatches([
                             {'destination': fakes.CIDR_VPC_1,
                              'nexthop': fakes.IP_GATEWAY_SUBNET_1},
                             {'destination': '0.0.0.0/0',
@@ -813,7 +813,7 @@ class RouteTableTestCase(base.ApiTestCase):
             mock.ANY, fakes.DB_ROUTE_TABLE_2, fakes.IP_GATEWAY_SUBNET_1)
 
         self.assertThat(host_routes,
-                        matchers.DictListMatches([
+                        matchers.ListMatches([
                             {'destination': fakes.CIDR_VPC_1,
                              'nexthop': fakes.IP_GATEWAY_SUBNET_1},
                             {'destination': fakes.CIDR_EXTERNAL_NETWORK,

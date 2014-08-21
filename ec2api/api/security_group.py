@@ -144,9 +144,9 @@ def _build_rule(context, group_id, ip_permissions, direction):
     for rule in ip_permissions:
         if rule.get('ip_protocol'):
             os_security_group_rule_body['protocol'] = rule['ip_protocol']
-        if rule.get('from_port'):
+        if rule.get('from_port', -1) != -1:
             os_security_group_rule_body['port_range_min'] = rule['from_port']
-        if rule.get('to_port'):
+        if rule.get('to_port', -1) != -1:
             os_security_group_rule_body['port_range_max'] = rule['to_port']
         # TODO(Alex) AWS protocol claims support of multiple groups and cidrs,
         # however, neither aws cli, nor neutron support it at the moment.

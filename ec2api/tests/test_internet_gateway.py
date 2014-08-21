@@ -271,7 +271,7 @@ class IgwTestCase(base.ApiTestCase):
 
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['internetGatewaySet'],
-                        matchers.DictListMatches([fakes.EC2_IGW_1,
+                        matchers.ListMatches([fakes.EC2_IGW_1,
                                                   fakes.EC2_IGW_2]))
 
     @base.skip_not_implemented

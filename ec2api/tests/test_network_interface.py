@@ -358,7 +358,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         resp = self.execute('DescribeNetworkInterfaces', {})
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['networkInterfaceSet'],
-                        matchers.DictListMatches(
+                        matchers.ListMatches(
                             [fakes.EC2_NETWORK_INTERFACE_1,
                              fakes.EC2_NETWORK_INTERFACE_2]))
 

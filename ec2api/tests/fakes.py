@@ -273,12 +273,14 @@ EC2_SUBNET_1 = {'subnetId': ID_EC2_SUBNET_1,
                 'vpcId': ID_EC2_VPC_1,
                 'cidrBlock': CIDR_SUBNET_1,
                 'defaultForAz': False,
+                'availableIpAddressCount': 254,
                 'mapPublicIpOnLaunch': False}
 EC2_SUBNET_2 = {'subnetId': ID_EC2_SUBNET_2,
                 'state': 'available',
                 'vpcId': ID_EC2_VPC_1,
                 'cidrBlock': CIDR_SUBNET_2,
                 'defaultForAz': False,
+                'availableIpAddressCount': 254,
                 'mapPublicIpOnLaunch': False}
 
 OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
@@ -286,8 +288,6 @@ OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
                'name': ID_EC2_SUBNET_1,
                'ip_version': '4',
                'cidr': CIDR_SUBNET_1,
-               'allocation_pools': [{'start': IP_FIRST_SUBNET_1,
-                                     'end': IP_LAST_SUBNET_1}],
                'host_routes': [{'nexthop': IP_GATEWAY_SUBNET_1,
                                 'destination': '10.10.0.0/16'},
                                {'nexthop': '127.0.0.1',
@@ -296,9 +296,7 @@ OS_SUBNET_2 = {'id': ID_OS_SUBNET_2,
                'network_id': ID_OS_NETWORK_2,
                'name': ID_EC2_SUBNET_2,
                'ip_version': '4',
-               'cidr': CIDR_SUBNET_2,
-               'allocation_pools': [{'start': IP_FIRST_SUBNET_2,
-                                     'end': IP_LAST_SUBNET_2}]}
+               'cidr': CIDR_SUBNET_2}
 OS_NETWORK_1 = {'id': ID_OS_NETWORK_1,
                 'name': ID_EC2_SUBNET_1,
                 'status': 'available'}
@@ -482,15 +480,15 @@ EC2_RESERVATION_2 = {
 DB_DHCP_OPTIONS_1 = {'id': ID_DB_DHCP_OPTIONS_1,
                      'dhcp_configuration':
                      {'domain-name': ['my.domain.com'],
-                         'domain-name-servers': [u'8.8.8.8', u'127.0.0.1']}}
+                      'domain-name-servers': ['8.8.8.8', '127.0.0.1']}}
 
 DB_DHCP_OPTIONS_2 = {'id': ID_DB_DHCP_OPTIONS_2,
                      'dhcp_configuration':
                      {'domain-name': ['my.domain.com'],
-                         'domain-name-servers': ['8.8.8.8', '127.0.0.1'],
-                         'netbios-name-servers': ['127.0.0.1'],
-                         'netbios-node-type': '1',
-                         'ntp-servers': ['127.0.0.1']}}
+                      'domain-name-servers': ['8.8.8.8', '127.0.0.1'],
+                      'netbios-name-servers': ['127.0.0.1'],
+                      'netbios-node-type': '1',
+                      'ntp-servers': ['127.0.0.1']}}
 
 EC2_DHCP_OPTIONS_1 = {
     'dhcpOptionsId': ID_EC2_DHCP_OPTIONS_1,

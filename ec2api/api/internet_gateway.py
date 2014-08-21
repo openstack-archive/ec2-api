@@ -46,6 +46,11 @@ CONF.register_opts(ec2_opts)
 """
 
 
+FILTER_MAP = {'internet-gateway-id': 'id',
+              'attachment.state': ['attachmentSet', 'state'],
+              'attachment.vpc-id': ['attachmentSet', 'vpcId']}
+
+
 def create_internet_gateway(context):
     igw = db_api.add_item(context, 'igw', {})
     return {'internet_gateway': _format_internet_gateway(igw)}
@@ -125,7 +130,9 @@ def describe_internet_gateways(context, internet_gateway_id=None,
     igws = ec2utils.get_db_items(context, 'igw', internet_gateway_id)
     formatted_igws = []
     for igw in igws:
-        formatted_igws.append(_format_internet_gateway(igw))
+        formatted_igw = _format_internet_gateway(igw)
+        if not utils.filtered_out(formatted_igw, filter, FILTER_MAP):
+            formatted_igws.append(formatted_igw)
     return {'internetGatewaySet': formatted_igws}
 
 

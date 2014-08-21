@@ -217,7 +217,7 @@ class VpcTestCase(base.ApiTestCase):
 
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['vpcSet'],
-                        matchers.DictListMatches([fakes.EC2_VPC_1,
+                        matchers.ListMatches([fakes.EC2_VPC_1,
                                                   fakes.EC2_VPC_2]))
         self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')
 
@@ -229,5 +229,5 @@ class VpcTestCase(base.ApiTestCase):
 
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['vpcSet'],
-                        matchers.DictListMatches([fakes.EC2_VPC_1]))
+                        matchers.ListMatches([fakes.EC2_VPC_1]))
         self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')

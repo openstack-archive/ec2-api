@@ -541,5 +541,5 @@ class AddressTestCase(base.ApiTestCase):
         resp = self.execute('DescribeAddresses', {})
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['addressesSet'],
-                        matchers.DictListMatches([fakes.EC2_ADDRESS_1,
+                        matchers.ListMatches([fakes.EC2_ADDRESS_1,
                                                   fakes.EC2_ADDRESS_2]))

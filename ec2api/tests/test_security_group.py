@@ -90,7 +90,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
             {'GroupId':
              fakes.ID_EC2_SECURITY_GROUP_1})
         self.assertEqual(400, resp['status'])
-        self.assertEqual('InvalidSecurityGroupID.NotFound',
+        self.assertEqual('InvalidGroup.NotFound',
                          resp['Error']['Code'])
         self.assertEqual(0, self.neutron.delete_port.call_count)
 
@@ -116,7 +116,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
         resp = self.execute('DescribeSecurityGroups', {})
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['securityGroupInfo'],
-                        matchers.DictListMatches(
+                        matchers.ListMatches(
                             [fakes.EC2_SECURITY_GROUP_1,
                              fakes.EC2_SECURITY_GROUP_2]))
 

@@ -243,7 +243,7 @@ class SubnetTestCase(base.ApiTestCase):
         resp = self.execute('DescribeSubnets', {})
         self.assertEqual(200, resp['status'])
         self.assertThat(resp['subnetSet'],
-                        matchers.DictListMatches([fakes.EC2_SUBNET_1,
+                        matchers.ListMatches([fakes.EC2_SUBNET_1,
                                                   fakes.EC2_SUBNET_2]))
 
     @base.skip_not_implemented

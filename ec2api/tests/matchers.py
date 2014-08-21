@@ -15,6 +15,7 @@
 
 """Matcher classes to be used inside of the testtools assertThat framework."""
 
+import copy
 import pprint
 
 from lxml import etree
@@ -35,6 +36,20 @@ class DictKeysMismatch(object):
         return {}
 
 
+class ValueMismatch(object):
+
+    def __init__(self, v1, v2):
+        self.v1 = v1
+        self.v2 = v2
+
+    def describe(self):
+        return ("Values do not match."
+                " v1: %(v1)s v2: %(v2)s" % self.__dict__)
+
+    def get_details(self):
+        return {}
+
+
 class DictMismatch(object):
 
     def __init__(self, key, d1_value, d2_value):
@@ -50,12 +65,67 @@ class DictMismatch(object):
         return {}
 
 
+class ValueMatches(object):
+
+    def __init__(self, v1, approx_equal=False, tolerance=0.001,
+                 orderless_lists=False):
+        self.v1 = v1
+        self.approx_equal = approx_equal
+        self.tolerance = tolerance
+        self.orderless_lists = orderless_lists
+
+    def __str__(self):
+        return 'ValueMatches(%s)' % (pprint.pformat(self.v1))
+
+    # Useful assertions
+    def match(self, v2):
+        """Assert two values are equivalent.
+
+        NOTE:
+
+            If you don't care (or don't know) a given value, you can specify
+            the string DONTCARE as the value. This will cause that item
+            to be skipped.
+
+        """
+
+        try:
+            error = abs(float(self.v1) - float(v2))
+            within_tolerance = error <= self.tolerance
+        except (ValueError, TypeError):
+            # If both values aren't convertible to float, just ignore
+            # ValueError if arg is a str, TypeError if it's something else
+            # (like None)
+            within_tolerance = False
+
+        if hasattr(self.v1, 'keys') and hasattr(v2, 'keys'):
+            matcher = DictMatches(self.v1, self.approx_equal, self.tolerance,
+                                  self.orderless_lists)
+            did_match = matcher.match(v2)
+            if did_match is not None:
+                return did_match
+        elif isinstance(self.v1, list) and isinstance(v2, list):
+            matcher = ListMatches(self.v1, self.approx_equal, self.tolerance,
+                                  self.orderless_lists)
+            did_match = matcher.match(v2)
+            if did_match is not None:
+                return did_match
+        elif 'DONTCARE' in (self.v1, v2):
+            return
+        elif self.approx_equal and within_tolerance:
+            return
+        elif self.v1 != v2:
+            return ValueMismatch(self.v1, v2)
+
+
 class DictMatches(object):
 
-    def __init__(self, d1, approx_equal=False, tolerance=0.001):
+    def __init__(self, d1, approx_equal=False, tolerance=0.001,
+                 orderless_lists=False):
         self.d1 = d1
         self.approx_equal = approx_equal
         self.tolerance = tolerance
+        self.orderless_lists = orderless_lists
 
     def __str__(self):
         return 'DictMatches(%s)' % (pprint.pformat(self.d1))
@@ -85,26 +155,25 @@ class DictMatches(object):
         for key in d1keys:
             d1value = self.d1[key]
             d2value = d2[key]
-            try:
-                error = abs(float(d1value) - float(d2value))
-                within_tolerance = error <= self.tolerance
-            except (ValueError, TypeError):
-                # If both values aren't convertible to float, just ignore
-                # ValueError if arg is a str, TypeError if it's something else
-                # (like None)
-                within_tolerance = False
+            matcher = ValueMatches(d1value, self.approx_equal, self.tolerance,
+                                   self.orderless_lists)
+            did_match = matcher.match(d2value)
+            if did_match is not None:
+                return did_match
 
-            if hasattr(d1value, 'keys') and hasattr(d2value, 'keys'):
-                matcher = DictMatches(d1value)
-                did_match = matcher.match(d2value)
-                if did_match is not None:
-                    return did_match
-            elif 'DONTCARE' in (d1value, d2value):
-                continue
-            elif self.approx_equal and within_tolerance:
-                continue
-            elif d1value != d2value:
-                return DictMismatch(key, d1value, d2value)
+
+class ListMismatch(object):
+
+    def __init__(self, l1, l2):
+        self.l1 = l1
+        self.l2 = l2
+
+    def describe(self):
+        return ('Lists mismatch: L1=%(l1)s != '
+                'L2=%(l2)s' % self.__dict__)
+
+    def get_details(self):
+        return {}
 
 
 class ListLengthMismatch(object):
@@ -121,15 +190,17 @@ class ListLengthMismatch(object):
         return {}
 
 
-class DictListMatches(object):
+class ListMatches(object):
 
-    def __init__(self, l1, approx_equal=False, tolerance=0.001):
+    def __init__(self, l1, approx_equal=False, tolerance=0.001,
+                 orderless_lists=False):
         self.l1 = l1
         self.approx_equal = approx_equal
         self.tolerance = tolerance
+        self.orderless_lists = orderless_lists
 
     def __str__(self):
-        return 'DictListMatches(%s)' % (pprint.pformat(self.l1))
+        return 'ListMatches(%s)' % (pprint.pformat(self.l1))
 
     # Useful assertions
     def match(self, l2):
@@ -139,13 +210,18 @@ class DictListMatches(object):
         l2count = len(l2)
         if l1count != l2count:
             return ListLengthMismatch(l1count, l2count)
-
-        for d1, d2 in zip(self.l1, l2):
-            matcher = DictMatches(d2,
-                                  approx_equal=self.approx_equal,
-                                  tolerance=self.tolerance)
-            did_match = matcher.match(d1)
-            if did_match:
+        l2 = copy.deepcopy(l2)
+        for v1 in self.l1:
+            for v2 in l2:
+                matcher = ValueMatches(v1, self.approx_equal, self.tolerance,
+                                      self.orderless_lists)
+                did_match = matcher.match(v2)
+                if did_match is None:
+                    l2.remove(v2)
+                    break
+                if not self.orderless_lists:
+                    break
+            if did_match is not None:
                 return did_match
 
 
@@ -211,7 +287,7 @@ class FunctionCallMatcher(object):
         self.actual_func_calls.append(func_call)
 
     def match(self):
-        dict_list_matcher = DictListMatches(self.expected_func_calls)
+        dict_list_matcher = ListMatches(self.expected_func_calls)
         return dict_list_matcher.match(self.actual_func_calls)
 
 
