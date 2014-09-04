@@ -374,7 +374,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertEqual(fakes.ID_EC2_NETWORK_INTERFACE_1,
                          resp['networkInterfaceId'])
         self.assertEqual(fakes.DESCRIPTION_NETWORK_INTERFACE_1,
-                         resp['description'])
+                         resp['description'].get('value', None))
 
     def test_modify_network_interface_attribute(self):
         self.db_api.get_item_by_id.return_value = (

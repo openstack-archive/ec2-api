@@ -39,6 +39,11 @@ SECURITY_GROUP_MAP = {'domain-name-servers': 'dns-servers',
                       'netbios-node-type': 'netbios-nodetype'}
 
 
+FILTER_MAP = {'vpc-id': 'vpcId',
+              'group-name': 'groupName',
+              'group-id': 'groupId'}
+
+
 def create_security_group(context, group_name, group_description,
                           vpc_id=None):
     if vpc_id is None:
@@ -59,6 +64,17 @@ def create_security_group(context, group_name, group_description,
                                           'os_id': os_security_group['id']})
     return {'return': 'true',
             'groupId': ec2utils.get_ec2_id(security_group['id'], 'sg')}
+
+
+def _create_default_security_group(context, vpc):
+    neutron = clients.neutron(context)
+    os_security_group = neutron.create_security_group(
+        {'security_group':
+         {'name': 'Default',
+          'description': 'Default VPC security group'}})['security_group']
+    security_group = db_api.add_item(context, 'sg',
+                                     {'vpc_id': vpc['id'],
+                                      'os_id': os_security_group['id']})
 
 
 def delete_security_group(context, group_name=None, group_id=None):
@@ -98,10 +114,13 @@ def describe_security_groups(context, group_name=None, group_id=None,
                                if g['os_id'] == os_security_group['id']), None)
         if group_id is not None and security_group is None:
             continue
-        formatted_security_groups.append(
-            _format_security_group(context, security_group,
-                                   os_security_group, os_security_groups,
-                                   security_groups))
+        formatted_security_group = _format_security_group(
+            context, security_group,
+            os_security_group, os_security_groups,
+            security_groups)
+        if not utils.filtered_out(formatted_security_group, filter,
+                                  FILTER_MAP):
+            formatted_security_groups.append(formatted_security_group)
     return {'securityGroupInfo': formatted_security_groups}
 
 

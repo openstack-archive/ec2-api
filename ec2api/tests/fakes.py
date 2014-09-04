@@ -273,14 +273,14 @@ EC2_SUBNET_1 = {'subnetId': ID_EC2_SUBNET_1,
                 'vpcId': ID_EC2_VPC_1,
                 'cidrBlock': CIDR_SUBNET_1,
                 'defaultForAz': False,
-                'availableIpAddressCount': 254,
+                'availableIpAddressCount': 253,
                 'mapPublicIpOnLaunch': False}
 EC2_SUBNET_2 = {'subnetId': ID_EC2_SUBNET_2,
                 'state': 'available',
                 'vpcId': ID_EC2_VPC_1,
                 'cidrBlock': CIDR_SUBNET_2,
                 'defaultForAz': False,
-                'availableIpAddressCount': 254,
+                'availableIpAddressCount': 253,
                 'mapPublicIpOnLaunch': False}
 
 OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
@@ -335,6 +335,7 @@ EC2_NETWORK_INTERFACE_1 = {
                                'primary': True}],
     'sourceDestCheck': False,
     'ownerId': ID_OS_PROJECT,
+    'requesterManaged': False,
     'groupSet': [],
 }
 EC2_NETWORK_INTERFACE_2 = {
@@ -367,6 +368,7 @@ EC2_NETWORK_INTERFACE_2 = {
     ],
     'sourceDestCheck': False,
     'ownerId': ID_OS_PROJECT,
+    'requesterManaged': False,
     'attachment': {
         'status': 'attached',
         'attachTime': TIME_ATTACH_NETWORK_INTERFACE,
@@ -386,6 +388,7 @@ OS_PORT_1 = {'id': ID_OS_PORT_1,
              'fixed_ips': [{'ip_address': IP_NETWORK_INTERFACE_1,
                             'subnet_id': ID_OS_SUBNET_1}],
              'device_id': None,
+             'device_owner': '',
              'security_groups': []}
 OS_PORT_2 = {'id': ID_OS_PORT_2,
              'network_id': ID_OS_SUBNET_2,
@@ -399,6 +402,7 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
                            {'ip_address': IP_NETWORK_INTERFACE_2_EXT_2,
                             'subnet_id': ID_OS_SUBNET_2}],
              'device_id': ID_OS_INSTANCE_1,
+             'device_owner': '',
              'security_groups': []}
 
 
@@ -462,6 +466,7 @@ EC2_INSTANCE_1 = {
          },
          'sourceDestCheck': False,
          'ownerId': ID_OS_PROJECT,
+         'requesterManaged': False,
          'groupSet': []},
     ],
 }
@@ -778,6 +783,7 @@ def gen_ec2_network_interface(ec2_network_interface_id, ec2_subnet, ips,
                                   for ip in ips],
         'sourceDestCheck': False,
         'ownerId': ID_OS_PROJECT,
+        'requesterManaged': False,
         'groupSet': [],
     }
     if not ec2_instance_id:

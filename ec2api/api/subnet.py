@@ -19,6 +19,7 @@ from oslo.config import cfg
 
 from ec2api.api import clients
 from ec2api.api import ec2utils
+from ec2api.api import network_interface as network_interface_api
 from ec2api.api import route_table as route_table_api
 from ec2api.api import utils
 from ec2api.db import api as db_api
@@ -100,9 +101,11 @@ def create_subnet(context, vpc_id, cidr_block,
 def delete_subnet(context, subnet_id):
     subnet = ec2utils.get_db_item(context, 'subnet', subnet_id)
     vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
-    # TODO(ft): implement search in DB layer
-    network_interfaces = db_api.get_items(context, 'eni')
-    if any(eni['subnet_id'] == subnet['id'] for eni in network_interfaces):
+    network_interfaces = network_interface_api.describe_network_interfaces(
+        context,
+        filter=[{'name': 'subnet-id',
+                 'value': [subnet_id]}])['networkInterfaceSet']
+    if network_interfaces:
         msg = _("The subnet '%(subnet_id)s' has dependencies and "
                 "cannot be deleted.") % {'subnet_id': subnet_id}
         raise exception.DependencyViolation(msg)
@@ -145,6 +148,7 @@ def describe_subnets(context, subnet_id=None, filter=None):
         os_subnet = next((s for s in os_subnets
                           if s['id'] == subnet['os_id']), None)
         if not os_subnet:
+            db_api.delete_item(context, subnet['id'])
             continue
         os_network = next((n for n in os_networks
                            if n['id'] == os_subnet['network_id']),
@@ -166,10 +170,15 @@ def _format_subnet(context, subnet, os_subnet, os_network, os_ports):
     # NOTE(Alex) First and last IP addresses are system ones.
     ip_count = pow(2, 32 - range) - 2
     # TODO(Alex): Probably performance-killer. Will have to optimize.
+    dhcp_port_accounted = False
     for port in os_ports:
         for fixed_ip in port.get('fixed_ips', []):
             if fixed_ip['subnet_id'] == os_subnet['id']:
                 ip_count -= 1
+            if port['device_owner'] == 'network:dhcp':
+                dhcp_port_accounted = True
+    if not dhcp_port_accounted:
+        ip_count -= 1
     return {
         'subnetId': ec2utils.get_ec2_id(subnet['id'], 'subnet'),
         'state': status_map.get(os_network['status'], 'available'),

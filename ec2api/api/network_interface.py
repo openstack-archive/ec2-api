@@ -23,7 +23,7 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import dhcp_options
 from ec2api.api import ec2utils
-from ec2api.api import security_group
+from ec2api.api import security_group as security_group_api
 from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
@@ -38,6 +38,10 @@ LOG = logging.getLogger(__name__)
 
 """Network interface related API implementation
 """
+
+
+FILTER_MAP = {'vpc-id': 'vpcId',
+              'subnet-id': 'subnetId'}
 
 
 def create_network_interface(context, subnet_id,
@@ -88,13 +92,22 @@ def create_network_interface(context, subnet_id,
         for _i in range(secondary_private_ip_address_count):
             fixed_ips.append({'subnet_id': os_subnet['id']})
     vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
+    vpc_id = ec2utils.get_ec2_id(vpc['id'], 'vpc')
     dhcp_options_id = vpc.get('dhcp_options_id', None)
+    if not security_group_id:
+        default_groups = security_group_api.describe_security_groups(
+            context,
+            filter=[{'name': 'vpc-id', 'value': [vpc_id]},
+                    {'name': 'group-name', 'value': ['Default']}]
+            )['securityGroupInfo']
+        security_group_id = [default_group['groupId']
+                             for default_group in default_groups]
     security_groups = [ec2utils.get_db_item(context, 'sg', ec2_id)
-                       for ec2_id in (security_group_id or [])]
+                       for ec2_id in security_group_id]
     if any(security_group['vpc_id'] != vpc['id']
            for security_group in security_groups):
-        msg = _('You have specified two resources that belong to different '
-                'networks.')
+        msg = _('You have specified two resources that belong to '
+                'different networks.')
         raise exception.InvalidGroupNotFound(msg)
     os_groups = [security_group['os_id'] for security_group in security_groups]
     with utils.OnCrashCleaner() as cleaner:
@@ -103,6 +116,9 @@ def create_network_interface(context, subnet_id,
         os_port_body['port']['fixed_ips'] = fixed_ips
         try:
             os_port = neutron.create_port(os_port_body)['port']
+        except neutron_exception.IpAddressGenerationFailureClient as e:
+            raise exception.NetworkInterfaceLimitExceeded(
+                        subnet_id=subnet_id)
         except Exception as e:
             raise exception.InvalidParameterValue(
                 value=description,
@@ -130,10 +146,13 @@ def create_network_interface(context, subnet_id,
                 db_api.get_item_by_id(context, 'dopt', dhcp_options_id),
                 network_interface,
                 os_port)
-    # TODO(ft): add security groups to output
+    security_groups = security_group_api._format_security_groups_ids_names(
+        context)
     return {'networkInterface':
             _format_network_interface(context,
-                                      network_interface, os_port)}
+                                      network_interface,
+                                      os_port,
+                                      security_groups=security_groups)}
 
 
 def delete_network_interface(context, network_interface_id):
@@ -180,20 +199,74 @@ def describe_network_interfaces(context, network_interface_id=None,
         if ('network_interface_id' in address and
                 address['os_id'] in os_floating_ip_ids):
             addresses[address['network_interface_id']].append(address)
-    security_groups = security_group._format_security_groups_ids_names(
+    security_groups = security_group_api._format_security_groups_ids_names(
         context)
     formatted_network_interfaces = []
     for network_interface in network_interfaces:
         os_port = next((p for p in os_ports
                         if p['id'] == network_interface['os_id']), None)
         if not os_port:
+            db_api.delete_item(context, network_interface['id'])
             continue
-        formatted_network_interfaces.append(
-            _format_network_interface(
-                context, network_interface, os_port,
-                addresses[network_interface['id']],
-                security_groups))
+        formatted_network_interface = _format_network_interface(
+            context, network_interface, os_port,
+            addresses[network_interface['id']],
+            security_groups)
+        if not utils.filtered_out(formatted_network_interface, filter,
+                                  FILTER_MAP):
+            formatted_network_interfaces.append(formatted_network_interface)
     return {'networkInterfaceSet': formatted_network_interfaces}
+
+
+def assign_private_ip_addresses(context, network_interface_id,
+                                private_ip_address=None,
+                                secondary_private_ip_address_count=None,
+                                allow_reassignment=False):
+    # TODO(Alex): allow_reassignment is not supported at the moment
+    network_interface = ec2utils.get_db_item(context, 'eni',
+                                             network_interface_id)
+    subnet = ec2utils.get_db_item(context, 'subnet',
+                                  ec2utils.get_ec2_id(
+                                    network_interface['subnet_id'],
+                                    'subnet'))
+    neutron = clients.neutron(context)
+    os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
+    os_port = neutron.show_port(network_interface['os_id'])['port']
+    subnet_ipnet = netaddr.IPNetwork(os_subnet['cidr'])
+    fixed_ips = os_port['fixed_ips'] or []
+    if private_ip_address is not None:
+        for ip_address in private_ip_address:
+            if ip_address not in subnet_ipnet:
+                raise exception.InvalidParameterValue(
+                    value=str(ip_address),
+                    parameter='private_ip_address',
+                    reason='IP address is out of the subnet range')
+            fixed_ips.append({'ip_address': str(ip_address)})
+    elif secondary_private_ip_address_count > 0:
+        for _i in range(secondary_private_ip_address_count):
+            fixed_ips.append({'subnet_id': os_subnet['id']})
+    os_port = neutron.update_port(os_port['id'],
+                                  {'port': {'fixed_ips': fixed_ips}})
+    return True
+
+
+def unassign_private_ip_addresses(context, network_interface_id,
+                                  private_ip_address):
+    network_interface = ec2utils.get_db_item(context, 'eni',
+                                             network_interface_id)
+    if network_interface['private_ip_address'] in private_ip_address:
+        raise exception.InvalidParameterValue(
+                value=str(network_interface['private_ip_address']),
+                parameter='private_ip_addresses',
+                reason='Primary IP address cannot be unassigned')
+    neutron = clients.neutron(context)
+    os_port = neutron.show_port(network_interface['os_id'])['port']
+    fixed_ips = os_port['fixed_ips'] or []
+    new_fixed_ips = [ip for ip in fixed_ips
+                     if ip['ip_address'] not in private_ip_address]
+    os_port = neutron.update_port(os_port['id'],
+                                  {'port': {'fixed_ips': new_fixed_ips}})
+    return True
 
 
 def describe_network_interface_attribute(context, network_interface_id,
@@ -204,7 +277,7 @@ def describe_network_interface_attribute(context, network_interface_id,
 
     return {'networkInterfaceId': ec2utils.get_ec2_id(
         network_interface['id'], 'eni'),
-        'description': network_interface.get('description', '')}
+        'description': {'value': network_interface.get('description', '')}}
 
 
 def modify_network_interface_attribute(context, network_interface_id,
@@ -316,6 +389,8 @@ def _format_network_interface(context, network_interface, os_port,
     # TODO(Alex) Implement
     # ec2_network_interface['availabilityZone'] = ''
     ec2_network_interface['sourceDestCheck'] = 'False'
+    ec2_network_interface['requesterManaged'] = (
+        os_port.get('device_owner', '').startswith('network:'))
     ec2_network_interface['ownerId'] = context.project_id
     security_group_set = []
     for sg_id in os_port['security_groups']:

@@ -18,7 +18,10 @@ from oslo.config import cfg
 
 from ec2api.api import clients
 from ec2api.api import ec2utils
+from ec2api.api import internet_gateway as internet_gateway_api
 from ec2api.api import route_table as route_table_api
+from ec2api.api import security_group as security_group_api
+from ec2api.api import subnet as subnet_api
 from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
@@ -60,21 +63,24 @@ def create_vpc(context, cidr_block, instance_tenancy='default'):
         db_api.update_item(context, vpc)
         vpc_id = ec2utils.get_ec2_id(vpc['id'], 'vpc')
         neutron.update_router(os_router['id'], {'router': {'name': vpc_id}})
-
+        # NOTE(Alex): OpenStack doesn't allow creation of another group
+        # named 'default' hence 'Default' is used.
+        security_group = security_group_api._create_default_security_group(
+            context, vpc)
     return {'vpc': _format_vpc(vpc)}
 
 
 def delete_vpc(context, vpc_id):
     vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
-    # TODO(ft): move search by vpc_id to DB api
-    if (any(igw.get('vpc_id') == vpc['id']
-            for igw in db_api.get_items(context, 'igw')) or
-            any(subnet['vpc_id'] == vpc['id']
-                for subnet in db_api.get_items(context, 'subnet')) or
-            any(rtb['vpc_id'] == vpc['id'] and
-                (rtb['id'] != vpc['route_table_id'] or
-                 len(rtb['routes']) > 1)
-                for rtb in db_api.get_items(context, 'rtb'))):
+    subnets = subnet_api.describe_subnets(context,
+        filter=[{'name': 'vpc-id', 'value': [vpc_id]}])['subnetSet']
+    internet_gateways = internet_gateway_api.describe_internet_gateways(
+        context,
+        filter=[{'name': 'attachment.vpc-id',
+                 'value': [vpc_id]}])['internetGatewaySet']
+    route_tables = route_table_api.describe_route_tables(context,
+        filter=[{'name': 'vpc-id', 'value': [vpc_id]}])['routeTableSet']
+    if subnets or internet_gateways or len(route_tables) > 1:
         msg = _("The vpc '%(vpc_id)s' has dependencies and "
                 "cannot be deleted.")
         msg = msg % {'vpc_id': ec2utils.get_ec2_id(vpc['id'], 'vpc')}
@@ -86,6 +92,13 @@ def delete_vpc(context, vpc_id):
         cleaner.addCleanup(db_api.restore_item, context, 'vpc', vpc)
         route_table_api._delete_route_table(context, vpc['route_table_id'],
                                             cleaner=cleaner)
+        security_groups = security_group_api.describe_security_groups(
+            context,
+            filter=[{'name': 'vpc-id',
+                     'value': [vpc_id]}])['securityGroupInfo']
+        for security_group in security_groups:
+            security_group_api.delete_security_group(
+                context, group_id=security_group['groupId'])
         try:
             neutron.delete_router(vpc['os_id'])
         except neutron_exception.NeutronClientException as ex:

@@ -63,8 +63,13 @@ def filtered_out(item, filters, filter_map):
             values = [item.get(filter_name)]
         if not values:
             return True
-        filter_values = filter['value'].values()
+        # NOTE(Alex): Two modes are supported for values here:
+        # Dict like it comes from the outside: {'1': 'value1', '2', 'value2'}
+        # And simple list of values.
+        filter_values = filter['value']
+        if isinstance(filter_values, dict):
+            filter_values = filter_values.values()
         for filter_value in filter_values:
-            if filter_value in values:
-                return False
-    return True
+            if filter_value not in values:
+                return True
+    return False

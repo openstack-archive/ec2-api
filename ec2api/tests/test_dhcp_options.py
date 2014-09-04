@@ -155,8 +155,8 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                      {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_2,
                       'vpcId': fakes.ID_EC2_VPC_1})
 
-        self._assert_any_call(self.neutron.update_port,
-                              fakes.ID_OS_PORT_1,
-                              {'port': fakes.OS_DHCP_OPTIONS_1})
+        self.assert_any_call(self.neutron.update_port,
+                             fakes.ID_OS_PORT_1,
+                             {'port': fakes.OS_DHCP_OPTIONS_1})
         self.db_api.update_item.assert_any_call(
                 mock.ANY, vpc)

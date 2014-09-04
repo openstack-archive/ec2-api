@@ -286,6 +286,12 @@ class RouteAlreadyExists(Invalid):
                 'already exists.')
 
 
+class NetworkInterfaceLimitExceeded(Invalid):
+    ec2_code = 'NetworkInterfaceLimitExceeded'
+    msg_fmt = _('You have reached the limit of network interfaces for subnet'
+                '%(subnet_id)s.')
+
+
 # TODO(Alex) Change next class with the real AWS exception
 class RuleAlreadyExists(Invalid):
     msg_fmt = _('The rule already exists.')

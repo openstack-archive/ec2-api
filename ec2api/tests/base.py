@@ -104,7 +104,7 @@ class ApiTestCase(test_base.BaseTestCase):
         body['status'] = response.status_code
         return body
 
-    def _assert_any_call(self, func, *args, **kwargs):
+    def assert_any_call(self, func, *args, **kwargs):
         calls = func.mock_calls
         for call in calls:
             call_args = call[1]

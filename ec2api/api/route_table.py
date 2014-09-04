@@ -26,6 +26,9 @@ from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 
 
+FILTER_MAP = {'vpc-id': 'vpcId'}
+
+
 def create_route_table(context, vpc_id):
     vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
     route_table = _create_route_table(context, vpc)
@@ -205,15 +208,18 @@ def describe_route_tables(context, route_table_id=None, filter=None):
     network_interfaces = db_api.get_items(context, 'eni')
     network_interfaces = dict((eni['id'], eni) for eni in network_interfaces)
 
-    return {'routeTableSet': [
-        _format_route_table(
-            context, rtb,
-            associated_subnet_ids=associations[rtb['id']],
-            is_main=vpcs[rtb['vpc_id']]['route_table_id'] ==
-            rtb['id'],
+    formatted_route_tables = []
+    for route_table in route_tables:
+        formatted_route_table = _format_route_table(
+            context, route_table,
+            associated_subnet_ids=associations[route_table['id']],
+            is_main=vpcs[route_table['vpc_id']]['route_table_id'] ==
+            route_table['id'],
             gateways=gateways,
             network_interfaces=network_interfaces)
-        for rtb in route_tables]}
+        if not utils.filtered_out(formatted_route_table, filter, FILTER_MAP):
+            formatted_route_tables.append(formatted_route_table)
+    return {'routeTableSet': formatted_route_tables}
 
 
 def _create_route_table(context, vpc):

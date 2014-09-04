@@ -964,6 +964,46 @@ class CloudController(object):
                                                          attachment_id,
                                                          force)
 
+    def assign_private_ip_addresses(self, context, network_interface_id,
+                                    private_ip_address=None,
+                                    secondary_private_ip_address_count=None,
+                                    allow_reassignment=False):
+        """Assigns secondary private IP addresses to the network interface.
+
+         Args:
+            network_interface_id (str): The ID of the network interface.
+            private_ip_address (list of str): List of IP addresses to assign.
+            secondary_private_ip_address_count (integer): The number of
+                secondary private IP addresses to assign. EC2 selects these
+                IP addresses within the subnet range.
+
+        Returns:
+            true if the request succeeds.
+        """
+        return network_interface.assign_private_ip_addresses(
+            context,
+            network_interface_id,
+            private_ip_address,
+            secondary_private_ip_address_count,
+            allow_reassignment)
+
+    def unassign_private_ip_addresses(self, context, network_interface_id,
+                                      private_ip_address=None):
+        """Unassigns secondary IP addresses from the network interface.
+
+         Args:
+            network_interface_id (str): The ID of the network interface.
+            private_ip_address (list of str): List of secondary private IP
+            addresses to unassign.
+
+        Returns:
+            true if the request succeeds.
+        """
+        return network_interface.unassign_private_ip_addresses(
+            context,
+            network_interface_id,
+            private_ip_address)
+
     def run_instances(self, context, image_id, min_count, max_count,
                      subnet_id=None, private_ip_address=None,
                      network_interface=None, security_group=None,

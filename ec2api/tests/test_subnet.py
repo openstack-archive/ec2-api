@@ -225,7 +225,17 @@ class SubnetTestCase(base.ApiTestCase):
                 fakes.get_db_api_get_item_by_id(
                         {fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
                          fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1}))
-        self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1]
+        self.db_api.get_items.side_effect = (
+            lambda _, kind: [fakes.DB_NETWORK_INTERFACE_1,
+                             fakes.DB_NETWORK_INTERFACE_2]
+            if kind == 'eni' else
+            [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2]
+            if kind == 'eipalloc' else [])
+        self.neutron.list_ports.return_value = (
+            {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
+        self.neutron.list_floatingips.return_value = (
+            {'floatingips': [fakes.OS_FLOATING_IP_1,
+                             fakes.OS_FLOATING_IP_2]})
 
         resp = self.execute('DeleteSubnet',
                             {'subnetId': fakes.ID_EC2_SUBNET_1})

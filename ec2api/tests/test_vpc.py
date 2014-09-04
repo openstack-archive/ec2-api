@@ -30,7 +30,11 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.add_item.side_effect = (
             fakes.get_db_api_add_item({
                 'vpc': fakes.ID_DB_VPC_1,
-                'rtb': fakes.ID_DB_ROUTE_TABLE_1}))
+                'rtb': fakes.ID_DB_ROUTE_TABLE_1,
+                'sg': fakes.ID_DB_SECURITY_GROUP_1}))
+        self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
+        self.neutron.create_security_group.return_value = {
+            'security_group': fakes.OS_SECURITY_GROUP_1}
 
         def check_response(response):
             self.assertEqual(response['status'], 200)
@@ -157,12 +161,18 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
         self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
             {'igw': [fakes.DB_IGW_1],
-             'subnet': []})
+             'subnet': [],
+             'rtb': [],
+             'vpc': [fakes.DB_VPC_1],
+             'eni': []})
         do_check()
 
         self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
             {'igw': [],
-             'subnet': [fakes.DB_SUBNET_1]})
+             'subnet': [],
+             'rtb': [fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2],
+             'vpc': [fakes.DB_VPC_1],
+             'eni': []})
         do_check()
 
     def test_delete_vpc_not_conststent_os_vpc(self):
