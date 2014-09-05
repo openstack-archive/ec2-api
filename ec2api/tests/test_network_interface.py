@@ -19,7 +19,6 @@ import mock
 from neutronclient.common import exceptions as neutron_exception
 
 from ec2api.api import ec2utils
-from ec2api.openstack.common import timeutils
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
@@ -38,9 +37,9 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             self.assertEqual(200, resp['status'])
             self.assertThat(fakes.EC2_NETWORK_INTERFACE_1,
                             matchers.DictMatches(resp['networkInterface']))
-            self.db_api.add_item.called_once_with(
-                mock.ANY, 'network_interface',
-                tools.purge_dict(fakes.DB_SUBNET_1, ('id',)))
+            self.db_api.add_item.assert_called_once_with(
+                mock.ANY, 'eni',
+                tools.purge_dict(fakes.DB_NETWORK_INTERFACE_1, ('id',)))
             if auto_ips:
                 self.neutron.create_port.assert_called_once_with(
                     {'port':
@@ -116,9 +115,13 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             self.assertEqual(200, resp['status'])
             self.assertThat(created_ec2_network_interface,
                             matchers.DictMatches(resp['networkInterface']))
-            self.db_api.add_item.called_once_with(
-                mock.ANY, 'network_interface',
-                tools.purge_dict(fakes.DB_SUBNET_2, ('id',)))
+            self.db_api.add_item.assert_called_once_with(
+                mock.ANY, 'eni',
+                tools.purge_dict(fakes.DB_NETWORK_INTERFACE_2,
+                                 ('id',
+                                  'instance_id',
+                                  'delete_on_termination',
+                                  'attach_time')))
             self.neutron.update_port.assert_called_once_with(
                 fakes.ID_OS_PORT_2,
                 {'port': {'name':
@@ -386,8 +389,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              fakes.ID_EC2_NETWORK_INTERFACE_1,
              'Description.Value': 'New description'})
         self.assertEqual(200, resp['status'])
-        self.db_api.add_item.called_once_with(
-            mock.ANY, 'network_interface',
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
             tools.update_dict(fakes.DB_NETWORK_INTERFACE_1,
                               {'description': 'New description'}))
 
@@ -416,7 +419,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.ec2_inst_id_to_uuid.return_value = fakes.ID_OS_INSTANCE_1
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
-        self.isotime.return_value = '2014-06-19T14:00:51.230334Z'
+        self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
         resp = self.execute(
             'AttachNetworkInterface',
             {'NetworkInterfaceId':
@@ -424,15 +427,13 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              'InstanceId': fakes.ID_EC2_INSTANCE_1,
              'DeviceIndex': '1'})
         self.assertEqual(200, resp['status'])
-        self.nova_servers.interface_attach.called_once_with(
-            mock.ANY, fakes.ID_OS_INSTANCE_1, fakes.OS_PORT_2)
-        self.db_api.update_item.called_once_with(
-            mock.ANY, 'network_interface',
-            tools.update_dict(fakes.DB_NETWORK_INTERFACE_1,
+        self.nova_servers.interface_attach.assert_called_once_with(
+            fakes.ID_OS_INSTANCE_1, fakes.ID_OS_PORT_2, None, None)
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
+            tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
                               {'instance_id': fakes.ID_DB_INSTANCE_1,
-                               'delete_on_termination': False,
-                               'attachment_time':
-                               timeutils.isotime(None, True)}))
+                               'delete_on_termination': False}))
 
     def test_attach_network_interface_rollback(self):
         self.db_api.get_item_by_id.return_value = (
@@ -462,17 +463,17 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              ec2utils.get_ec2_id(
                  fakes.ID_DB_NETWORK_INTERFACE_2, 'eni-attach')})
         self.assertEqual(200, resp['status'])
-        self.neutron.update_port.called_once_with(
-            mock.ANY, fakes.ID_OS_PORT_1,
+        self.neutron.update_port.assert_called_once_with(
+            fakes.ID_OS_PORT_2,
             {'port': {'device_id': '',
                       'device_owner': ''}}
         )
-        self.db_api.update_item.called_once_with(
-            mock.ANY, 'network_interface',
-            tools.purge_dict(fakes.DB_NETWORK_INTERFACE_1,
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
+            tools.purge_dict(fakes.DB_NETWORK_INTERFACE_2,
                              {'instance_id',
                               'delete_on_termination',
-                              'attachment_time'}))
+                              'attach_time'}))
 
     def test_detach_network_interface_rollback(self):
         self.db_api.get_item_by_id.return_value = (
@@ -487,3 +488,44 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
         self.db_api.update_item.assert_any_call(
             mock.ANY, fakes.DB_NETWORK_INTERFACE_2)
+
+    def test_assign_unassign_private_ip_addresses(self):
+        self.db_api.get_item_by_id.return_value = (
+            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1))
+        self.db_api.get_items.return_value = (
+            [fakes.DB_SUBNET_1,
+             fakes.DB_SUBNET_2])
+        self.neutron.show_subnet.return_value = (
+            {'subnet': fakes.OS_SUBNET_1})
+        self.neutron.show_port.return_value = (
+            {'port': copy.deepcopy(fakes.OS_PORT_1)})
+        resp = self.execute(
+            'AssignPrivateIpAddresses',
+            {'NetworkInterfaceId':
+             fakes.ID_EC2_NETWORK_INTERFACE_1,
+             'PrivateIpAddress.1': '10.10.1.5',
+             'PrivateIpAddress.2': '10.10.1.6',
+            })
+        self.assertEqual(200, resp['status'])
+        self.neutron.update_port.assert_called_once_with(
+            fakes.ID_OS_PORT_1,
+            {'port':
+             {'fixed_ips': [
+                 {'subnet_id': fakes.ID_OS_SUBNET_1,
+                  'ip_address': fakes.IP_NETWORK_INTERFACE_1},
+                 {'ip_address': '10.10.1.5'},
+                 {'ip_address': '10.10.1.6'}]}})
+        resp = self.execute(
+            'UnassignPrivateIpAddresses',
+            {'NetworkInterfaceId':
+             fakes.ID_EC2_NETWORK_INTERFACE_1,
+             'PrivateIpAddress.1': '10.10.1.5',
+             'PrivateIpAddress.2': '10.10.1.6',
+            })
+        self.assertEqual(200, resp['status'])
+        self.neutron.update_port.assert_any_call(
+            fakes.ID_OS_PORT_1,
+            {'port':
+             {'fixed_ips': [
+                 {'subnet_id': fakes.ID_OS_SUBNET_1,
+                  'ip_address': fakes.IP_NETWORK_INTERFACE_1}]}})

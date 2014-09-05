@@ -50,9 +50,9 @@ class DhcpOptionsTestCase(base.ApiTestCase):
             self.assertEqual(200, resp['status'])
             self.assertThat(ec2_fake, matchers.DictMatches(
                     resp['dhcpOptions'], orderless_lists=True))
-            self.db_api.add_item.called_once_with(
-                    mock.ANY, 'dhcp_options',
-                    tools.purge_dict(db_fake, ('id',)))
+            self.assert_any_call(self.db_api.add_item,
+                                 mock.ANY, 'dopt',
+                                 tools.purge_dict(db_fake, ('id',)))
             self.db_api.reset_mock()
 
         check(fakes.EC2_DHCP_OPTIONS_1, fakes.DB_DHCP_OPTIONS_1)

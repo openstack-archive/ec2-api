@@ -328,6 +328,7 @@ def attach_network_interface(context, network_interface_id,
                                              network_interface_id)
     neutron = clients.neutron(context)
     os_instance_id = ec2utils.ec2_inst_id_to_uuid(context, instance_id)
+    db_instance_id = ec2utils.ec2_id_to_id(instance_id)
     # TODO(Alex) Check that the instance is not yet attached to another VPC
     # TODO(Alex) Check that the instance is "our", not created via nova
     # (which means that it doesn't belong to any VPC and can't be attached)
@@ -336,7 +337,8 @@ def attach_network_interface(context, network_interface_id,
     with utils.OnCrashCleaner() as cleaner:
         # TODO(Alex) nova inserts compute:%availability_zone into device_owner
         #                              'device_owner': 'compute:None'}})
-        _attach_network_interface_item(context, network_interface, instance_id)
+        _attach_network_interface_item(context, network_interface,
+                                       db_instance_id)
         cleaner.addCleanup(_detach_network_interface_item, context,
                            network_interface)
         try:
@@ -344,8 +346,6 @@ def attach_network_interface(context, network_interface_id,
                                           None, None)
         except nova_exception.ClientException as e:
             raise exception.IncorrectState(reason=e.message)
-        # neutron.update_port(os_port['id'],
-        #                     {'port': {'device_id': os_instance_id,
     return {'attachmentId': ec2utils.get_ec2_id(
         network_interface['id'], 'eni-attach')}
 
@@ -446,8 +446,10 @@ def _format_network_interface(context, network_interface, os_port,
 
 
 def _attach_network_interface_item(context, network_interface, instance_id,
-                                   attach_time=timeutils.isotime(None, True),
+                                   attach_time=None,
                                    delete_on_termination=False):
+    if not attach_time:
+        attach_time = timeutils.isotime(None, True)
     network_interface.update({
         'instance_id': instance_id,
         'attach_time': attach_time,

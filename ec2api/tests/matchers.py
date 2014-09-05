@@ -178,13 +178,13 @@ class ListMismatch(object):
 
 class ListLengthMismatch(object):
 
-    def __init__(self, len1, len2):
-        self.len1 = len1
-        self.len2 = len2
+    def __init__(self, l1, l2):
+        self.l1 = l1
+        self.l2 = l2
 
     def describe(self):
-        return ('Length mismatch: len(L1)=%(len1)d != '
-                'len(L2)=%(len2)d' % self.__dict__)
+        return ('Lists lengths mismatch: L1=%(l1)s != '
+                'L2=%(l2)s' % self.__dict__)
 
     def get_details(self):
         return {}
@@ -209,7 +209,7 @@ class ListMatches(object):
         l1count = len(self.l1)
         l2count = len(l2)
         if l1count != l2count:
-            return ListLengthMismatch(l1count, l2count)
+            return ListLengthMismatch(self.l1, l2)
         l2 = copy.deepcopy(l2)
         for v1 in self.l1:
             for v2 in l2:

@@ -135,9 +135,10 @@ def _add_dhcp_opts_to_port(context, dhcp_options, network_interface, os_port,
                            neutron=None):
     dhcp_opts = []
     if dhcp_options is not None:
-        for key, value in dhcp_options['dhcp_configuration'].items():
+        for key, values in dhcp_options['dhcp_configuration'].items():
+            strvalues = [str(v) for v in values]
             dhcp_opts.append({'opt_name': DHCP_OPTIONS_MAP[key],
-                              'opt_value': ','.join(value)})
+                              'opt_value': ','.join(strvalues)})
     if not neutron:
         neutron = clients.neutron(context)
     neutron.update_port(os_port['id'],

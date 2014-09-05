@@ -492,7 +492,7 @@ DB_DHCP_OPTIONS_2 = {'id': ID_DB_DHCP_OPTIONS_2,
                      {'domain-name': ['my.domain.com'],
                       'domain-name-servers': ['8.8.8.8', '127.0.0.1'],
                       'netbios-name-servers': ['127.0.0.1'],
-                      'netbios-node-type': '1',
+                      'netbios-node-type': [1],
                       'ntp-servers': ['127.0.0.1']}}
 
 EC2_DHCP_OPTIONS_1 = {

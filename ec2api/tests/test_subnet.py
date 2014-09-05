@@ -40,7 +40,7 @@ class SubnetTestCase(base.ApiTestCase):
             self.assertEqual(200, resp['status'])
             self.assertThat(fakes.EC2_SUBNET_1, matchers.DictMatches(
                     resp['subnet']))
-            self.db_api.add_item.called_once_with(
+            self.db_api.add_item.assert_called_once_with(
                     mock.ANY, 'subnet',
                     tools.purge_dict(fakes.DB_SUBNET_1, ('id',)))
             self.neutron.create_network.assert_called_once_with(

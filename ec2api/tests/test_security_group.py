@@ -35,8 +35,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
         def check_response(resp, auto_ips=False):
             self.assertEqual(200, resp['status'])
             self.assertEqual(fakes.ID_EC2_SECURITY_GROUP_1, resp['groupId'])
-            self.db_api.add_item.called_once_with(
-                mock.ANY, 'security_group',
+            self.db_api.add_item.assert_called_once_with(
+                mock.ANY, 'sg',
                 tools.purge_dict(fakes.DB_SECURITY_GROUP_1, ('id',)))
             self.neutron.create_security_group.assert_called_once_with(
                 {'security_group':
