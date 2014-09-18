@@ -161,7 +161,7 @@ def _build_rule(context, group_id, ip_permissions, direction):
     if ip_permissions is None:
         ip_permissions = []
     for rule in ip_permissions:
-        if rule.get('ip_protocol'):
+        if rule.get('ip_protocol', -1) != -1:
             os_security_group_rule_body['protocol'] = rule['ip_protocol']
         if rule.get('from_port', -1) != -1:
             os_security_group_rule_body['port_range_min'] = rule['from_port']

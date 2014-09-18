@@ -21,6 +21,7 @@ from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
+from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 
 
@@ -65,7 +66,7 @@ def create_dhcp_options(context, dhcp_configuration):
                 ips.append(ip)
             dhcp_options[key] = ips
         else:
-            dhcp_options[key] = [value['1']]
+            dhcp_options[key] = value.values()
     dhcp_options = db_api.add_item(context, 'dopt',
                                    {'dhcp_configuration': dhcp_options})
     return {'dhcpOptions':
@@ -73,11 +74,14 @@ def create_dhcp_options(context, dhcp_configuration):
 
 
 def delete_dhcp_options(context, dhcp_options_id):
+    if not dhcp_options_id:
+        raise exception.MissingParameter(
+            _('DHCP options ID must be specified'))
     dhcp_options = ec2utils.get_db_item(context, 'dopt',
                                         dhcp_options_id)
     vpcs = db_api.get_items(context, 'vpc')
     for vpc in vpcs:
-        if dhcp_options['id'] == vpc['dhcp_options_id']:
+        if dhcp_options['id'] == vpc.get('dhcp_options_id'):
             raise exception.DependencyViolation(
                         obj1_id=ec2utils.get_ec2_id(dhcp_options['id'],
                                                     'dopt'),

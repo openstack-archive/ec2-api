@@ -281,6 +281,11 @@ class InvalidIPAddressInUse(Invalid):
     msg_fmt = _('Address %(ip_address)s is in use.')
 
 
+class InvalidAddressNotFound(Invalid):
+    ec2_code = 'InvalidAddress.NotFound'
+    msg_fmt = _('The specified elastic IP address %(ip)s cannot be found.')
+
+
 class RouteAlreadyExists(Invalid):
     msg_fmt = _('The route identified by %(destination_cidr_block)s '
                 'already exists.')

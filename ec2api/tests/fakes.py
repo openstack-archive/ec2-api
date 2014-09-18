@@ -566,13 +566,13 @@ EC2_ADDRESS_2 = {
 OS_FLOATING_IP_1 = {
     'id': ID_OS_FLOATING_IP_1,
     'floating_ip_address': IP_ADDRESS_1,
-    'fixed_port_id': None,
+    'port_id': None,
     'fixed_ip_address': None,
 }
 OS_FLOATING_IP_2 = {
     'id': ID_OS_FLOATING_IP_2,
     'floating_ip_address': IP_ADDRESS_2,
-    'fixed_port_id': ID_OS_PORT_2,
+    'port_id': ID_OS_PORT_2,
     'fixed_ip_address': IP_NETWORK_INTERFACE_2,
 }
 

@@ -428,8 +428,8 @@ class CloudController(object):
         Returns:
             A list of route tables
         """
-        return route_table.describe_route_tables(context, route_table_id=None,
-                                                 filter=None)
+        return route_table.describe_route_tables(context, route_table_id,
+                                                 filter)
 
     def create_dhcp_options(self, context, dhcp_configuration):
         """Creates a set of DHCP options for your VPC.

@@ -531,12 +531,16 @@ class AddressTestCase(base.ApiTestCase):
         self.neutron.list_floatingips.return_value = (
             {'floatingips': [fakes.OS_FLOATING_IP_1,
                              fakes.OS_FLOATING_IP_2]})
+        self.neutron.list_ports.return_value = (
+            {'ports': [fakes.OS_PORT_1,
+                       fakes.OS_PORT_2]})
         self.db_api.get_items.side_effect = (
             lambda _, kind: [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2]
             if kind == 'eipalloc' else
             [fakes.DB_NETWORK_INTERFACE_1,
              fakes.DB_NETWORK_INTERFACE_2]
             if kind == 'eni' else [])
+        self.id_to_ec2_inst_id.return_value = fakes.ID_EC2_INSTANCE_1
 
         resp = self.execute('DescribeAddresses', {})
         self.assertEqual(200, resp['status'])

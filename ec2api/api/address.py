@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import netaddr
 from neutronclient.common import exceptions as neutron_exception
 from oslo.config import cfg
 
@@ -28,6 +29,9 @@ CONF = cfg.CONF
 CONF.import_opt('external_network', 'ec2api.api.internet_gateway')
 
 
+FILTER_MAP = {'vpc-id': 'vpcId'}
+
+
 # TODO(ft): generate unique association id
 
 def allocate_address(context, domain=None):
@@ -38,7 +42,8 @@ def allocate_address(context, domain=None):
     if not domain:
         ec2 = ec2client.ec2client(context)
         ec2_address = ec2.allocate_address()
-        return _format_address(context, ec2_address)
+        ec2_address['domain'] = 'standard'
+        return ec2_address
 
     neutron = clients.neutron(context)
     # TODO(ft): check no public network exists
@@ -58,7 +63,7 @@ def allocate_address(context, domain=None):
                    'public_ip': os_floating_ip['floating_ip_address']}
         address = db_api.add_item(context, 'eipalloc', address)
 
-    return _format_address(context, address=address)
+    return _format_address(context, address, os_floating_ip)
 
 
 def associate_address(context, public_ip=None, instance_id=None,
@@ -232,45 +237,75 @@ def release_address(context, public_ip=None, allocation_id=None):
 
 def describe_addresses(context, public_ip=None, allocation_id=None,
                        filter=None):
-    # TODO(ft):implement filters
-    ec2 = ec2client.ec2client(context)
-    ec2_addresses = ec2.describe_addresses(public_ip=public_ip,
-                                           allocation_id=allocation_id,
-                                           filter=filter)
+    if public_ip:
+        for ip in public_ip:
+            try:
+                ip_address = netaddr.IPAddress(ip)
+            except Exception as ex:
+                raise exception.InvalidParameterValue(
+                    value=str(public_ip),
+                    parameter='public_ip',
+                    reason='Invalid public IP specified')
     neutron = clients.neutron(context)
     os_floating_ips = neutron.list_floatingips()['floatingips']
-    os_floating_ips = dict((fip['floating_ip_address'], fip)
-                           for fip in os_floating_ips)
     addresses = ec2utils.get_db_items(context, 'eipalloc', allocation_id)
-    addresses = dict((eip['os_id'], eip)
-                     for eip in addresses)
+    address_pairs = []
+    for address in addresses:
+        os_floating_ip = next((ip for ip in os_floating_ips
+            if ip['id'] == address['os_id']), None)
+        if not os_floating_ip:
+            db_api.delete_item(context, address['id'])
+            continue
+        os_floating_ips.remove(os_floating_ip)
+        if public_ip:
+            if os_floating_ip['floating_ip_address'] in public_ip:
+                public_ip.remove(os_floating_ip['floating_ip_address'])
+            elif not allocation_id:
+                continue
+        address_pairs.append((address, os_floating_ip))
+    for os_floating_ip in os_floating_ips:
+        if (public_ip and
+                os_floating_ip['floating_ip_address'] in public_ip):
+            address_pairs.append((None, os_floating_ip))
+            public_ip.remove(os_floating_ip['floating_ip_address'])
+    if public_ip:
+        raise exception.InvalidAddressNotFound(
+            ip=os_floating_ip['floating_ip_address'])
+    formatted_addresses = []
+    os_ports = neutron.list_ports()['ports']
+    for address_pair in address_pairs:
+        formatted_address = _format_address(
+            context, address_pair[0], address_pair[1], os_ports)
+        if not utils.filtered_out(formatted_address, filter,
+                                  FILTER_MAP):
+            formatted_addresses.append(formatted_address)
+    return {'addressesSet': formatted_addresses}
 
-    for ec2_address in ec2_addresses['addressesSet']:
-        os_floating_ip = os_floating_ips.get(ec2_address['publicIp'])
-        address = (addresses.get(os_floating_ip['id'])
-                   if os_floating_ip else None)
-        _format_address(context, ec2_address, address)
 
-    return ec2_addresses
-
-
-def _format_address(context, ec2_address=None, address=None):
+def _format_address(context, address, os_floating_ip, os_ports=[]):
+    ec2_address = {'publicIp': os_floating_ip['floating_ip_address']}
+    fixed_ip_address = os_floating_ip.get('fixed_ip_address')
+    if fixed_ip_address:
+        ec2_address['privateIpAddress'] = fixed_ip_address
+        port_id = os_floating_ip.get('port_id')
+        if port_id:
+            port = next((port for port in os_ports
+                if port['id'] == port_id), None)
+            if port and port.get('device_id'):
+                ec2_address['instanceId'] = (
+                    ec2utils.id_to_ec2_inst_id(port['device_id']))
     if not address:
         ec2_address['domain'] = 'standard'
     else:
-        if not ec2_address:
-            ec2_address = {'publicIp': address['public_ip']}
-        ec2_address.update({
-                'domain': 'vpc',
-                'allocationId': ec2utils.get_ec2_id(address['id'],
-                                                    'eipalloc')})
+        ec2_address['domain'] = 'vpc'
+        ec2_address['allocationId'] = ec2utils.get_ec2_id(address['id'],
+                                                          'eipalloc')
         if 'network_interface_id' in address:
             ec2_address.update({
                     'associationId': ec2_address['allocationId'].
                     replace('eipalloc', 'eipassoc'),
                     'networkInterfaceId': ec2utils.get_ec2_id(
-                    address['network_interface_id'], 'eni'),
-                    'privateIpAddress': address['private_ip_address'],
+                        address['network_interface_id'], 'eni'),
                     'networkInterfaceOwnerId': context.project_id})
 
     return ec2_address
