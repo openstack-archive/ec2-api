@@ -32,7 +32,7 @@ LOG = logging.getLogger(__name__)
 """DHCP options related API implementation
 """
 
-DHCP_OPTIONS_MAP = {'domain-name-servers': 'dns-servers',
+DHCP_OPTIONS_MAP = {'domain-name-servers': 'dns-server',
                     'domain-name': 'domain-name',
                     'ntp-servers': 'ntp-server',
                     'netbios-name-servers': 'netbios-ns',
@@ -43,20 +43,20 @@ def create_dhcp_options(context, dhcp_configuration):
     dhcp_options = {}
     for dhcp_option in dhcp_configuration:
         key = dhcp_option['key']
-        value = dhcp_option['value']
+        values = dhcp_option['value']
         if key not in DHCP_OPTIONS_MAP:
             raise exception.InvalidParameterValue(
-                        value=value,
+                        value=values,
                         parameter=key,
                         reason='Unrecognized key is specified')
-        if not type(value) is dict:
+        if not type(values) is list:
             raise exception.InvalidParameterValue(
-                value=value,
+                value=values,
                 parameter=key,
                 reason='List of values is expected')
         if key not in ['domain-name', 'netbios-node-type']:
             ips = []
-            for ip in value.values():
+            for ip in values:
                 ip_address = netaddr.IPAddress(ip)
                 if not ip_address:
                     raise exception.InvalidParameterValue(
@@ -66,7 +66,7 @@ def create_dhcp_options(context, dhcp_configuration):
                 ips.append(ip)
             dhcp_options[key] = ips
         else:
-            dhcp_options[key] = value.values()
+            dhcp_options[key] = values
     dhcp_options = db_api.add_item(context, 'dopt',
                                    {'dhcp_configuration': dhcp_options})
     return {'dhcpOptions':

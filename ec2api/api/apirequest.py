@@ -64,19 +64,25 @@ class APIRequest(object):
 
         args = ec2utils.dict_from_dotted_str(self.args.items())
 
-        for key in args.keys():
-            # NOTE(vish): Turn numeric dict keys into lists
-            # NOTE(Alex): Turn "value"-only dict keys into values
-            if isinstance(args[key], dict):
-                if args[key] == {}:
-                    continue
-                if args[key].keys()[0].isdigit():
-                    s = args[key].items()
-                    s.sort()
-                    args[key] = [v for k, v in s]
-                elif args[key].keys()[0] == 'value' and len(args[key]) == 1:
-                    args[key] = args[key]['value']
+        def convert_dicts_to_lists(args):
+            if not isinstance(args, dict):
+                return args
+            for key in args.keys():
+                # NOTE(vish): Turn numeric dict keys into lists
+                # NOTE(Alex): Turn "value"-only dict keys into values
+                if isinstance(args[key], dict):
+                    if args[key] == {}:
+                        continue
+                    if args[key].keys()[0].isdigit():
+                        s = args[key].items()
+                        s.sort()
+                        args[key] = [convert_dicts_to_lists(v) for k, v in s]
+                    elif (args[key].keys()[0] == 'value' and
+                            len(args[key]) == 1):
+                        args[key] = args[key]['value']
+            return args
 
+        args = convert_dicts_to_lists(args)
         result = method(context, **args)
         return self._render_response(result, context.request_id)
 

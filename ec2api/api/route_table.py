@@ -491,14 +491,14 @@ def _get_subnet_host_routes(context, route_table, gateway_ip,
         if 'gateway_id' in route:
             gateway_id = route['gateway_id']
             if gateway_id:
-                gateway = (router_objects['gateway_id']
+                gateway = (router_objects[route['gateway_id']]
                            if router_objects else
                            db_api.get_item_by_id(context, 'igw', gateway_id))
                 if (not gateway or
                         gateway.get('vpc_id') != route_table['vpc_id']):
                     return '127.0.0.1'
             return gateway_ip
-        network_interface = (router_objects['network_interface_id']
+        network_interface = (router_objects[route['network_interface_id']]
                              if router_objects else
                              db_api.get_item_by_id(
             context, 'eni',
