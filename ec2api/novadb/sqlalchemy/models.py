@@ -49,6 +49,30 @@ class NovaBase(models.SoftDeleteMixin,
         super(NovaBase, self).save(session=session)
 
 
+class S3Image(BASE, NovaBase):
+    """Compatibility layer for the S3 image service talking to Glance."""
+    __tablename__ = 's3_images'
+    __table_args__ = ()
+    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
+    uuid = Column(String(36), nullable=False)
+
+
+class VolumeIdMapping(BASE, NovaBase):
+    """Compatibility layer for the EC2 volume service."""
+    __tablename__ = 'volume_id_mappings'
+    __table_args__ = ()
+    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
+    uuid = Column(String(36), nullable=False)
+
+
+class SnapshotIdMapping(BASE, NovaBase):
+    """Compatibility layer for the EC2 snapshot service."""
+    __tablename__ = 'snapshot_id_mappings'
+    __table_args__ = ()
+    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
+    uuid = Column(String(36), nullable=False)
+
+
 class InstanceIdMapping(BASE, NovaBase):
     """Compatibility layer for the EC2 instance service."""
     __tablename__ = 'instance_id_mappings'

@@ -163,7 +163,50 @@ def model_query(context, model, *args, **kwargs):
     return query
 
 
+####################
+
+
+def s3_image_get(context, image_id):
+    """Find local s3 image represented by the provided id."""
+    result = (model_query(context, models.S3Image, read_deleted="yes").
+              filter_by(id=image_id).
+              first())
+
+    if not result:
+        raise exception.ImageNotFound(image_id=image_id)
+
+    return result
+
+
 ##################
+
+
+@require_context
+def get_volume_uuid_by_ec2_id(context, ec2_id):
+    result = (model_query(context, models.VolumeIdMapping, read_deleted='yes').
+              filter_by(id=ec2_id).
+              first())
+
+    if not result:
+        raise exception.VolumeNotFound(volume_id=ec2_id)
+
+    return result['uuid']
+
+
+@require_context
+def get_snapshot_uuid_by_ec2_id(context, ec2_id):
+    result = (model_query(context, models.SnapshotIdMapping,
+                          read_deleted='yes').
+              filter_by(id=ec2_id).
+              first())
+
+    if not result:
+        raise exception.SnapshotNotFound(snapshot_id=ec2_id)
+
+    return result['uuid']
+
+
+###################
 
 
 @require_context

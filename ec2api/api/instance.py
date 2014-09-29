@@ -15,6 +15,8 @@
 
 import collections
 import copy
+import random
+import re
 
 from ec2api.api import clients
 from ec2api.api import ec2client
@@ -35,9 +37,12 @@ from ec2api.openstack.common import timeutils
 
 
 def run_instances(context, image_id, min_count, max_count,
-                  subnet_id=None, private_ip_address=None,
-                  network_interface=None, security_group=None,
-                  security_group_id=None, **kwargs):
+                  key_name=None, security_group_id=None,
+                  security_group=None, user_data=None, instance_type=None,
+                  placement=None, kernel_id=None, ramdisk_id=None,
+                  block_device_mapping=None, subnet_id=None,
+                  private_ip_address=None, client_token=None,
+                  network_interface=None, **kwargs):
     # TODO(ft): fix passing complex network parameters create_network_interface
     # TODO(ft): check the compatibility of complex network parameters and
     # multiple running
@@ -45,7 +50,23 @@ def run_instances(context, image_id, min_count, max_count,
     # network interface params function
     _check_min_max_count(min_count, max_count)
 
-    (ec2_security_groups,
+    # TODO(ft): support client tokens
+
+    os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
+            context, image_id, kernel_id, ramdisk_id)
+
+    nova = clients.nova(context)
+    os_flavor = next((f for f in nova.flavors.list()
+                      if f.name == instance_type), None)
+    if not os_flavor:
+        raise exception.InvalidParameterValue(value=instance_type,
+                                              parameter='InstanceType')
+
+    bdm = _parse_block_device_mapping(block_device_mapping, os_image)
+
+    # TODO(ft): support auto_assign_floating_ip
+
+    (security_groups_names,
      vpc_network_parameters) = _merge_network_interface_parameters(
             security_group,
             subnet_id, private_ip_address, security_group_id,
@@ -98,34 +119,44 @@ def run_instances(context, image_id, min_count, max_count,
 
         ec2 = ec2client.ec2client(context)
         # NOTE(ft): run instances one by one using created ports
-        ec2_instance_network_pairs = []
+        network_interfaces_by_instances = {}
+        ec2_instance_ids = []
         for network_interfaces in instance_network_interfaces:
-            arg_network_interfaces = [{'network_interface_id': eni['os_id']}
-                                       for eni in network_interfaces]
-            ec2_reservation = ec2.run_instances(
-                    image_id=image_id,
-                    min_count=1, max_count=1,
-                    network_interface=arg_network_interfaces,
-                    security_group=ec2_security_groups,
-                    **kwargs)
-            ec2_instance = ec2_reservation['instancesSet'][0]
+            nics = [{'port-id': eni['os_id']} for eni in network_interfaces]
+            os_instance = nova.servers.create(
+                'EC2 server', os_image.id, os_flavor,
+                min_count=1, max_count=1,
+                kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
+                availability_zone=(placement or {}).get('availability_zone'),
+                block_device_mapping=bdm,
+                security_group=security_groups_names,
+                nics=nics,
+                key_name=key_name, userdata=user_data)
+
+            ec2_instance_id = ec2utils.id_to_ec2_inst_id(os_instance.id)
             cleaner.addCleanup(ec2.terminate_instances,
-                               instance_id=ec2_instance['instanceId'])
-            ec2_instance_network_pairs.append((ec2_instance,
-                                               network_interfaces,))
+                               instance_id=ec2_instance_id)
+            nova.servers.update(os_instance, name=ec2_instance_id)
+
+            network_interfaces_by_instances[ec2_instance_id] = (
+                network_interfaces)
+            ec2_instance_ids.append(ec2_instance_id)
 
         # TODO(ft): receive port from a create_network_interface sub-function
         os_ports = neutron.list_ports()['ports']
         os_ports = dict((p['id'], p) for p in os_ports)
+        ec2_instances = ec2.describe_instances(instance_id=ec2_instance_ids)
+        ec2_instances = [i for r in ec2_instances['reservationSet']
+                         for i in r['instancesSet']]
         attach_time = timeutils.isotime(None, True)
         # TODO(ft): Process min and max counts on running errors accordingly to
         # their meanings. Correct error messages are also critical
-        ec2_instances = []
-        for ec2_instance, network_interfaces in ec2_instance_network_pairs:
+        for ec2_instance in ec2_instances:
             instance_ports_info = []
             instance_id = ec2utils.ec2_id_to_id(ec2_instance['instanceId'])
             delete_on_termination = iter(delete_on_termination_flags)
-            for network_interface in network_interfaces:
+            for network_interface in network_interfaces_by_instances[
+                    ec2_instance['instanceId']]:
                 # TODO(ft): implement update items in DB layer to prevent
                 # record by record modification
                 # Alternatively a create_network_interface sub-function can
@@ -141,17 +172,16 @@ def run_instances(context, image_id, min_count, max_count,
                 os_port = os_ports[network_interface['os_id']]
                 instance_ports_info.append((network_interface, os_port, [],))
 
-            _format_instance(context, ec2_instance, instance_ports_info,
-                             security_groups)
-            ec2_instances.append(ec2_instance)
+            _format_instance(context, ec2_instance,
+                             instance_ports_info, security_groups)
 
     # TODO(ft): since we run instances separately each instance has its
     # own ec2_reservation id. Now we return ec2_reservation id of
     # the last started instance
     # If we aren't able to update OpenStack to fit ec2 requirements,
     # we should have our own ec2_reservation id to use it instead of Nova's.
-    ec2_reservation['instancesSet'] = ec2_instances
-    return ec2_reservation
+    ec2_reservation_id = _generate_reservation_id()
+    return _format_reservation(context, ec2_reservation_id, ec2_instances)
 
 
 def terminate_instances(context, instance_id):
@@ -267,7 +297,20 @@ def _format_instance(context, ec2_instance, ports_info, security_groups):
     return ec2_instance
 
 
+def _format_reservation(context, ec2_reservation_id, ec2_instances):
+    return {'reservationId': ec2_reservation_id,
+            'ownerId': context.project_id,
+            'instancesSet': ec2_instances,
+            # TODO(ft): Check AWS behavior: can it start zero instances with
+            # successfull result?
+            'groupSet': ec2_instances[0].get('groupSet')}
+
+
 def _check_min_max_count(min_count, max_count):
+    # TODO(ft): figure out appropriate aws message and use them
+    min_count = int(min_count)
+    max_count = int(max_count)
+
     if min_count < 1:
         msg = _('Minimum instance count must be greater than zero')
         raise exception.InvalidParameterValue(msg)
@@ -278,6 +321,52 @@ def _check_min_max_count(min_count, max_count):
         msg = _('Maximum instance count must not be smaller than '
                 'minimum instance count')
         raise exception.InvalidParameterValue(msg)
+
+
+def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
+    glance = clients.glance(context)
+    if kernel_id:
+        os_kernel_id = ec2utils.ec2_id_to_glance_id(context, kernel_id)
+        glance.images.get(os_kernel_id)
+    if ramdisk_id:
+        os_ramdisk_id = ec2utils.ec2_id_to_glance_id(context, ramdisk_id)
+        glance.images.get(os_ramdisk_id)
+    os_image_id = ec2utils.ec2_id_to_glance_id(context, image_id)
+    os_image = glance.images.get(os_image_id)
+
+    if _cloud_get_image_state(os_image) != 'available':
+        # TODO(ft): Change the message with the real AWS message
+        msg = _('Image must be available')
+        raise exception.ImageNotActive(message=msg)
+
+    return os_image, kernel_id, ramdisk_id
+
+
+def _parse_block_device_mapping(block_device_mapping, os_image):
+    # NOTE(ft): The following code allows reconfiguration of devices
+    # according to list of new parameters supplied in EC2 call.
+    # This code merges these parameters with information taken from image.
+    image_root_device_name = os_image.properties.get('root_device_name')
+    image_bdm = dict(
+        (_block_device_strip_dev(bd.get('device_name') or
+                                image_root_device_name),
+         bd)
+        for bd in os_image.properties.get('block_device_mapping', [])
+        if bd.get('device_name') or bd.get('boot_index') == 0)
+
+    for args_bd in (block_device_mapping or []):
+        _cloud_parse_block_device_mapping(args_bd)
+        dev_name = _block_device_strip_dev(args_bd.get('device_name'))
+        if (not dev_name or dev_name not in image_bdm or
+                'snapshot_id' in args_bd or 'volume_id' in args_bd):
+            continue
+        image_bd = image_bdm[dev_name]
+        for key in ('device_name', 'delete_on_termination', 'virtual_name',
+                    'snapshot_id', 'volume_id', 'volume_size',
+                    'no_device'):
+            args_bd[key] = args_bd.get(key, image_bd.get(key))
+
+    return block_device_mapping
 
 
 def _merge_network_interface_parameters(security_group_names,
@@ -441,3 +530,57 @@ def _create_network_interfaces(context, cleaner, params):
         network_interfaces.append(network_interface)
 
     return network_interfaces
+
+
+# NOTE(ft): following functions are copied from various parts of Nova
+
+_dev = re.compile('^/dev/')
+
+
+def _block_device_strip_dev(device_name):
+    """remove leading '/dev/'."""
+    return _dev.sub('', device_name) if device_name else device_name
+
+
+def _cloud_parse_block_device_mapping(bdm):
+    """Parse BlockDeviceMappingItemType into flat hash
+
+    BlockDevicedMapping.<N>.DeviceName
+    BlockDevicedMapping.<N>.Ebs.SnapshotId
+    BlockDevicedMapping.<N>.Ebs.VolumeSize
+    BlockDevicedMapping.<N>.Ebs.DeleteOnTermination
+    BlockDevicedMapping.<N>.Ebs.NoDevice
+    BlockDevicedMapping.<N>.VirtualName
+    => remove .Ebs and allow volume id in SnapshotId
+    """
+    ebs = bdm.pop('ebs', None)
+    if ebs:
+        ec2_id = ebs.pop('snapshot_id', None)
+        if ec2_id:
+            if ec2_id.startswith('snap-'):
+                bdm['snapshot_id'] = ec2utils.ec2_snap_id_to_uuid(ec2_id)
+            elif ec2_id.startswith('vol-'):
+                bdm['volume_id'] = ec2utils.ec2_vol_id_to_uuid(ec2_id)
+            else:
+                # NOTE(ft): AWS returns undocumented InvalidSnapshotID.NotFound
+                raise exception.InvalidSnapshotIDMalformed(snapshot_id=ec2_id)
+            ebs.setdefault('delete_on_termination', True)
+        bdm.update(ebs)
+    return bdm
+
+
+def _utils_generate_uid(topic, size=8):
+    characters = '01234567890abcdefghijklmnopqrstuvwxyz'
+    choices = [random.choice(characters) for _x in xrange(size)]
+    return '%s-%s' % (topic, ''.join(choices))
+
+
+def _generate_reservation_id():
+    return _utils_generate_uid('r')
+
+
+def _cloud_get_image_state(image):
+    state = image.status
+    if state == 'active':
+        state = 'available'
+    return image.properties.get('image_state', state)

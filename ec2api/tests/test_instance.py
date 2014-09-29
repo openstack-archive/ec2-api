@@ -13,6 +13,7 @@
 #    under the License.
 
 
+import collections
 import copy
 import itertools
 
@@ -36,6 +37,28 @@ class InstanceTestCase(base.ApiTestCase):
         self.create_network_interface = (
             create_network_interface_patcher.start())
         self.addCleanup(create_network_interface_patcher.stop)
+        glance_patcher = mock.patch('glanceclient.client.Client')
+        self.glance = glance_patcher.start().return_value
+        self.addCleanup(glance_patcher.stop)
+        ec2_id_to_glance_id_patcher = (
+            mock.patch('ec2api.api.ec2utils.ec2_id_to_glance_id'))
+        self.ec2_id_to_glance_id = ec2_id_to_glance_id_patcher.start()
+        self.addCleanup(ec2_id_to_glance_id_patcher.stop)
+        id_to_ec2_inst_id_patcher = (
+            mock.patch('ec2api.api.ec2utils.id_to_ec2_inst_id'))
+        self.id_to_ec2_inst_id = id_to_ec2_inst_id_patcher.start()
+        self.addCleanup(id_to_ec2_inst_id_patcher.stop)
+        utils_generate_uid_patcher = (
+            mock.patch('ec2api.api.instance._utils_generate_uid'))
+        self.utils_generate_uid = utils_generate_uid_patcher.start()
+        self.addCleanup(utils_generate_uid_patcher.stop)
+
+        self.fake_image_class = collections.namedtuple(
+            'FakeImage', ['id', 'status', 'properties'])
+        self.fake_flavor_class = collections.namedtuple(
+            'FakeFlavor', ['name'])
+        self.fake_instance_class = collections.namedtuple(
+            'FakeInstance', ['id'])
 
     def test_run_instances(self):
         """Run instance with various network interface settings."""
@@ -48,13 +71,26 @@ class InstanceTestCase(base.ApiTestCase):
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.create_network_interface.return_value = (
             {'networkInterface': fakes.EC2_NETWORK_INTERFACE_1})
-        self.ec2.run_instances.return_value = (
-            fakes.gen_ec2_reservation([fakes.gen_ec2_instance(
-                fakes.ID_EC2_INSTANCE_1, private_ip_address=None)]))
+        self.ec2.describe_instances.return_value = {
+            'reservationSet': [fakes.gen_ec2_reservation(
+                fakes.ID_EC2_RESERVATION_1,
+                [fakes.gen_ec2_instance(fakes.ID_EC2_INSTANCE_1,
+                                        private_ip_address=None)])]}
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
+        self.id_to_ec2_inst_id.return_value = fakes.ID_EC2_INSTANCE_1
+        self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
+
+        self.glance.images.get.return_value = self.fake_image_class(
+                'fake_image_id', 'active', {})
+        self.ec2_id_to_glance_id.return_value = 'fake_image_id'
+        fake_flavor = self.fake_flavor_class('fake_flavor')
+        self.nova_flavors.list.return_value = [fake_flavor]
+        self.nova_servers.create.return_value = self.fake_instance_class(
+                fakes.ID_OS_INSTANCE_1)
 
         def do_check(params, new_port=True, delete_on_termination=None):
-            params.update({'ImageId': 'fake_image',
+            params.update({'ImageId': 'ami-00000001',
+                           'InstanceType': 'fake_flavor',
                            'MinCount': '1', 'MaxCount': '1'})
             resp = self.execute('RunInstances', params)
             self.assertEqual(200, resp['status'])
@@ -78,25 +114,30 @@ class InstanceTestCase(base.ApiTestCase):
                 ec2_instance_id=fakes.ID_EC2_INSTANCE_1,
                 delete_on_termination=delete_port_on_termination,
                 for_instance_output=True)
-            expected_reservation = fakes.gen_ec2_reservation([
-                fakes.gen_ec2_instance(
+            expected_reservation = fakes.gen_ec2_reservation(
+                fakes.ID_EC2_RESERVATION_1,
+                [fakes.gen_ec2_instance(
                     fakes.ID_EC2_INSTANCE_1, private_ip_address=None,
                     ec2_network_interfaces=[eni])])
             self.assertThat(resp, matchers.DictMatches(expected_reservation))
             if new_port:
                 self.create_network_interface.assert_called_once_with(
                     mock.ANY, fakes.EC2_SUBNET_1['subnetId'])
-            self.ec2.run_instances.assert_called_once_with(
-                image_id='fake_image',
+            self.nova_servers.create.assert_called_once_with(
+                'EC2 server', 'fake_image_id', fake_flavor,
                 min_count=1, max_count=1,
+                kernel_id=None, ramdisk_id=None,
+                availability_zone=None,
+                block_device_mapping=None,
                 security_group=None,
-                network_interface=[
-                    {'network_interface_id': fakes.ID_OS_PORT_1}])
+                nics=[{'port-id': fakes.ID_OS_PORT_1}],
+                key_name=None, userdata=None)
             self.db_api.update_item.assert_called_once_with(
                 mock.ANY, db_attached_eni)
             self.isotime.assert_called_once_with(None, True)
 
             self.create_network_interface.reset_mock()
+            self.nova_servers.reset_mock()
             self.ec2.reset_mock()
             self.db_api.reset_mock()
             self.isotime.reset_mock()
@@ -119,11 +160,14 @@ class InstanceTestCase(base.ApiTestCase):
         """Run 2 instances at once on 2 subnets in all combinations."""
         self._build_multiple_data_model()
 
-        ec2os_reservations = [
-            fakes.gen_ec2_reservation([
-                fakes.gen_ec2_instance(ec2_instance_id,
-                                       private_ip_address=None)])
-            for ec2_instance_id in self.IDS_EC2_INSTANCE]
+        self.id_to_ec2_inst_id.side_effect = self.IDS_EC2_INSTANCE
+        self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
+
+        self.glance.images.get.return_value = self.fake_image_class(
+                'fake_image_id', 'active', {})
+        self.ec2_id_to_glance_id.return_value = 'fake_image_id'
+        fake_flavor = self.fake_flavor_class('fake_flavor')
+        self.nova_flavors.list.return_value = [fake_flavor]
 
         ec2_instances = [
             fakes.gen_ec2_instance(
@@ -133,7 +177,8 @@ class InstanceTestCase(base.ApiTestCase):
             for ec2_instance_id, eni_pair in zip(
                 self.IDS_EC2_INSTANCE,
                 zip(*[iter(self.EC2_ATTACHED_ENIS)] * 2))]
-        ec2_reservation = fakes.gen_ec2_reservation(ec2_instances)
+        ec2_reservation = fakes.gen_ec2_reservation(fakes.ID_EC2_RESERVATION_1,
+                                                    ec2_instances)
 
         fakes_db_items = dict((eni['id'], eni)
                               for eni in self.DB_DETACHED_ENIS)
@@ -145,16 +190,24 @@ class InstanceTestCase(base.ApiTestCase):
         self.create_network_interface.side_effect = (
             [{'networkInterface': eni}
              for eni in self.EC2_DETACHED_ENIS])
-        self.ec2.run_instances.side_effect = (
-            [copy.deepcopy(r)
-             for r in ec2os_reservations])
+        self.ec2.describe_instances.return_value = {
+            'reservationSet': [
+                fakes.gen_ec2_reservation(
+                    fakes.ID_EC2_RESERVATION_1,
+                    [fakes.gen_ec2_instance(ec2_instance_id,
+                                            private_ip_address=None)
+                     for ec2_instance_id in self.IDS_EC2_INSTANCE])]}
+        self.nova_servers.create.side_effect = [
+            self.fake_instance_class(os_instance_id)
+            for os_instance_id in self.IDS_OS_INSTANCE]
         self.neutron.list_ports.return_value = (
             {'ports': self.OS_DETACHED_PORTS + [self.OS_FAKE_PORT]})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
 
         resp = self.execute(
             'RunInstances',
-            {'ImageId': 'fake_image',
+            {'ImageId': 'ami-00000001',
+             'InstanceType': 'fake_flavor',
              'MinCount': '2',
              'MaxCount': '2',
              'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
@@ -168,13 +221,17 @@ class InstanceTestCase(base.ApiTestCase):
         self.create_network_interface.assert_has_calls([
             mock.call(mock.ANY, ec2_subnet_id)
             for ec2_subnet_id in self.IDS_EC2_SUBNET_BY_PORT])
-        self.ec2.run_instances.assert_has_calls([
-            mock.call(image_id='fake_image',
-                      min_count=1, max_count=1,
-                      security_group=None,
-                      network_interface=[
-                          {'network_interface_id': port_id}
-                          for port_id in port_ids])
+        self.nova_servers.create.assert_has_calls([
+            mock.call(
+                'EC2 server', 'fake_image_id', fake_flavor,
+                min_count=1, max_count=1,
+                kernel_id=None, ramdisk_id=None,
+                availability_zone=None,
+                block_device_mapping=None,
+                security_group=None,
+                nics=[{'port-id': port_id}
+                      for port_id in port_ids],
+                key_name=None, userdata=None)
             for port_ids in zip(*[iter(self.IDS_OS_PORT)] * 2)])
         self.db_api.update_item.assert_has_calls([
             mock.call(mock.ANY, eni)
@@ -194,14 +251,27 @@ class InstanceTestCase(base.ApiTestCase):
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.create_network_interface.return_value = (
             {'networkInterface': fakes.EC2_NETWORK_INTERFACE_1})
-        self.ec2.run_instances.return_value = (
-            fakes.gen_ec2_reservation([fakes.gen_ec2_instance(
-                fakes.ID_EC2_INSTANCE_1, private_ip_address=None)]))
+        self.ec2.describe_instances.return_value = {
+            'reservationSet': [fakes.gen_ec2_reservation(
+                fakes.ID_EC2_RESERVATION_1,
+                [fakes.gen_ec2_instance(fakes.ID_EC2_INSTANCE_1,
+                                        private_ip_address=None)])]}
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
+        self.id_to_ec2_inst_id.return_value = fakes.ID_EC2_INSTANCE_1
+        self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
+
+        self.glance.images.get.return_value = self.fake_image_class(
+                'fake_image_id', 'active', {})
+        self.ec2_id_to_glance_id.return_value = 'fake_image_id'
+        fake_flavor = self.fake_flavor_class('fake_flavor')
+        self.nova_flavors.list.return_value = [fake_flavor]
+        self.nova_servers.create.return_value = self.fake_instance_class(
+                fakes.ID_OS_INSTANCE_1)
         format_instance.side_effect = Exception()
 
         def do_check(params, new_port=True, delete_on_termination=None):
-            params.update({'ImageId': 'fake_image',
+            params.update({'ImageId': 'ami-00000001',
+                           'InstanceType': 'fake_flavor',
                            'MinCount': '1', 'MaxCount': '1'})
             self.execute('RunInstances', params)
 
@@ -419,11 +489,14 @@ class InstanceTestCase(base.ApiTestCase):
                      is_instance_ip_in_vpc_by_instance=[True, True]):
             def gen_reservation_set(instances):
                 if separate_reservations:
-                    return [fakes.gen_ec2_reservation([instances[0]]),
-                            fakes.gen_ec2_reservation([instances[1]])]
+                    return [fakes.gen_ec2_reservation(
+                                fakes.ID_EC2_RESERVATION_1, [instances[0]]),
+                            fakes.gen_ec2_reservation(
+                                fakes.ID_EC2_RESERVATION_2, [instances[1]])]
                 else:
-                    return [fakes.gen_ec2_reservation([instances[0],
-                                                       instances[1]])]
+                    return [fakes.gen_ec2_reservation(
+                        fakes.ID_EC2_RESERVATION_1, [instances[0],
+                                                     instances[1]])]
 
             instances = [fakes.gen_ec2_instance(inst_id, private_ip_address=ip)
                          for inst_id, ip in zip(
@@ -634,29 +707,3 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertIn('device_id', list_ports_kwargs)
         self.assertEqual(sorted(instance_ids),
                          sorted(list_ports_kwargs['device_id']))
-
-
-class InstanceIntegrationTestCase(base.ApiTestCase):
-
-    def test_run_instances(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1,
-                 fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                 fakes.ID_DB_NETWORK_INTERFACE_1:
-                 fakes.DB_NETWORK_INTERFACE_1}))
-        self.db_api.add_item.return_value = fakes.DB_NETWORK_INTERFACE_1
-        self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
-        self.neutron.create_port.return_value = {'port': fakes.OS_PORT_1}
-        self.neutron.list_ports.return_value = {'ports': [fakes.OS_PORT_1]}
-        self.ec2.run_instances.return_value = (
-            fakes.gen_ec2_reservation([fakes.gen_ec2_instance(
-                fakes.ID_EC2_INSTANCE_1, private_ip_address=None)]))
-        self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
-
-        resp = self.execute('RunInstances',
-                            {'ImageId': 'fake_image',
-                             'MinCount': '1', 'MaxCount': '1',
-                             'SubnetId': fakes.ID_EC2_SUBNET_1})
-
-        self.assertEqual(200, resp['status'])

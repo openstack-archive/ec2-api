@@ -175,6 +175,16 @@ def is_ec2_timestamp_expired(request, expires=None):
         return True
 
 
+def id_to_glance_id(context, image_id):
+    """Convert an internal (db) id to a glance id."""
+    return novadb.s3_image_get(context, image_id)['uuid']
+
+
+def ec2_id_to_glance_id(context, ec2_id):
+    image_id = ec2_id_to_id(ec2_id)
+    return id_to_glance_id(context, image_id)
+
+
 # TODO(Alex) This function is copied as is from original cloud.py. It doesn't
 # check for the prefix which allows any prefix used for any object.
 def ec2_id_to_id(ec2_id):
@@ -220,6 +230,31 @@ def get_int_id_from_instance_uuid(context, instance_uuid):
     except exception.NotFound:
         return novadb.ec2_instance_create(context, instance_uuid)['id']
 
+
+def get_volume_uuid_from_int_id(context, int_id):
+    return novadb.get_volume_uuid_by_ec2_id(context, int_id)
+
+
+def ec2_vol_id_to_uuid(ec2_id):
+    """Get the corresponding UUID for the given ec2-id."""
+    ctxt = context.get_admin_context()
+
+    # NOTE(jgriffith) first strip prefix to get just the numeric
+    int_id = ec2_id_to_id(ec2_id)
+    return get_volume_uuid_from_int_id(ctxt, int_id)
+
+
+def get_snapshot_uuid_from_int_id(context, int_id):
+    return novadb.get_snapshot_uuid_by_ec2_id(context, int_id)
+
+
+def ec2_snap_id_to_uuid(ec2_id):
+    """Get the corresponding UUID for the given ec2-id."""
+    ctxt = context.get_admin_context()
+
+    # NOTE(jgriffith) first strip prefix to get just the numeric
+    int_id = ec2_id_to_id(ec2_id)
+    return get_snapshot_uuid_from_int_id(ctxt, int_id)
 
 # NOTE(ft): extra functions to use in vpc specific code or instead of
 # malformed existed functions

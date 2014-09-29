@@ -80,6 +80,25 @@ MAX_INT = 0x7FFFFFFF
 ####################
 
 
+def s3_image_get(context, image_id):
+    """Find local s3 image represented by the provided id."""
+    return IMPL.s3_image_get(context, image_id)
+
+
+###################
+
+
+def get_volume_uuid_by_ec2_id(context, ec2_id):
+    return IMPL.get_volume_uuid_by_ec2_id(context, ec2_id)
+
+
+def get_snapshot_uuid_by_ec2_id(context, ec2_id):
+    return IMPL.get_snapshot_uuid_by_ec2_id(context, ec2_id)
+
+
+###################
+
+
 def get_ec2_instance_id_by_uuid(context, instance_id):
     """Get ec2 id through uuid from instance_id_mappings table."""
     return IMPL.get_ec2_instance_id_by_uuid(context, instance_id)

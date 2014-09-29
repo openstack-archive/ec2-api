@@ -1005,9 +1005,12 @@ class CloudController(object):
             private_ip_address)
 
     def run_instances(self, context, image_id, min_count, max_count,
-                     subnet_id=None, private_ip_address=None,
-                     network_interface=None, security_group=None,
-                     security_group_id=None, **kwargs):
+                      key_name=None, security_group_id=None,
+                      security_group=None, user_data=None, instance_type=None,
+                      placement=None, kernel_id=None, ramdisk_id=None,
+                      block_device_mapping=None, subnet_id=None,
+                      private_ip_address=None, client_token=None,
+                      network_interface=None, **kwargs):
         """Launches the specified number of instances using an AMI.
 
         Args:
@@ -1021,10 +1024,33 @@ class CloudController(object):
                 If you specify more instances than EC2 can launch in the target
                 Availability Zone, EC2 launches the largest possible number
                 of instances above max_count.
+            key_name (str): The name of the key pair.
+            security_group_id (list of str): One or more security group IDs.
+            security_group (list of str): One or more security group names.
+                For VPC mode, you must use security_group_id.
+            user_data (str): Base64-encoded MIME user data for the instances.
+            instance_type (str): The instance type.
+            placement (dict): Dict can contain:
+                availability_zone (str): Availability Zone for the instance.
+            kernel_id (str): The ID of the kernel.
+            ramdisk_id (str): The ID of the RAM disk.
+            block_device_mapping (list of dict): Dict can contain:
+                device_name (str): The device name exposed to the instance
+                    (for example, /dev/sdh or xvdh).
+                virtual_name (str): The virtual device name (ephemeral[0..3]).
+                ebs (dict): Dict can contain:
+                    volume_id (str): The ID of the volume (Nova extension).
+                    snapshot_id (str): The ID of the snapshot.
+                    volume_size (str): The size of the volume, in GiBs.
+                    delete_on_termination (bool): Indicates whether to delete
+                        the volume on instance termination.
+                no_device (str): Suppresses the device mapping.
             subnet_id (str): The ID of the subnet to launch the instance into.
             private_ip_address (str): The primary IP address.
                 You must specify a value from the IP address range
                 of the subnet.
+            client_token (str): Unique, case-sensitive identifier you provide
+                to ensure idempotency of the request.
             network_interface (list of dicts): Dict can contain:
                 network_interface_id (str): An existing interface to attach
                     to a single instance. Requires n=1 instances.
@@ -1053,9 +1079,6 @@ class CloudController(object):
                         IP address using private_ip_address.
                 associate_public_ip_address (boolean): Indicates whether
                     to assign a public IP address to an instance in a VPC.
-            security_group (list of str): One or more security group names.
-                For a nondefault VPC, you must use security_group_id.
-            security_group_id (list of str): One or more security group IDs.
             kwargs: Other arguments supported by AWS EC2.
 
         Returns:
@@ -1065,9 +1088,12 @@ class CloudController(object):
         uses the default security group.
         """
         return instance.run_instances(context, image_id, min_count, max_count,
-                                      subnet_id, private_ip_address,
-                                      network_interface, security_group,
-                                      security_group_id, **kwargs)
+                                      key_name, security_group_id,
+                                      security_group, user_data, instance_type,
+                                      placement, kernel_id, ramdisk_id,
+                                      block_device_mapping, subnet_id,
+                                      private_ip_address, client_token,
+                                      network_interface, **kwargs)
 
     def terminate_instances(self, context, instance_id):
         """Shuts down one or more instances.

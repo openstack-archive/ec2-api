@@ -160,7 +160,8 @@ ID_EC2_INSTANCE_1 = ec2utils.get_ec2_id(ID_DB_INSTANCE_1, 'i')
 ID_EC2_INSTANCE_2 = ec2utils.get_ec2_id(ID_DB_INSTANCE_2, 'i')
 ID_OS_INSTANCE_1 = random_os_id()
 ID_OS_INSTANCE_2 = random_os_id()
-
+ID_EC2_RESERVATION_1 = 'r-%s' % random_db_id()
+ID_EC2_RESERVATION_2 = 'r-%s' % random_db_id()
 
 # DHCP options constants
 ID_DB_DHCP_OPTIONS_1 = random_db_id()
@@ -838,7 +839,9 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
     return ec2_instance
 
 
-def gen_ec2_reservation(ec2_instances):
+def gen_ec2_reservation(ec2_reservation_id, ec2_instances):
     """Generate EC2 Reservation dictionary."""
-    return {'instancesSet': [inst for inst in ec2_instances],
-            'fakeKey': 'fakeValue'}
+    return {'reservationId': ec2_reservation_id,
+            'ownerId': ID_OS_PROJECT,
+            'instancesSet': [inst for inst in ec2_instances],
+            'groupSet': []}

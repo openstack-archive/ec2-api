@@ -36,9 +36,11 @@ class ApiTestCase(test_base.BaseTestCase):
         neutron_patcher = mock.patch('neutronclient.v2_0.client.Client')
         self.neutron = neutron_patcher.start().return_value
         self.addCleanup(neutron_patcher.stop)
-        nova_servers_patcher = mock.patch('novaclient.v1_1.client.Client')
-        self.nova_servers = nova_servers_patcher.start().return_value.servers
-        self.addCleanup(nova_servers_patcher.stop)
+        nova_patcher = mock.patch('novaclient.v1_1.client.Client')
+        nova_mock = nova_patcher.start()
+        self.nova_servers = nova_mock.return_value.servers
+        self.nova_flavors = nova_mock.return_value.flavors
+        self.addCleanup(nova_patcher.stop)
         db_api_patcher = mock.patch('ec2api.db.api.IMPL')
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)
