@@ -275,9 +275,11 @@ def describe_network_interface_attribute(context, network_interface_id,
                                              network_interface_id)
     # TODO(Alex): Implement attachments, groupSet
 
+    db_key = attribute if attribute == 'description' else 'source_dest_check'
+    default_value = '' if attribute == 'description' else True
     return {'networkInterfaceId': ec2utils.get_ec2_id(
         network_interface['id'], 'eni'),
-        'description': {'value': network_interface.get('description', '')}}
+        attribute: {'value': network_interface.get(db_key, default_value)}}
 
 
 def modify_network_interface_attribute(context, network_interface_id,
@@ -291,23 +293,26 @@ def modify_network_interface_attribute(context, network_interface_id,
     if params_count != 1:
         raise exception.InvalidParameterCombination(
             'Multiple attributes specified')
-    # TODO(Alex) OpenStack doesn't support it. We should return error if
-    # True is specified in this parameter.
-    if source_dest_check is not None:
-        return True
     network_interface = ec2utils.get_db_item(context, 'eni',
                                              network_interface_id)
     # TODO(Alex): Implement attachments
     if description is not None:
         network_interface['description'] = description
         db_api.update_item(context, network_interface)
+    neutron = clients.neutron(context)
+    os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
     if security_group_id is not None:
-        neutron = clients.neutron(context)
-        os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
         os_groups = [ec2utils.get_db_item(context, 'sg', ec2_id)['os_id']
                      for ec2_id in security_group_id]
         os_port = neutron.update_port(os_port['id'],
                                       {'port': {'security_groups': os_groups}})
+    if source_dest_check is not None:
+        allowed = [] if source_dest_check else [{'ip_address': '0.0.0.0/0'}]
+        os_port = neutron.update_port(
+            os_port['id'],
+            {'port': {'allowed_address_pairs': allowed}})
+        network_interface['source_dest_check'] = source_dest_check
+        db_api.update_item(context, network_interface)
     return True
 
 
@@ -388,7 +393,8 @@ def _format_network_interface(context, network_interface, os_port,
     ec2_network_interface['description'] = network_interface['description']
     # TODO(Alex) Implement
     # ec2_network_interface['availabilityZone'] = ''
-    ec2_network_interface['sourceDestCheck'] = 'False'
+    ec2_network_interface['sourceDestCheck'] = (
+        network_interface.get('source_dest_check', True))
     ec2_network_interface['requesterManaged'] = (
         os_port.get('device_owner', '').startswith('network:'))
     ec2_network_interface['ownerId'] = context.project_id
