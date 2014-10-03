@@ -25,8 +25,17 @@ from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 
 
-CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
+
+ec2_opts = [
+    cfg.StrOpt('network_device_mtu',
+               default=1500,
+               help='MTU size to set by DHCP for instances. Corresponds '
+                    'with the network_device_mtu in nova.conf.')
+]
+
+CONF = cfg.CONF
+CONF.register_opts(ec2_opts)
 
 
 """DHCP options related API implementation
@@ -137,7 +146,8 @@ def associate_dhcp_options(context, dhcp_options_id, vpc_id):
 
 def _add_dhcp_opts_to_port(context, dhcp_options, network_interface, os_port,
                            neutron=None):
-    dhcp_opts = []
+    dhcp_opts = [{'opt_name': 'mtu',
+                  'opt_value': str(CONF.network_device_mtu)}]
     if dhcp_options is not None:
         for key, values in dhcp_options['dhcp_configuration'].items():
             strvalues = [str(v) for v in values]
