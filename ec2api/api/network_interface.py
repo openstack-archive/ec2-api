@@ -324,6 +324,10 @@ def reset_network_interface_attribute(context, network_interface_id,
     # "sourceDestCheck" should be used instead of "SourceDestCheck".
     # Also aws cli doesn't work with it because it doesn't comply with
     # the API.
+    if attribute == 'sourceDestCheck':
+        return modify_network_interface_attribute(context,
+                                                  network_interface_id,
+                                                  source_dest_check=True)
     return True
 
 
