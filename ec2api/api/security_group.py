@@ -176,10 +176,10 @@ def _build_rule(context, group_id, ip_permissions, direction):
         if rule.get('groups'):
             os_security_group_rule_body['remote_group_id'] = (
                 ec2utils.get_db_item(context, 'sg',
-                                     rule['groups']['1']['group_id'])['os_id'])
+                                     rule['groups'][0]['group_id'])['os_id'])
         elif rule.get('ip_ranges'):
             os_security_group_rule_body['remote_ip_prefix'] = (
-                rule['ip_ranges']['1']['cidr_ip'])
+                rule['ip_ranges'][0]['cidr_ip'])
     return os_security_group_rule_body
 
 
@@ -205,6 +205,7 @@ def _are_identical_rules(rule1, rule2):
         dict = {}
         for key, value in rule.items():
             if (value is not None and value != -1 and
+                    value != '0.0.0.0/0' and
                     key not in ['id', 'tenant_id']):
                 dict[key] = str(value)
         return dict
