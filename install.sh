@@ -7,6 +7,7 @@ SERVICE_TENANT=service
 CONNECTION="mysql://ec2api:ec2api@127.0.0.1/ec2api?charset=utf8"
 LOG_DIR=/var/log/ec2api
 CONF_DIR=/etc/ec2api
+NOVA_CONF=/etc/nova/nova.conf
 SIGNING_DIR=/var/cache/ec2api
 
 #Check for environment
@@ -14,7 +15,6 @@ if [[ -z "$OS_AUTH_URL" || -z "$OS_USERNAME" || -z "$OS_PASSWORD" || -z "$OS_TEN
     echo "Please set OS_AUTH_URL, OS_USERNAME, OS_PASSWORD and OS_TENANT_NAME"
     exit 1
 fi
-
 
 
 #### utilities functions merged from devstack to check required parameter is not empty
@@ -175,6 +175,58 @@ $option = $value
     fi
 }
 
+# Get an option from an INI file
+# iniget config-file section option
+function iniget() {
+    local file=$1
+    local section=$2
+    local option=$3
+    local line
+    line=$(sed -ne "/^\[$section\]/,/^\[.*\]/ { /^$option[ \t]*=/ p; }" "$file")
+    echo ${line#*=}
+}
+
+
+#get nova settings
+if [[ -z "$NOVA_CONNECTION" ]]; then
+    if [[ ! -f "$NOVA_CONF" ]]; then
+        reason="$NOVA_CONF isn't found"
+    else
+        reason="Connection string isn't found in $NOVA_CONF"
+        NOVA_CONNECTION=$(iniget $NOVA_CONF database connection)
+        if [[ -z "$NOVA_CONNECTION" ]]; then
+            NOVA_CONNECTION=$(iniget $NOVA_CONF DEFAULT sql_connection)
+        fi
+        if [[ -z "$NOVA_CONNECTION" ]]; then
+            NOVA_CONNECTION=$(iniget $NOVA_CONF DATABASE sql_connection)
+        fi
+        if [[ -z "$NOVA_CONNECTION" ]]; then
+            NOVA_CONNECTION=$(iniget $NOVA_CONF sql connection)
+        fi
+    fi
+    if [[ -z "$NOVA_CONNECTION" ]]; then
+        echo "$reason"
+        echo "Please set NOVA_CONNECTION environment variable to the connection string to Nova DB"
+        exit 1
+    fi
+fi
+if [[ -z "$EXTERNAL_NETWORK" ]]; then
+    declare -a newtron_output
+    readarray -s 3 -t newtron_output < <(neutron net-external-list)
+    if ((${#newtron_output[@]} < 2)); then
+        reason="No external network is declared in Neutron."
+    elif ((${#newtron_output[@]} > 2)); then
+        reason="More than one external networks are declared in Neutron."
+    else
+        EXTERNAL_NETWORK=$(echo $newtron_output | awk -F '|' '{ print $3 }')
+    fi
+    if [[ -z "$EXTERNAL_NETWORK" ]]; then
+        echo $reason
+        echo "Please set PUBLIC_NETWORK environment variable to the external network dedicated to EC2 elastic IP operations"
+        exit 1
+    fi
+fi
+
 
 #create keystone user with admin privileges
 ADMIN_ROLE=$(get_data 2 admin 1 keystone role-list)
@@ -221,6 +273,8 @@ iniset $CONF_FILE DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d
 iniset $CONF_FILE DEFAULT verbose True
 iniset $CONF_FILE DEFAULT keystone_url "$OS_AUTH_URL"
 iniset $CONF_FILE database connection "$CONNECTION"
+iniset $CONF_FILE database connection_nova "$NOVA_CONNECTION"
+iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
 
 iniset $CONF_FILE keystone_authtoken signing_dir $SIGNING_DIR
 iniset $CONF_FILE keystone_authtoken auth_host $AUTH_HOST
