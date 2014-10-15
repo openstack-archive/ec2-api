@@ -327,3 +327,13 @@ class InvalidSnapshotIDMalformed(Invalid):
     ec2_code = 'InvalidSnapshotID.Malformed'
     # TODO(ft): Change the message with the real AWS message
     msg_fmg = _('The snapshot %(snapshot_id)s ID is not valid')
+
+
+class KeypairNotFound(NotFound):
+    ec2_code = 'InvalidKeyPair.NotFound'
+    msg_fmt = _("Keypair %(name)s not found for user %(user_id)s")
+
+
+class KeyPairExists(Invalid):
+    ec2_code = 'InvalidKeyPair.Duplicate'
+    msg_fmt = _("Key pair '%(key_name)s' already exists.")
