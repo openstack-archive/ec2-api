@@ -19,7 +19,6 @@ import itertools
 
 import mock
 
-from ec2api.api import ec2utils
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
@@ -64,9 +63,9 @@ class InstanceTestCase(base.ApiTestCase):
         """Run instance with various network interface settings."""
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1,
-                 fakes.ID_DB_NETWORK_INTERFACE_1:
-                 copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1)}))
+                {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
+                 fakes.ID_EC2_NETWORK_INTERFACE_1:
+                    copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1)}))
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.create_network_interface.return_value = (
@@ -99,12 +98,12 @@ class InstanceTestCase(base.ApiTestCase):
                                           if delete_on_termination is None
                                           else delete_on_termination)
             db_attached_eni = fakes.gen_db_network_interface(
-                fakes.ID_DB_NETWORK_INTERFACE_1,
-                fakes.ID_OS_PORT_1, fakes.ID_DB_VPC_1,
-                fakes.ID_DB_SUBNET_1,
+                fakes.ID_EC2_NETWORK_INTERFACE_1,
+                fakes.ID_OS_PORT_1, fakes.ID_EC2_VPC_1,
+                fakes.ID_EC2_SUBNET_1,
                 fakes.IP_NETWORK_INTERFACE_1,
                 fakes.DESCRIPTION_NETWORK_INTERFACE_1,
-                instance_id=fakes.ID_DB_INSTANCE_1,
+                instance_id=fakes.ID_EC2_INSTANCE_1,
                 delete_on_termination=delete_port_on_termination)
             eni = fakes.gen_ec2_network_interface(
                 fakes.ID_EC2_NETWORK_INTERFACE_1,
@@ -183,8 +182,8 @@ class InstanceTestCase(base.ApiTestCase):
         fakes_db_items = dict((eni['id'], eni)
                               for eni in self.DB_DETACHED_ENIS)
         fakes_db_items.update({
-            fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1,
-            fakes.ID_DB_SUBNET_2: fakes.DB_SUBNET_2})
+            fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
+            fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(fakes_db_items))
         self.create_network_interface.side_effect = (
@@ -244,9 +243,9 @@ class InstanceTestCase(base.ApiTestCase):
                                     delete_network_interface):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1,
-                 fakes.ID_DB_NETWORK_INTERFACE_1:
-                 copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1)}))
+                {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
+                 fakes.ID_EC2_NETWORK_INTERFACE_1:
+                    copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1)}))
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.create_network_interface.return_value = (
@@ -318,9 +317,10 @@ class InstanceTestCase(base.ApiTestCase):
                              {'instanceId': fakes.ID_EC2_INSTANCE_2,
                               'fakeKey': 'fakeValue'}]}
 
-        os_instance_ids_dict = {fakes.ID_DB_INSTANCE_1: fakes.ID_OS_INSTANCE_1,
-                                fakes.ID_DB_INSTANCE_2: fakes.ID_OS_INSTANCE_2}
-        self.get_instance_uuid_from_int_id.side_effect = (
+        os_instance_ids_dict = {
+            fakes.ID_EC2_INSTANCE_1: fakes.ID_OS_INSTANCE_1,
+            fakes.ID_EC2_INSTANCE_2: fakes.ID_OS_INSTANCE_2}
+        self.ec2_inst_id_to_uuid.side_effect = (
             lambda _, inst_id: os_instance_ids_dict[inst_id])
         self.neutron.list_ports.return_value = {'ports': [fakes.OS_PORT_2]}
         self.db_api.get_items.return_value = (
@@ -337,10 +337,10 @@ class InstanceTestCase(base.ApiTestCase):
         resp.pop('status')
         self.assertThat(resp, matchers.DictMatches(
             ec2_terminate_instances_result))
-        self.get_instance_uuid_from_int_id.assert_any_call(
-            mock.ANY, fakes.ID_DB_INSTANCE_1)
-        self.get_instance_uuid_from_int_id.assert_any_call(
-            mock.ANY, fakes.ID_DB_INSTANCE_2)
+        self.ec2_inst_id_to_uuid.assert_any_call(
+            mock.ANY, fakes.ID_EC2_INSTANCE_1)
+        self.ec2_inst_id_to_uuid.assert_any_call(
+            mock.ANY, fakes.ID_EC2_INSTANCE_2)
         self._assert_list_ports_is_called_with_filter(
             [fakes.ID_OS_INSTANCE_1, fakes.ID_OS_INSTANCE_2])
         self.neutron.update_port.assert_called_once_with(
@@ -360,9 +360,10 @@ class InstanceTestCase(base.ApiTestCase):
                              {'instanceId': fakes.ID_EC2_INSTANCE_2,
                               'fakeKey': 'fakeValue'}]}
 
-        os_instance_ids_dict = {fakes.ID_DB_INSTANCE_1: fakes.ID_OS_INSTANCE_1,
-                                fakes.ID_DB_INSTANCE_2: fakes.ID_OS_INSTANCE_2}
-        self.get_instance_uuid_from_int_id.side_effect = (
+        os_instance_ids_dict = {
+            fakes.ID_EC2_INSTANCE_1: fakes.ID_OS_INSTANCE_1,
+            fakes.ID_EC2_INSTANCE_2: fakes.ID_OS_INSTANCE_2}
+        self.ec2_inst_id_to_uuid.side_effect = (
             lambda _, inst_id: os_instance_ids_dict[inst_id])
         self.ec2.terminate_instances.return_value = (
             ec2_terminate_instances_result)
@@ -382,7 +383,7 @@ class InstanceTestCase(base.ApiTestCase):
             self.assertThat(resp, matchers.DictMatches(
                 ec2_terminate_instances_result))
             for inst_id in self.IDS_DB_INSTANCE:
-                self.get_instance_uuid_from_int_id.assert_any_call(
+                self.ec2_inst_id_to_uuid.assert_any_call(
                     mock.ANY, inst_id)
             self._assert_list_ports_is_called_with_filter(self.IDS_OS_INSTANCE)
             self.ec2.terminate_instances.assert_called_once_with(
@@ -406,7 +407,7 @@ class InstanceTestCase(base.ApiTestCase):
                     mock.ANY,
                     port['id'])
 
-            self.get_instance_uuid_from_int_id.reset_mock()
+            self.ec2_inst_id_to_uuid.reset_mock()
             self.neutron.list_ports.reset_mock()
             self.neutron.update_port.reset_mock()
             self.ec2.terminate_instances.reset_mock()
@@ -579,17 +580,17 @@ class InstanceTestCase(base.ApiTestCase):
         instances_count = 2
         subnets_count = 2
         ports_count = instances_count * subnets_count
-        ids_db_eni = [fakes.random_db_id() for _ in range(ports_count)]
+        ids_ec2_eni = [fakes.random_ec2_id('eni') for _ in range(ports_count)]
         ids_os_port = [fakes.random_os_id() for _ in range(ports_count)]
 
-        ids_db_subnet = (fakes.ID_DB_SUBNET_1, fakes.ID_DB_SUBNET_2)
+        ids_db_subnet = (fakes.ID_EC2_SUBNET_1, fakes.ID_EC2_SUBNET_2)
         ids_db_subnet_by_port = ids_db_subnet * 2
         ids_ec2_subnet = (fakes.ID_EC2_SUBNET_1, fakes.ID_EC2_SUBNET_2)
         ids_ec2_subnet_by_port = ids_ec2_subnet * 2
         ips = (fakes.IP_FIRST_SUBNET_1, fakes.IP_FIRST_SUBNET_2,
                fakes.IP_LAST_SUBNET_1, fakes.IP_LAST_SUBNET_2)
 
-        ids_db_instance = [fakes.ID_DB_INSTANCE_1, fakes.ID_DB_INSTANCE_2]
+        ids_db_instance = [fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]
         ids_db_instance_by_port = list(
             itertools.chain(*map(lambda i: [i] * subnets_count,
                                  ids_db_instance)))
@@ -605,12 +606,12 @@ class InstanceTestCase(base.ApiTestCase):
         dots_by_port = [True, False] * instances_count
         db_attached_enis = [
             fakes.gen_db_network_interface(
-                db_id, os_id, fakes.ID_DB_VPC_1,
+                ec2_id, os_id, fakes.ID_EC2_VPC_1,
                 subnet_db_id, ip,
                 instance_id=instance_db_id,
                 delete_on_termination=dot)
-            for db_id, os_id, subnet_db_id, ip, instance_db_id, dot in zip(
-                ids_db_eni,
+            for ec2_id, os_id, subnet_db_id, ip, instance_db_id, dot in zip(
+                ids_ec2_eni,
                 ids_os_port,
                 ids_db_subnet_by_port,
                 ips,
@@ -618,16 +619,16 @@ class InstanceTestCase(base.ApiTestCase):
                 dots_by_port)]
         db_detached_enis = [
             fakes.gen_db_network_interface(
-                db_id, os_id, fakes.ID_DB_VPC_1,
+                ec2_id, os_id, fakes.ID_EC2_VPC_1,
                 subnet_db_id, ip)
-            for db_id, os_id, subnet_db_id, ip in zip(
-                ids_db_eni,
+            for ec2_id, os_id, subnet_db_id, ip in zip(
+                ids_ec2_eni,
                 ids_os_port,
                 ids_db_subnet_by_port,
                 ips)]
         ec2_attached_enis = [
             fakes.gen_ec2_network_interface(
-                ec2utils.get_ec2_id(db_eni['id'], 'eni'),
+                db_eni['id'],
                 None,  # ec2_subnet
                 [db_eni['private_ip_address']],
                 ec2_instance_id=ec2_instance_id,
@@ -642,7 +643,7 @@ class InstanceTestCase(base.ApiTestCase):
                 ids_ec2_instance_by_port)]
         ec2_detached_enis = [
             fakes.gen_ec2_network_interface(
-                ec2utils.get_ec2_id(db_eni['id'], 'eni'),
+                db_eni['id'],
                 None,  # ec2_subnet
                 [db_eni['private_ip_address']],
                 ec2_subnet_id=ec2_subnet_id,
@@ -669,7 +670,6 @@ class InstanceTestCase(base.ApiTestCase):
                 ec2_detached_enis,
                 ids_db_subnet_by_port)]
 
-        self.IDS_DB_ENI = ids_db_eni
         self.IDS_OS_PORT = ids_os_port
         self.IDS_DB_INSTANCE = ids_db_instance
         self.IDS_OS_INSTANCE = ids_os_instance
@@ -684,11 +684,11 @@ class InstanceTestCase(base.ApiTestCase):
 
         # NOTE(ft): additional fake data to check filtering, etc
         self.DB_FAKE_ENI = fakes.gen_db_network_interface(
-            fakes.random_db_id(), fakes.random_os_id(),
-            fakes.ID_DB_VPC_1, fakes.ID_DB_SUBNET_2,
+            fakes.random_ec2_id('eni'), fakes.random_os_id(),
+            fakes.ID_EC2_VPC_1, fakes.ID_EC2_SUBNET_2,
             'fake_ip')
         ec2_fake_eni = fakes.gen_ec2_network_interface(
-            ec2utils.get_ec2_id(self.DB_FAKE_ENI['id'], 'eni'),
+            self.DB_FAKE_ENI['id'],
             fakes.EC2_SUBNET_2, ['fake_ip'])
         self.OS_FAKE_PORT = fakes.gen_os_port(
             fakes.random_os_id(), ec2_fake_eni,

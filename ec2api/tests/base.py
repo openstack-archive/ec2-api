@@ -48,11 +48,6 @@ class ApiTestCase(test_base.BaseTestCase):
             mock.patch('ec2api.api.ec2utils.ec2_inst_id_to_uuid'))
         self.ec2_inst_id_to_uuid = ec2_inst_id_to_uuid_patcher.start()
         self.addCleanup(ec2_inst_id_to_uuid_patcher.stop)
-        get_instance_uuid_from_int_id_patcher = (
-            mock.patch('ec2api.api.ec2utils.get_instance_uuid_from_int_id'))
-        self.get_instance_uuid_from_int_id = (
-            get_instance_uuid_from_int_id_patcher.start())
-        self.addCleanup(get_instance_uuid_from_int_id_patcher.stop)
         # TODO(ft): patch EC2Client object instead of ec2client function
         # to make this similar to other patchers (neutron)
         # Now it's impossible since tests use EC2Client._parse_xml

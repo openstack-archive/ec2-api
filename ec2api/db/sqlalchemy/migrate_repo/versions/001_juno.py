@@ -12,7 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from sqlalchemy import Column, Integer, MetaData
+from sqlalchemy import Column, MetaData
 from sqlalchemy import PrimaryKeyConstraint, String, Table, Text
 from sqlalchemy import UniqueConstraint
 
@@ -22,10 +22,9 @@ def upgrade(migrate_engine):
     meta.bind = migrate_engine
 
     items = Table('items', meta,
-        Column("id", Integer(), autoincrement=True),
+        Column("id", String(length=30)),
         Column("project_id", String(length=64)),
-        Column("vpc_id", Integer),
-        Column("kind", String(length=20)),
+        Column("vpc_id", String(length=12)),
         Column("os_id", String(length=36)),
         Column("data", Text()),
         PrimaryKeyConstraint('id'),

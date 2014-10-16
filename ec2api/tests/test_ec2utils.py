@@ -23,50 +23,36 @@ from ec2api.tests import matchers
 
 class EC2UtilsTestCase(testtools.TestCase):
 
-    def test_get_ec2_id(self):
-        self.assertEqual('vpc-000004d2',
-                         ec2utils.get_ec2_id(0x4d2, 'vpc'))
-        self.assertEqual('vpc-000004d2',
-                         ec2utils.get_ec2_id(long(0x4d2), 'vpc'))
-        self.assertRaises(OverflowError,
-                          ec2utils.get_ec2_id, -1, 'vpc')
-        self.assertRaises(OverflowError,
-                          ec2utils.get_ec2_id, 0x123456789, 'vpc')
-        self.assertRaises(TypeError,
-                          ec2utils.get_ec2_id, 'fake', 'vpc')
-        self.assertRaises(TypeError,
-                          ec2utils.get_ec2_id, 1.1, 'vpc')
-
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_db_item(self, db_api):
         item = {'fake_key': 'fake_value'}
         db_api.get_item_by_id.return_value = item
 
-        def check_normal_flow(db_id, kind, ec2_id):
-            item['id'] = db_id
+        def check_normal_flow(kind, ec2_id):
+            item['id'] = ec2_id
             res = ec2utils.get_db_item('fake_context', kind, ec2_id)
             self.assertThat(res, matchers.DictMatches(item))
             db_api.get_item_by_id.assert_called_once_with('fake_context',
-                                                          kind, db_id)
+                                                          kind, ec2_id)
             db_api.reset_mock()
 
-        check_normal_flow(0x001234af, 'vpc', 'vpc-001234af')
-        check_normal_flow(0x22, 'igw', 'igw-22')
+        check_normal_flow('vpc', 'vpc-001234af')
+        check_normal_flow('igw', 'igw-00000022')
 
-        def check_not_found(kind, ec2_id, item_id, ex_class):
+        def check_not_found(kind, ec2_id, ex_class):
             self.assertRaises(ex_class,
                               ec2utils.get_db_item,
                               'fake_context', kind, ec2_id)
             db_api.get_item_by_id.assert_called_once_with('fake_context',
-                                                          kind, item_id)
+                                                          kind, ec2_id)
             db_api.reset_mock()
 
         db_api.get_item_by_id.return_value = None
-        check_not_found('vpc', 'vpc-22', 0x22,
+        check_not_found('vpc', 'vpc-00000022',
                         exception.InvalidVpcIDNotFound)
-        check_not_found('igw', 'igw-22', 0x22,
+        check_not_found('igw', 'igw-00000022',
                         exception.InvalidInternetGatewayIDNotFound)
-        check_not_found('subnet', 'subnet-22', 0x22,
+        check_not_found('subnet', 'subnet-00000022',
                         exception.InvalidSubnetIDNotFound)
 
     def test_validate_cidr(self):

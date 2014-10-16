@@ -31,7 +31,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_route_table_create(self):
         self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_DB_ROUTE_TABLE_1))
+            fakes.get_db_api_add_item(fakes.ID_EC2_ROUTE_TABLE_1))
         resp = self.execute('CreateRouteTable',
                             {'VpcId': fakes.ID_EC2_VPC_1})
         self.assertEqual(200, resp['status'])
@@ -42,11 +42,11 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY,
             'rtb',
-            {'vpc_id': fakes.ID_DB_VPC_1,
+            {'vpc_id': fakes.ID_EC2_VPC_1,
              'routes': [{'destination_cidr_block': fakes.CIDR_VPC_1,
                          'gateway_id': None}]})
         self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'vpc', fakes.ID_DB_VPC_1)
+            mock.ANY, 'vpc', fakes.ID_EC2_VPC_1)
 
     def test_route_table_create_invalid_parameters(self):
         self.db_api.get_item_by_id.return_value = None
@@ -59,13 +59,13 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_create_route(self, routes_updater):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_DB_IGW_1: fakes.DB_IGW_1,
-                fakes.ID_DB_NETWORK_INTERFACE_1:
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
+                fakes.ID_EC2_NETWORK_INTERFACE_1:
                 fakes.DB_NETWORK_INTERFACE_1,
-                fakes.ID_DB_NETWORK_INTERFACE_2:
+                fakes.ID_EC2_NETWORK_INTERFACE_2:
                 fakes.DB_NETWORK_INTERFACE_2}))
         self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
                                               fakes.DB_NETWORK_INTERFACE_2]
@@ -86,7 +86,7 @@ class RouteTableTestCase(base.ApiTestCase):
             routes_updater.reset_mock()
 
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
-        route_table['routes'].append({'gateway_id': fakes.ID_DB_IGW_1,
+        route_table['routes'].append({'gateway_id': fakes.ID_EC2_IGW_1,
                                       'destination_cidr_block': '0.0.0.0/0'})
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                   'DestinationCidrBlock': '0.0.0.0/0',
@@ -95,7 +95,7 @@ class RouteTableTestCase(base.ApiTestCase):
 
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
         route_table['routes'].append({
-            'network_interface_id': fakes.ID_DB_NETWORK_INTERFACE_1,
+            'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1,
             'destination_cidr_block': '192.168.75.0/24'})
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                   'DestinationCidrBlock': '192.168.75.0/24',
@@ -104,7 +104,7 @@ class RouteTableTestCase(base.ApiTestCase):
 
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
         route_table['routes'].append({
-            'network_interface_id': fakes.ID_DB_NETWORK_INTERFACE_2,
+            'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_2,
             'destination_cidr_block': '192.168.80.0/24'})
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                   'DestinationCidrBlock': '192.168.80.0/24',
@@ -123,31 +123,29 @@ class RouteTableTestCase(base.ApiTestCase):
                  fakes.DB_ROUTE_TABLE_2, fakes.DB_ROUTE_TABLE_2)
 
     def test_create_route_invalid_parameters(self):
-        id_db_eni_vpc_2 = fakes.random_db_id()
-        id_ec2_eni_vpc_2 = ec2utils.get_ec2_id(id_db_eni_vpc_2, 'eni')
+        id_ec2_eni_vpc_2 = fakes.random_ec2_id('eni')
         eni_vpc_2 = fakes.gen_db_network_interface(
-            id_db_eni_vpc_2, fakes.random_os_id(),
-            fakes.ID_DB_VPC_2, fakes.random_db_id(), '10.20.0.10',
-            instance_id=fakes.ID_DB_INSTANCE_2)
+            id_ec2_eni_vpc_2, fakes.random_os_id(),
+            fakes.ID_EC2_VPC_2, fakes.random_ec2_id('subnet'), '10.20.0.10',
+            instance_id=fakes.ID_EC2_INSTANCE_2)
 
-        id_db_eni_2_in_instance_1 = fakes.random_db_id()
         eni_2_in_instance_1 = fakes.gen_db_network_interface(
-            id_db_eni_2_in_instance_1, fakes.random_os_id(),
-            fakes.ID_DB_VPC_1, fakes.random_db_id(), '10.10.3.15',
-            instance_id=fakes.ID_DB_INSTANCE_1)
+            fakes.random_ec2_id('eni'), fakes.random_os_id(),
+            fakes.ID_EC2_VPC_1, fakes.random_ec2_id('subnet'), '10.10.3.15',
+            instance_id=fakes.ID_EC2_INSTANCE_1)
 
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_DB_IGW_1: fakes.DB_IGW_1,
-                fakes.ID_DB_IGW_2: fakes.DB_IGW_2,
-                fakes.ID_DB_NETWORK_INTERFACE_1:
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
+                fakes.ID_EC2_IGW_2: fakes.DB_IGW_2,
+                fakes.ID_EC2_NETWORK_INTERFACE_1:
                 fakes.DB_NETWORK_INTERFACE_1,
-                fakes.ID_DB_NETWORK_INTERFACE_2:
+                fakes.ID_EC2_NETWORK_INTERFACE_2:
                 fakes.DB_NETWORK_INTERFACE_2,
-                id_db_eni_vpc_2: eni_vpc_2}))
+                id_ec2_eni_vpc_2: eni_vpc_2}))
 
         def do_check(params, error_code):
             resp = self.execute('CreateRoute', params)
@@ -159,8 +157,7 @@ class RouteTableTestCase(base.ApiTestCase):
                   'GatewayId': fakes.ID_EC2_IGW_1},
                  'InvalidParameterValue')
 
-        do_check({'RouteTableId': ec2utils.get_ec2_id(fakes.random_db_id(),
-                                                      'rtb'),
+        do_check({'RouteTableId': fakes.random_ec2_id('rtb'),
                   'DestinationCidrBlock': fakes.CIDR_VPC_1,
                   'GatewayId': fakes.ID_EC2_IGW_1},
                  'InvalidRouteTableID.NotFound')
@@ -234,12 +231,12 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_create_or_replace_route_rollback(self, routes_updater):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_DB_IGW_1: fakes.DB_IGW_1,
-                fakes.ID_DB_IGW_2: fakes.gen_db_igw(
-                    fakes.ID_DB_IGW_2, fakes.ID_DB_VPC_1)}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
+                fakes.ID_EC2_IGW_2: fakes.gen_db_igw(
+                    fakes.ID_EC2_IGW_2, fakes.ID_EC2_VPC_1)}))
         routes_updater.side_effect = Exception()
 
         self.execute('CreateRoute',
@@ -261,14 +258,14 @@ class RouteTableTestCase(base.ApiTestCase):
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
     def test_replace_route(self, routes_updater):
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
-        route_table['routes'].append({'gateway_id': fakes.ID_DB_IGW_1,
+        route_table['routes'].append({'gateway_id': fakes.ID_EC2_IGW_1,
                                       'destination_cidr_block': '0.0.0.0/0'})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: route_table,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_DB_IGW_1: fakes.DB_IGW_1,
-                fakes.ID_DB_NETWORK_INTERFACE_1:
+                fakes.ID_EC2_ROUTE_TABLE_1: route_table,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
+                fakes.ID_EC2_NETWORK_INTERFACE_1:
                 fakes.DB_NETWORK_INTERFACE_1}))
         self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
                                               fakes.DB_NETWORK_INTERFACE_2]
@@ -284,7 +281,7 @@ class RouteTableTestCase(base.ApiTestCase):
         rollback_route_table_state = route_table
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
         route_table['routes'].append({
-            'network_interface_id': fakes.ID_DB_NETWORK_INTERFACE_1,
+            'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1,
             'destination_cidr_block': '0.0.0.0/0'})
         self.db_api.update_item.assert_called_once_with(mock.ANY, route_table)
         routes_updater.assert_called_once_with(mock.ANY, route_table, mock.ANY,
@@ -293,9 +290,9 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_replace_route_invalid_parameters(self):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_DB_IGW_1: fakes.DB_IGW_1}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                fakes.ID_EC2_IGW_1: fakes.DB_IGW_1}))
 
         resp = self.execute(
             'ReplaceRoute',
@@ -356,9 +353,9 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_associate_route_table(self, routes_updater):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_SUBNET_1:
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_SUBNET_1:
                 copy.deepcopy(fakes.DB_SUBNET_1)}))
         resp = self.execute('AssociateRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
@@ -368,7 +365,7 @@ class RouteTableTestCase(base.ApiTestCase):
                          resp['associationId'])
         subnet = tools.update_dict(
             fakes.DB_SUBNET_1,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_1})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1})
         self.db_api.update_item.assert_called_once_with(
             mock.ANY, subnet)
         routes_updater.assert_called_once_with(
@@ -388,32 +385,31 @@ class RouteTableTestCase(base.ApiTestCase):
 
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                 fakes.ID_DB_SUBNET_1: None}))
+                {fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                 fakes.ID_EC2_SUBNET_1: None}))
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                   'SubnetId': fakes.ID_EC2_SUBNET_1},
                  'InvalidSubnetID.NotFound')
 
-        id_db_subnet_vpc_2 = fakes.random_db_id()
-        id_ec2_subnet_vpc_2 = ec2utils.get_ec2_id(id_db_subnet_vpc_2, 'subnet')
-        db_subnet_vpc_2 = {'id': id_db_subnet_vpc_2,
+        id_ec2_subnet_vpc_2 = fakes.random_ec2_id('subnet')
+        db_subnet_vpc_2 = {'id': id_ec2_subnet_vpc_2,
                            'os_id': fakes.random_os_id(),
-                           'vpc_id': fakes.ID_DB_VPC_2}
+                           'vpc_id': fakes.ID_EC2_VPC_2}
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                 id_db_subnet_vpc_2: db_subnet_vpc_2}))
+                {fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                 id_ec2_subnet_vpc_2: db_subnet_vpc_2}))
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                   'SubnetId': id_ec2_subnet_vpc_2},
                  'InvalidParameterValue')
 
         subnet_2 = tools.update_dict(
             fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_2})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                 fakes.ID_DB_SUBNET_2: subnet_2}))
+                {fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                 fakes.ID_EC2_SUBNET_2: subnet_2}))
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                   'SubnetId': fakes.ID_EC2_SUBNET_2},
                  'Resource.AlreadyAssociated')
@@ -422,9 +418,9 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_associate_route_table_rollback(self, routes_updater):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_SUBNET_1:
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_SUBNET_1:
                 copy.deepcopy(fakes.DB_SUBNET_1)}))
         routes_updater.side_effect = Exception()
 
@@ -438,12 +434,12 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_replace_route_table_association(self, routes_updater):
         subnet = tools.update_dict(
             fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_1})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_SUBNET_2: subnet}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_SUBNET_2: subnet}))
         resp = self.execute('ReplaceRouteTableAssociation',
                             {'AssociationId':
                              fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
@@ -453,7 +449,7 @@ class RouteTableTestCase(base.ApiTestCase):
                          resp['associationId'])
         subnet = tools.update_dict(
             subnet,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_2})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.update_item.assert_called_once_with(
             mock.ANY, subnet)
         routes_updater.assert_called_once_with(
@@ -464,9 +460,9 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_replace_route_table_association_main(self, routes_updater):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         resp = self.execute('ReplaceRouteTableAssociation',
                             {'AssociationId':
                              fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
@@ -476,7 +472,7 @@ class RouteTableTestCase(base.ApiTestCase):
                          resp['associationId'])
         vpc = tools.update_dict(
             fakes.DB_VPC_1,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_2})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.update_item.assert_called_once_with(
             mock.ANY, vpc)
         routes_updater.assert_called_once_with(
@@ -497,8 +493,8 @@ class RouteTableTestCase(base.ApiTestCase):
         # NOTE(ft): association with vpc is obsolete
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                 fakes.ID_DB_VPC_1: None}))
+                {fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                 fakes.ID_EC2_VPC_1: None}))
         do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
                   'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1},
                  'InvalidAssociationID.NotFound')
@@ -506,8 +502,8 @@ class RouteTableTestCase(base.ApiTestCase):
         # NOTE(ft): association with subnet is obsolete (no subnet)
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                 fakes.ID_DB_SUBNET_2: None}))
+                {fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                 fakes.ID_EC2_SUBNET_2: None}))
         do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
                   'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2},
                  'InvalidAssociationID.NotFound')
@@ -516,25 +512,24 @@ class RouteTableTestCase(base.ApiTestCase):
         # disassociated)
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                 fakes.ID_DB_SUBNET_2: fakes.DB_SUBNET_2}))
+                {fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                 fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2}))
         do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
                   'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2},
                  'InvalidAssociationID.NotFound')
 
         # NOTE(ft): association belongs to different vpc
-        id_db_subnet_vpc_2 = fakes.random_db_id()
-        id_ec2_association_vpc_2 = ec2utils.get_ec2_id(id_db_subnet_vpc_2,
-                                                       'rtbassoc')
-        db_subnet_vpc_2 = {'id': id_db_subnet_vpc_2,
+        id_ec2_subnet_vpc_2 = fakes.random_ec2_id('subnet')
+        db_subnet_vpc_2 = {'id': id_ec2_subnet_vpc_2,
                            'os_id': fakes.random_os_id(),
-                           'vpc_id': fakes.ID_DB_VPC_2,
-                           'route_table_id': fakes.random_db_id()}
+                           'vpc_id': fakes.ID_EC2_VPC_2,
+                           'route_table_id': fakes.random_ec2_id('rtb')}
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                 id_db_subnet_vpc_2: db_subnet_vpc_2}))
-        do_check({'AssociationId': id_ec2_association_vpc_2,
+                {fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                 id_ec2_subnet_vpc_2: db_subnet_vpc_2}))
+        do_check({'AssociationId': ec2utils.change_ec2_id_kind(
+                        id_ec2_subnet_vpc_2, 'rtbassoc'),
                   'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2},
                  'InvalidParameterValue')
 
@@ -544,13 +539,13 @@ class RouteTableTestCase(base.ApiTestCase):
                                                       multiply_routes_updater):
         subnet = tools.update_dict(
             fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_1})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_SUBNET_2: subnet,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_SUBNET_2: subnet,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         multiply_routes_updater.side_effect = Exception()
 
         self.execute('ReplaceRouteTableAssociation',
@@ -573,13 +568,13 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_disassociate_route_table(self, routes_updater):
         subnet = tools.update_dict(
             fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_2})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_SUBNET_2: subnet,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_SUBNET_2: subnet,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         resp = self.execute(
             'DisassociateRouteTable',
             {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2})
@@ -607,7 +602,7 @@ class RouteTableTestCase(base.ApiTestCase):
             None
             if kind == 'subnet' else
             fakes.DB_VPC_1
-            if kind == 'vpc' and item_id == fakes.ID_DB_VPC_1
+            if kind == 'vpc' and item_id == fakes.ID_EC2_VPC_1
             else None)
         do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1},
                  'InvalidParameterValue')
@@ -620,13 +615,13 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_disassociate_route_table_rollback(self, routes_updater):
         subnet = tools.update_dict(
             fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_2})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_SUBNET_2: subnet,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_SUBNET_2: subnet,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         routes_updater.side_effect = Exception()
 
         self.execute('DisassociateRouteTable',
@@ -638,8 +633,8 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_delete_route_table(self):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1}))
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         self.db_api.get_items.return_value = [fakes.DB_SUBNET_1,
                                               fakes.DB_SUBNET_2]
         resp = self.execute('DeleteRouteTable',
@@ -648,7 +643,7 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY,
-            fakes.ID_DB_ROUTE_TABLE_2)
+            fakes.ID_EC2_ROUTE_TABLE_2)
 
     def test_delete_route_table_invalid_parameters(self):
         self.db_api.get_item_by_id.return_value = None
@@ -659,8 +654,8 @@ class RouteTableTestCase(base.ApiTestCase):
 
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1}))
+                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         resp = self.execute('DeleteRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1})
         self.assertEqual(400, resp['status'])
@@ -668,11 +663,11 @@ class RouteTableTestCase(base.ApiTestCase):
 
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_DB_VPC_1: fakes.DB_VPC_1}))
+                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         subnet = tools.update_dict(
             fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_2})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.get_items.return_value = [subnet]
         resp = self.execute('DeleteRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
@@ -693,8 +688,6 @@ class RouteTableTestCase(base.ApiTestCase):
             [fakes.DB_NETWORK_INTERFACE_1,
              fakes.DB_NETWORK_INTERFACE_2]
             if kind == 'eni' else [])
-        self.get_instance_uuid_from_int_id.return_value = (
-            fakes.ID_OS_INSTANCE_2)
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
         self.nova_servers.get.return_value = fake_server_class('ACTIVE')
         resp = self.execute('DescribeRouteTables', {})
@@ -706,28 +699,28 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_describe_route_tables_variations(self):
         igw_1 = tools.purge_dict(fakes.DB_IGW_1, ('vpc_id',))
         igw_2 = tools.update_dict(fakes.DB_IGW_2,
-                                  {'vpc_id': fakes.ID_DB_VPC_2})
+                                  {'vpc_id': fakes.ID_EC2_VPC_2})
         subnet_1 = tools.update_dict(
             fakes.DB_SUBNET_1,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_1})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1})
         subnet_2 = tools.update_dict(
             fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_DB_ROUTE_TABLE_2})
+            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         route_table_1 = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
         route_table_1['routes'].append(
             {'destination_cidr_block': '0.0.0.0/0',
-             'gateway_id': fakes.ID_DB_IGW_2})
+             'gateway_id': fakes.ID_EC2_IGW_2})
         route_table_1['routes'].append(
             {'destination_cidr_block': '192.168.77.0/24',
-             'network_interface_id': fakes.ID_DB_NETWORK_INTERFACE_1})
-        deleted_eni_id = fakes.random_db_id()
+             'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1})
+        deleted_eni_id = fakes.random_ec2_id('eni')
         route_table_1['routes'].append(
             {'destination_cidr_block': '192.168.99.0/24',
              'network_interface_id': deleted_eni_id})
         route_table_2 = copy.deepcopy(fakes.DB_ROUTE_TABLE_2)
         route_table_2['routes'].append(
             {'destination_cidr_block': '192.168.88.0/24',
-             'network_interface_id': fakes.ID_DB_NETWORK_INTERFACE_2})
+             'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_2})
         self.db_api.get_items.side_effect = (
             lambda _, kind:
             [route_table_1, route_table_2]
@@ -741,8 +734,6 @@ class RouteTableTestCase(base.ApiTestCase):
             [fakes.DB_NETWORK_INTERFACE_1,
              fakes.DB_NETWORK_INTERFACE_2]
             if kind == 'eni' else [])
-        self.get_instance_uuid_from_int_id.return_value = (
-            fakes.ID_OS_INSTANCE_2)
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
         self.nova_servers.get.return_value = fake_server_class('DOWN')
         resp = self.execute('DescribeRouteTables', {})
@@ -760,8 +751,7 @@ class RouteTableTestCase(base.ApiTestCase):
             'origin': 'CreateRoute'})
         ec2_route_table_1['routeSet'].append({
             'destinationCidrBlock': '192.168.99.0/24',
-            'networkInterfaceId': ec2utils.get_ec2_id(deleted_eni_id,
-                                                      'eni'),
+            'networkInterfaceId': deleted_eni_id,
             'state': 'blackhole',
             'origin': 'CreateRoute'})
         ec2_route_table_1['associationSet'].append({
@@ -793,10 +783,10 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_get_subnet_host_routes(self):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_IGW_1: fakes.DB_IGW_1,
-                fakes.ID_DB_NETWORK_INTERFACE_1:
+                fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
+                fakes.ID_EC2_NETWORK_INTERFACE_1:
                 fakes.DB_NETWORK_INTERFACE_1,
-                fakes.ID_DB_NETWORK_INTERFACE_2:
+                fakes.ID_EC2_NETWORK_INTERFACE_2:
                 fakes.DB_NETWORK_INTERFACE_2}))
 
         host_routes = route_table._get_subnet_host_routes(
@@ -871,12 +861,12 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_update_routes_in_associated_subnets(self, routes_updater,
                                                  get_router_objects):
         subnet_default_rtb = {'id': 'fake_1',
-                              'vpc_id': fakes.ID_DB_VPC_1}
+                              'vpc_id': fakes.ID_EC2_VPC_1}
         subnet_rtb_2 = {'id': 'fake_2',
-                        'vpc_id': fakes.ID_DB_VPC_1,
-                        'route_table_id': fakes.ID_DB_ROUTE_TABLE_2}
+                        'vpc_id': fakes.ID_EC2_VPC_1,
+                        'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2}
         subnet_vpc_2 = {'id': 'fake_3',
-                        'vpc_id': fakes.ID_DB_VPC_2}
+                        'vpc_id': fakes.ID_EC2_VPC_2}
         self.db_api.get_items.return_value = [subnet_default_rtb,
                                               subnet_rtb_2, subnet_vpc_2]
         self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
@@ -888,7 +878,7 @@ class RouteTableTestCase(base.ApiTestCase):
 
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, 'vpc',
-            fakes.ID_DB_VPC_1)
+            fakes.ID_EC2_VPC_1)
         routes_updater.assert_called_once_with(
             mock.ANY, subnet_rtb_2, fakes.DB_ROUTE_TABLE_2,
             cleaner='fake_cleaner',
@@ -917,12 +907,12 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_get_router_objects(self):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_IGW_1: fakes.DB_IGW_1,
-                fakes.ID_DB_NETWORK_INTERFACE_2:
+                fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
+                fakes.ID_EC2_NETWORK_INTERFACE_2:
                 fakes.DB_NETWORK_INTERFACE_2}))
         host_routes = route_table._get_router_objects('fake_context',
                                                       fakes.DB_ROUTE_TABLE_2)
         self.assertThat(host_routes, matchers.DictMatches({
-            fakes.ID_DB_IGW_1: fakes.DB_IGW_1,
-            fakes.ID_DB_NETWORK_INTERFACE_2:
+            fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
+            fakes.ID_EC2_NETWORK_INTERFACE_2:
                         fakes.DB_NETWORK_INTERFACE_2}))

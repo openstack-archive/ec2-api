@@ -59,8 +59,8 @@ def create_internet_gateway(context):
 def attach_internet_gateway(context, internet_gateway_id, vpc_id):
     igw = ec2utils.get_db_item(context, 'igw', internet_gateway_id)
     if igw.get('vpc_id'):
-        msg_params = {'igw_id': ec2utils.get_ec2_id(igw['id'], 'igw'),
-                      'vpc_id': ec2utils.get_ec2_id(igw['vpc_id'], 'vpc')}
+        msg_params = {'igw_id': igw['id'],
+                      'vpc_id': igw['vpc_id']}
         msg = _("resource %(igw_id)s is already attached to "
                 "network %(vpc_id)s") % msg_params
         raise exception.ResourceAlreadyAssociated(msg)
@@ -68,9 +68,8 @@ def attach_internet_gateway(context, internet_gateway_id, vpc_id):
     # TODO(ft): move search by vpc_id to DB api
     for gw in db_api.get_items(context, 'igw'):
         if gw.get('vpc_id') == vpc['id']:
-            msg_params = {'vpc_id': ec2utils.get_ec2_id(vpc['id'], 'vpc')}
             msg = _("Network %(vpc_id)s already has an internet gateway "
-                    "attached") % msg_params
+                    "attached") % {'vpc_id': vpc['id']}
             raise exception.InvalidParameterValue(msg)
 
     neutron = clients.neutron(context)
@@ -116,9 +115,8 @@ def detach_internet_gateway(context, internet_gateway_id, vpc_id):
 def delete_internet_gateway(context, internet_gateway_id):
     igw = ec2utils.get_db_item(context, 'igw', internet_gateway_id)
     if igw.get('vpc_id'):
-        msg_params = {'igw_id': ec2utils.get_ec2_id(igw['id'], 'igw')}
         msg = _("The internetGateway '%(igw_id)s' has dependencies and "
-                "cannot be deleted.") % msg_params
+                "cannot be deleted.") % {'igw_id': igw['id']}
         raise exception.DependencyViolation(msg)
     db_api.delete_item(context, igw['id'])
     return True
@@ -137,10 +135,10 @@ def describe_internet_gateways(context, internet_gateway_id=None,
 
 
 def _format_internet_gateway(igw):
-    ec2_igw = {'internetGatewayId': ec2utils.get_ec2_id(igw['id'], 'igw'),
-                'attachmentSet': []}
+    ec2_igw = {'internetGatewayId': igw['id'],
+               'attachmentSet': []}
     if igw.get('vpc_id'):
-        attachment = {'vpcId': ec2utils.get_ec2_id(igw['vpc_id'], 'vpc'),
+        attachment = {'vpcId': igw['vpc_id'],
                       'state': 'available'}
         ec2_igw['attachmentSet'].append(attachment)
     return ec2_igw

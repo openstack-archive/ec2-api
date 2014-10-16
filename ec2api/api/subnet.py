@@ -88,11 +88,10 @@ def create_subnet(context, vpc_id, cidr_block,
                                  {'os_id': os_subnet['id'],
                                   'vpc_id': vpc['id']})
         cleaner.addCleanup(db_api.delete_item, context, subnet['id'])
-        ec2_subnet_id = ec2utils.get_ec2_id(subnet['id'], 'subnet')
         neutron.update_network(os_network['id'],
-                               {'network': {'name': ec2_subnet_id}})
+                               {'network': {'name': subnet['id']}})
         neutron.update_subnet(os_subnet['id'],
-                              {'subnet': {'name': ec2_subnet_id}})
+                              {'subnet': {'name': subnet['id']}})
     os_ports = neutron.list_ports()['ports']
     return {'subnet': _format_subnet(context, subnet, os_subnet,
                                           os_network, os_ports)}
@@ -180,9 +179,9 @@ def _format_subnet(context, subnet, os_subnet, os_network, os_ports):
     if not dhcp_port_accounted:
         ip_count -= 1
     return {
-        'subnetId': ec2utils.get_ec2_id(subnet['id'], 'subnet'),
+        'subnetId': subnet['id'],
         'state': status_map.get(os_network['status'], 'available'),
-        'vpcId': ec2utils.get_ec2_id(subnet['vpc_id'], 'vpc'),
+        'vpcId': subnet['vpc_id'],
         'cidrBlock': os_subnet['cidr'],
         'defaultForAz': 'false',
         'mapPublicIpOnLaunch': 'false',

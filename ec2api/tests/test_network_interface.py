@@ -221,7 +221,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_2})
         self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'subnet', fakes.ID_DB_SUBNET_2)
+            mock.ANY, 'subnet', fakes.ID_EC2_SUBNET_2)
         check_response(resp, 'InvalidSubnetID.NotFound')
 
         self.db_api.get_item_by_id.return_value = fakes.DB_SUBNET_1
@@ -246,12 +246,12 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_create_network_interface_rollback(self, _add_dhcp_opts_to_port):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_VPC_1: tools.update_dict(
+                fakes.ID_EC2_VPC_1: tools.update_dict(
                     fakes.DB_VPC_1,
                     {'dhcp_options_id':
-                     fakes.ID_DB_DHCP_OPTIONS_1}),
-                fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1,
-                fakes.ID_DB_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1}))
+                     fakes.ID_EC2_DHCP_OPTIONS_1}),
+                fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
+                fakes.ID_EC2_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1}))
         self.db_api.add_item.return_value = fakes.DB_NETWORK_INTERFACE_1
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
         self.neutron.create_port.return_value = {'port': fakes.OS_PORT_1}
@@ -262,7 +262,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
         self.neutron.delete_port.assert_called_once_with(fakes.ID_OS_PORT_1)
         self.db_api.delete_item.assert_called_once_with(
-            mock.ANY, fakes.ID_DB_NETWORK_INTERFACE_1)
+            mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_1)
 
     def test_delete_network_interface(self):
         self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1
@@ -275,10 +275,10 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_has_call(
             mock.ANY,
-            fakes.ID_DB_NETWORK_INTERFACE_1)
+            fakes.ID_EC2_NETWORK_INTERFACE_1)
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY,
-            fakes.ID_DB_NETWORK_INTERFACE_1)
+            fakes.ID_EC2_NETWORK_INTERFACE_1)
         self.neutron.delete_port.assert_called_once_with(
             fakes.ID_OS_PORT_1)
 
@@ -305,10 +305,10 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
     def test_delete_network_interface_with_public_ip(self):
         detached_network_interface_2 = fakes.gen_db_network_interface(
-            fakes.ID_DB_NETWORK_INTERFACE_2,
+            fakes.ID_EC2_NETWORK_INTERFACE_2,
             fakes.ID_OS_PORT_2,
-            fakes.ID_DB_VPC_1,
-            fakes.ID_DB_SUBNET_2,
+            fakes.ID_EC2_VPC_1,
+            fakes.ID_EC2_SUBNET_2,
             fakes.IP_NETWORK_INTERFACE_2)
         self.db_api.get_item_by_id.return_value = detached_network_interface_2
         self.db_api.get_items.return_value = (
@@ -322,10 +322,10 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_has_call(
             mock.ANY,
-            fakes.ID_DB_NETWORK_INTERFACE_1)
+            fakes.ID_EC2_NETWORK_INTERFACE_1)
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY,
-            fakes.ID_DB_NETWORK_INTERFACE_2)
+            fakes.ID_EC2_NETWORK_INTERFACE_2)
         self.neutron.delete_port.assert_called_once_with(
             fakes.ID_OS_PORT_2)
         self.db_api.update_item.assert_called_once_with(
@@ -432,7 +432,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_called_once_with(
             mock.ANY,
             tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
-                              {'instance_id': fakes.ID_DB_INSTANCE_1,
+                              {'instance_id': fakes.ID_EC2_INSTANCE_1,
                                'delete_on_termination': False}))
 
     def test_attach_network_interface_rollback(self):
@@ -459,9 +459,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             {'ports': [fakes.OS_PORT_2]})
         resp = self.execute(
             'DetachNetworkInterface',
-            {'AttachmentId':
-             ec2utils.get_ec2_id(
-                 fakes.ID_DB_NETWORK_INTERFACE_2, 'eni-attach')})
+            {'AttachmentId': ec2utils.change_ec2_id_kind(
+                    fakes.ID_EC2_NETWORK_INTERFACE_2, 'eni-attach')})
         self.assertEqual(200, resp['status'])
         self.neutron.update_port.assert_called_once_with(
             fakes.ID_OS_PORT_2,

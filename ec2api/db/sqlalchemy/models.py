@@ -17,7 +17,7 @@ SQLAlchemy models for ec2api data.
 """
 
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, PrimaryKeyConstraint, String, Text
+from sqlalchemy import Column, PrimaryKeyConstraint, String, Text
 from sqlalchemy import UniqueConstraint
 
 from ec2api.openstack.common.db.sqlalchemy import models
@@ -43,9 +43,8 @@ class Item(BASE, EC2Base):
         PrimaryKeyConstraint('id'),
         UniqueConstraint('id', name='items_os_id_idx'),
     )
-    id = Column(Integer, autoincrement=True)
+    id = Column(String(length=30))
     project_id = Column(String(length=64))
-    vpc_id = Column(Integer)
-    kind = Column(String(length=20))
+    vpc_id = Column(String(length=12))
     os_id = Column(String(length=36))
     data = Column(Text())

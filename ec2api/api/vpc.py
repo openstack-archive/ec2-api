@@ -61,8 +61,7 @@ def create_vpc(context, cidr_block, instance_tenancy='default'):
                            context, route_table['id'])
         vpc['route_table_id'] = route_table['id']
         db_api.update_item(context, vpc)
-        vpc_id = ec2utils.get_ec2_id(vpc['id'], 'vpc')
-        neutron.update_router(os_router['id'], {'router': {'name': vpc_id}})
+        neutron.update_router(os_router['id'], {'router': {'name': vpc['id']}})
         # NOTE(Alex): OpenStack doesn't allow creation of another group
         # named 'default' hence 'Default' is used.
         security_group = security_group_api._create_default_security_group(
@@ -77,13 +76,13 @@ def delete_vpc(context, vpc_id):
     internet_gateways = internet_gateway_api.describe_internet_gateways(
         context,
         filter=[{'name': 'attachment.vpc-id',
-                 'value': [vpc_id]}])['internetGatewaySet']
+                 'value': [vpc['id']]}])['internetGatewaySet']
     route_tables = route_table_api.describe_route_tables(context,
-        filter=[{'name': 'vpc-id', 'value': [vpc_id]}])['routeTableSet']
+        filter=[{'name': 'vpc-id', 'value': [vpc['id']]}])['routeTableSet']
     if subnets or internet_gateways or len(route_tables) > 1:
         msg = _("The vpc '%(vpc_id)s' has dependencies and "
                 "cannot be deleted.")
-        msg = msg % {'vpc_id': ec2utils.get_ec2_id(vpc['id'], 'vpc')}
+        msg = msg % {'vpc_id': vpc['id']}
         raise exception.DependencyViolation(msg)
 
     neutron = clients.neutron(context)
@@ -95,7 +94,7 @@ def delete_vpc(context, vpc_id):
         security_groups = security_group_api.describe_security_groups(
             context,
             filter=[{'name': 'vpc-id',
-                     'value': [vpc_id]}])['securityGroupInfo']
+                     'value': [vpc['id']]}])['securityGroupInfo']
         for security_group in security_groups:
             security_group_api.delete_security_group(
                 context, group_id=security_group['groupId'])
@@ -123,15 +122,10 @@ def describe_vpcs(context, vpc_id=None, filter=None):
 
 
 def _format_vpc(vpc):
-    dhcp_options_id = vpc.get('dhcp_options_id', None)
-    if dhcp_options_id:
-        dhcp_options_id = ec2utils.get_ec2_id(dhcp_options_id, 'dopt')
-    else:
-        dhcp_options_id = 'default'
-    return {'vpcId': ec2utils.get_ec2_id(vpc['id'], 'vpc'),
+    return {'vpcId': vpc['id'],
             'state': "available",
             'cidrBlock': vpc['cidr_block'],
             'isDefault': 'false',
-            'dhcpOptionsId': dhcp_options_id
+            'dhcpOptionsId': vpc.get('dhcp_options_id', 'default'),
             # 'instanceTenancy': 'default', #TODO(Alex) implement
             }

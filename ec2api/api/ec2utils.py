@@ -260,14 +260,9 @@ def ec2_snap_id_to_uuid(ec2_id):
 # malformed existed functions
 
 
-def get_ec2_id(obj_id, kind):
-    # TODO(ft): move to standard conversion function
-    if not isinstance(obj_id, int) and not isinstance(obj_id, long):
-        raise TypeError('obj_id must be int')
-    elif obj_id < 0 or obj_id > 0xffffffff:
-        raise OverflowError('obj_id must be non negative integer')
-    return '%(kind)s-%(id)08x' % {'kind': kind, 'id': obj_id}
-
+def change_ec2_id_kind(obj_id, new_kind):
+    return '%(kind)s-%(id)s' % {'kind': new_kind,
+                                'id': obj_id.split('-')[-1]}
 
 _NOT_FOUND_EXCEPTION_MAP = {
     'vpc': exception.InvalidVpcIDNotFound,
@@ -282,8 +277,7 @@ _NOT_FOUND_EXCEPTION_MAP = {
 
 
 def get_db_item(context, kind, ec2_id):
-    db_id = ec2_id_to_id(ec2_id)
-    item = db_api.get_item_by_id(context, kind, db_id)
+    item = db_api.get_item_by_id(context, kind, ec2_id)
     if item is None:
         params = {'%s_id' % kind: ec2_id}
         raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
@@ -292,8 +286,7 @@ def get_db_item(context, kind, ec2_id):
 
 def get_db_items(context, kind, ec2_ids):
     if ec2_ids is not None:
-        db_ids = [ec2_id_to_id(id) for id in ec2_ids]
-        items = db_api.get_items_by_ids(context, kind, db_ids)
+        items = db_api.get_items_by_ids(context, kind, ec2_ids)
         if items is None or items == []:
             params = {'%s_id' % kind: ec2_ids[0]}
             raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)

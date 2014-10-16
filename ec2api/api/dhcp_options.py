@@ -92,9 +92,8 @@ def delete_dhcp_options(context, dhcp_options_id):
     for vpc in vpcs:
         if dhcp_options['id'] == vpc.get('dhcp_options_id'):
             raise exception.DependencyViolation(
-                        obj1_id=ec2utils.get_ec2_id(dhcp_options['id'],
-                                                    'dopt'),
-                        obj2_id=ec2utils.get_ec2_id(vpc['id'], 'vpc'))
+                        obj1_id=dhcp_options['id'],
+                        obj2_id=vpc['id'])
     db_api.delete_item(context, dhcp_options['id'])
     return True
 
@@ -164,7 +163,7 @@ def _format_dhcp_options(context, dhcp_options):
     for key, values in dhcp_options['dhcp_configuration'].items():
         items = [{'value': v} for v in values]
         dhcp_configuration.append({'key': key, 'valueSet': items})
-    return {'dhcpOptionsId': ec2utils.get_ec2_id(dhcp_options['id'], 'dopt'),
+    return {'dhcpOptionsId': dhcp_options['id'],
             'dhcpConfigurationSet': dhcp_configuration}
 
 

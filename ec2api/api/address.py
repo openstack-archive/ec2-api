@@ -82,11 +82,10 @@ def associate_address(context, public_ip=None, instance_id=None,
 
     instance_network_interfaces = []
     if instance_id:
-        api_instance_id = ec2utils.ec2_id_to_id(instance_id)
         # TODO(ft): check instance exists
         # TODO(ft): implement search in DB layer
         for eni in db_api.get_items(context, 'eni'):
-            if instance_id and eni.get('instance_id') == api_instance_id:
+            if instance_id and eni.get('instance_id') == instance_id:
                 instance_network_interfaces.append(eni)
 
     neutron = clients.neutron(context)
@@ -136,8 +135,8 @@ def associate_address(context, public_ip=None, instance_id=None,
         msg = _('resource %(eipalloc_id)s is already associated with '
                 'associate-id %(eipassoc_id)s')
         msg = msg % {'eipalloc_id': allocation_id,
-                     'eipassoc_id': ec2utils.get_ec2_id(
-                             address['id'], 'eipassoc')}
+                     'eipassoc_id': ec2utils.change_ec2_id_kind(address['id'],
+                                                                'eipassoc')}
         raise exception.ResourceAlreadyAssociated(msg)
     else:
         with utils.OnCrashCleaner() as cleaner:
@@ -151,7 +150,8 @@ def associate_address(context, public_ip=None, instance_id=None,
                                       {'floatingip': os_floating_ip})
 
     return {'return': True,
-            'associationId': ec2utils.get_ec2_id(address['id'], 'eipassoc')}
+            'associationId': ec2utils.change_ec2_id_kind(address['id'],
+                                                         'eipassoc')}
 
 
 def disassociate_address(context, public_ip=None, association_id=None):
@@ -177,7 +177,8 @@ def disassociate_address(context, public_ip=None, association_id=None):
         return ec2.disassociate_address(public_ip=public_ip)
 
     address = db_api.get_item_by_id(context, 'eipalloc',
-                                    ec2utils.ec2_id_to_id(association_id))
+                                    ec2utils.change_ec2_id_kind(association_id,
+                                                                'eipalloc'))
     if address is None or not _is_address_valid(context, neutron, address):
         raise exception.InvalidAssociationIDNotFound(
                 assoc_id=association_id)
@@ -298,14 +299,12 @@ def _format_address(context, address, os_floating_ip, os_ports=[]):
         ec2_address['domain'] = 'standard'
     else:
         ec2_address['domain'] = 'vpc'
-        ec2_address['allocationId'] = ec2utils.get_ec2_id(address['id'],
-                                                          'eipalloc')
+        ec2_address['allocationId'] = address['id']
         if 'network_interface_id' in address:
             ec2_address.update({
-                    'associationId': ec2_address['allocationId'].
-                    replace('eipalloc', 'eipassoc'),
-                    'networkInterfaceId': ec2utils.get_ec2_id(
-                        address['network_interface_id'], 'eni'),
+                    'associationId': ec2utils.change_ec2_id_kind(
+                            ec2_address['allocationId'], 'eipassoc'),
+                    'networkInterfaceId': address['network_interface_id'],
                     'networkInterfaceOwnerId': context.project_id})
 
     return ec2_address

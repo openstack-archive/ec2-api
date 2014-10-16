@@ -92,7 +92,7 @@ def create_network_interface(context, subnet_id,
         for _i in range(secondary_private_ip_address_count):
             fixed_ips.append({'subnet_id': os_subnet['id']})
     vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
-    vpc_id = ec2utils.get_ec2_id(vpc['id'], 'vpc')
+    vpc_id = vpc['id']
     dhcp_options_id = vpc.get('dhcp_options_id', None)
     if not security_group_id:
         default_groups = security_group_api.describe_security_groups(
@@ -136,8 +136,7 @@ def create_network_interface(context, subnet_id,
         cleaner.addCleanup(db_api.delete_item,
                            context, network_interface['id'])
 
-        network_interface_id = ec2utils.get_ec2_id(network_interface['id'],
-                                                   'eni')
+        network_interface_id = network_interface['id']
         neutron.update_port(os_port['id'],
                             {'port': {'name': network_interface_id}})
         if dhcp_options_id:
@@ -226,9 +225,7 @@ def assign_private_ip_addresses(context, network_interface_id,
     network_interface = ec2utils.get_db_item(context, 'eni',
                                              network_interface_id)
     subnet = ec2utils.get_db_item(context, 'subnet',
-                                  ec2utils.get_ec2_id(
-                                    network_interface['subnet_id'],
-                                    'subnet'))
+                                  network_interface['subnet_id'])
     neutron = clients.neutron(context)
     os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
     os_port = neutron.show_port(network_interface['os_id'])['port']
@@ -277,9 +274,8 @@ def describe_network_interface_attribute(context, network_interface_id,
 
     db_key = attribute if attribute == 'description' else 'source_dest_check'
     default_value = '' if attribute == 'description' else True
-    return {'networkInterfaceId': ec2utils.get_ec2_id(
-        network_interface['id'], 'eni'),
-        attribute: {'value': network_interface.get(db_key, default_value)}}
+    return {'networkInterfaceId': network_interface['id'],
+            attribute: {'value': network_interface.get(db_key, default_value)}}
 
 
 def modify_network_interface_attribute(context, network_interface_id,
@@ -337,7 +333,6 @@ def attach_network_interface(context, network_interface_id,
                                              network_interface_id)
     neutron = clients.neutron(context)
     os_instance_id = ec2utils.ec2_inst_id_to_uuid(context, instance_id)
-    db_instance_id = ec2utils.ec2_id_to_id(instance_id)
     # TODO(Alex) Check that the instance is not yet attached to another VPC
     # TODO(Alex) Check that the instance is "our", not created via nova
     # (which means that it doesn't belong to any VPC and can't be attached)
@@ -347,7 +342,7 @@ def attach_network_interface(context, network_interface_id,
         # TODO(Alex) nova inserts compute:%availability_zone into device_owner
         #                              'device_owner': 'compute:None'}})
         _attach_network_interface_item(context, network_interface,
-                                       db_instance_id)
+                                       instance_id)
         cleaner.addCleanup(_detach_network_interface_item, context,
                            network_interface)
         try:
@@ -355,15 +350,13 @@ def attach_network_interface(context, network_interface_id,
                                           None, None)
         except nova_exception.ClientException as e:
             raise exception.IncorrectState(reason=e.message)
-    return {'attachmentId': ec2utils.get_ec2_id(
-        network_interface['id'], 'eni-attach')}
+    return {'attachmentId': ec2utils.change_ec2_id_kind(
+                    network_interface['id'], 'eni-attach')}
 
 
 def detach_network_interface(context, attachment_id,
                              force=None):
-    network_interface = db_api.get_item_by_id(
-        context, 'eni',
-        ec2utils.ec2_id_to_id(attachment_id))
+    network_interface = db_api.get_item_by_id(context, 'eni', attachment_id)
     if 'instance_id' not in network_interface:
         raise exception.InvalidAttachmentIDNotFound(
             attachment_id=attachment_id)
@@ -388,12 +381,9 @@ def detach_network_interface(context, attachment_id,
 def _format_network_interface(context, network_interface, os_port,
                               associated_addresses=[], security_groups={}):
     ec2_network_interface = {}
-    ec2_network_interface['networkInterfaceId'] = (
-        ec2utils.get_ec2_id(network_interface['id'], 'eni'))
-    ec2_network_interface['subnetId'] = (
-        ec2utils.get_ec2_id(network_interface['subnet_id'], 'subnet'))
-    ec2_network_interface['vpcId'] = (
-        ec2utils.get_ec2_id(network_interface['vpc_id'], 'vpc'))
+    ec2_network_interface['networkInterfaceId'] = network_interface['id']
+    ec2_network_interface['subnetId'] = network_interface['subnet_id']
+    ec2_network_interface['vpcId'] = network_interface['vpc_id']
     ec2_network_interface['description'] = network_interface['description']
     # TODO(Alex) Implement
     # ec2_network_interface['availabilityZone'] = ''
@@ -410,10 +400,9 @@ def _format_network_interface(context, network_interface, os_port,
     if 'instance_id' in network_interface:
         ec2_network_interface['status'] = 'in-use'
         ec2_network_interface['attachment'] = {
-            'attachmentId':
-            ec2utils.get_ec2_id(network_interface['id'], 'eni-attach'),
-            'instanceId':
-            ec2utils.get_ec2_id(network_interface['instance_id'], 'i'),
+            'attachmentId': ec2utils.change_ec2_id_kind(
+                    network_interface['id'], 'eni-attach'),
+            'instanceId': network_interface['instance_id'],
             'status': 'attached',
             'deleteOnTermination': network_interface['delete_on_termination'],
             'attachTime': network_interface['attach_time'],
@@ -436,8 +425,8 @@ def _format_network_interface(context, network_interface, os_port,
                            None)
             if address:
                 item['association'] = {
-                    'associationId': ec2utils.get_ec2_id(address['id'],
-                                                         'eipassoc'),
+                    'associationId': ec2utils.change_ec2_id_kind(address['id'],
+                                                                 'eipassoc'),
                     'ipOwnerId': context.project_id,
                     'publicDnsName': None,
                     'publicIp': address['public_ip'],

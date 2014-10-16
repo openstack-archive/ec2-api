@@ -103,20 +103,23 @@ def associate_route_table(context, route_table_id, subnet_id):
             context, subnet, route_table,
             cleaner=cleaner, rollback_route_table_object=main_route_table)
 
-    return {'associationId': ec2utils.get_ec2_id(subnet['id'], 'rtbassoc')}
+    return {'associationId': ec2utils.change_ec2_id_kind(subnet['id'],
+                                                         'rtbassoc')}
 
 
 def replace_route_table_association(context, association_id, route_table_id):
     route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
-    item_id = ec2utils.ec2_id_to_id(association_id)
-    if route_table['vpc_id'] == item_id:
-        vpc = db_api.get_item_by_id(context, 'vpc', item_id)
+    if route_table['vpc_id'] == ec2utils.change_ec2_id_kind(association_id,
+                                                            'vpc'):
+        vpc = db_api.get_item_by_id(context, 'vpc',
+                                    ec2utils.change_ec2_id_kind(association_id,
+                                                                'vpc'))
         if vpc is None:
             raise exception.InvalidAssociationIDNotFound(
                 assoc_id=association_id)
 
         rollabck_route_table_object = db_api.get_item_by_id(
-            context, 'vpc', vpc['route_table_id'])
+            context, 'rtb', vpc['route_table_id'])
         with utils.OnCrashCleaner() as cleaner:
             _associate_vpc_item(context, vpc, route_table['id'])
             cleaner.addCleanup(_associate_vpc_item, context, vpc,
@@ -128,7 +131,9 @@ def replace_route_table_association(context, association_id, route_table_id):
                 context, route_table, cleaner,
                 rollabck_route_table_object, is_main=True)
     else:
-        subnet = db_api.get_item_by_id(context, 'subnet', item_id)
+        subnet = db_api.get_item_by_id(
+                context, 'subnet',
+                ec2utils.change_ec2_id_kind(association_id, 'subnet'))
         if subnet is None or 'route_table_id' not in subnet:
             raise exception.InvalidAssociationIDNotFound(
                 assoc_id=association_id)
@@ -150,14 +155,17 @@ def replace_route_table_association(context, association_id, route_table_id):
                 context, subnet, route_table, cleaner=cleaner,
                 rollback_route_table_object=rollabck_route_table_object)
 
-    return {'associationId': ec2utils.get_ec2_id(item_id, 'rtbassoc')}
+    return {'associationId': association_id}
 
 
 def disassociate_route_table(context, association_id):
-    item_id = ec2utils.ec2_id_to_id(association_id)
-    subnet = db_api.get_item_by_id(context, 'subnet', item_id)
+    subnet = db_api.get_item_by_id(context, 'subnet',
+                                   ec2utils.change_ec2_id_kind(association_id,
+                                                               'subnet'))
     if not subnet:
-        vpc = db_api.get_item_by_id(context, 'vpc', item_id)
+        vpc = db_api.get_item_by_id(context, 'vpc',
+                                    ec2utils.change_ec2_id_kind(association_id,
+                                                                'vpc'))
         if vpc is None:
             raise exception.InvalidAssociationIDNotFound(
                 assoc_id=association_id)
@@ -238,8 +246,7 @@ def _delete_route_table(context, route_table_id, vpc=None, cleaner=None):
     if (vpc and route_table_id == vpc['route_table_id'] or
             len(get_associated_subnets()) > 0):
         msg = _("The routeTable '%(rtb_id)s' has dependencies and cannot "
-                "be deleted.") % {'rtb_id': ec2utils.get_ec2_id(route_table_id,
-                                                                'rtb')}
+                "be deleted.") % {'rtb_id': route_table_id}
         raise exception.DependencyViolation(msg)
     if cleaner:
         route_table = db_api.get_item_by_id(context, 'rtb', route_table_id)
@@ -309,10 +316,9 @@ def _set_route(context, route_table_id, destination_cidr_block,
             raise exception.InvalidParameterValue(msg)
         route = {'network_interface_id': network_interface['id']}
     elif instance_id:
-        inst_id = ec2utils.ec2_id_to_id(instance_id)
         # TODO(ft): implement search in DB layer
         network_interfaces = [eni for eni in db_api.get_items(context, 'eni')
-                              if eni.get('instance_id') == inst_id]
+                              if eni.get('instance_id') == instance_id]
         if len(network_interfaces) == 0:
             msg = _("Invalid value '%(i_id)s' for instance ID. "
                     "Instance is not in a VPC.")
@@ -324,10 +330,8 @@ def _set_route(context, route_table_id, destination_cidr_block,
         if network_interface['vpc_id'] != route_table['vpc_id']:
             msg = _('Route table %(rtb_id)s and interface %(eni_id)s '
                     'belong to different networks')
-            ec2_network_interface_id = ec2utils.get_ec2_id(
-                network_interface['id'], 'eni')
             msg = msg % {'rtb_id': route_table_id,
-                         'eni_id': ec2_network_interface_id}
+                         'eni_id': network_interface['id']}
             raise exception.InvalidParameterValue(msg)
         route = {'network_interface_id': network_interface['id']}
     else:
@@ -364,9 +368,8 @@ def _format_route_table(context, route_table, is_main=False,
                         gateways={},
                         network_interfaces={}):
     vpc_id = route_table['vpc_id']
-    ec2_route_table_id = ec2utils.get_ec2_id(route_table['id'], 'rtb')
-    ec2_route_table = {'routeTableId': ec2_route_table_id,
-                       'vpcId': ec2utils.get_ec2_id(vpc_id, 'vpc'),
+    ec2_route_table = {'routeTableId': route_table['id'],
+                       'vpcId': vpc_id,
                        # TODO(ft): propagationVgwSet
                        'routeSet': []}
     # TODO(ft): refactor to get Nova instances outside of this function
@@ -387,7 +390,7 @@ def _format_route_table(context, route_table, is_main=False,
                 state = ('active'
                          if gateway and gateway.get('vpc_id') == vpc_id else
                          'blackhole')
-                ec2_gateway_id = ec2utils.get_ec2_id(gateway_id, 'igw')
+                ec2_gateway_id = gateway_id
             ec2_route.update({'gatewayId': ec2_gateway_id,
                               'state': state})
         else:
@@ -399,38 +402,34 @@ def _format_route_table(context, route_table, is_main=False,
             state = 'blackhole'
             if instance_id:
                 try:
-                    os_instance_id = (
-                        ec2utils.get_instance_uuid_from_int_id(context,
-                                                               instance_id))
+                    os_instance_id = ec2utils.ec2_inst_id_to_uuid(context,
+                                                                  instance_id)
                     os_instance = nova.servers.get(os_instance_id)
                 except nova_exception.NotFound:
                     pass
                 else:
                     if os_instance.status == 'ACTIVE':
                         state = 'active'
-                ec2_route.update({'instanceId':
-                                  ec2utils.get_ec2_id(instance_id, 'i'),
+                ec2_route.update({'instanceId': instance_id,
                                   'instanceOwnerId': context.project_id})
-            ec2_route.update({'networkInterfaceId':
-                              ec2utils.get_ec2_id(network_interface_id,
-                                                  'eni'),
+            ec2_route.update({'networkInterfaceId': network_interface_id,
                               'state': state})
         ec2_route_table['routeSet'].append(ec2_route)
 
     associations = []
     if is_main:
         associations.append({
-            'routeTableAssociationId':
-            ec2utils.get_ec2_id(vpc_id, 'rtbassoc'),
-                'routeTableId': ec2_route_table_id,
-                'main': True})
+            'routeTableAssociationId': ec2utils.change_ec2_id_kind(vpc_id,
+                                                                   'rtbassoc'),
+            'routeTableId': route_table['id'],
+            'main': True})
     for subnet_id in associated_subnet_ids:
         associations.append({
-            'routeTableAssociationId':
-            ec2utils.get_ec2_id(subnet_id, 'rtbassoc'),
-                'routeTableId': ec2_route_table_id,
-                'subnetId': ec2utils.get_ec2_id(subnet_id, 'subnet'),
-                'main': False})
+            'routeTableAssociationId': ec2utils.change_ec2_id_kind(subnet_id,
+                                                                   'rtbassoc'),
+            'routeTableId': route_table['id'],
+            'subnetId': subnet_id,
+            'main': False})
     if associations:
         ec2_route_table['associationSet'] = associations
 

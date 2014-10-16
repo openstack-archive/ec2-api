@@ -76,10 +76,10 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_has_call(
             mock.ANY,
-            fakes.ID_DB_SECURITY_GROUP_1)
+            fakes.ID_EC2_SECURITY_GROUP_1)
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY,
-            fakes.ID_DB_SECURITY_GROUP_1)
+            fakes.ID_EC2_SECURITY_GROUP_1)
         self.neutron.delete_security_group.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_1)
 
@@ -123,8 +123,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_authorize_security_group_ingress_ip_ranges(self):
         self.db_api.get_item_by_id.side_effect = copy.deepcopy(
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_DB_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
+                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
         self.neutron.create_security_group_rule.return_value = (
             {'security_group_rule': [fakes.OS_SECURITY_GROUP_RULE_1]})
         resp = self.execute(
@@ -143,8 +143,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_authorize_security_group_egress_groups(self):
         self.db_api.get_item_by_id.side_effect = copy.deepcopy(
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_DB_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
+                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
         self.neutron.create_security_group_rule.return_value = (
             {'security_group_rule': [fakes.OS_SECURITY_GROUP_RULE_1]})
         resp = self.execute(
@@ -164,8 +164,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_revoke_security_group_ingress_ip_ranges(self):
         self.db_api.get_item_by_id.side_effect = copy.deepcopy(
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_DB_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
+                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
         self.neutron.show_security_group.return_value = {
             'security_group': fakes.OS_SECURITY_GROUP_2}
         self.neutron.delete_security_group_rule.return_value = True
@@ -185,8 +185,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_revoke_security_group_egress_groups(self):
         self.db_api.get_item_by_id.side_effect = copy.deepcopy(
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_DB_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
+                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
         self.neutron.show_security_group.return_value = {
             'security_group': fakes.OS_SECURITY_GROUP_2}
         self.neutron.delete_security_group_rule.return_value = True

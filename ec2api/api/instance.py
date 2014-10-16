@@ -153,7 +153,6 @@ def run_instances(context, image_id, min_count, max_count,
         # their meanings. Correct error messages are also critical
         for ec2_instance in ec2_instances:
             instance_ports_info = []
-            instance_id = ec2utils.ec2_id_to_id(ec2_instance['instanceId'])
             delete_on_termination = iter(delete_on_termination_flags)
             for network_interface in network_interfaces_by_instances[
                     ec2_instance['instanceId']]:
@@ -162,7 +161,7 @@ def run_instances(context, image_id, min_count, max_count,
                 # Alternatively a create_network_interface sub-function can
                 # set attach_time  at once
                 network_interface.update({
-                        'instance_id': instance_id,
+                        'instance_id': ec2_instance['instanceId'],
                         'attach_time': attach_time,
                         'delete_on_termination': delete_on_termination.next()})
                 db_api.update_item(context, network_interface)
@@ -186,10 +185,8 @@ def run_instances(context, image_id, min_count, max_count,
 
 def terminate_instances(context, instance_id):
     # NOTE(ft): collect network interfaces to update and delete
-    instance_ids = set(ec2utils.ec2_id_to_id(inst_id)
-                       for inst_id in instance_id)
-    os_instances_ids = [ec2utils.get_instance_uuid_from_int_id(context,
-                                                               inst_id)
+    instance_ids = set(inst_id for inst_id in instance_id)
+    os_instances_ids = [ec2utils.ec2_inst_id_to_uuid(context, inst_id)
                         for inst_id in instance_ids]
     neutron = clients.neutron(context)
     os_ports = neutron.list_ports(device_id=os_instances_ids)['ports']
@@ -255,7 +252,7 @@ def describe_instances(context, instance_id=None, filter=None, **kwargs):
 
     for ec2_reservation in result['reservationSet']:
         for ec2_instance in ec2_reservation['instancesSet']:
-            inst_id = ec2utils.ec2_id_to_id(ec2_instance['instanceId'])
+            inst_id = ec2_instance['instanceId']
             instance_network_interfaces = network_interfaces[inst_id]
             ports_info = [(eni, os_ports[eni['os_id']], addresses[eni['id']])
                           for eni in instance_network_interfaces
@@ -287,12 +284,10 @@ def _format_instance(context, ec2_instance, ports_info, security_groups):
     for network_interface, os_port, addresses in ports_info:
         if instance_ip in (ip['ip_address']
                            for ip in os_port['fixed_ips']):
-            ec2_instance['subnetId'] = ec2utils.get_ec2_id(
-                    network_interface['subnet_id'], 'subnet')
+            ec2_instance['subnetId'] = network_interface['subnet_id']
             break
     if network_interface:
-        ec2_instance['vpcId'] = ec2utils.get_ec2_id(
-                network_interface['vpc_id'], 'vpc')
+        ec2_instance['vpcId'] = network_interface['vpc_id']
 
     return ec2_instance
 

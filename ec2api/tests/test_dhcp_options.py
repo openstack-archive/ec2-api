@@ -74,19 +74,19 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_has_call(
                 mock.ANY,
-                fakes.ID_DB_DHCP_OPTIONS_1)
+                fakes.ID_EC2_DHCP_OPTIONS_1)
         self.db_api.get_items.assert_has_call(
                 mock.ANY,
                 'vpc')
         self.db_api.delete_item.assert_called_once_with(
                 mock.ANY,
-                fakes.ID_DB_DHCP_OPTIONS_1)
+                fakes.ID_EC2_DHCP_OPTIONS_1)
 
     def test_delete_dhcp_options_with_dependencies(self):
         self.db_api.get_item_by_id.return_value = fakes.DB_DHCP_OPTIONS_1
         self.db_api.get_items.return_value = [tools.update_dict(
                             fakes.DB_VPC_1,
-                            {'dhcp_options_id': fakes.ID_DB_DHCP_OPTIONS_1})]
+                            {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1})]
         resp = self.execute('DeleteDhcpOptions',
                             {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
         self.assertEqual(400, resp['status'])
@@ -105,8 +105,8 @@ class DhcpOptionsTestCase(base.ApiTestCase):
     def test_associate_dhcp_options(self):
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id(
-                    {fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                     fakes.ID_DB_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1}))
+                    {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                     fakes.ID_EC2_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1}))
         self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1]
         self.neutron.list_ports.return_value = (
                 {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
@@ -126,7 +126,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                         mock.ANY, fakes.ID_OS_PORT_1,
                         {'port': os_dhcp_options})
 
-        check(fakes.ID_EC2_DHCP_OPTIONS_1, fakes.ID_DB_DHCP_OPTIONS_1,
+        check(fakes.ID_EC2_DHCP_OPTIONS_1, fakes.ID_EC2_DHCP_OPTIONS_1,
               fakes.OS_DHCP_OPTIONS_1)
 
         check('default', None, {'extra_dhcp_opts': []})
@@ -134,12 +134,12 @@ class DhcpOptionsTestCase(base.ApiTestCase):
     def test_associate_dhcp_options_rollback(self):
         vpc = tools.update_dict(
                 fakes.DB_VPC_1,
-                {'dhcp_options_id': fakes.ID_DB_DHCP_OPTIONS_1})
+                {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1})
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id(
-                    {fakes.ID_DB_VPC_1: vpc,
-                     fakes.ID_DB_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1,
-                     fakes.ID_DB_DHCP_OPTIONS_2: fakes.DB_DHCP_OPTIONS_2}))
+                    {fakes.ID_EC2_VPC_1: vpc,
+                     fakes.ID_EC2_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1,
+                     fakes.ID_EC2_DHCP_OPTIONS_2: fakes.DB_DHCP_OPTIONS_2}))
         self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
                                               fakes.DB_NETWORK_INTERFACE_2]
         self.neutron.list_ports.return_value = (

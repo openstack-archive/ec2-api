@@ -26,10 +26,10 @@ class SubnetTestCase(base.ApiTestCase):
     def test_create_subnet(self):
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id({
-                        fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                        fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+                        fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                        fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
         self.db_api.add_item.side_effect = (
-                fakes.get_db_api_add_item(fakes.ID_DB_SUBNET_1))
+                fakes.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
         self.neutron.create_network.side_effect = (
                 fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
@@ -85,7 +85,7 @@ class SubnetTestCase(base.ApiTestCase):
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': fakes.CIDR_SUBNET_1})
         self.db_api.get_item_by_id.assert_called_once_with(mock.ANY, 'vpc',
-                                                           fakes.ID_DB_VPC_1)
+                                                           fakes.ID_EC2_VPC_1)
         check_response(resp, 'InvalidVpcID.NotFound')
 
         self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
@@ -102,7 +102,7 @@ class SubnetTestCase(base.ApiTestCase):
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': '10.20.0.0/24'})
         self.db_api.get_item_by_id.assert_called_once_with(mock.ANY, 'vpc',
-                                                           fakes.ID_DB_VPC_1)
+                                                           fakes.ID_EC2_VPC_1)
         check_response(resp, 'InvalidSubnet.Range')
 
     @base.skip_not_implemented
@@ -134,10 +134,10 @@ class SubnetTestCase(base.ApiTestCase):
     def test_create_subnet_rollback(self):
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id({
-                        fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                        fakes.ID_DB_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+                        fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                        fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
         self.db_api.add_item.side_effect = (
-                fakes.get_db_api_add_item(fakes.ID_DB_SUBNET_1))
+                fakes.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
         self.neutron.create_network.side_effect = (
                 fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
@@ -157,7 +157,7 @@ class SubnetTestCase(base.ApiTestCase):
         self.neutron.delete_network.assert_called_once_with(
                 fakes.ID_OS_NETWORK_1)
         self.db_api.delete_item.assert_called_once_with(
-                mock.ANY, fakes.ID_DB_SUBNET_1)
+                mock.ANY, fakes.ID_EC2_SUBNET_1)
 
     @base.skip_not_implemented
     def test_create_subnet_not_consistent_os_vpc(self):
@@ -166,8 +166,8 @@ class SubnetTestCase(base.ApiTestCase):
     def test_delete_subnet(self):
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                         fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1}))
+                        {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                         fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
         self.neutron.show_subnet.return_value = (
                 {'subnet': fakes.OS_SUBNET_1})
         self.db_api.get_items.return_value = []
@@ -179,13 +179,13 @@ class SubnetTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_has_call(
                 mock.ANY,
-                fakes.ID_DB_SUBNET_1)
+                fakes.ID_EC2_SUBNET_1)
         self.db_api.get_item_by_id.assert_has_call(
                 mock.ANY,
-                fakes.ID_DB_VPC_1)
+                fakes.ID_EC2_VPC_1)
         self.db_api.delete_item.assert_called_once_with(
                 mock.ANY,
-                fakes.ID_DB_SUBNET_1)
+                fakes.ID_EC2_SUBNET_1)
         self.neutron.show_subnet.assert_called_once_with(
                 fakes.ID_OS_SUBNET_1)
         self.neutron.remove_interface_router.assert_called_once_with(
@@ -209,8 +209,8 @@ class SubnetTestCase(base.ApiTestCase):
     def test_delete_subnet_rollback(self):
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                         fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1}))
+                        {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                         fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
         self.neutron.show_subnet.side_effect = Exception()
 
         self.execute('DeleteSubnet', {'subnetId': fakes.ID_EC2_SUBNET_1})
@@ -223,8 +223,8 @@ class SubnetTestCase(base.ApiTestCase):
     def test_delete_subnet_has_ports(self):
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_DB_VPC_1: fakes.DB_VPC_1,
-                         fakes.ID_DB_SUBNET_1: fakes.DB_SUBNET_1}))
+                        {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
+                         fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
         self.db_api.get_items.side_effect = (
             lambda _, kind: [fakes.DB_NETWORK_INTERFACE_1,
                              fakes.DB_NETWORK_INTERFACE_2]

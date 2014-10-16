@@ -17,7 +17,6 @@ import copy
 import random
 import uuid
 
-from ec2api.api import ec2utils
 from ec2api.openstack.common import timeutils
 from ec2api.tests import tools
 
@@ -67,9 +66,8 @@ def random_os_id():
     return str(uuid.uuid4())
 
 
-def random_db_id():
-    return random.randint(0, 0xffff)
-
+def random_ec2_id(kind):
+    return '%s-%08x' % (kind, random.randint(0, 0xffffffff))
 
 # Plain constants section
 # Constant name notation:
@@ -78,10 +76,8 @@ def random_db_id():
 #    type - type of object the constant represents
 #        ID - for identifiers, CIDR for cidrs, etc
 #    subtype - type of object storage, is used for IDs only
-#        DB - object is stored in EC2 API database
 #        EC2 - object representation to end user
 #        OS - object is stored in OpenStack
-#        EC2OS - object is returned from original nova's EC2 layer
 #    object_name - identifies the object
 
 # common constants
@@ -91,10 +87,8 @@ TIME_ATTACH_NETWORK_INTERFACE = timeutils.isotime(None, True)
 
 
 # vpc constants
-ID_DB_VPC_1 = random_db_id()
-ID_DB_VPC_2 = random_db_id()
-ID_EC2_VPC_1 = ec2utils.get_ec2_id(ID_DB_VPC_1, 'vpc')
-ID_EC2_VPC_2 = ec2utils.get_ec2_id(ID_DB_VPC_2, 'vpc')
+ID_EC2_VPC_1 = random_ec2_id('vpc')
+ID_EC2_VPC_2 = random_ec2_id('vpc')
 ID_OS_ROUTER_1 = random_os_id()
 ID_OS_ROUTER_2 = random_os_id()
 
@@ -105,17 +99,13 @@ NAME_OS_PUBLIC_NETWORK = 'public_external'
 
 
 # internet gateway constants
-ID_DB_IGW_1 = random_db_id()
-ID_DB_IGW_2 = random_db_id()
-ID_EC2_IGW_1 = ec2utils.get_ec2_id(ID_DB_IGW_1, 'igw')
-ID_EC2_IGW_2 = ec2utils.get_ec2_id(ID_DB_IGW_2, 'igw')
+ID_EC2_IGW_1 = random_ec2_id('igw')
+ID_EC2_IGW_2 = random_ec2_id('igw')
 
 
 # subnet constants
-ID_DB_SUBNET_1 = random_db_id()
-ID_DB_SUBNET_2 = random_db_id()
-ID_EC2_SUBNET_1 = ec2utils.get_ec2_id(ID_DB_SUBNET_1, 'subnet')
-ID_EC2_SUBNET_2 = ec2utils.get_ec2_id(ID_DB_SUBNET_2, 'subnet')
+ID_EC2_SUBNET_1 = random_ec2_id('subnet')
+ID_EC2_SUBNET_2 = random_ec2_id('subnet')
 ID_OS_SUBNET_1 = random_os_id()
 ID_OS_SUBNET_2 = random_os_id()
 ID_OS_NETWORK_1 = random_os_id()
@@ -131,12 +121,8 @@ IP_LAST_SUBNET_2 = '10.10.2.254'
 
 
 # network interface constants
-ID_DB_NETWORK_INTERFACE_1 = random_db_id()
-ID_DB_NETWORK_INTERFACE_2 = random_db_id()
-ID_EC2_NETWORK_INTERFACE_1 = ec2utils.get_ec2_id(ID_DB_NETWORK_INTERFACE_1,
-                                                 'eni')
-ID_EC2_NETWORK_INTERFACE_2 = ec2utils.get_ec2_id(ID_DB_NETWORK_INTERFACE_2,
-                                                 'eni')
+ID_EC2_NETWORK_INTERFACE_1 = random_ec2_id('eni')
+ID_EC2_NETWORK_INTERFACE_2 = random_ec2_id('eni')
 ID_EC2_NETWORK_INTERFACE_2_ATTACH = (
     ID_EC2_NETWORK_INTERFACE_2.replace('eni', 'eni-attach'))
 ID_OS_PORT_1 = random_os_id()
@@ -154,27 +140,21 @@ DESCRIPTION_NETWORK_INTERFACE_2 = 'description2'
 
 
 # instance constants
-ID_DB_INSTANCE_1 = random_db_id()
-ID_DB_INSTANCE_2 = random_db_id()
-ID_EC2_INSTANCE_1 = ec2utils.get_ec2_id(ID_DB_INSTANCE_1, 'i')
-ID_EC2_INSTANCE_2 = ec2utils.get_ec2_id(ID_DB_INSTANCE_2, 'i')
+ID_EC2_INSTANCE_1 = random_ec2_id('i')
+ID_EC2_INSTANCE_2 = random_ec2_id('i')
 ID_OS_INSTANCE_1 = random_os_id()
 ID_OS_INSTANCE_2 = random_os_id()
-ID_EC2_RESERVATION_1 = 'r-%s' % random_db_id()
-ID_EC2_RESERVATION_2 = 'r-%s' % random_db_id()
+ID_EC2_RESERVATION_1 = random_ec2_id('r')
+ID_EC2_RESERVATION_2 = random_ec2_id('r')
 
 # DHCP options constants
-ID_DB_DHCP_OPTIONS_1 = random_db_id()
-ID_DB_DHCP_OPTIONS_2 = random_db_id()
-ID_EC2_DHCP_OPTIONS_1 = ec2utils.get_ec2_id(ID_DB_DHCP_OPTIONS_1, 'dopt')
-ID_EC2_DHCP_OPTIONS_2 = ec2utils.get_ec2_id(ID_DB_DHCP_OPTIONS_2, 'dopt')
+ID_EC2_DHCP_OPTIONS_1 = random_ec2_id('dopt')
+ID_EC2_DHCP_OPTIONS_2 = random_ec2_id('dopt')
 
 
 # address constants
-ID_DB_ADDRESS_1 = random_db_id()
-ID_DB_ADDRESS_2 = random_db_id()
-ID_EC2_ADDRESS_1 = ec2utils.get_ec2_id(ID_DB_ADDRESS_1, 'eipalloc')
-ID_EC2_ADDRESS_2 = ec2utils.get_ec2_id(ID_DB_ADDRESS_2, 'eipalloc')
+ID_EC2_ADDRESS_1 = random_ec2_id('eipalloc')
+ID_EC2_ADDRESS_2 = random_ec2_id('eipalloc')
 ID_EC2_ASSOCIATION_1 = ID_EC2_ADDRESS_1.replace('eipalloc', 'eipassoc')
 ID_EC2_ASSOCIATION_2 = ID_EC2_ADDRESS_2.replace('eipalloc', 'eipassoc')
 ID_OS_FLOATING_IP_1 = random_os_id()
@@ -185,19 +165,15 @@ IP_ADDRESS_2 = '192.168.1.200'
 
 
 # security group constants
-ID_DB_SECURITY_GROUP_1 = random_db_id()
-ID_DB_SECURITY_GROUP_2 = random_db_id()
-ID_EC2_SECURITY_GROUP_1 = ec2utils.get_ec2_id(ID_DB_SECURITY_GROUP_1, 'sg')
-ID_EC2_SECURITY_GROUP_2 = ec2utils.get_ec2_id(ID_DB_SECURITY_GROUP_2, 'sg')
+ID_EC2_SECURITY_GROUP_1 = random_ec2_id('sg')
+ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
 ID_OS_SECURITY_GROUP_1 = random_os_id()
 ID_OS_SECURITY_GROUP_2 = random_os_id()
 
 
 # route table constants
-ID_DB_ROUTE_TABLE_1 = random_db_id()
-ID_DB_ROUTE_TABLE_2 = random_db_id()
-ID_EC2_ROUTE_TABLE_1 = ec2utils.get_ec2_id(ID_DB_ROUTE_TABLE_1, 'rtb')
-ID_EC2_ROUTE_TABLE_2 = ec2utils.get_ec2_id(ID_DB_ROUTE_TABLE_2, 'rtb')
+ID_EC2_ROUTE_TABLE_1 = random_ec2_id('rtb')
+ID_EC2_ROUTE_TABLE_2 = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_ASSOCIATION_1 = ID_EC2_VPC_1.replace('vpc', 'rtbassoc')
 ID_EC2_ROUTE_TABLE_ASSOCIATION_2 = ID_EC2_SUBNET_2.replace('subnet',
                                                            'rtbassoc')
@@ -211,18 +187,18 @@ CIDR_EXTERNAL_NETWORK = '192.168.50.0/24'
 # where
 #    subtype - type of object storage, is not used for DB objects
 #        EC2 - object representation to end user
-#        EC2 - object received from Nova EC2 API
+#        EC2OS - object received from Nova EC2 API
 #        OS - object is stored in OpenStack
 #    object_name - identifies the object
 
 # vpc objects
 # 2 vpcs in normal state
-DB_VPC_1 = {'id': ID_DB_VPC_1,
+DB_VPC_1 = {'id': ID_EC2_VPC_1,
             'os_id': ID_OS_ROUTER_1,
             'vpc_id': None,
             'cidr_block': CIDR_VPC_1,
-            'route_table_id': ID_DB_ROUTE_TABLE_1}
-DB_VPC_2 = {'id': ID_DB_VPC_2,
+            'route_table_id': ID_EC2_ROUTE_TABLE_1}
+DB_VPC_2 = {'id': ID_EC2_VPC_2,
             'os_id': ID_OS_ROUTER_2,
             'vpc_id': None,
             'cidr_block': CIDR_VPC_2}
@@ -246,10 +222,10 @@ OS_ROUTER_2 = {'id': ID_OS_ROUTER_2,
 
 # internet gateway objects
 # 2 internate gateway, the first is attached to the first vpc
-DB_IGW_1 = {'id': ID_DB_IGW_1,
+DB_IGW_1 = {'id': ID_EC2_IGW_1,
             'os_id': None,
-            'vpc_id': ID_DB_VPC_1}
-DB_IGW_2 = {'id': ID_DB_IGW_2,
+            'vpc_id': ID_EC2_VPC_1}
+DB_IGW_2 = {'id': ID_EC2_IGW_2,
             'os_id': None,
             'vpc_id': None}
 
@@ -262,12 +238,12 @@ EC2_IGW_2 = {'internetGatewayId': ID_EC2_IGW_2,
 
 # subnet objects
 # 2 subnets in the first vpc
-DB_SUBNET_1 = {'id': ID_DB_SUBNET_1,
+DB_SUBNET_1 = {'id': ID_EC2_SUBNET_1,
                'os_id': ID_OS_SUBNET_1,
-               'vpc_id': ID_DB_VPC_1}
-DB_SUBNET_2 = {'id': ID_DB_SUBNET_2,
+               'vpc_id': ID_EC2_VPC_1}
+DB_SUBNET_2 = {'id': ID_EC2_SUBNET_2,
                'os_id': ID_OS_SUBNET_2,
-               'vpc_id': ID_DB_VPC_1}
+               'vpc_id': ID_EC2_VPC_1}
 
 EC2_SUBNET_1 = {'subnetId': ID_EC2_SUBNET_1,
                 'state': 'available',
@@ -308,19 +284,19 @@ OS_NETWORK_2 = {'id': ID_OS_NETWORK_2,
 
 # network interface objects
 # 2 ports in both subnets, the second is attached to the first instance
-DB_NETWORK_INTERFACE_1 = {'id': ID_DB_NETWORK_INTERFACE_1,
+DB_NETWORK_INTERFACE_1 = {'id': ID_EC2_NETWORK_INTERFACE_1,
                           'os_id': ID_OS_PORT_1,
-                          'vpc_id': ID_DB_VPC_1,
-                          'subnet_id': ID_DB_SUBNET_1,
+                          'vpc_id': ID_EC2_VPC_1,
+                          'subnet_id': ID_EC2_SUBNET_1,
                           'description': DESCRIPTION_NETWORK_INTERFACE_1,
                           'private_ip_address': IP_NETWORK_INTERFACE_1}
-DB_NETWORK_INTERFACE_2 = {'id': ID_DB_NETWORK_INTERFACE_2,
+DB_NETWORK_INTERFACE_2 = {'id': ID_EC2_NETWORK_INTERFACE_2,
                           'os_id': ID_OS_PORT_2,
-                          'vpc_id': ID_DB_VPC_1,
-                          'subnet_id': ID_DB_SUBNET_2,
+                          'vpc_id': ID_EC2_VPC_1,
+                          'subnet_id': ID_EC2_SUBNET_2,
                           'description': DESCRIPTION_NETWORK_INTERFACE_2,
                           'private_ip_address': IP_NETWORK_INTERFACE_2,
-                          'instance_id': ID_DB_INSTANCE_1,
+                          'instance_id': ID_EC2_INSTANCE_1,
                           'delete_on_termination': False,
                           'attach_time': TIME_ATTACH_NETWORK_INTERFACE}
 
@@ -483,12 +459,12 @@ EC2_RESERVATION_2 = {
 
 
 # DHCP options objects
-DB_DHCP_OPTIONS_1 = {'id': ID_DB_DHCP_OPTIONS_1,
+DB_DHCP_OPTIONS_1 = {'id': ID_EC2_DHCP_OPTIONS_1,
                      'dhcp_configuration':
                      {'domain-name': ['my.domain.com'],
                       'domain-name-servers': ['8.8.8.8', '127.0.0.1']}}
 
-DB_DHCP_OPTIONS_2 = {'id': ID_DB_DHCP_OPTIONS_2,
+DB_DHCP_OPTIONS_2 = {'id': ID_EC2_DHCP_OPTIONS_2,
                      'dhcp_configuration':
                      {'domain-name': ['my.domain.com'],
                       'domain-name-servers': ['8.8.8.8', '127.0.0.1'],
@@ -527,17 +503,17 @@ OS_DHCP_OPTIONS_1 = {'extra_dhcp_opts': [{'opt_name': 'domain-name',
 
 # address objects
 DB_ADDRESS_1 = {
-    'id': ID_DB_ADDRESS_1,
+    'id': ID_EC2_ADDRESS_1,
     'os_id': ID_OS_FLOATING_IP_1,
     'vpc_id': None,
     'public_ip': IP_ADDRESS_1,
 }
 DB_ADDRESS_2 = {
-    'id': ID_DB_ADDRESS_2,
+    'id': ID_EC2_ADDRESS_2,
     'os_id': ID_OS_FLOATING_IP_2,
     'vpc_id': None,
     'public_ip': IP_ADDRESS_2,
-    'network_interface_id': ID_DB_NETWORK_INTERFACE_2,
+    'network_interface_id': ID_EC2_NETWORK_INTERFACE_2,
     'private_ip_address': IP_NETWORK_INTERFACE_2,
 }
 
@@ -580,14 +556,14 @@ OS_FLOATING_IP_2 = {
 
 # security group objects
 DB_SECURITY_GROUP_1 = {
-    'id': ID_DB_SECURITY_GROUP_1,
+    'id': ID_EC2_SECURITY_GROUP_1,
     'os_id': ID_OS_SECURITY_GROUP_1,
-    'vpc_id': ID_DB_VPC_1,
+    'vpc_id': ID_EC2_VPC_1,
 }
 DB_SECURITY_GROUP_2 = {
-    'id': ID_DB_SECURITY_GROUP_2,
+    'id': ID_EC2_SECURITY_GROUP_2,
     'os_id': ID_OS_SECURITY_GROUP_2,
-    'vpc_id': ID_DB_VPC_1,
+    'vpc_id': ID_EC2_VPC_1,
 }
 OS_SECURITY_GROUP_RULE_1 = {
     'direction': 'ingress',
@@ -685,20 +661,20 @@ EC2_SECURITY_GROUP_2 = {
 
 # route table objects
 DB_ROUTE_TABLE_1 = {
-    'id': ID_DB_ROUTE_TABLE_1,
-    'vpc_id': ID_DB_VPC_1,
+    'id': ID_EC2_ROUTE_TABLE_1,
+    'vpc_id': ID_EC2_VPC_1,
     'routes': [{'destination_cidr_block': CIDR_VPC_1,
                 'gateway_id': None}],
 }
 DB_ROUTE_TABLE_2 = {
-    'id': ID_DB_ROUTE_TABLE_2,
-    'vpc_id': ID_DB_VPC_1,
+    'id': ID_EC2_ROUTE_TABLE_2,
+    'vpc_id': ID_EC2_VPC_1,
     'routes': [{'destination_cidr_block': CIDR_VPC_1,
                 'gateway_id': None},
                {'destination_cidr_block': CIDR_EXTERNAL_NETWORK,
-                'network_interface_id': ID_DB_NETWORK_INTERFACE_2},
+                'network_interface_id': ID_EC2_NETWORK_INTERFACE_2},
                {'destination_cidr_block': '0.0.0.0/0',
-                'gateway_id': ID_DB_IGW_1}],
+                'gateway_id': ID_EC2_IGW_1}],
 }
 EC2_ROUTE_TABLE_1 = {
     'routeTableId': ID_EC2_ROUTE_TABLE_1,
@@ -737,20 +713,20 @@ EC2_ROUTE_TABLE_2 = {
 # Object generator functions section
 
 # internet gateway generator functions
-def gen_db_igw(db_id, db_vpc_id=None):
-    return {'id': db_id,
+def gen_db_igw(ec2_id, ec2_vpc_id=None):
+    return {'id': ec2_id,
             'os_id': None,
-            'vpc_id': db_vpc_id}
+            'vpc_id': ec2_vpc_id}
 
 
 # network interface generator functions
-def gen_db_network_interface(db_id, os_id, vpc_db_id, subnet_db_id,
+def gen_db_network_interface(ec2_id, os_id, vpc_ec2_id, subnet_ec2_id,
                              private_ip_address, description=None,
                              instance_id=None, delete_on_termination=False):
-    eni = {'id': db_id,
+    eni = {'id': ec2_id,
            'os_id': os_id,
-           'vpc_id': vpc_db_id,
-           'subnet_id': subnet_db_id,
+           'vpc_id': vpc_ec2_id,
+           'subnet_id': subnet_ec2_id,
            'description': description,
            'private_ip_address': private_ip_address}
     if instance_id:

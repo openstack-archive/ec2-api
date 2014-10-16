@@ -63,7 +63,7 @@ def create_security_group(context, group_name, group_description,
                                          {'vpc_id': vpc['id'],
                                           'os_id': os_security_group['id']})
     return {'return': 'true',
-            'groupId': ec2utils.get_ec2_id(security_group['id'], 'sg')}
+            'groupId': security_group['id']}
 
 
 def _create_default_security_group(context, vpc):
@@ -241,8 +241,7 @@ def _format_security_groups_ids_names(context):
         if security_group is None:
             continue
         ec2_security_groups[os_security_group['id']] = (
-            {'groupId': ec2utils.get_ec2_id(security_group['id'],
-                                            'sg'),
+            {'groupId': security_group['id'],
              'groupName': os_security_group['name']})
     return ec2_security_groups
 
@@ -251,10 +250,8 @@ def _format_security_group(context, security_group, os_security_group,
                            os_security_groups, security_groups):
     ec2_security_group = {}
     if security_group is not None:
-        ec2_security_group['groupId'] = (
-            ec2utils.get_ec2_id(security_group['id'], 'sg'))
-        ec2_security_group['vpcId'] = (
-            ec2utils.get_ec2_id(security_group['vpc_id'], 'vpc'))
+        ec2_security_group['groupId'] = security_group['id']
+        ec2_security_group['vpcId'] = security_group['vpc_id']
     ec2_security_group['ownerId'] = os_security_group['tenant_id']
     ec2_security_group['groupName'] = os_security_group['name']
     ec2_security_group['groupDescription'] = os_security_group['description']
@@ -277,8 +274,7 @@ def _format_security_group(context, security_group, os_security_group,
             db_remote_group = next((g for g in security_groups
                                     if g['os_id'] == remote_group_id), None)
             if db_remote_group is not None:
-                ec2_remote_group['groupId'] = ec2utils.get_ec2_id(
-                    db_remote_group['id'], 'sg')
+                ec2_remote_group['groupId'] = db_remote_group['id']
             else:
                 # TODO(Alex) Log absence of remote_group
                 pass

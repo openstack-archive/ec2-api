@@ -139,7 +139,7 @@ class AddressTestCase(base.ApiTestCase):
                 tools.update_dict(
                     fakes.DB_ADDRESS_1,
                     {'network_interface_id':
-                     fakes.ID_DB_NETWORK_INTERFACE_2,
+                     fakes.ID_EC2_NETWORK_INTERFACE_2,
                      'private_ip_address': fixed_ip}))
 
             self.neutron.update_floatingip.reset_mock()
@@ -158,10 +158,10 @@ class AddressTestCase(base.ApiTestCase):
 
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_DB_ADDRESS_1:
+                fakes.ID_EC2_ADDRESS_1:
                 copy.deepcopy(fakes.DB_ADDRESS_1),
-                fakes.ID_DB_NETWORK_INTERFACE_2:
-                fakes.DB_NETWORK_INTERFACE_2}))
+                fakes.ID_EC2_NETWORK_INTERFACE_2:
+                    fakes.DB_NETWORK_INTERFACE_2}))
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
                   'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2},
                  fakes.IP_NETWORK_INTERFACE_2)
@@ -173,7 +173,7 @@ class AddressTestCase(base.ApiTestCase):
 
         assigned_db_address_1 = tools.update_dict(
             fakes.DB_ADDRESS_1,
-            {'network_interface_id': fakes.ID_DB_NETWORK_INTERFACE_1,
+            {'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'private_ip_address': fakes.IP_NETWORK_INTERFACE_1})
         assigned_floating_ip_1 = tools.update_dict(
             fakes.OS_FLOATING_IP_1,
@@ -199,10 +199,10 @@ class AddressTestCase(base.ApiTestCase):
                                               fakes.DB_NETWORK_INTERFACE_2]
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ADDRESS_2:
+                {fakes.ID_EC2_ADDRESS_2:
                  copy.deepcopy(fakes.DB_ADDRESS_2),
-                 fakes.ID_DB_NETWORK_INTERFACE_2:
-                 fakes.DB_NETWORK_INTERFACE_2}))
+                 fakes.ID_EC2_NETWORK_INTERFACE_2:
+                    fakes.DB_NETWORK_INTERFACE_2}))
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_2})
 
@@ -292,9 +292,9 @@ class AddressTestCase(base.ApiTestCase):
         # NOTE(ft): already associated address vs network interface
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_DB_ADDRESS_2: fakes.DB_ADDRESS_2,
-                 fakes.ID_DB_NETWORK_INTERFACE_1:
-                 fakes.DB_NETWORK_INTERFACE_1}))
+                {fakes.ID_EC2_ADDRESS_2: fakes.DB_ADDRESS_2,
+                 fakes.ID_EC2_NETWORK_INTERFACE_1:
+                    fakes.DB_NETWORK_INTERFACE_1}))
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_2})
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_2,
@@ -304,12 +304,12 @@ class AddressTestCase(base.ApiTestCase):
         # NOTE(ft): already associated address vs vpc instance
         self.db_api.get_items.return_value = [
             fakes.gen_db_network_interface(
-                fakes.ID_DB_NETWORK_INTERFACE_1,
+                fakes.ID_EC2_NETWORK_INTERFACE_1,
                 fakes.ID_OS_NETWORK_1,
-                fakes.ID_DB_VPC_1,
-                fakes.ID_DB_SUBNET_1,
+                fakes.ID_EC2_VPC_1,
+                fakes.ID_EC2_SUBNET_1,
                 fakes.IP_NETWORK_INTERFACE_1,
-                instance_id=fakes.ID_DB_INSTANCE_1)]
+                instance_id=fakes.ID_EC2_INSTANCE_1)]
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_2,
                   'InstanceId': fakes.ID_EC2_INSTANCE_1},
                  'Resource.AlreadyAssociated')
@@ -471,7 +471,7 @@ class AddressTestCase(base.ApiTestCase):
         self.neutron.delete_floatingip.assert_called_once_with(
             fakes.ID_OS_FLOATING_IP_1)
         self.db_api.delete_item.assert_called_once_with(
-            mock.ANY, fakes.ID_DB_ADDRESS_1)
+            mock.ANY, fakes.ID_EC2_ADDRESS_1)
 
     def test_release_address_invalid_parameters(self):
         def do_check(params, error):

@@ -17,6 +17,7 @@
 import ast
 import copy
 import functools
+import random
 import sys
 
 from oslo.config import cfg
@@ -88,8 +89,9 @@ def model_query(context, model, *args, **kwargs):
 def add_item(context, kind, data):
     item_ref = models.Item()
     item_ref.update({
+        "id": "%(kind)s-%(id)08x" % {"kind": kind,
+                                     "id": random.randint(1, 0xffffffff)},
         "project_id": context.project_id,
-        "kind": kind,
     })
     item_ref.update(_pack_item_data(data))
     item_ref.save()
@@ -120,7 +122,6 @@ def restore_item(context, kind, data):
     item_ref = models.Item()
     item_ref.update({
         "project_id": context.project_id,
-        "kind": kind,
     })
     item_ref.id = data['id']
     item_ref.update(_pack_item_data(data))
@@ -132,8 +133,8 @@ def restore_item(context, kind, data):
 def get_items(context, kind):
     return [_unpack_item_data(item)
             for item in model_query(context, models.Item).
-                    filter_by(project_id=context.project_id,
-                              kind=kind).
+                    filter_by(project_id=context.project_id).
+                    filter(models.Item.id.like('%s-%%' % kind)).
                     all()]
 
 
@@ -141,8 +142,8 @@ def get_items(context, kind):
 def get_item_by_id(context, kind, item_id):
     return _unpack_item_data(model_query(context, models.Item).
             filter_by(project_id=context.project_id,
-                      kind=kind,
                       id=item_id).
+            filter(models.Item.id.like('%s-%%' % kind)).
             first())
 
 
@@ -152,9 +153,9 @@ def get_items_by_ids(context, kind, item_ids):
         return get_items(context, kind)
     return [_unpack_item_data(item)
             for item in (model_query(context, models.Item).
-                         filter_by(project_id=context.project_id,
-                                  kind=kind).
+                         filter_by(project_id=context.project_id).
                          filter(models.Item.id.in_(item_ids))).
+                         filter(models.Item.id.like('%s-%%' % kind)).
                          all()]
 
 
