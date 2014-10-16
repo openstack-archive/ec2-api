@@ -8,8 +8,6 @@ iso8601>=0.1.9
 jsonschema>=2.0.0,<3.0.0
 lxml>=2.3
 oslo.config>=1.4.0.0a2
-oslotest
-paramiko>=1.13.0
 Paste
 PasteDeploy>=1.5.0
 pbr>=0.6,!=0.7,<1.0
