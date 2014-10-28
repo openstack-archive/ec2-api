@@ -128,7 +128,7 @@ class InstanceTestCase(base.ApiTestCase):
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
                 block_device_mapping=None,
-                security_group=None,
+                security_groups=None,
                 nics=[{'port-id': fakes.ID_OS_PORT_1}],
                 key_name=None, userdata=None)
             self.db_api.update_item.assert_called_once_with(
@@ -227,7 +227,7 @@ class InstanceTestCase(base.ApiTestCase):
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
                 block_device_mapping=None,
-                security_group=None,
+                security_groups=None,
                 nics=[{'port-id': port_id}
                       for port_id in port_ids],
                 key_name=None, userdata=None)

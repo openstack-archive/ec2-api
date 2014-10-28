@@ -129,7 +129,7 @@ def run_instances(context, image_id, min_count, max_count,
                 kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
                 availability_zone=(placement or {}).get('availability_zone'),
                 block_device_mapping=bdm,
-                security_group=security_groups_names,
+                security_groups=security_groups_names,
                 nics=nics,
                 key_name=key_name, userdata=user_data)
 
