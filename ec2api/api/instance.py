@@ -81,6 +81,11 @@ def run_instances(context, image_id, min_count, max_count,
      delete_on_termination_flags) = _parse_network_interface_parameters(
                     context, neutron, vpc_network_parameters)
 
+    # NOTE(ft): workaround for Launchpad Bug #1384347 in Icehouse
+    if not security_groups_names and vpc_network_parameters:
+        security_groups_names = _get_vpc_default_security_group_id(
+                context, network_interfaces, create_network_interfaces_args)
+
     security_groups = security_group_api._format_security_groups_ids_names(
             context)
 
@@ -525,6 +530,25 @@ def _create_network_interfaces(context, cleaner, params):
         network_interfaces.append(network_interface)
 
     return network_interfaces
+
+
+def _get_vpc_default_security_group_id(context, network_interfaces,
+                                       create_network_interfaces_args):
+    if network_interfaces:
+        vpc_id = network_interfaces[0]['vpc_id']
+    else:
+        subnet = db_api.get_item_by_id(
+                context, 'subnet', create_network_interfaces_args[0][0])
+        vpc_id = subnet['vpc_id']
+    default_groups = security_group_api.describe_security_groups(
+        context,
+        filter=[{'name': 'vpc-id', 'value': [vpc_id]},
+                {'name': 'group-name', 'value': ['Default']}]
+        )['securityGroupInfo']
+    security_groups = [ec2utils.get_db_item(context, 'sg',
+                                            default_group['groupId'])
+                       for default_group in default_groups]
+    return [sg['os_id'] for sg in security_groups]
 
 
 # NOTE(ft): following functions are copied from various parts of Nova

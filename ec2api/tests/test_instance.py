@@ -59,7 +59,8 @@ class InstanceTestCase(base.ApiTestCase):
         self.fake_instance_class = collections.namedtuple(
             'FakeInstance', ['id'])
 
-    def test_run_instances(self):
+    @mock.patch('ec2api.api.instance._get_vpc_default_security_group_id')
+    def test_run_instances(self, _get_vpc_default_security_group_id):
         """Run instance with various network interface settings."""
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
@@ -86,6 +87,8 @@ class InstanceTestCase(base.ApiTestCase):
         self.nova_flavors.list.return_value = [fake_flavor]
         self.nova_servers.create.return_value = self.fake_instance_class(
                 fakes.ID_OS_INSTANCE_1)
+
+        _get_vpc_default_security_group_id.return_value = None
 
         def do_check(params, new_port=True, delete_on_termination=None):
             params.update({'ImageId': 'ami-00000001',
@@ -155,7 +158,9 @@ class InstanceTestCase(base.ApiTestCase):
                   fakes.EC2_NETWORK_INTERFACE_1['networkInterfaceId']},
                  new_port=False)
 
-    def test_run_instances_multiple_networks(self):
+    @mock.patch('ec2api.api.instance._get_vpc_default_security_group_id')
+    def test_run_instances_multiple_networks(
+                self, _get_vpc_default_security_group_id):
         """Run 2 instances at once on 2 subnets in all combinations."""
         self._build_multiple_data_model()
 
@@ -167,6 +172,8 @@ class InstanceTestCase(base.ApiTestCase):
         self.ec2_id_to_glance_id.return_value = 'fake_image_id'
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.list.return_value = [fake_flavor]
+
+        _get_vpc_default_security_group_id.return_value = None
 
         ec2_instances = [
             fakes.gen_ec2_instance(
@@ -707,3 +714,6 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertIn('device_id', list_ports_kwargs)
         self.assertEqual(sorted(instance_ids),
                          sorted(list_ports_kwargs['device_id']))
+
+
+# TODO(ft): add tests for _get_vpc_default_security_group_id
