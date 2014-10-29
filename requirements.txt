@@ -21,7 +21,6 @@ six>=1.7.0
 SQLAlchemy>=0.8.4,!=0.9.5,<=0.9.99
 sqlalchemy-migrate>=0.9.1
 stevedore>=0.14
-suds>=0.4
 WebOb>=1.2.3
 
 
