@@ -54,13 +54,10 @@ aws --endpoint-url http://10.0.2.15:8788/services/Cloud ec2 describe-instances
 Limitations
 ===========
 
-This is an alpha-version, Tempest tests are not run yet.  
 VPN-related functionality is not supported yet. 
-Route-tables functionality is limited. 
-Filtering in describe functions can be done by IDs only.
-Security groups are attached to network interfaces only, not to instances yet.
-Rollbacks in case of failure during object creation are not supported yet.
-Some other not-listed here limitations exist also.
+Filtering in describe functions is not fully implemented everywhere.
+Default VPC Security Groups had to be named "Default" instead of Amazon's
+"default" due to conflict with OpenStack's default groups.
 
 Supported Features
 ==================
