@@ -15,6 +15,7 @@
 """
 Starting point for routing EC2 requests.
 """
+import sys
 
 from eventlet.green import httplib
 import netaddr
@@ -327,16 +328,41 @@ def exception_to_ec2code(ex):
     return code
 
 
-def ec2_error_ex(ex, req, code=None, message=None):
-    """Return an EC2 error response based on passed exception and log it."""
+def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
+    """Return an EC2 error response.
+
+    Return an EC2 error response based on passed exception and log
+    the exception on an appropriate log level:
+
+        * DEBUG: expected errors
+        * ERROR: unexpected errors
+
+    All expected errors are treated as client errors and 4xx HTTP
+    status codes are always returned for them.
+
+    Unexpected 5xx errors may contain sensitive information,
+    suppress their messages for security.
+    """
     if not code:
         code = exception_to_ec2code(ex)
     status = getattr(ex, 'code', None)
     if not status:
         status = 500
 
-    log_fun = LOG.error
-    log_msg = _("Unexpected %(ex_name)s raised: %(ex_str)s")
+    if unexpected:
+        log_fun = LOG.error
+        log_msg = _("Unexpected %(ex_name)s raised: %(ex_str)s")
+        exc_info = sys.exc_info()
+    else:
+        log_fun = LOG.debug
+        log_msg = _("%(ex_name)s raised: %(ex_str)s")
+        # NOTE(jruzicka): For compatibility with EC2 API, treat expected
+        # exceptions as client (4xx) errors. The exception error code is 500
+        # by default and most exceptions inherit this from NovaException even
+        # though they are actually client errors in most cases.
+        if status >= 500:
+            status = 400
+        exc_info = None
 
     context = req.environ['ec2api.context']
     request_id = context.request_id
@@ -344,16 +370,17 @@ def ec2_error_ex(ex, req, code=None, message=None):
         'ex_name': type(ex).__name__,
         'ex_str': unicode(ex)
     }
-    log_fun(log_msg % log_msg_args, context=context)
+    log_fun(log_msg % log_msg_args, context=context, exc_info=exc_info)
 
-    if ex.args and not message and status < 500:
+    if ex.args and not message and (not unexpected or status < 500):
         message = unicode(ex.args[0])
-    # Log filtered environment for unexpected errors.
-    env = req.environ.copy()
-    for k in env.keys():
-        if not isinstance(env[k], six.string_types):
-            env.pop(k)
-    log_fun(_('Environment: %s') % jsonutils.dumps(env))
+    if unexpected:
+        # Log filtered environment for unexpected errors.
+        env = req.environ.copy()
+        for k in env.keys():
+            if not isinstance(env[k], six.string_types):
+                env.pop(k)
+        log_fun(_('Environment: %s') % jsonutils.dumps(env))
     if not message:
         message = _('Unknown error occurred.')
     return faults.ec2_error_response(request_id, code, message, status=status)
@@ -387,7 +414,7 @@ class Executor(wsgi.Application):
                 resp.body = str(response)
                 return resp
             except Exception as ex:
-                return ec2_error_ex(ex, req)
+                return ec2_error_ex(ex, req, unexpected=True)
         except exception.EC2ServerError as ex:
             resp = webob.Response()
             resp.status = ex.response['status']
@@ -395,7 +422,9 @@ class Executor(wsgi.Application):
             resp.body = ex.content
             return resp
         except Exception as ex:
-            return ec2_error_ex(ex, req)
+            return ec2_error_ex(ex, req,
+                                unexpected=not isinstance(
+                                        ex, exception.EC2Exception))
         else:
             resp = webob.Response()
             resp.status = 200

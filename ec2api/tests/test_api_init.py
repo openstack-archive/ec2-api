@@ -88,8 +88,8 @@ class ApiInitTestCase(test_base.BaseTestCase):
             self.controller.fake_action.assert_called_once_with(
                 self.fake_context, param='fake_param')
 
-        do_check(exception.EC2Exception('fake_msg'), 500,
-                 'EC2Exception', 'Unknown error occurred.')
+        do_check(exception.EC2Exception('fake_msg'), 400,
+                 'EC2Exception', 'fake_msg')
         do_check(KeyError('fake_msg'), 500,
                  'KeyError', 'Unknown error occurred.')
         do_check(exception.InvalidVpcIDNotFound('fake_msg'), 400,
