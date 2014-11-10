@@ -290,10 +290,10 @@ DOTTED_FAKE_PARAMS = {
     'FakeList.2.FakeElemKey': 'fake',
     'FakeComplexList.1.FakeElemKey.1.FakeSubElemKey': 'fake',
     'FakeComplexList.1.FakeElemKey.2.FakeSubElemKey': 'fake',
-    'FakeComplexList.1.FakeElemKey1': 'fake',
+    'FakeComplexList.1.FakeElemKeyOther': 'fake',
     'FakeComplexList.2.FakeElemKey.1.FakeSubElemKey': 'fake',
     'FakeComplexList.2.FakeElemKey.2.FakeSubElemKey': 'fake',
-    'FakeComplexList.2.FakeElemKey1': 'fake',
+    'FakeComplexList.2.FakeElemKeyOther': 'fake',
 }
 DICT_FAKE_PARAMS = {
     'fake_str': 'fake',
@@ -305,8 +305,8 @@ DICT_FAKE_PARAMS = {
     'fake_complex_list': [
         {'fake_elem_key': [{'fake_sub_elem_key': 'fake'},
                            {'fake_sub_elem_key': 'fake'}],
-         'fake_elem_key_1': 'fake'},
+         'fake_elem_key_other': 'fake'},
         {'fake_elem_key': [{'fake_sub_elem_key': 'fake'},
                            {'fake_sub_elem_key': 'fake'}],
-         'fake_elem_key_1': 'fake'}],
+         'fake_elem_key_other': 'fake'}],
 }
