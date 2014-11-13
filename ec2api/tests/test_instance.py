@@ -22,6 +22,7 @@ import mock
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
+from ec2api.tests import tools
 
 
 class InstanceTestCase(base.ApiTestCase):
@@ -77,7 +78,7 @@ class InstanceTestCase(base.ApiTestCase):
                 [fakes.gen_ec2_instance(fakes.ID_EC2_INSTANCE_1,
                                         private_ip_address=None)])]}
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
-        self.id_to_ec2_inst_id.return_value = fakes.ID_EC2_INSTANCE_1
+        self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
 
         self.glance.images.get.return_value = self.fake_image_class(
@@ -137,6 +138,8 @@ class InstanceTestCase(base.ApiTestCase):
             self.db_api.update_item.assert_called_once_with(
                 mock.ANY, db_attached_eni)
             self.isotime.assert_called_once_with(None, True)
+            self.db_api.add_item.assert_called_once_with(
+                mock.ANY, 'i', tools.purge_dict(fakes.DB_INSTANCE_1, ('id',)))
 
             self.create_network_interface.reset_mock()
             self.nova_servers.reset_mock()
@@ -164,7 +167,11 @@ class InstanceTestCase(base.ApiTestCase):
         """Run 2 instances at once on 2 subnets in all combinations."""
         self._build_multiple_data_model()
 
-        self.id_to_ec2_inst_id.side_effect = self.IDS_EC2_INSTANCE
+        self.db_api.add_item.side_effect = [
+            {'id': ec2_instance_id,
+             'os_id': os_instance_id}
+            for ec2_instance_id, os_instance_id in zip(
+                self.IDS_EC2_INSTANCE, self.IDS_OS_INSTANCE)]
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
 
         self.glance.images.get.return_value = self.fake_image_class(
@@ -243,6 +250,10 @@ class InstanceTestCase(base.ApiTestCase):
             mock.call(mock.ANY, eni)
             for eni in self.DB_ATTACHED_ENIS])
         self.isotime.assert_called_once_with(None, True)
+        self.db_api.add_item.assert_has_calls([
+            mock.call(
+                mock.ANY, 'i', {'os_id': os_instance_id})
+            for os_instance_id in self.IDS_OS_INSTANCE])
 
     @mock.patch('ec2api.api.network_interface.delete_network_interface')
     @mock.patch('ec2api.api.instance._format_instance')
@@ -263,7 +274,7 @@ class InstanceTestCase(base.ApiTestCase):
                 [fakes.gen_ec2_instance(fakes.ID_EC2_INSTANCE_1,
                                         private_ip_address=None)])]}
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
-        self.id_to_ec2_inst_id.return_value = fakes.ID_EC2_INSTANCE_1
+        self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
 
         self.glance.images.get.return_value = self.fake_image_class(
@@ -292,14 +303,16 @@ class InstanceTestCase(base.ApiTestCase):
                     fakes.ID_OS_PORT_1,
                     {'port': {'device_id': '',
                               'device_owner': ''}})
-            self.ec2.terminate_instances.assert_called_once_with(
-                instance_id=fakes.ID_EC2_INSTANCE_1)
+            self.nova_servers.delete.assert_called_once_with(
+                fakes.ID_OS_INSTANCE_1)
+            self.db_api.delete_item.assert_called_once_with(
+                mock.ANY, fakes.ID_EC2_INSTANCE_1)
             self.db_api.update_item.assert_any_call(
                 mock.ANY, fakes.DB_NETWORK_INTERFACE_1)
 
             delete_network_interface.reset_mock()
             self.neutron.reset_mock()
-            self.ec2.reset_mock()
+            self.nova_servers.reset_mock()
             self.db_api.reset_mock()
 
         do_check({'SubnetId': fakes.EC2_SUBNET_1['subnetId']})
@@ -356,6 +369,8 @@ class InstanceTestCase(base.ApiTestCase):
                       'device_owner': ''}})
         self.ec2.terminate_instances.assert_called_once_with(
             instance_id=[fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2])
+        for inst_id in (fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2):
+            self.db_api.delete_item.assert_any_call(mock.ANY, inst_id)
 
     def test_terminate_instances_multiple_networks(self):
         """Terminate an instance with various combinations of ports."""
@@ -407,12 +422,14 @@ class InstanceTestCase(base.ApiTestCase):
                 self.db_api.update_item.assert_any_call(
                     mock.ANY,
                     port)
-            self.assertEqual(len(deleted_ports),
+            self.assertEqual(len(deleted_ports) + 2,
                              self.db_api.delete_item.call_count)
             for port in deleted_ports:
                 self.db_api.delete_item.assert_any_call(
                     mock.ANY,
                     port['id'])
+            for inst_id in (fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2):
+                self.db_api.delete_item.assert_any_call(mock.ANY, inst_id)
 
             self.ec2_inst_id_to_uuid.reset_mock()
             self.neutron.list_ports.reset_mock()

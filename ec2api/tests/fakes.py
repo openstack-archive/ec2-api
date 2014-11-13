@@ -384,6 +384,10 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
 
 
 # instance objects
+DB_INSTANCE_1 = {
+    'id': ID_EC2_INSTANCE_1,
+    'os_id': ID_OS_INSTANCE_1,
+}
 EC2OS_INSTANCE_1 = {
     'instanceId': ID_EC2_INSTANCE_1,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,

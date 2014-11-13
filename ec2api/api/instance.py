@@ -138,14 +138,14 @@ def run_instances(context, image_id, min_count, max_count,
                 nics=nics,
                 key_name=key_name, userdata=user_data)
 
-            ec2_instance_id = ec2utils.id_to_ec2_inst_id(os_instance.id)
-            cleaner.addCleanup(ec2.terminate_instances,
-                               instance_id=ec2_instance_id)
-            nova.servers.update(os_instance, name=ec2_instance_id)
+            cleaner.addCleanup(nova.servers.delete, os_instance.id)
+            instance = db_api.add_item(context, 'i', {'os_id': os_instance.id})
+            cleaner.addCleanup(db_api.delete_item, context, instance['id'])
+            nova.servers.update(os_instance, name=instance['id'])
 
-            network_interfaces_by_instances[ec2_instance_id] = (
+            network_interfaces_by_instances[instance['id']] = (
                 network_interfaces)
-            ec2_instance_ids.append(ec2_instance_id)
+            ec2_instance_ids.append(instance['id'])
 
         # TODO(ft): receive port from a create_network_interface sub-function
         os_ports = neutron.list_ports()['ports']
@@ -215,6 +215,8 @@ def terminate_instances(context, instance_id):
     ec2 = ec2client.ec2client(context)
     # TODO(ft): rollback detached ports on any error
     instances_set = ec2.terminate_instances(instance_id=instance_id)
+    for inst_id in instance_id:
+        db_api.delete_item(context, inst_id)
 
     for network_interface in network_interfaces.itervalues():
         if network_interface['delete_on_termination']:

@@ -22,6 +22,7 @@ import sys
 
 from oslo.config import cfg
 
+from ec2api.api import ec2utils
 import ec2api.context
 from ec2api.db.sqlalchemy import models
 from ec2api.openstack.common.db.sqlalchemy import session as db_session
@@ -87,11 +88,17 @@ def model_query(context, model, *args, **kwargs):
 
 @require_context
 def add_item(context, kind, data):
+    # NOTE(ft): obtaining new id from Nova DB is temporary solution
+    # while we don't implmenet all Nova EC2 methods
+    if kind == 'i':
+        obj_id = ec2utils.id_to_ec2_inst_id(data['os_id'])
+    else:
+        obj_id = "%(kind)s-%(id)08x" % {"kind": kind,
+                                        "id": random.randint(1, 0xffffffff)}
     item_ref = models.Item()
     item_ref.update({
-        "id": "%(kind)s-%(id)08x" % {"kind": kind,
-                                     "id": random.randint(1, 0xffffffff)},
         "project_id": context.project_id,
+        "id": obj_id,
     })
     item_ref.update(_pack_item_data(data))
     item_ref.save()
