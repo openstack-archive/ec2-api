@@ -387,7 +387,35 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
 DB_INSTANCE_1 = {
     'id': ID_EC2_INSTANCE_1,
     'os_id': ID_OS_INSTANCE_1,
+    'vpc_id': ID_EC2_VPC_1,
+    'reservation_id': ID_EC2_RESERVATION_1,
+    'launch_index': 0,
 }
+DB_INSTANCE_2 = {
+    'id': ID_EC2_INSTANCE_2,
+    'os_id': ID_OS_INSTANCE_2,
+    'vpc_id': None,
+    'reservation_id': ID_EC2_RESERVATION_2,
+    'launch_index': 0,
+}
+
+NOVADB_INSTANCE_1 = {
+    'reservation_id': random_ec2_id('r'),
+    'launch_index': 0,
+    'kernel_id': None,
+    'ramdisk_id': None,
+    'root_device_name': '/dev/vda',
+    'hostname': ID_EC2_INSTANCE_1,
+}
+NOVADB_INSTANCE_2 = {
+    'reservation_id': ID_EC2_RESERVATION_2,
+    'launch_index': 0,
+    'kernel_id': None,
+    'ramdisk_id': None,
+    'root_device_name': '/dev/vda',
+    'hostname': 'Server %s' % ID_OS_INSTANCE_2,
+}
+
 EC2OS_INSTANCE_1 = {
     'instanceId': ID_EC2_INSTANCE_1,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
@@ -409,7 +437,6 @@ EC2OS_RESERVATION_2 = {
 EC2_INSTANCE_1 = {
     'instanceId': ID_EC2_INSTANCE_1,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
-    'fakeKey': 'fakeValue',
     'vpcId': ID_EC2_VPC_1,
     'subnetId': ID_EC2_SUBNET_2,
     'networkInterfaceSet': [
@@ -450,17 +477,85 @@ EC2_INSTANCE_1 = {
          'requesterManaged': False,
          'groupSet': []},
     ],
+    'amiLaunchIndex': 0,
+    'placement': {'availabilityZone': None},
+    'dnsName': IP_ADDRESS_2,
+    'instanceState': {'code': 0, 'name': 'pending'},
+    'imageId': None,
+    'productCodesSet': [],
+    'privateDnsName': ID_EC2_INSTANCE_1,
+    'keyName': None,
+    'launchTime': None,
+    'rootDeviceType': 'instance-store',
+    'instanceType': 'fake_flavor',
+    'ipAddress': IP_ADDRESS_2,
+    'rootDeviceName': '/dev/vda',
 }
-EC2_INSTANCE_2 = EC2OS_INSTANCE_2
+EC2_INSTANCE_2 = {
+    'instanceId': ID_EC2_INSTANCE_2,
+    'privateIpAddress': None,
+    'amiLaunchIndex': 0,
+    'placement': {'availabilityZone': None},
+    'dnsName': None,
+    'instanceState': {'code': 0, 'name': 'pending'},
+    'imageId': None,
+    'productCodesSet': [],
+    'privateDnsName': 'Server %s' % ID_OS_INSTANCE_2,
+    'keyName': None,
+    'launchTime': None,
+    'rootDeviceType': 'instance-store',
+    'instanceType': 'fake_flavor',
+    'rootDeviceName': '/dev/vda',
+}
 EC2_RESERVATION_1 = {
+    'reservationId': ID_EC2_RESERVATION_1,
+    'ownerId': ID_OS_PROJECT,
     'instancesSet': [EC2_INSTANCE_1],
-    'fakeKey': 'fakeValue',
 }
 EC2_RESERVATION_2 = {
+    'reservationId': ID_EC2_RESERVATION_2,
+    'ownerId': ID_OS_PROJECT,
+    'groupSet': [],
     'instancesSet': [EC2_INSTANCE_2],
-    'fakeKey': 'fakeValue',
 }
 
+
+class OSInstance(object):
+    def __init__(self, instance_id, flavor=None, image=None, key_name=None,
+                 created=None, tenant_id=ID_OS_PROJECT, addresses={},
+                 security_groups=[], vm_state=None, host=None,
+                 availability_zone=None):
+        self.id = instance_id
+        self.flavor = flavor
+        self.image = image
+        self.key_name = key_name
+        self.created = created
+        self.tenant_id = tenant_id
+        self.addresses = addresses
+        self.security_groups = security_groups
+        setattr(self, 'OS-EXT-STS:vm_state', vm_state)
+        setattr(self, 'OS-EXT-SRV-ATTR:host', host)
+        setattr(self, 'OS-EXT-AZ:availability_zone', availability_zone)
+
+
+OS_INSTANCE_1 = OSInstance(
+    ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
+    addresses={
+        ID_EC2_SUBNET_2: [{'addr': IP_NETWORK_INTERFACE_2,
+                           'version': 4,
+                           'OS-EXT-IPS:type': 'fixed'},
+                          {'addr': IP_NETWORK_INTERFACE_2_EXT_1,
+                           'version': 4,
+                           'OS-EXT-IPS:type': 'fixed'},
+                          {'addr': IP_NETWORK_INTERFACE_2_EXT_2,
+                           'version': 4,
+                           'OS-EXT-IPS:type': 'fixed'},
+                          {'addr': IP_ADDRESS_2,
+                           'version': 4,
+                           'OS-EXT-IPS:type': 'floating'}]},
+    )
+OS_INSTANCE_2 = OSInstance(
+    ID_OS_INSTANCE_2, {'id': 'fakeFlavorId'})
 
 # DHCP options objects
 DB_DHCP_OPTIONS_1 = {'id': ID_EC2_DHCP_OPTIONS_1,
@@ -799,7 +894,8 @@ def gen_os_port(os_id, ec2_network_interface, os_subnet_id, fixed_ips,
 
 # instance generator functions
 def gen_ec2_instance(ec2_instance_id, private_ip_address='',
-                     ec2_network_interfaces=None, is_private_ip_in_vpc=True):
+                     ec2_network_interfaces=None, is_private_ip_in_vpc=True,
+                     floating_ip=None):
     """Generate EC2 Instance dictionary.
 
     private_ip_address must be specified as IP value or None
@@ -809,7 +905,20 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
     """
     ec2_instance = {'instanceId': ec2_instance_id,
                     'privateIpAddress': private_ip_address,
-                    'fakeKey': 'fakeValue'}
+                    'amiLaunchIndex': 0,
+                    'placement': {'availabilityZone': None},
+                    'dnsName': floating_ip,
+                    'instanceState': {'code': 0, 'name': 'pending'},
+                    'imageId': None,
+                    'productCodesSet': [],
+                    'privateDnsName': ec2_instance_id,
+                    'keyName': None,
+                    'launchTime': None,
+                    'rootDeviceType': 'instance-store',
+                    'instanceType': 'fake_flavor',
+                    'rootDeviceName': '/dev/vda'}
+    if floating_ip is not None:
+        ec2_instance['ipAddress'] = floating_ip
     if ec2_network_interfaces is not None:
         ec2_instance['networkInterfaceSet'] = (
             [ni for ni in ec2_network_interfaces])
@@ -823,5 +932,4 @@ def gen_ec2_reservation(ec2_reservation_id, ec2_instances):
     """Generate EC2 Reservation dictionary."""
     return {'reservationId': ec2_reservation_id,
             'ownerId': ID_OS_PROJECT,
-            'instancesSet': [inst for inst in ec2_instances],
-            'groupSet': []}
+            'instancesSet': [inst for inst in ec2_instances]}

@@ -180,9 +180,24 @@ def id_to_glance_id(context, image_id):
     return novadb.s3_image_get(context, image_id)['uuid']
 
 
+def glance_id_to_id(context, glance_id):
+    """Convert a glance id to an internal (db) id."""
+    if glance_id is None:
+        return
+    try:
+        return novadb.s3_image_get_by_uuid(context, glance_id)['id']
+    except exception.NotFound:
+        return novadb.s3_image_create(context, glance_id)['id']
+
+
 def ec2_id_to_glance_id(context, ec2_id):
     image_id = ec2_id_to_id(ec2_id)
     return id_to_glance_id(context, image_id)
+
+
+def glance_id_to_ec2_id(context, glance_id, image_type='ami'):
+    image_id = glance_id_to_id(context, glance_id)
+    return image_ec2_id(image_id, image_type=image_type)
 
 
 # TODO(Alex) This function is copied as is from original cloud.py. It doesn't
@@ -193,6 +208,12 @@ def ec2_id_to_id(ec2_id):
         return int(ec2_id.split('-')[-1], 16)
     except ValueError:
         raise exception.InvalidEc2Id(ec2_id=ec2_id)
+
+
+def image_ec2_id(image_id, image_type='ami'):
+    """Returns image ec2_id using id and three letter type."""
+    template = image_type + '-%08x'
+    return id_to_ec2_id(image_id, template=template)
 
 
 def id_to_ec2_id(instance_id, template='i-%08x'):

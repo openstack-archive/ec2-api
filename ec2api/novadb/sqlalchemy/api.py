@@ -26,6 +26,7 @@ from sqlalchemy import or_
 import ec2api.context
 from ec2api import exception
 from ec2api.novadb.sqlalchemy import models
+from ec2api.openstack.common.db import exception as db_exc
 from ec2api.openstack.common.db.sqlalchemy import session as db_session
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
@@ -178,6 +179,30 @@ def s3_image_get(context, image_id):
     return result
 
 
+def s3_image_get_by_uuid(context, image_uuid):
+    """Find local s3 image represented by the provided uuid."""
+    result = (model_query(context, models.S3Image, read_deleted="yes").
+                 filter_by(uuid=image_uuid).
+                 first())
+
+    if not result:
+        raise exception.NovaDbImageNotFound(image_id=image_uuid)
+
+    return result
+
+
+def s3_image_create(context, image_uuid):
+    """Create local s3 image represented by provided uuid."""
+    try:
+        s3_image_ref = models.S3Image()
+        s3_image_ref.update({'uuid': image_uuid})
+        s3_image_ref.save()
+    except Exception as e:
+        raise db_exc.DBError(e)
+
+    return s3_image_ref
+
+
 ##################
 
 
@@ -323,3 +348,51 @@ def _ec2_instance_get_query(context, session=None):
                        models.InstanceIdMapping,
                        session=session,
                        read_deleted='yes')
+
+
+@require_context
+def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):
+    return _instance_get_by_uuid(context, uuid,
+            columns_to_join=columns_to_join, use_slave=use_slave)
+
+
+def _instance_get_by_uuid(context, uuid, session=None,
+                          columns_to_join=None, use_slave=False):
+    result = (_build_instance_get(context, session=session,
+                                 columns_to_join=columns_to_join,
+                                 use_slave=use_slave).
+                filter_by(uuid=uuid).
+                first())
+
+    if not result:
+        raise exception.NovaDbInstanceNotFound(instance_id=uuid)
+
+    return result
+
+
+def _build_instance_get(context, session=None,
+                        columns_to_join=None, use_slave=False):
+    query = model_query(context, models.Instance, session=session,
+                        project_only=True, use_slave=use_slave,
+                        read_deleted="no")
+    return query
+
+
+def _block_device_mapping_get_query(context, session=None,
+        columns_to_join=None, use_slave=False):
+    if columns_to_join is None:
+        columns_to_join = []
+
+    query = model_query(context, models.BlockDeviceMapping,
+                        session=session, use_slave=use_slave,
+                        read_deleted="no")
+
+    return query
+
+
+@require_context
+def block_device_mapping_get_all_by_instance(context, instance_uuid,
+                                             use_slave=False):
+    return (_block_device_mapping_get_query(context, use_slave=use_slave).
+                 filter_by(instance_uuid=instance_uuid).
+                 all())

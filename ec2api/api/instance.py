@@ -15,8 +15,11 @@
 
 import collections
 import copy
+import itertools
 import random
 import re
+
+from oslo.config import cfg
 
 from ec2api.api import clients
 from ec2api.api import ec2client
@@ -26,9 +29,20 @@ from ec2api.api import security_group as security_group_api
 from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
+from ec2api import novadb
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import timeutils
 
+
+ec2_opts = [
+    cfg.BoolOpt('ec2_private_dns_show_ip',
+                default=False,
+                help='Return the IP address as private dns hostname in '
+                     'describe instances'),
+]
+
+CONF = cfg.CONF
+CONF.register_opts(ec2_opts)
 
 """Instance related API implementation
 """
@@ -76,7 +90,8 @@ def run_instances(context, image_id, min_count, max_count,
                     vpc_network_parameters, min_count, min_count)
 
     neutron = clients.neutron(context)
-    (network_interfaces,
+    (vpc_id,
+     network_interfaces,
      create_network_interfaces_args,
      delete_on_termination_flags) = _parse_network_interface_parameters(
                     context, neutron, vpc_network_parameters)
@@ -84,11 +99,13 @@ def run_instances(context, image_id, min_count, max_count,
     # NOTE(ft): workaround for Launchpad Bug #1384347 in Icehouse
     if not security_groups_names and vpc_network_parameters:
         security_groups_names = _get_vpc_default_security_group_id(
-                context, network_interfaces, create_network_interfaces_args)
+                context, vpc_id)
 
-    security_groups = security_group_api._format_security_groups_ids_names(
-            context)
+    instances_infos = []
+    ec2_reservation_id = _generate_reservation_id()
 
+    # TODO(ft): Process min and max counts on running errors accordingly to
+    # their meanings. Correct error messages are also critical
     with utils.OnCrashCleaner() as cleaner:
         # NOTE(ft): create Neutron's ports manually to have a chance to:
         # process individual network interface options like security_group
@@ -122,11 +139,9 @@ def run_instances(context, image_id, min_count, max_count,
                     context, cleaner, create_network_interfaces_args)
                 instance_network_interfaces.append(network_interfaces)
 
-        ec2 = ec2client.ec2client(context)
         # NOTE(ft): run instances one by one using created ports
-        network_interfaces_by_instances = {}
-        ec2_instance_ids = []
-        for network_interfaces in instance_network_interfaces:
+        for (launch_index,
+             network_interfaces) in enumerate(instance_network_interfaces):
             nics = [{'port-id': eni['os_id']} for eni in network_interfaces]
             os_instance = nova.servers.create(
                 'EC2 server', os_image.id, os_flavor,
@@ -139,53 +154,37 @@ def run_instances(context, image_id, min_count, max_count,
                 key_name=key_name, userdata=user_data)
 
             cleaner.addCleanup(nova.servers.delete, os_instance.id)
-            instance = db_api.add_item(context, 'i', {'os_id': os_instance.id})
+            instance = db_api.add_item(context, 'i',
+                                       {'os_id': os_instance.id,
+                                        'vpc_id': vpc_id,
+                                        'reservation_id': ec2_reservation_id,
+                                        'launch_index': launch_index})
             cleaner.addCleanup(db_api.delete_item, context, instance['id'])
             nova.servers.update(os_instance, name=instance['id'])
 
-            network_interfaces_by_instances[instance['id']] = (
-                network_interfaces)
-            ec2_instance_ids.append(instance['id'])
-
-        # TODO(ft): receive port from a create_network_interface sub-function
-        os_ports = neutron.list_ports()['ports']
-        os_ports = dict((p['id'], p) for p in os_ports)
-        ec2_instances = ec2.describe_instances(instance_id=ec2_instance_ids)
-        ec2_instances = [i for r in ec2_instances['reservationSet']
-                         for i in r['instancesSet']]
-        attach_time = timeutils.isotime(None, True)
-        # TODO(ft): Process min and max counts on running errors accordingly to
-        # their meanings. Correct error messages are also critical
-        for ec2_instance in ec2_instances:
-            instance_ports_info = []
             delete_on_termination = iter(delete_on_termination_flags)
-            for network_interface in network_interfaces_by_instances[
-                    ec2_instance['instanceId']]:
+            for network_interface in network_interfaces:
                 # TODO(ft): implement update items in DB layer to prevent
                 # record by record modification
                 # Alternatively a create_network_interface sub-function can
                 # set attach_time  at once
                 network_interface.update({
-                        'instance_id': ec2_instance['instanceId'],
-                        'attach_time': attach_time,
+                        'instance_id': instance['id'],
+                        'attach_time': timeutils.isotime(None, True),
                         'delete_on_termination': delete_on_termination.next()})
                 db_api.update_item(context, network_interface)
                 cleaner.addCleanup(
                         network_interface_api._detach_network_interface_item,
                         context, network_interface)
-                os_port = os_ports[network_interface['os_id']]
-                instance_ports_info.append((network_interface, os_port, [],))
 
-            _format_instance(context, ec2_instance,
-                             instance_ports_info, security_groups)
+            novadb_instance = novadb.instance_get_by_uuid(context,
+                                                          os_instance.id)
+            instances_infos.append((instance, os_instance, novadb_instance,
+                                    network_interfaces,))
 
-    # TODO(ft): since we run instances separately each instance has its
-    # own ec2_reservation id. Now we return ec2_reservation id of
-    # the last started instance
-    # If we aren't able to update OpenStack to fit ec2 requirements,
-    # we should have our own ec2_reservation id to use it instead of Nova's.
-    ec2_reservation_id = _generate_reservation_id()
-    return _format_reservation(context, ec2_reservation_id, ec2_instances)
+    common_nw_info = _get_common_nw_info(context)
+    return _format_reservation(context, ec2_reservation_id, instances_infos,
+                               common_nw_info)
 
 
 def terminate_instances(context, instance_id):
@@ -230,48 +229,131 @@ def terminate_instances(context, instance_id):
 
 def describe_instances(context, instance_id=None, filter=None, **kwargs):
 
-    # TODO(ft): implement filters by network attributes
-    ec2 = ec2client.ec2client(context)
-    result = ec2.describe_instances(instance_id=instance_id,
-                                    filter=filter, **kwargs)
-
-    os_instance_ids = [
-            ec2utils.ec2_inst_id_to_uuid(context, inst['instanceId'])
-            for reservation in result['reservationSet']
-            for inst in reservation['instancesSet']]
-    neutron = clients.neutron(context)
-    os_ports = neutron.list_ports(device_id=os_instance_ids)['ports']
-    os_ports = dict((p['id'], p) for p in os_ports)
+    instances = db_api.get_items(context, 'i')
+    instances_by_os_id = dict((i['os_id'], i) for i in instances)
+    nova = clients.nova(context)
+    os_instances = nova.servers.list()
     # TODO(ft): implement search db items by os_id in DB layer
     network_interfaces = collections.defaultdict(list)
     for eni in db_api.get_items(context, 'eni'):
         if 'instance_id' in eni:
             network_interfaces[eni['instance_id']].append(eni)
-    os_floating_ips = neutron.list_floatingips()['floatingips']
-    os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
-    addresses = collections.defaultdict(list)
-    for address in db_api.get_items(context, 'eipalloc'):
-        if ('network_interface_id' in address and
-                address['os_id'] in os_floating_ip_ids):
-            addresses[address['network_interface_id']].append(address)
-    security_groups = security_group_api._format_security_groups_ids_names(
-            context)
 
-    for ec2_reservation in result['reservationSet']:
-        for ec2_instance in ec2_reservation['instancesSet']:
-            inst_id = ec2_instance['instanceId']
-            instance_network_interfaces = network_interfaces[inst_id]
-            ports_info = [(eni, os_ports[eni['os_id']], addresses[eni['id']])
-                          for eni in instance_network_interfaces
-                          if eni['os_id'] in os_ports]
-            _format_instance(context, ec2_instance, ports_info,
-                             security_groups)
+    reservations = _prepare_reservations(
+            context, os_instances, instances_by_os_id, network_interfaces)
+    common_nw_info = _get_common_nw_info(context)
 
-    return result
+    ec2_reservations = []
+    for reservation_id, instances_infos in reservations.iteritems():
+        ec2_reservations.append(_format_reservation(
+                context, reservation_id, instances_infos, common_nw_info))
+    return {'reservationSet': ec2_reservations}
 
 
-def _format_instance(context, ec2_instance, ports_info, security_groups):
+def _prepare_reservations(context, os_instances, instances_by_os_id,
+                          network_interfaces):
+    reservations = {}
+    for os_instance in os_instances:
+        novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
+        if os_instance.id in instances_by_os_id:
+            instance = instances_by_os_id.get(os_instance.id)
+            reservation_id = instance['reservation_id']
+        else:
+            reservation_id = novadb_instance['reservation_id']
+            instance = db_api.add_item(
+                    context, 'i',
+                    {'os_id': os_instance.id,
+                     'vpc_id': None,
+                     'reservation_id': reservation_id,
+                     'launch_index': novadb_instance['launch_index']})
+        if reservation_id not in reservations:
+            reservations[reservation_id] = []
+        reservations[reservation_id].append(
+                (instance, os_instance, novadb_instance,
+                 network_interfaces[instance['id']],))
+    return reservations
+
+
+def _format_reservation(context, reservation_id, instances_infos,
+                        common_nw_info):
+    os_ports, addresses, security_groups = common_nw_info
+    ec2_instances = []
+    for (instance, os_instance, novadb_instance,
+         network_interfaces) in instances_infos:
+        ports_info = [(eni,
+                       os_ports[eni['os_id']],
+                       addresses.get(eni['id'], []))
+                      for eni in network_interfaces
+                      if eni['os_id'] in os_ports]
+        ec2_instances.append(
+                _format_instance(context, instance, os_instance,
+                                 novadb_instance, ports_info, security_groups))
+    ec2_reservation = {'reservationId': reservation_id,
+                       'ownerId': os_instance.tenant_id,
+                       'instancesSet': ec2_instances}
+    if not instance['vpc_id']:
+        ec2_reservation['groupSet'] = _format_group_set(
+                context, os_instance.security_groups)
+    return ec2_reservation
+
+
+def _format_instance(context, instance, os_instance, novadb_instance,
+                     ports_info, security_groups):
+    ec2_instance = {}
+    ec2_instance['instanceId'] = instance['id']
+    image_uuid = os_instance.image['id'] if os_instance.image else ''
+    ec2_instance['imageId'] = ec2utils.glance_id_to_ec2_id(context, image_uuid)
+    _cloud_format_kernel_id(context, novadb_instance, ec2_instance, 'kernelId')
+    _cloud_format_ramdisk_id(context, novadb_instance, ec2_instance,
+                             'ramdiskId')
+    ec2_instance['instanceState'] = _cloud_state_description(
+            getattr(os_instance, 'OS-EXT-STS:vm_state'))
+
+    fixed_ip, fixed_ip6, floating_ip = _get_ip_info_for_instance(os_instance)
+    if fixed_ip6:
+        ec2_instance['dnsNameV6'] = fixed_ip6
+    if CONF.ec2_private_dns_show_ip:
+        ec2_instance['privateDnsName'] = fixed_ip
+    else:
+        ec2_instance['privateDnsName'] = novadb_instance['hostname']
+    ec2_instance['privateIpAddress'] = fixed_ip
+    if floating_ip is not None:
+        ec2_instance['ipAddress'] = floating_ip
+    ec2_instance['dnsName'] = floating_ip
+    ec2_instance['keyName'] = os_instance.key_name
+
+    # NOTE(ft): add tags
+#     i['tagSet'] = []
+#
+#     for k, v in utils.instance_meta(instance).iteritems():
+#         i['tagSet'].append({'key': k, 'value': v})
+
+    # NOTE(ft): add client token
+#     client_token = self._get_client_token(context, instance_uuid)
+#     if client_token:
+#         i['clientToken'] = client_token
+
+    if context.is_admin:
+        ec2_instance['keyName'] = '%s (%s, %s)' % (ec2_instance['keyName'],
+            os_instance.tenant_id,
+            getattr(os_instance, 'OS-EXT-SRV-ATTR:host'))
+    ec2_instance['productCodesSet'] = None
+    _cloud_format_instance_type(context, os_instance, ec2_instance)
+    ec2_instance['launchTime'] = os_instance.created
+    ec2_instance['amiLaunchIndex'] = instance['launch_index']
+    _cloud_format_instance_root_device_name(novadb_instance, ec2_instance)
+    _cloud_format_instance_bdm(context, instance['os_id'],
+                               ec2_instance['rootDeviceName'], ec2_instance)
+    ec2_instance['placement'] = {
+        'availabilityZone': getattr(os_instance,
+                                    'OS-EXT-AZ:availability_zone')
+    }
     if not ports_info:
+        # TODO(ft): boto uses 2010-08-31 version of AWS protocol
+        # which doesn't contain groupSet element in an instance
+        # We should support different versions of output data
+        # ec2_instance['groupSet'] = _format_group_set(
+        #         context, os_instance.security_groups)
         return ec2_instance
     ec2_network_interfaces = []
     for network_interface, os_port, addresses in ports_info:
@@ -288,24 +370,39 @@ def _format_instance(context, ec2_instance, ports_info, security_groups):
     # NOTE(ft): get instance's subnet by instance's privateIpAddress
     instance_ip = ec2_instance['privateIpAddress']
     network_interface = None
-    for network_interface, os_port, addresses in ports_info:
+    for ((network_interface, os_port, _addresses),
+         ec2_network_interface) in zip(ports_info, ec2_network_interfaces):
         if instance_ip in (ip['ip_address']
                            for ip in os_port['fixed_ips']):
             ec2_instance['subnetId'] = network_interface['subnet_id']
+            # TODO(ft): boto uses 2010-08-31 version of AWS protocol
+            # which doesn't contain groupSet element in an instance
+            # We should support different versions of output data
+            # ec2_instance['groupSet'] = ec2_network_interface['groupSet']
             break
     if network_interface:
         ec2_instance['vpcId'] = network_interface['vpc_id']
-
     return ec2_instance
 
 
-def _format_reservation(context, ec2_reservation_id, ec2_instances):
-    return {'reservationId': ec2_reservation_id,
-            'ownerId': context.project_id,
-            'instancesSet': ec2_instances,
-            # TODO(ft): Check AWS behavior: can it start zero instances with
-            # successfull result?
-            'groupSet': ec2_instances[0].get('groupSet')}
+def _get_common_nw_info(context):
+    neutron = clients.neutron(context)
+
+    os_ports = neutron.list_ports()['ports']
+    os_ports = dict((p['id'], p) for p in os_ports)
+
+    os_floating_ips = neutron.list_floatingips()['floatingips']
+    os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
+    addresses = collections.defaultdict(list)
+    for address in db_api.get_items(context, 'eipalloc'):
+        if ('network_interface_id' in address and
+                address['os_id'] in os_floating_ip_ids):
+            addresses[address['network_interface_id']].append(address)
+
+    security_groups = security_group_api._format_security_groups_ids_names(
+            context)
+
+    return os_ports, addresses, security_groups
 
 
 def _check_min_max_count(min_count, max_count):
@@ -508,7 +605,8 @@ def _parse_network_interface_parameters(context, neutron, params):
     subnet_vpcs = set(s['vpc_id'] for s in subnets)
     network_interface_vpcs = set(eni['vpc_id']
                                  for eni in network_interfaces)
-    if len(subnet_vpcs | network_interface_vpcs) > 1:
+    vpc_ids = subnet_vpcs | network_interface_vpcs
+    if len(vpc_ids) > 1:
         msg = _('Network interface attachments may not cross '
                 'VPC boundaries.')
         raise exception.InvalidParameterValue(msg)
@@ -519,7 +617,9 @@ def _parse_network_interface_parameters(context, neutron, params):
 
     delete_on_termination_flags = ([False] * len(network_interfaces) +
                                    delete_on_termination_flags)
-    return (network_interfaces, create_network_interfaces_args,
+    return (next(iter(vpc_ids), None),
+            network_interfaces,
+            create_network_interfaces_args,
             delete_on_termination_flags)
 
 
@@ -541,14 +641,7 @@ def _create_network_interfaces(context, cleaner, params):
     return network_interfaces
 
 
-def _get_vpc_default_security_group_id(context, network_interfaces,
-                                       create_network_interfaces_args):
-    if network_interfaces:
-        vpc_id = network_interfaces[0]['vpc_id']
-    else:
-        subnet = db_api.get_item_by_id(
-                context, 'subnet', create_network_interfaces_args[0][0])
-        vpc_id = subnet['vpc_id']
+def _get_vpc_default_security_group_id(context, vpc_id):
     default_groups = security_group_api.describe_security_groups(
         context,
         filter=[{'name': 'vpc-id', 'value': [vpc_id]},
@@ -560,6 +653,25 @@ def _get_vpc_default_security_group_id(context, network_interfaces,
     return [sg['os_id'] for sg in security_groups]
 
 
+def _format_group_set(context, os_security_groups):
+    if not os_security_groups:
+        return None
+    # TODO(ft): add groupId
+    return [{'groupName': sg['name']} for sg in os_security_groups]
+
+
+def _get_ip_info_for_instance(os_instance):
+    addresses = list(itertools.chain(*os_instance.addresses.itervalues()))
+    fixed_ip = next((addr['addr'] for addr in addresses
+                     if addr['version'] == 4 and
+                            addr['OS-EXT-IPS:type'] == 'fixed'), None)
+    fixed_ip6 = next((addr['addr'] for addr in addresses
+                      if addr['version'] == 6 and
+                            addr['OS-EXT-IPS:type'] == 'fixed'), None)
+    floating_ip = next((addr['addr'] for addr in addresses
+                        if addr['OS-EXT-IPS:type'] == 'floating'), None)
+    return fixed_ip, fixed_ip6, floating_ip
+
 # NOTE(ft): following functions are copied from various parts of Nova
 
 _dev = re.compile('^/dev/')
@@ -568,6 +680,11 @@ _dev = re.compile('^/dev/')
 def _block_device_strip_dev(device_name):
     """remove leading '/dev/'."""
     return _dev.sub('', device_name) if device_name else device_name
+
+
+def _block_device_prepend_dev(device_name):
+    """Make sure there is a leading '/dev/'."""
+    return device_name and '/dev/' + _block_device_strip_dev(device_name)
 
 
 def _cloud_parse_block_device_mapping(bdm):
@@ -612,3 +729,212 @@ def _cloud_get_image_state(image):
     if state == 'active':
         state = 'available'
     return image.properties.get('image_state', state)
+
+
+def _cloud_format_kernel_id(context, instance_ref, result, key):
+    kernel_uuid = instance_ref['kernel_id']
+    if kernel_uuid is None or kernel_uuid == '':
+        return
+    result[key] = ec2utils.glance_id_to_ec2_id(context, kernel_uuid, 'aki')
+
+
+def _cloud_format_ramdisk_id(context, instance_ref, result, key):
+    ramdisk_uuid = instance_ref['ramdisk_id']
+    if ramdisk_uuid is None or ramdisk_uuid == '':
+        return
+    result[key] = ec2utils.glance_id_to_ec2_id(context, ramdisk_uuid,
+                                               'ari')
+
+
+def _cloud_format_instance_type(context, os_instance, result):
+    flavor = clients.nova(context).flavors.get(os_instance.flavor['id'])
+    result['instanceType'] = flavor.name
+
+
+def _cloud_format_instance_root_device_name(novadb_instance, result):
+    result['rootDeviceName'] = (novadb_instance.get('root_device_name') or
+                                block_device_DEFAULT_ROOT_DEV_NAME)
+
+
+block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
+
+
+def _cloud_format_instance_bdm(context, instance_uuid, root_device_name,
+                               result):
+    """Format InstanceBlockDeviceMappingResponseItemType."""
+    root_device_type = 'instance-store'
+    root_device_short_name = _block_device_strip_dev(root_device_name)
+    if root_device_name == root_device_short_name:
+        root_device_name = _block_device_prepend_dev(root_device_name)
+    cinder = clients.cinder(context)
+    mapping = []
+    for bdm in novadb.block_device_mapping_get_all_by_instance(context,
+                                                               instance_uuid):
+        volume_id = bdm['volume_id']
+        if (volume_id is None or bdm['no_device']):
+            continue
+
+        if ((bdm['snapshot_id'] or bdm['volume_id']) and
+                (bdm['device_name'] == root_device_name or
+                 bdm['device_name'] == root_device_short_name)):
+            root_device_type = 'ebs'
+
+        vol = cinder.volumes.get(volume_id)
+        # TODO(yamahata): volume attach time
+        ebs = {'volumeId': ec2utils.id_to_ec2_vol_id(volume_id),
+               'deleteOnTermination': bdm['delete_on_termination'],
+               'attachTime': '',
+               'status': _cloud_get_volume_attach_status(vol), }
+        res = {'deviceName': bdm['device_name'],
+               'ebs': ebs, }
+        mapping.append(res)
+
+    if mapping:
+        result['blockDeviceMapping'] = mapping
+    result['rootDeviceType'] = root_device_type
+
+
+def _cloud_get_volume_attach_status(volume):
+    if volume.status in ('attaching', 'detaching'):
+        return volume.status
+    elif volume.attachments:
+        return 'attached'
+    else:
+        return 'detached'
+
+
+# NOTE(ft): nova/compute/vm_states.py
+
+"""Possible vm states for instances.
+
+Compute instance vm states represent the state of an instance as it pertains to
+a user or administrator.
+
+vm_state describes a VM's current stable (not transition) state. That is, if
+there is no ongoing compute API calls (running tasks), vm_state should reflect
+what the customer expect the VM to be. When combined with task states
+(task_states.py), a better picture can be formed regarding the instance's
+health and progress.
+
+See http://wiki.openstack.org/VMState
+"""
+
+vm_states_ACTIVE = 'active'  # VM is running
+vm_states_BUILDING = 'building'  # VM only exists in DB
+vm_states_PAUSED = 'paused'
+vm_states_SUSPENDED = 'suspended'  # VM is suspended to disk.
+vm_states_STOPPED = 'stopped'  # VM is powered off, the disk image is still
+# there.
+vm_states_RESCUED = 'rescued'  # A rescue image is running with the original VM
+# image attached.
+vm_states_RESIZED = 'resized'  # a VM with the new size is active. The user is
+# expected to manually confirm or revert.
+
+vm_states_SOFT_DELETED = 'soft-delete'  # VM is marked as deleted but the disk
+# images are still available to restore.
+vm_states_DELETED = 'deleted'  # VM is permanently deleted.
+
+vm_states_ERROR = 'error'
+
+vm_states_SHELVED = 'shelved'  # VM is powered off, resources still on
+# hypervisor
+vm_states_SHELVED_OFFLOADED = 'shelved_offloaded'  # VM and associated
+# resources are not on hypervisor
+
+vm_states_ALLOW_SOFT_REBOOT = [vm_states_ACTIVE]  # states we can soft reboot
+# from
+vm_states_ALLOW_HARD_REBOOT = (
+    vm_states_ALLOW_SOFT_REBOOT +
+    [vm_states_STOPPED, vm_states_PAUSED, vm_states_SUSPENDED,
+     vm_states_ERROR])
+# states we allow hard reboot from
+
+# NOTE(ft): end of nova/compute/vm_states.py
+
+# NOTE(ft): nova/api/ec2/inst_states.py
+
+inst_state_PENDING_CODE = 0
+inst_state_RUNNING_CODE = 16
+inst_state_SHUTTING_DOWN_CODE = 32
+inst_state_TERMINATED_CODE = 48
+inst_state_STOPPING_CODE = 64
+inst_state_STOPPED_CODE = 80
+
+inst_state_PENDING = 'pending'
+inst_state_RUNNING = 'running'
+inst_state_SHUTTING_DOWN = 'shutting-down'
+inst_state_TERMINATED = 'terminated'
+inst_state_STOPPING = 'stopping'
+inst_state_STOPPED = 'stopped'
+
+# non-ec2 value
+inst_state_MIGRATE = 'migrate'
+inst_state_RESIZE = 'resize'
+inst_state_PAUSE = 'pause'
+inst_state_SUSPEND = 'suspend'
+inst_state_RESCUE = 'rescue'
+
+# EC2 API instance status code
+_NAME_TO_CODE = {
+    inst_state_PENDING: inst_state_PENDING_CODE,
+    inst_state_RUNNING: inst_state_RUNNING_CODE,
+    inst_state_SHUTTING_DOWN: inst_state_SHUTTING_DOWN_CODE,
+    inst_state_TERMINATED: inst_state_TERMINATED_CODE,
+    inst_state_STOPPING: inst_state_STOPPING_CODE,
+    inst_state_STOPPED: inst_state_STOPPED_CODE,
+
+    # approximation
+    inst_state_MIGRATE: inst_state_RUNNING_CODE,
+    inst_state_RESIZE: inst_state_RUNNING_CODE,
+    inst_state_PAUSE: inst_state_STOPPED_CODE,
+    inst_state_SUSPEND: inst_state_STOPPED_CODE,
+    inst_state_RESCUE: inst_state_RUNNING_CODE,
+}
+_CODE_TO_NAMES = dict([(code,
+                        [item[0] for item in _NAME_TO_CODE.iteritems()
+                         if item[1] == code])
+                       for code in set(_NAME_TO_CODE.itervalues())])
+
+
+def inst_state_name_to_code(name):
+    return _NAME_TO_CODE.get(name, inst_state_PENDING_CODE)
+
+
+def inst_state_code_to_names(code):
+    return _CODE_TO_NAMES.get(code, [])
+
+# NOTE(ft): end of nova/api/ec2/inst_state.py
+
+# EC2 API can return the following values as documented in the EC2 API
+# http://docs.amazonwebservices.com/AWSEC2/latest/APIReference/
+#    ApiReference-ItemType-InstanceStateType.html
+# pending 0 | running 16 | shutting-down 32 | terminated 48 | stopping 64 |
+# stopped 80
+_STATE_DESCRIPTION_MAP = {
+    None: inst_state_PENDING,
+    vm_states_ACTIVE: inst_state_RUNNING,
+    vm_states_BUILDING: inst_state_PENDING,
+    vm_states_DELETED: inst_state_TERMINATED,
+    vm_states_SOFT_DELETED: inst_state_TERMINATED,
+    vm_states_STOPPED: inst_state_STOPPED,
+    vm_states_PAUSED: inst_state_PAUSE,
+    vm_states_SUSPENDED: inst_state_SUSPEND,
+    vm_states_RESCUED: inst_state_RESCUE,
+    vm_states_RESIZED: inst_state_RESIZE,
+}
+_EC2_STATE_TO_VM = dict((state,
+                         [item[0]
+                          for item in _STATE_DESCRIPTION_MAP.iteritems()
+                          if item[1] == state])
+                        for state in set(_STATE_DESCRIPTION_MAP.itervalues()))
+
+
+def _cloud_state_description(vm_state):
+    """Map the vm state to the server status string."""
+    # Note(maoy): We do not provide EC2 compatibility
+    # in shutdown_terminate flag behavior. So we ignore
+    # it here.
+    name = _STATE_DESCRIPTION_MAP.get(vm_state, vm_state)
+
+    return {'code': inst_state_name_to_code(name),
+            'name': name}

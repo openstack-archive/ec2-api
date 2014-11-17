@@ -78,6 +78,7 @@ class RequestContext(object):
         self.user_name = user_name
         self.project_name = project_name
         self.is_admin = is_admin
+        # TODO(ft): call policy.check_is_admin if is_admin is None
         self.api_version = api_version
         if overwrite or not hasattr(local.store, 'context'):
             self.update_store()
