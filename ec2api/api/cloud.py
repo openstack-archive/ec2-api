@@ -25,6 +25,7 @@ from ec2api.api import address
 from ec2api.api import dhcp_options
 from ec2api.api import instance
 from ec2api.api import internet_gateway
+from ec2api.api import key_pair
 from ec2api.api import network_interface
 from ec2api.api import route_table
 from ec2api.api import security_group
@@ -1131,3 +1132,16 @@ class CloudController(object):
         """
         return instance.describe_instances(context, instance_id, filter,
                                            **kwargs)
+
+    def describe_key_pairs(self, context, key_name=None, filter=None):
+        return key_pair.describe_key_pairs(context, key_name, filter)
+
+    def create_key_pair(self, context, key_name):
+        return key_pair.create_key_pair(context, key_name)
+
+    def delete_key_pair(self, context, key_name):
+        return key_pair.delete_key_pair(context, key_name)
+
+    def import_key_pair(self, context, key_name, public_key_material):
+        return key_pair.create_key_pair(context, key_name,
+                                        public_key_material)

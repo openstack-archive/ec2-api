@@ -68,7 +68,7 @@ def create_key_pair(context, key_name):
     except clients.novaclient.exceptions.Conflict as ex:
         raise exception.KeyPairExists(key_name=key_name)
     formatted_key_pair = _format_key_pair(key_pair)
-    formatted_key_pair['keyMaterial'] = key_pair.public_key
+    formatted_key_pair['keyMaterial'] = key_pair.private_key
     return formatted_key_pair
 
 
