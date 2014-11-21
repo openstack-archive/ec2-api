@@ -48,7 +48,7 @@ def create_security_group(context, group_name, group_description,
                           vpc_id=None):
     if vpc_id is None:
         ec2 = ec2client.ec2client(context)
-        return ec2.create_security_groups(group_name=group_name,
+        return ec2.create_security_group(group_name=group_name,
                                           group_description=group_description)
     vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
     neutron = clients.neutron(context)
@@ -80,7 +80,7 @@ def _create_default_security_group(context, vpc):
 def delete_security_group(context, group_name=None, group_id=None):
     if group_id is None or not group_id.startswith('sg-'):
         ec2 = ec2client.ec2client(context)
-        return ec2.delete_security_groups(group_name=group_name,
+        return ec2.delete_security_group(group_name=group_name,
                                           group_id=group_id)
     security_group = ec2utils.get_db_item(context, 'sg', group_id)
     # TODO(Alex) Check dependencies - instances and other security groups
@@ -114,6 +114,8 @@ def describe_security_groups(context, group_name=None, group_id=None,
                                if g['os_id'] == os_security_group['id']), None)
         if group_id is not None and security_group is None:
             continue
+        if group_name and not os_security_group['name'] in group_name:
+            continue
         formatted_security_group = _format_security_group(
             context, security_group,
             os_security_group, os_security_groups,
@@ -128,7 +130,7 @@ def authorize_security_group_ingress(context, group_id,
                                      group_name, ip_permissions):
     if group_id is None or not group_id.startswith('sg-'):
         ec2 = ec2client.ec2client(context)
-        return ec2.authorize_security_groups_ingress(
+        return ec2.authorize_security_group_ingress(
             group_name=group_name,
             group_id=group_id,
             ip_permissions=ip_permissions)
@@ -187,7 +189,7 @@ def revoke_security_group_ingress(context, group_id,
                                   group_name, ip_permissions):
     if group_id is None or not group_id.startswith('sg-'):
         ec2 = ec2client.ec2client(context)
-        return ec2.revoke_security_groups_ingress(
+        return ec2.revoke_security_group_ingress(
             group_name=group_name,
             group_id=group_id,
             ip_permissions=ip_permissions)
