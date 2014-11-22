@@ -103,6 +103,10 @@ class InvalidRequest(Invalid):
     msg_fmt = _("The request is invalid.")
 
 
+class InvalidAttribute(Invalid):
+    msg_fmt = _("Attribute not supported: %(attr)s")
+
+
 class InvalidEc2Id(Invalid):
     msg_fmt = _("Ec2 id %(ec2_id)s is unacceptable.")
 

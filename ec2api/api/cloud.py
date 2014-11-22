@@ -1173,6 +1173,26 @@ class CloudController(object):
         """
         return instance.start_instances(context, instance_id)
 
+    def describe_instance_attribute(self, context, instance_id, attribute):
+        """Describes the specified attribute of the specified instance.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (str): The ID of the instance.
+            attribute (str): The instance attribute.
+                Valid values: blockDeviceMapping | disableApiTermination |
+                ebsOptimized (unsupported now) | groupSet |
+                instanceInitiatedShutdownBehavior | instanceType | kernel |
+                productCodes (unsupported now) | ramdisk | rootDeviceName |
+                sourceDestCheck (unsupported now) |
+                sriovNetSupport (unsupported now) | userData
+
+        Returns:
+            Specified attribute.
+        """
+        return instance.describe_instance_attribute(context, instance_id,
+                                                    attribute)
+
     def describe_key_pairs(self, context, key_name=None, filter=None):
         return key_pair.describe_key_pairs(context, key_name, filter)
 

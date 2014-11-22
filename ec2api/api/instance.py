@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import base64
 import collections
 import copy
 import itertools
@@ -281,6 +281,81 @@ def start_instances(context, instance_id):
     return True
 
 
+def describe_instance_attribute(context, instance_id, attribute):
+    os_instance = None
+    novadb_instance = None
+
+    def _format_attr_block_device_mapping(result):
+        root_device_name = _cloud_format_instance_root_device_name(
+                                                               novadb_instance)
+        # TODO(ft): next call add 'rootDeviceType' to result,
+        # but AWS doesn't. This is legacy behavior of Nova EC2
+        _cloud_format_instance_bdm(context, os_instance.id,
+                                   root_device_name, result)
+
+    def _format_attr_disable_api_termination(result):
+        result['disableApiTermination'] = {
+                                'value': novadb_instance['disable_terminate']}
+
+    def _format_attr_group_set(result):
+        result['groupSet'] = _format_group_set(context,
+                                               os_instance.security_groups)
+
+    def _format_attr_instance_initiated_shutdown_behavior(result):
+        value = ('terminate' if novadb_instance['shutdown_terminate']
+                 else 'stop')
+        result['instanceInitiatedShutdownBehavior'] = {'value': value}
+
+    def _format_attr_instance_type(result):
+        result['instanceType'] = {'value': _cloud_format_instance_type(
+                                                       context, os_instance)}
+
+    def _format_attr_kernel(result):
+        value = _cloud_format_kernel_id(context, novadb_instance)
+        result['kernel'] = {'value': value}
+
+    def _format_attr_ramdisk(result):
+        value = _cloud_format_ramdisk_id(context, novadb_instance)
+        result['ramdisk'] = {'value': value}
+
+    def _format_attr_root_device_name(result):
+        result['rootDeviceName'] = {
+                'value': _cloud_format_instance_root_device_name(
+                                                             novadb_instance)}
+
+    def _format_attr_user_data(result):
+        if novadb_instance['user_data']:
+            value = base64.b64decode(novadb_instance['user_data'])
+            result['userData'] = {'value': value}
+
+    attribute_formatter = {
+        'blockDeviceMapping': _format_attr_block_device_mapping,
+        'disableApiTermination': _format_attr_disable_api_termination,
+        'groupSet': _format_attr_group_set,
+        'instanceInitiatedShutdownBehavior': (
+                _format_attr_instance_initiated_shutdown_behavior),
+        'instanceType': _format_attr_instance_type,
+        'kernel': _format_attr_kernel,
+        'ramdisk': _format_attr_ramdisk,
+        'rootDeviceName': _format_attr_root_device_name,
+        'userData': _format_attr_user_data,
+        }
+
+    fn = attribute_formatter.get(attribute)
+    if fn is None:
+        # TODO(ft): clarify an exact AWS error
+        raise exception.InvalidAttribute(attr=attribute)
+
+    instance = db_api.get_item_by_id(context, 'i', instance_id)
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+    novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
+
+    result = {'instance_id': instance_id}
+    fn(result)
+    return result
+
+
 def _prepare_reservations(context, os_instances, instances_by_os_id,
                           network_interfaces):
     reservations = {}
@@ -334,9 +409,12 @@ def _format_instance(context, instance, os_instance, novadb_instance,
     ec2_instance['instanceId'] = instance['id']
     image_uuid = os_instance.image['id'] if os_instance.image else ''
     ec2_instance['imageId'] = ec2utils.glance_id_to_ec2_id(context, image_uuid)
-    _cloud_format_kernel_id(context, novadb_instance, ec2_instance, 'kernelId')
-    _cloud_format_ramdisk_id(context, novadb_instance, ec2_instance,
-                             'ramdiskId')
+    kernel_id = _cloud_format_kernel_id(context, novadb_instance)
+    if kernel_id:
+        ec2_instance['kernelId'] = kernel_id
+    ramdisk_id = _cloud_format_ramdisk_id(context, novadb_instance)
+    if ramdisk_id:
+        ec2_instance['ramdiskId'] = ramdisk_id
     ec2_instance['instanceState'] = _cloud_state_description(
             getattr(os_instance, 'OS-EXT-STS:vm_state'))
 
@@ -369,10 +447,12 @@ def _format_instance(context, instance, os_instance, novadb_instance,
             os_instance.tenant_id,
             getattr(os_instance, 'OS-EXT-SRV-ATTR:host'))
     ec2_instance['productCodesSet'] = None
-    _cloud_format_instance_type(context, os_instance, ec2_instance)
+    ec2_instance['instanceType'] = _cloud_format_instance_type(context,
+                                                               os_instance)
     ec2_instance['launchTime'] = os_instance.created
     ec2_instance['amiLaunchIndex'] = instance['launch_index']
-    _cloud_format_instance_root_device_name(novadb_instance, ec2_instance)
+    ec2_instance['rootDeviceName'] = _cloud_format_instance_root_device_name(
+                                                            novadb_instance)
     _cloud_format_instance_bdm(context, instance['os_id'],
                                ec2_instance['rootDeviceName'], ec2_instance)
     ec2_instance['placement'] = {
@@ -811,29 +891,27 @@ def _cloud_get_image_state(image):
     return image.properties.get('image_state', state)
 
 
-def _cloud_format_kernel_id(context, instance_ref, result, key):
+def _cloud_format_kernel_id(context, instance_ref):
     kernel_uuid = instance_ref['kernel_id']
     if kernel_uuid is None or kernel_uuid == '':
         return
-    result[key] = ec2utils.glance_id_to_ec2_id(context, kernel_uuid, 'aki')
+    return ec2utils.glance_id_to_ec2_id(context, kernel_uuid, 'aki')
 
 
-def _cloud_format_ramdisk_id(context, instance_ref, result, key):
+def _cloud_format_ramdisk_id(context, instance_ref):
     ramdisk_uuid = instance_ref['ramdisk_id']
     if ramdisk_uuid is None or ramdisk_uuid == '':
         return
-    result[key] = ec2utils.glance_id_to_ec2_id(context, ramdisk_uuid,
-                                               'ari')
+    return ec2utils.glance_id_to_ec2_id(context, ramdisk_uuid, 'ari')
 
 
-def _cloud_format_instance_type(context, os_instance, result):
-    flavor = clients.nova(context).flavors.get(os_instance.flavor['id'])
-    result['instanceType'] = flavor.name
+def _cloud_format_instance_type(context, os_instance):
+    return clients.nova(context).flavors.get(os_instance.flavor['id']).name
 
 
-def _cloud_format_instance_root_device_name(novadb_instance, result):
-    result['rootDeviceName'] = (novadb_instance.get('root_device_name') or
-                                block_device_DEFAULT_ROOT_DEV_NAME)
+def _cloud_format_instance_root_device_name(novadb_instance):
+    return (novadb_instance.get('root_device_name') or
+            block_device_DEFAULT_ROOT_DEV_NAME)
 
 
 block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
