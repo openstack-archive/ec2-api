@@ -537,6 +537,9 @@ class OSInstance(object):
         setattr(self, 'OS-EXT-SRV-ATTR:host', host)
         setattr(self, 'OS-EXT-AZ:availability_zone', availability_zone)
 
+    def get(self):
+        None
+
 
 OS_INSTANCE_1 = OSInstance(
     ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},

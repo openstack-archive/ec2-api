@@ -341,23 +341,14 @@ class InstanceTestCase(base.ApiTestCase):
 
     def test_terminate_instances(self):
         """Terminate 2 instances in one request."""
-        ec2_terminate_instances_result = {
-            'instancesSet': [{'instanceId': fakes.ID_EC2_INSTANCE_1,
-                              'fakeKey': 'fakeValue'},
-                             {'instanceId': fakes.ID_EC2_INSTANCE_2,
-                              'fakeKey': 'fakeValue'}]}
-
-        os_instance_ids_dict = {
-            fakes.ID_EC2_INSTANCE_1: fakes.ID_OS_INSTANCE_1,
-            fakes.ID_EC2_INSTANCE_2: fakes.ID_OS_INSTANCE_2}
-        self.ec2_inst_id_to_uuid.side_effect = (
-            lambda _, inst_id: os_instance_ids_dict[inst_id])
-        self.neutron.list_ports.return_value = {'ports': [fakes.OS_PORT_2]}
+        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1,
+                                                     fakes.DB_INSTANCE_2]
+        self.nova_servers.list.return_value = [fakes.OS_INSTANCE_1,
+                                               fakes.OS_INSTANCE_2]
         self.db_api.get_items.return_value = (
             [copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1),
              copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2)])
-        self.ec2.terminate_instances.return_value = (
-            ec2_terminate_instances_result)
+        self.neutron.list_ports.return_value = {'ports': [fakes.OS_PORT_2]}
 
         resp = self.execute('TerminateInstances',
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
@@ -365,24 +356,43 @@ class InstanceTestCase(base.ApiTestCase):
 
         self.assertEqual(200, resp['status'])
         resp.pop('status')
+        fake_state_change = {'previousState': {'code': 0,
+                                               'name': 'pending'},
+                             'currentState': {'code': 0,
+                                              'name': 'pending'}}
         self.assertThat(resp, matchers.DictMatches(
-            ec2_terminate_instances_result))
-        self.ec2_inst_id_to_uuid.assert_any_call(
-            mock.ANY, fakes.ID_EC2_INSTANCE_1)
-        self.ec2_inst_id_to_uuid.assert_any_call(
-            mock.ANY, fakes.ID_EC2_INSTANCE_2)
+            {'instancesSet': [tools.update_dict(
+                                    {'instanceId': fakes.ID_EC2_INSTANCE_1},
+                                    fake_state_change),
+                              tools.update_dict(
+                                    {'instanceId': fakes.ID_EC2_INSTANCE_2},
+                                    fake_state_change)]}))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'i',
+            set([fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]))
+        self.nova_servers.list.assert_called_once_with(
+            search_opts={'id': [fakes.ID_OS_INSTANCE_1,
+                                fakes.ID_OS_INSTANCE_2]})
         self._assert_list_ports_is_called_with_filter(
             [fakes.ID_OS_INSTANCE_1, fakes.ID_OS_INSTANCE_2])
+        self.db_api.get_items.assert_called_once_with(mock.ANY, 'eni')
         self.neutron.update_port.assert_called_once_with(
             fakes.ID_OS_PORT_2,
             {'port': {'device_id': '',
                       'device_owner': ''}})
-        self.ec2.terminate_instances.assert_called_once_with(
-            instance_id=[fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2])
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, tools.purge_dict(fakes.DB_NETWORK_INTERFACE_2,
+                                       ('instance_id', 'attach_time',
+                                        'delete_on_termination')))
+        self.nova_servers.delete.assert_any_call(fakes.ID_OS_INSTANCE_1)
+        self.nova_servers.delete.assert_any_call(fakes.ID_OS_INSTANCE_2)
+        self.assertEqual(2, self.nova_servers.delete.call_count)
         for inst_id in (fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2):
             self.db_api.delete_item.assert_any_call(mock.ANY, inst_id)
+        self.assertEqual(2, self.db_api.delete_item.call_count)
 
-    def test_terminate_instances_multiple_networks(self):
+    # TODO(ft): restore test after finish extraction of Nova EC2 API
+    def _test_terminate_instances_multiple_networks(self):
         """Terminate an instance with various combinations of ports."""
         self._build_multiple_data_model()
 

@@ -162,6 +162,11 @@ class NovaDbInstanceNotFound(EC2NotFound):
     msg_fmt = _("Instance %(instance_id)s could not be found.")
 
 
+class InstanceNotFound(EC2NotFound):
+    ec2_code = 'InvalidInstanceID.NotFound'
+    msg_fmt = _("The instance ID '%(instance_id)s' does not exist")
+
+
 class InvalidVpcIDNotFound(EC2NotFound):
     ec2_code = 'InvalidVpcID.NotFound'
     msg_fmt = _("The vpc ID '%(vpc_id)s' does not exist")

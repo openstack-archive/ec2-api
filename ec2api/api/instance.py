@@ -19,10 +19,10 @@ import itertools
 import random
 import re
 
+from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
-from ec2api.api import ec2client
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import security_group as security_group_api
@@ -188,43 +188,62 @@ def run_instances(context, image_id, min_count, max_count,
 
 
 def terminate_instances(context, instance_id):
-    # NOTE(ft): collect network interfaces to update and delete
     instance_ids = set(inst_id for inst_id in instance_id)
-    os_instances_ids = [ec2utils.ec2_inst_id_to_uuid(context, inst_id)
-                        for inst_id in instance_ids]
-    neutron = clients.neutron(context)
-    os_ports = neutron.list_ports(device_id=os_instances_ids)['ports']
+    instances = db_api.get_items_by_ids(context, 'i', instance_ids)
+    if len(instance_ids) > len(instances):
+        missed = instance_ids - set((inst['id'] for inst in instances))
+        if len(missed) == 1:
+            raise exception.InstanceNotFound(instance_id=next(iter(missed)))
+        else:
+            msg = _("The instance IDs '%(instance_ids)s' do not exist")
+            msg = msg % {'instance_ids': ', '.join(map(str, missed))}
+            raise exception.InstanceNotFound(msg)
+
+    nova = clients.nova(context)
+    os_instances_ids = [instance['os_id'] for instance in instances]
+    os_instances = nova.servers.list(search_opts={'id': os_instances_ids})
+
     # TODO(ft): implement search db items by os_id in DB layer
     network_interfaces = db_api.get_items(context, 'eni')
-    network_interfaces = dict((ni['os_id'], ni)
-                              for ni in network_interfaces
-                              if ni.get('instance_id') in instance_ids)
+
+    # NOTE(ft): detach port before terminating instance to prevent
+    # Nova deletes it
     neutron = clients.neutron(context)
-    for os_port in os_ports:
-        network_interface = network_interfaces.get(os_port['id'])
-        if not network_interface:
+    os_ports = neutron.list_ports(device_id=os_instances_ids)['ports']
+    for network_interface in network_interfaces:
+        if (network_interface.get('instance_id') not in instance_ids or
+                network_interface['delete_on_termination']):
             continue
-        if not network_interface['delete_on_termination']:
-            # NOTE(ft): detach port before terminating instance to prevent
-            # nova deletes it
+        # NOTE(ft): detach ports only really attached to the instance
+        instance = next(i for i in instances
+                        if i['id'] == network_interface['instance_id'])
+        os_port = next((p for p in os_ports
+                        if p['id'] == network_interface['os_id']), None)
+        if (os_port and os_port['device_id'] == instance['os_id']):
             neutron.update_port(os_port['id'],
                                 {'port': {'device_id': '',
                                           'device_owner': ''}})
+        network_interface_api._detach_network_interface_item(
+                context, network_interface)
 
-    ec2 = ec2client.ec2client(context)
-    # TODO(ft): rollback detached ports on any error
-    instances_set = ec2.terminate_instances(instance_id=instance_id)
-    for inst_id in instance_id:
-        db_api.delete_item(context, inst_id)
+    for os_instance in os_instances:
+        nova.servers.delete(os_instance.id)
+    for instance in instances:
+        db_api.delete_item(context, instance['id'])
 
-    for network_interface in network_interfaces.itervalues():
-        if network_interface['delete_on_termination']:
-            db_api.delete_item(context, network_interface['id'])
-        else:
-            network_interface_api._detach_network_interface_item(
-                    context, network_interface)
+    for network_interface in network_interfaces:
+        if (network_interface.get('instance_id') not in instance_ids or
+                not network_interface['delete_on_termination']):
+            continue
+        db_api.delete_item(context, network_interface['id'])
 
-    return instances_set
+    state_changes = []
+    for inst in instances:
+        state_change = _format_state_change(
+            inst,
+            next((i for i in os_instances if i.id == inst['os_id']), None))
+        state_changes.append(state_change)
+    return {'instancesSet': state_changes}
 
 
 def describe_instances(context, instance_id=None, filter=None, **kwargs):
@@ -383,6 +402,23 @@ def _format_instance(context, instance, os_instance, novadb_instance,
     if network_interface:
         ec2_instance['vpcId'] = network_interface['vpc_id']
     return ec2_instance
+
+
+def _format_state_change(instance, os_instance):
+    prev_state = (_cloud_state_description(getattr(os_instance,
+                                                   'OS-EXT-STS:vm_state'))
+                  if os_instance else vm_states_DELETED)
+    try:
+        os_instance.get()
+        curr_state = _cloud_state_description(getattr(os_instance,
+                                                      'OS-EXT-STS:vm_state'))
+    except nova_exception.NotFound:
+        curr_state = _cloud_state_description(vm_states_DELETED)
+    return {
+        'instanceId': instance['id'],
+        'previousState': prev_state,
+        'currentState': curr_state,
+    }
 
 
 def _get_common_nw_info(context):
