@@ -401,9 +401,17 @@ class Executor(wsgi.Application):
         api_request = req.environ['ec2.request']
         try:
             result = api_request.invoke(context)
-        except exception.InstanceNotFound as ex:
+        except exception.NovaDbInstanceNotFound as ex:
             ec2_id = ec2utils.id_to_ec2_inst_id(ex.kwargs['instance_id'])
             message = ex.msg_fmt % {'instance_id': ec2_id}
+            return ec2_error_ex(ex, req, message=message)
+        except exception.NovaDbVolumeNotFound as ex:
+            ec2_id = ec2utils.id_to_ec2_vol_id(ex.kwargs['volume_id'])
+            message = ex.msg_fmt % {'volume_id': ec2_id}
+            return ec2_error_ex(ex, req, message=message)
+        except exception.NovaDbSnapshotNotFound as ex:
+            ec2_id = ec2utils.id_to_ec2_snap_id(ex.kwargs['snapshot_id'])
+            message = ex.msg_fmt % {'snapshot_id': ec2_id}
             return ec2_error_ex(ex, req, message=message)
         except exception.MethodNotFound:
             try:

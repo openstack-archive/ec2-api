@@ -142,22 +142,22 @@ class EC2NotFound(NotFound):
     code = 400
 
 
-class ImageNotFound(EC2NotFound):
+class NovaDbImageNotFound(EC2NotFound):
     ec2_code = 'InvalidAMIID.NotFound'
     msg_fmt = _("The image id '[%(image_id)s]' does not exist")
 
 
-class VolumeNotFound(NotFound):
+class NovaDbVolumeNotFound(EC2NotFound):
     ec2_code = 'InvalidVolume.NotFound'
     msg_fmt = _("Volume %(volume_id)s could not be found.")
 
 
-class SnapshotNotFound(NotFound):
+class NovaDbSnapshotNotFound(EC2NotFound):
     ec2_code = 'InvalidSnapshot.NotFound'
     msg_fmt = _("Snapshot %(snapshot_id)s could not be found.")
 
 
-class InstanceNotFound(EC2NotFound):
+class NovaDbInstanceNotFound(EC2NotFound):
     ec2_code = 'InvalidInstanceID.NotFound'
     msg_fmt = _("Instance %(instance_id)s could not be found.")
 

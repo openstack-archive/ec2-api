@@ -88,12 +88,28 @@ def s3_image_get(context, image_id):
 ###################
 
 
+def get_ec2_volume_id_by_uuid(context, volume_id):
+    return IMPL.get_ec2_volume_id_by_uuid(context, volume_id)
+
+
 def get_volume_uuid_by_ec2_id(context, ec2_id):
     return IMPL.get_volume_uuid_by_ec2_id(context, ec2_id)
 
 
+def ec2_volume_create(context, volume_id, forced_id=None):
+    return IMPL.ec2_volume_create(context, volume_id, forced_id)
+
+
 def get_snapshot_uuid_by_ec2_id(context, ec2_id):
     return IMPL.get_snapshot_uuid_by_ec2_id(context, ec2_id)
+
+
+def get_ec2_snapshot_id_by_uuid(context, snapshot_id):
+    return IMPL.get_ec2_snapshot_id_by_uuid(context, snapshot_id)
+
+
+def ec2_snapshot_create(context, snapshot_id, forced_id=None):
+    return IMPL.ec2_snapshot_create(context, snapshot_id, forced_id)
 
 
 ###################

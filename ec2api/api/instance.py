@@ -326,14 +326,21 @@ def _check_min_max_count(min_count, max_count):
 
 
 def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
+
+    def get_os_image_id(ec2_image_id):
+        try:
+            return ec2utils.ec2_id_to_glance_id(context, ec2_image_id)
+        except exception.NovaDbImageNotFound:
+            raise exception.NovaDbImageNotFound(image_id=ec2_image_id)
+
     glance = clients.glance(context)
     if kernel_id:
-        os_kernel_id = ec2utils.ec2_id_to_glance_id(context, kernel_id)
+        os_kernel_id = get_os_image_id(kernel_id)
         glance.images.get(os_kernel_id)
     if ramdisk_id:
-        os_ramdisk_id = ec2utils.ec2_id_to_glance_id(context, ramdisk_id)
+        os_ramdisk_id = get_os_image_id(ramdisk_id)
         glance.images.get(os_ramdisk_id)
-    os_image_id = ec2utils.ec2_id_to_glance_id(context, image_id)
+    os_image_id = get_os_image_id(image_id)
     os_image = glance.images.get(os_image_id)
 
     if _cloud_get_image_state(os_image) != 'available':

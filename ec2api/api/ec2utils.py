@@ -235,6 +235,35 @@ def get_volume_uuid_from_int_id(context, int_id):
     return novadb.get_volume_uuid_by_ec2_id(context, int_id)
 
 
+def id_to_ec2_snap_id(snapshot_id):
+    """Get or create an ec2 volume ID (vol-[base 16 number]) from uuid."""
+    if uuidutils.is_uuid_like(snapshot_id):
+        ctxt = context.get_admin_context()
+        int_id = get_int_id_from_snapshot_uuid(ctxt, snapshot_id)
+        return id_to_ec2_id(int_id, 'snap-%08x')
+    else:
+        return id_to_ec2_id(snapshot_id, 'snap-%08x')
+
+
+def id_to_ec2_vol_id(volume_id):
+    """Get or create an ec2 volume ID (vol-[base 16 number]) from uuid."""
+    if uuidutils.is_uuid_like(volume_id):
+        ctxt = context.get_admin_context()
+        int_id = get_int_id_from_volume_uuid(ctxt, volume_id)
+        return id_to_ec2_id(int_id, 'vol-%08x')
+    else:
+        return id_to_ec2_id(volume_id, 'vol-%08x')
+
+
+def get_int_id_from_volume_uuid(context, volume_uuid):
+    if volume_uuid is None:
+        return
+    try:
+        return novadb.get_ec2_volume_id_by_uuid(context, volume_uuid)
+    except exception.NotFound:
+        return novadb.ec2_volume_create(context, volume_uuid)['id']
+
+
 def ec2_vol_id_to_uuid(ec2_id):
     """Get the corresponding UUID for the given ec2-id."""
     ctxt = context.get_admin_context()
@@ -255,6 +284,15 @@ def ec2_snap_id_to_uuid(ec2_id):
     # NOTE(jgriffith) first strip prefix to get just the numeric
     int_id = ec2_id_to_id(ec2_id)
     return get_snapshot_uuid_from_int_id(ctxt, int_id)
+
+
+def get_int_id_from_snapshot_uuid(context, snapshot_uuid):
+    if snapshot_uuid is None:
+        return
+    try:
+        return novadb.get_ec2_snapshot_id_by_uuid(context, snapshot_uuid)
+    except exception.NotFound:
+        return novadb.ec2_snapshot_create(context, snapshot_uuid)['id']
 
 # NOTE(ft): extra functions to use in vpc specific code or instead of
 # malformed existed functions

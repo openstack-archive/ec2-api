@@ -173,12 +173,47 @@ def s3_image_get(context, image_id):
               first())
 
     if not result:
-        raise exception.ImageNotFound(image_id=image_id)
+        raise exception.NovaDbImageNotFound(image_id=image_id)
 
     return result
 
 
 ##################
+
+
+def _ec2_volume_get_query(context, session=None):
+    return model_query(context, models.VolumeIdMapping,
+                       session=session, read_deleted='yes')
+
+
+def _ec2_snapshot_get_query(context, session=None):
+    return model_query(context, models.SnapshotIdMapping,
+                       session=session, read_deleted='yes')
+
+
+@require_context
+def ec2_volume_create(context, volume_uuid, id=None):
+    """Create ec2 compatible volume by provided uuid."""
+    ec2_volume_ref = models.VolumeIdMapping()
+    ec2_volume_ref.update({'uuid': volume_uuid})
+    if id is not None:
+        ec2_volume_ref.update({'id': id})
+
+    ec2_volume_ref.save()
+
+    return ec2_volume_ref
+
+
+@require_context
+def get_ec2_volume_id_by_uuid(context, volume_id):
+    result = (_ec2_volume_get_query(context).
+                    filter_by(uuid=volume_id).
+                    first())
+
+    if not result:
+        raise exception.NovaDbVolumeNotFound(volume_id=volume_id)
+
+    return result['id']
 
 
 @require_context
@@ -188,9 +223,34 @@ def get_volume_uuid_by_ec2_id(context, ec2_id):
               first())
 
     if not result:
-        raise exception.VolumeNotFound(volume_id=ec2_id)
+        raise exception.NovaDbVolumeNotFound(volume_id=ec2_id)
 
     return result['uuid']
+
+
+@require_context
+def ec2_snapshot_create(context, snapshot_uuid, id=None):
+    """Create ec2 compatible snapshot by provided uuid."""
+    ec2_snapshot_ref = models.SnapshotIdMapping()
+    ec2_snapshot_ref.update({'uuid': snapshot_uuid})
+    if id is not None:
+        ec2_snapshot_ref.update({'id': id})
+
+    ec2_snapshot_ref.save()
+
+    return ec2_snapshot_ref
+
+
+@require_context
+def get_ec2_snapshot_id_by_uuid(context, snapshot_id):
+    result = (_ec2_snapshot_get_query(context).
+                    filter_by(uuid=snapshot_id).
+                    first())
+
+    if not result:
+        raise exception.NovaDbSnapshotNotFound(snapshot_id=snapshot_id)
+
+    return result['id']
 
 
 @require_context
@@ -201,7 +261,7 @@ def get_snapshot_uuid_by_ec2_id(context, ec2_id):
               first())
 
     if not result:
-        raise exception.SnapshotNotFound(snapshot_id=ec2_id)
+        raise exception.NovaDbSnapshotNotFound(snapshot_id=ec2_id)
 
     return result['uuid']
 
@@ -229,7 +289,7 @@ def ec2_instance_get_by_uuid(context, instance_uuid):
               first())
 
     if not result:
-        raise exception.InstanceNotFound(instance_id=instance_uuid)
+        raise exception.NovaDbInstanceNotFound(instance_id=instance_uuid)
 
     return result
 
@@ -247,7 +307,7 @@ def ec2_instance_get_by_id(context, instance_id):
               first())
 
     if not result:
-        raise exception.InstanceNotFound(instance_id=instance_id)
+        raise exception.NovaDbInstanceNotFound(instance_id=instance_id)
 
     return result
 
