@@ -1133,6 +1133,46 @@ class CloudController(object):
         return instance.describe_instances(context, instance_id, filter,
                                            **kwargs)
 
+    def reboot_instances(self, context, instance_id):
+        """Requests a reboot of one or more instances.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (list of str): One or more instance IDs.
+
+        Returns:
+            true if the request succeeds.
+        """
+        return instance.reboot_instances(context, instance_id)
+
+    def stop_instances(self, context, instance_id, force=False):
+        """Stops one or more instances.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (list of str): One or more instance IDs.
+            force (boolean): Forces the instances to stop. The instances do not
+                have an opportunity to flush file system caches or file system
+                metadata.
+                Not used now. Equivalent value is True.
+
+        Returns:
+            true if the request succeeds.
+        """
+        return instance.stop_instances(context, instance_id, force)
+
+    def start_instances(self, context, instance_id):
+        """Starts one or more instances.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (list of str): One or more instance IDs.
+
+        Returns:
+            true if the request succeeds.
+        """
+        return instance.start_instances(context, instance_id)
+
     def describe_key_pairs(self, context, key_name=None, filter=None):
         return key_pair.describe_key_pairs(context, key_name, filter)
 
