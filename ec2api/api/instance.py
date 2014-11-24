@@ -31,7 +31,6 @@ from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api import novadb
 from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import timeutils
 
 
 ec2_opts = [
@@ -168,11 +167,9 @@ def run_instances(context, image_id, min_count, max_count,
                 # record by record modification
                 # Alternatively a create_network_interface sub-function can
                 # set attach_time  at once
-                network_interface.update({
-                        'instance_id': instance['id'],
-                        'attach_time': timeutils.isotime(None, True),
-                        'delete_on_termination': delete_on_termination.next()})
-                db_api.update_item(context, network_interface)
+                network_interface_api._attach_network_interface_item(
+                        context, network_interface, instance['id'],
+                        delete_on_termination=delete_on_termination.next())
                 cleaner.addCleanup(
                         network_interface_api._detach_network_interface_item,
                         context, network_interface)
