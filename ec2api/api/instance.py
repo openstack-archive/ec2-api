@@ -192,7 +192,8 @@ def run_instances(context, image_id, min_count, max_count,
 
 
 def terminate_instances(context, instance_id):
-    instance_ids, instances = _parse_instance_ids(context, instance_id)
+    instance_ids = set(instance_id or [])
+    instances = ec2utils.get_db_items(context, 'i', instance_ids)
 
     nova = clients.nova(context)
     os_instances_ids = [instance['os_id'] for instance in instances]
@@ -833,36 +834,20 @@ def _get_ip_info_for_instance(os_instance):
     return fixed_ip, fixed_ip6, floating_ip
 
 
-def _parse_instance_ids(context, instance_ids):
-    instance_ids = set(inst_id for inst_id in instance_ids)
-    instances = db_api.get_items_by_ids(context, 'i', instance_ids)
-    if len(instance_ids) > len(instances):
-        missed = instance_ids - set((inst['id'] for inst in instances))
-        _raise_instance_not_found(missed)
-    return instance_ids, instances
-
-
 def _get_os_instances(context, instance_ids):
-    instance_ids, instances = _parse_instance_ids(context, instance_ids)
+    instances = ec2utils.get_db_items(context, 'i', instance_ids)
 
     nova = clients.nova(context)
     os_instances_ids = [instance['os_id'] for instance in instances]
     os_instances = nova.servers.list(search_opts={'id': os_instances_ids})
 
     if len(instances) > len(os_instances):
-        missed = (i for i in instances
-                  if all(i['os_id'] != os_i.id for os_i in os_instances))
-        _raise_instance_not_found([m['id'] for m in missed])
+        raise exception.InvalidInstanceIDNotFound(
+                instance_id=any(i['id'] for i in instances
+                                if all(i['os_id'] != os_i.id
+                                       for os_i in os_instances)))
     return os_instances
 
-
-def _raise_instance_not_found(missed_ids):
-    if len(missed_ids) == 1:
-        raise exception.InstanceNotFound(instance_id=next(iter(missed_ids)))
-    else:
-        msg = _("The instance IDs '%(instance_ids)s' do not exist")
-        msg = msg % {'instance_ids': ', '.join(map(str, missed_ids))}
-        raise exception.InstanceNotFound(msg)
 
 # NOTE(ft): following functions are copied from various parts of Nova
 

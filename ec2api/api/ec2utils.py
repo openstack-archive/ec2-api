@@ -332,6 +332,7 @@ _NOT_FOUND_EXCEPTION_MAP = {
     'eipalloc': exception.InvalidAllocationIDNotFound,
     'sg': exception.InvalidGroupNotFound,
     'rtb': exception.InvalidRouteTableIDNotFound,
+    'i': exception.InvalidInstanceIDNotFound,
 }
 
 
@@ -344,13 +345,16 @@ def get_db_item(context, kind, ec2_id):
 
 
 def get_db_items(context, kind, ec2_ids):
-    if ec2_ids is not None:
-        items = db_api.get_items_by_ids(context, kind, ec2_ids)
-        if items is None or items == []:
-            params = {'%s_id' % kind: ec2_ids[0]}
-            raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
-    else:
-        items = db_api.get_items(context, kind)
+    if not ec2_ids:
+        return db_api.get_items(context, kind)
+
+    if not isinstance(ec2_ids, set):
+        ec2_ids = set(ec2_ids)
+    items = db_api.get_items_by_ids(context, kind, ec2_ids)
+    if len(items) < len(ec2_ids):
+        missed_ids = ec2_ids - set((item['id'] for item in items))
+        params = {'%s_id' % kind: next(iter(missed_ids))}
+        raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
     return items
 
 
