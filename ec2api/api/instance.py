@@ -470,10 +470,8 @@ def _format_instance(context, instance, os_instance, novadb_instance,
 #     for k, v in utils.instance_meta(instance).iteritems():
 #         i['tagSet'].append({'key': k, 'value': v})
 
-    # NOTE(ft): add client token
-#     client_token = self._get_client_token(context, instance_uuid)
-#     if client_token:
-#         i['clientToken'] = client_token
+    if 'client_token' in instance:
+        ec2_instance['clientToken'] = instance['client_token']
 
     if context.is_admin:
         ec2_instance['keyName'] = '%s (%s, %s)' % (ec2_instance['keyName'],
