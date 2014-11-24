@@ -63,7 +63,10 @@ def run_instances(context, image_id, min_count, max_count,
     # network interface params function
     _check_min_max_count(min_count, max_count)
 
-    # TODO(ft): support client tokens
+    if client_token:
+        idempotent_run = _get_idempotent_run(context, client_token)
+        if idempotent_run:
+            return idempotent_run
 
     os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
             context, image_id, kernel_id, ramdisk_id)
@@ -142,6 +145,7 @@ def run_instances(context, image_id, min_count, max_count,
         for (launch_index,
              network_interfaces) in enumerate(instance_network_interfaces):
             nics = [{'port-id': eni['os_id']} for eni in network_interfaces]
+
             os_instance = nova.servers.create(
                 'EC2 server', os_image.id, os_flavor,
                 min_count=1, max_count=1,
@@ -151,14 +155,17 @@ def run_instances(context, image_id, min_count, max_count,
                 security_groups=security_groups_names,
                 nics=nics,
                 key_name=key_name, userdata=user_data)
-
             cleaner.addCleanup(nova.servers.delete, os_instance.id)
-            instance = db_api.add_item(context, 'i',
-                                       {'os_id': os_instance.id,
-                                        'vpc_id': vpc_id,
-                                        'reservation_id': ec2_reservation_id,
-                                        'launch_index': launch_index})
+
+            instance = {'os_id': os_instance.id,
+                        'vpc_id': vpc_id,
+                        'reservation_id': ec2_reservation_id,
+                        'launch_index': launch_index}
+            if client_token:
+                instance['client_token'] = client_token
+            instance = db_api.add_item(context, 'i', instance)
             cleaner.addCleanup(db_api.delete_item, context, instance['id'])
+
             nova.servers.update(os_instance, name=instance['id'])
 
             delete_on_termination = iter(delete_on_termination_flags)
@@ -351,6 +358,34 @@ def describe_instance_attribute(context, instance_id, attribute):
     result = {'instance_id': instance_id}
     fn(result)
     return result
+
+
+def _get_idempotent_run(context, client_token):
+    instances = db_api.get_items(context, 'i')
+    instances = [i for i in instances
+                 if i.get('client_token') == client_token]
+    if not instances:
+        return
+    os_instances = clients.nova(context).servers.list(
+            search_opts={'id': [i['os_id'] for i in instances]})
+    os_instances = dict((i.id, i) for i in os_instances)
+    # TODO(ft): implement search db items by os_id in DB layer
+    instance_ids = set(i['id'] for i in instances)
+    network_interfaces = collections.defaultdict(list)
+    for eni in db_api.get_items(context, 'eni'):
+        if 'instance_id' in eni and eni['instance_id'] in instance_ids:
+            network_interfaces[eni['instance_id']].append(eni)
+    instances_infos = []
+    for instance in instances:
+        os_instance = os_instances.get(instance['os_id'])
+        if not os_instance:
+            continue
+        novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
+        instances_infos.append((instance, os_instance, novadb_instance,
+                                network_interfaces[instance['id']],))
+    common_nw_info = _get_common_nw_info(context)
+    return _format_reservation(context, instance['reservation_id'],
+                               instances_infos, common_nw_info)
 
 
 def _prepare_reservations(context, os_instances, instances_by_os_id,
