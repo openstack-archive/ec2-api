@@ -56,9 +56,8 @@ def filtered_out(item, filters, filter_map):
                 value=filter['name'], parameter='filter',
                 reason='invalid filter')
         if type(filter_name) is list:
-            value_set = item.get(filter_name[0])
-            if value_set is not None:
-                values = [value[filter_name[1]] for value in value_set]
+            value_set = item.get(filter_name[0], [])
+            values = [value[filter_name[1]] for value in value_set]
         else:
             values = [item.get(filter_name)]
         if not values:

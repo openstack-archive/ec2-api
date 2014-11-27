@@ -22,6 +22,7 @@ import re
 from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
+from ec2api.api import address as address_api
 from ec2api.api import clients
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
@@ -47,6 +48,45 @@ CONF.register_opts(ec2_opts)
 """
 
 # TODO(ft): implement DeviceIndex
+
+INSTANCE_FILTER_MAP = {
+        'block-device-mapping.device-name': ['blockDeviceMapping',
+                                             'deviceName'],
+        'client-token': 'clientToken',
+        'dns-name': 'dnsName',
+        'image-id': 'imageId',
+        'instance-id': 'instanceId',
+        'instance-type': 'instanceType',
+        'ip-address': 'ipAddress',
+        'kernel-id': 'kernelId',
+        'key-name': 'keyName',
+        'launch-index': 'amiLaunchIndex',
+        'launch-time': 'launchTime',
+        'private-dns-name': 'privateDnsName',
+        'private-ip-address': 'privateIpAddress',
+        'ramdisk-id': 'ramdiskId',
+        'root-device-name': 'rootDeviceName',
+        'root-device-type': 'rootDeviceType',
+        'subnet-id': ['networkInterfaceSet', 'subnetId'],
+        'vpc-id': ['networkInterfaceSet', 'vpcId'],
+        'network-interface.description': ['networkInterfaceSet',
+                                          'description'],
+        'network-interface.subnet-id': ['networkInterfaceSet', 'subnetId'],
+        'network-interface.vpc-id': ['networkInterfaceSet', 'vpcId'],
+        'network-interface.network-interface.id': ['networkInterfaceSet',
+                                                   'networkInterfaceId'],
+        'network-interface.owner-id': ['networkInterfaceSet', 'ownerId'],
+        'network-interface.requester-managed': ['networkInterfaceSet',
+                                                'requesterManaged'],
+        'network-interface.status': ['networkInterfaceSet', 'status'],
+        'network-interface.mac-address': ['networkInterfaceSet', 'macAddress'],
+        'network-interface.source-destination-check': ['networkInterfaceSet',
+                                                       'sourceDestCheck'],
+}
+RESERVATION_FILTER_MAP = {
+        'reservation-id': 'reservationId',
+        'owner-id': 'ownerId',
+}
 
 
 def run_instances(context, image_id, min_count, max_count,
@@ -103,7 +143,7 @@ def run_instances(context, image_id, min_count, max_count,
         security_groups_names = _get_vpc_default_security_group_id(
                 context, vpc_id)
 
-    instances_infos = []
+    instances_info = []
     ec2_reservation_id = _generate_reservation_id()
 
     # TODO(ft): Process min and max counts on running errors accordingly to
@@ -183,112 +223,114 @@ def run_instances(context, image_id, min_count, max_count,
 
             novadb_instance = novadb.instance_get_by_uuid(context,
                                                           os_instance.id)
-            instances_infos.append((instance, os_instance, novadb_instance,
-                                    network_interfaces,))
+            instances_info.append((instance, os_instance, novadb_instance,))
 
-    common_nw_info = _get_common_nw_info(context)
-    return _format_reservation(context, ec2_reservation_id, instances_infos,
-                               common_nw_info)
+    # NOTE(ft): we cann't use describe_network_interfaces at this stage
+    # because network interfaces are not attached yet
+    ec2_network_interfaces = _format_network_interfaces(
+                                        context, instance_network_interfaces)
+    return _format_reservation(context, ec2_reservation_id, instances_info,
+                               ec2_network_interfaces)
 
 
 def terminate_instances(context, instance_id):
-    instance_ids = set(instance_id or [])
+    instance_ids = set(instance_id)
     instances = ec2utils.get_db_items(context, 'i', instance_ids)
 
+    # TODO(ft): implement search db items in DB layer
+    network_interfaces = collections.defaultdict(list)
+    for eni in db_api.get_items(context, 'eni'):
+        if eni.get('instance_id') in instance_ids:
+            if eni['delete_on_termination']:
+                network_interfaces[eni['instance_id']].append(eni)
+            else:
+                network_interface_api.detach_network_interface(
+                        context,
+                        ec2utils.change_ec2_id_kind(eni['id'], 'eni-attach'))
+
+    _remove_instances(context, instances, network_interfaces)
     nova = clients.nova(context)
-    os_instances_ids = [instance['os_id'] for instance in instances]
-    os_instances = nova.servers.list(search_opts={'id': os_instances_ids})
-
-    # TODO(ft): implement search db items by os_id in DB layer
-    network_interfaces = db_api.get_items(context, 'eni')
-
-    # NOTE(ft): detach port before terminating instance to prevent
-    # Nova deletes it
-    neutron = clients.neutron(context)
-    os_ports = neutron.list_ports(device_id=os_instances_ids)['ports']
-    for network_interface in network_interfaces:
-        if (network_interface.get('instance_id') not in instance_ids or
-                network_interface['delete_on_termination']):
-            continue
-        # NOTE(ft): detach ports only really attached to the instance
-        instance = next(i for i in instances
-                        if i['id'] == network_interface['instance_id'])
-        os_port = next((p for p in os_ports
-                        if p['id'] == network_interface['os_id']), None)
-        if (os_port and os_port['device_id'] == instance['os_id']):
-            neutron.update_port(os_port['id'],
-                                {'port': {'device_id': '',
-                                          'device_owner': ''}})
-        network_interface_api._detach_network_interface_item(
-                context, network_interface)
-
-    for os_instance in os_instances:
-        nova.servers.delete(os_instance.id)
-    for instance in instances:
-        db_api.delete_item(context, instance['id'])
-
-    for network_interface in network_interfaces:
-        if (network_interface.get('instance_id') not in instance_ids or
-                not network_interface['delete_on_termination']):
-            continue
-        db_api.delete_item(context, network_interface['id'])
-
     state_changes = []
-    for inst in instances:
-        state_change = _format_state_change(
-            inst,
-            next((i for i in os_instances if i.id == inst['os_id']), None))
+    for instance in instances:
+        try:
+            os_instance = nova.servers.get(instance['os_id'])
+        except nova_exception.NotFound:
+            os_instance = None
+        else:
+            os_instance.delete()
+        state_change = _format_state_change(instance, os_instance)
         state_changes.append(state_change)
+
     return {'instancesSet': state_changes}
 
 
-def describe_instances(context, instance_id=None, filter=None, **kwargs):
+def describe_instances(context, instance_id=None, filter=None,
+                       max_results=None, next_token=None):
+    instances = ec2utils.get_db_items(context, 'i', instance_id)
 
-    instances = db_api.get_items(context, 'i')
+    if instance_id:
+        os_instances = _get_os_instances_by_instances(context, instances)
+    else:
+        os_instances = clients.nova(context).servers.list()
+
     instances_by_os_id = dict((i['os_id'], i) for i in instances)
-    nova = clients.nova(context)
-    os_instances = nova.servers.list()
-    # TODO(ft): implement search db items by os_id in DB layer
-    network_interfaces = collections.defaultdict(list)
-    for eni in db_api.get_items(context, 'eni'):
-        if 'instance_id' in eni:
-            network_interfaces[eni['instance_id']].append(eni)
 
-    reservations = _prepare_reservations(
-            context, os_instances, instances_by_os_id, network_interfaces)
-    common_nw_info = _get_common_nw_info(context)
+    reservations = collections.defaultdict(list)
+    for os_instance in os_instances:
+        novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
+        instance = instances_by_os_id.pop(os_instance.id, None)
+        if not instance:
+            instance = db_api.add_item(
+                    context, 'i',
+                    {'os_id': os_instance.id,
+                     'vpc_id': None,
+                     'reservation_id': novadb_instance['reservation_id'],
+                     'launch_index': novadb_instance['launch_index']})
+        reservations[instance['reservation_id']].append(
+                (instance, os_instance, novadb_instance,))
 
+    _remove_instances(context, instances_by_os_id.itervalues())
+
+    ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_id)
+    reservation_filters = []
+    instance_filters = []
+    for f in filter or []:
+        if f.get('name') in RESERVATION_FILTER_MAP:
+            reservation_filters.append(f)
+        else:
+            instance_filters.append(f)
     ec2_reservations = []
-    for reservation_id, instances_infos in reservations.iteritems():
-        ec2_reservations.append(_format_reservation(
-                context, reservation_id, instances_infos, common_nw_info))
+    for reservation_id, instances_info in reservations.iteritems():
+        ec2_reservation = _format_reservation(
+                context, reservation_id, instances_info,
+                ec2_network_interfaces, instance_filters)
+        if (ec2_reservation['instancesSet'] and
+                not utils.filtered_out(ec2_reservation, reservation_filters,
+                                       RESERVATION_FILTER_MAP)):
+            ec2_reservations.append(ec2_reservation)
     return {'reservationSet': ec2_reservations}
 
 
 def reboot_instances(context, instance_id):
-    os_instances = _get_os_instances(context, instance_id)
-    for os_instance in os_instances:
-        os_instance.reboot()
-    return True
+    return _foreach_instance(context, instance_id,
+                             lambda instance: instance.reboot())
 
 
 def stop_instances(context, instance_id, force=False):
-    os_instances = _get_os_instances(context, instance_id)
-    for os_instance in os_instances:
-        os_instance.stop()
-    return True
+    return _foreach_instance(context, instance_id,
+                             lambda instance: instance.stop())
 
 
 def start_instances(context, instance_id):
-    os_instances = _get_os_instances(context, instance_id)
-    for os_instance in os_instances:
-        os_instance.start()
-    return True
+    return _foreach_instance(context, instance_id,
+                             lambda instance: instance.start())
 
 
 def describe_instance_attribute(context, instance_id, attribute):
-    os_instance = None
-    novadb_instance = None
+    instance = db_api.get_item_by_id(context, 'i', instance_id)
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+    novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
 
     def _format_attr_block_device_mapping(result):
         root_device_name = _cloud_format_instance_root_device_name(
@@ -351,82 +393,43 @@ def describe_instance_attribute(context, instance_id, attribute):
         # TODO(ft): clarify an exact AWS error
         raise exception.InvalidAttribute(attr=attribute)
 
-    instance = db_api.get_item_by_id(context, 'i', instance_id)
-    nova = clients.nova(context)
-    os_instance = nova.servers.get(instance['os_id'])
-    novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
-
     result = {'instance_id': instance_id}
     fn(result)
     return result
 
 
 def _get_idempotent_run(context, client_token):
-    instances = db_api.get_items(context, 'i')
-    instances = [i for i in instances
-                 if i.get('client_token') == client_token]
+    # TODO(ft): implement search in DB layer
+    instances = dict((i['os_id'], i) for i in db_api.get_items(context, 'i')
+                     if i.get('client_token') == client_token)
     if not instances:
         return
-    os_instances = clients.nova(context).servers.list(
-            search_opts={'id': [i['os_id'] for i in instances]})
-    os_instances = dict((i.id, i) for i in os_instances)
-    # TODO(ft): implement search db items by os_id in DB layer
-    instance_ids = set(i['id'] for i in instances)
-    network_interfaces = collections.defaultdict(list)
-    for eni in db_api.get_items(context, 'eni'):
-        if 'instance_id' in eni and eni['instance_id'] in instance_ids:
-            network_interfaces[eni['instance_id']].append(eni)
-    instances_infos = []
-    for instance in instances:
-        os_instance = os_instances.get(instance['os_id'])
-        if not os_instance:
-            continue
-        novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
-        instances_infos.append((instance, os_instance, novadb_instance,
-                                network_interfaces[instance['id']],))
-    common_nw_info = _get_common_nw_info(context)
-    return _format_reservation(context, instance['reservation_id'],
-                               instances_infos, common_nw_info)
-
-
-def _prepare_reservations(context, os_instances, instances_by_os_id,
-                          network_interfaces):
-    reservations = {}
+    os_instances = _get_os_instances_by_instances(context, instances)
+    instances_info = []
+    instance_ids = []
     for os_instance in os_instances:
+        instance = instances.pop(os_instance['id'])
         novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
-        if os_instance.id in instances_by_os_id:
-            instance = instances_by_os_id.get(os_instance.id)
-            reservation_id = instance['reservation_id']
-        else:
-            reservation_id = novadb_instance['reservation_id']
-            instance = db_api.add_item(
-                    context, 'i',
-                    {'os_id': os_instance.id,
-                     'vpc_id': None,
-                     'reservation_id': reservation_id,
-                     'launch_index': novadb_instance['launch_index']})
-        if reservation_id not in reservations:
-            reservations[reservation_id] = []
-        reservations[reservation_id].append(
-                (instance, os_instance, novadb_instance,
-                 network_interfaces[instance['id']],))
-    return reservations
+        instances_info.append((instance, os_instance, novadb_instance,))
+        instance_ids.append(instance['id'])
+    if instances:
+        _remove_instances(context, instances.itervalues())
+    if not instances_info:
+        return
+    ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_ids)
+    return _format_reservation(context, instance['reservation_id'],
+                               instances_info, ec2_network_interfaces)
 
 
-def _format_reservation(context, reservation_id, instances_infos,
-                        common_nw_info):
-    os_ports, addresses, security_groups = common_nw_info
+def _format_reservation(context, reservation_id, instances_info,
+                        ec2_network_interfaces, filters=None):
     ec2_instances = []
-    for (instance, os_instance, novadb_instance,
-         network_interfaces) in instances_infos:
-        ports_info = [(eni,
-                       os_ports[eni['os_id']],
-                       addresses.get(eni['id'], []))
-                      for eni in network_interfaces
-                      if eni['os_id'] in os_ports]
-        ec2_instances.append(
-                _format_instance(context, instance, os_instance,
-                                 novadb_instance, ports_info, security_groups))
+    for (instance, os_instance, novadb_instance) in instances_info:
+        ec2_instance = _format_instance(
+                context, instance, os_instance, novadb_instance,
+                ec2_network_interfaces.get(instance['id']))
+        if not utils.filtered_out(ec2_instance, filters, INSTANCE_FILTER_MAP):
+            ec2_instances.append(ec2_instance)
     ec2_reservation = {'reservationId': reservation_id,
                        'ownerId': os_instance.tenant_id,
                        'instancesSet': ec2_instances}
@@ -437,7 +440,7 @@ def _format_reservation(context, reservation_id, instances_infos,
 
 
 def _format_instance(context, instance, os_instance, novadb_instance,
-                     ports_info, security_groups):
+                     ec2_network_interfaces):
     ec2_instance = {}
     ec2_instance['instanceId'] = instance['id']
     image_uuid = os_instance.image['id'] if os_instance.image else ''
@@ -490,40 +493,32 @@ def _format_instance(context, instance, os_instance, novadb_instance,
         'availabilityZone': getattr(os_instance,
                                     'OS-EXT-AZ:availability_zone')
     }
-    if not ports_info:
+    if not ec2_network_interfaces:
         # TODO(ft): boto uses 2010-08-31 version of AWS protocol
         # which doesn't contain groupSet element in an instance
         # We should support different versions of output data
         # ec2_instance['groupSet'] = _format_group_set(
         #         context, os_instance.security_groups)
         return ec2_instance
-    ec2_network_interfaces = []
-    for network_interface, os_port, addresses in ports_info:
-        ec2_network_interface = (
-                network_interface_api._format_network_interface(
-                        context, network_interface, os_port, addresses,
-                        security_groups=security_groups))
-        attachment = ec2_network_interface.get('attachment')
-        if attachment:
-            attachment.pop('instanceId', None)
-            attachment.pop('instanceOwnerId', None)
-        ec2_network_interfaces.append(ec2_network_interface)
-    ec2_instance['networkInterfaceSet'] = ec2_network_interfaces
     # NOTE(ft): get instance's subnet by instance's privateIpAddress
     instance_ip = ec2_instance['privateIpAddress']
-    network_interface = None
-    for ((network_interface, os_port, _addresses),
-         ec2_network_interface) in zip(ports_info, ec2_network_interfaces):
-        if instance_ip in (ip['ip_address']
-                           for ip in os_port['fixed_ips']):
-            ec2_instance['subnetId'] = network_interface['subnet_id']
-            # TODO(ft): boto uses 2010-08-31 version of AWS protocol
-            # which doesn't contain groupSet element in an instance
-            # We should support different versions of output data
-            # ec2_instance['groupSet'] = ec2_network_interface['groupSet']
-            break
-    if network_interface:
-        ec2_instance['vpcId'] = network_interface['vpc_id']
+    main_ec2_network_interface = None
+    for ec2_network_interface in ec2_network_interfaces:
+        ec2_network_interface['attachment'].pop('instanceId')
+        ec2_network_interface['attachment'].pop('instanceOwnerId')
+        if (not main_ec2_network_interface and
+                any(address['privateIpAddress'] == instance_ip
+                    for address in
+                            ec2_network_interface['privateIpAddressesSet'])):
+            main_ec2_network_interface = ec2_network_interface
+    ec2_instance['networkInterfaceSet'] = ec2_network_interfaces
+    if main_ec2_network_interface:
+        ec2_instance['subnetId'] = main_ec2_network_interface['subnetId']
+        # TODO(ft): boto uses 2010-08-31 version of AWS protocol
+        # which doesn't contain groupSet element in an instance
+        # We should support different versions of output data
+        # ec2_instance['groupSet'] = main_ec2_network_interface['groupSet']
+    ec2_instance['vpcId'] = ec2_network_interface['vpcId']
     return ec2_instance
 
 
@@ -544,13 +539,32 @@ def _format_state_change(instance, os_instance):
     }
 
 
-def _get_common_nw_info(context):
+def _get_ec2_network_interfaces(context, instance_ids=None):
+    ec2_network_interfaces = collections.defaultdict(list)
+    if not instance_ids:
+        network_interface_ids = None
+    else:
+        # TODO(ft): implement search db items in DB layer
+        network_interface_ids = [
+                eni['id'] for eni in db_api.get_items(context, 'eni')
+                if eni.get('instance_id') in instance_ids]
+    enis = network_interface_api.describe_network_interfaces(
+            context,
+            network_interface_id=network_interface_ids)['networkInterfaceSet']
+    for eni in enis:
+        if eni['status'] == 'in-use':
+            ec2_network_interfaces[eni['attachment']['instanceId']].append(eni)
+    return ec2_network_interfaces
+
+
+def _format_network_interfaces(context, instances_network_interfaces):
     neutron = clients.neutron(context)
 
     os_ports = neutron.list_ports()['ports']
     os_ports = dict((p['id'], p) for p in os_ports)
 
-    os_floating_ips = neutron.list_floatingips()['floatingips']
+    # TODO(ft): reuse following code from network_interface_api
+    os_floating_ips = neutron.list_floatingips(fields=['id'])['floatingips']
     os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
     addresses = collections.defaultdict(list)
     for address in db_api.get_items(context, 'eipalloc'):
@@ -561,7 +575,40 @@ def _get_common_nw_info(context):
     security_groups = security_group_api._format_security_groups_ids_names(
             context)
 
-    return os_ports, addresses, security_groups
+    ec2_network_interfaces = collections.defaultdict(list)
+    for network_interfaces in instances_network_interfaces:
+        for network_interface in network_interfaces:
+            ec2_eni = network_interface_api._format_network_interface(
+                    context, network_interface,
+                    os_ports[network_interface['os_id']],
+                    addresses[network_interface['id']], security_groups)
+            ec2_network_interfaces[
+                    network_interface['instance_id']].append(ec2_eni)
+    return ec2_network_interfaces
+
+
+def _remove_instances(context, instances, network_interfaces=None):
+    if network_interfaces is None:
+        # TODO(ft): implement search db items by os_id in DB layer
+        network_interfaces = collections.defaultdict(list)
+        for eni in db_api.get_items(context, 'eni'):
+            if 'instance_id' in eni:
+                network_interfaces[eni['instance_id']].append(eni)
+
+    addresses = db_api.get_items(context, 'eipalloc')
+    addresses = dict((a['network_interface_id'], a) for a in addresses
+                     if 'network_interface_id' in a)
+    for instance in instances:
+        for eni in network_interfaces[instance['id']]:
+            if eni['delete_on_termination']:
+                address = addresses.get(eni['id'])
+                if address:
+                    address_api._disassociate_address_item(context, address)
+                db_api.delete_item(context, eni['id'])
+            else:
+                network_interface_api._detach_network_interface_item(context,
+                                                                     eni)
+        db_api.delete_item(context, instance['id'])
 
 
 def _check_min_max_count(min_count, max_count):
@@ -832,20 +879,26 @@ def _get_ip_info_for_instance(os_instance):
     return fixed_ip, fixed_ip6, floating_ip
 
 
-def _get_os_instances(context, instance_ids):
+def _foreach_instance(context, instance_ids, func):
     instances = ec2utils.get_db_items(context, 'i', instance_ids)
+    os_instances = _get_os_instances_by_instances(context, instances,
+                                                  exactly=True)
+    for os_instance in os_instances:
+        func(os_instance)
+    return True
 
+
+def _get_os_instances_by_instances(context, instances, exactly=False):
     nova = clients.nova(context)
-    os_instances_ids = [instance['os_id'] for instance in instances]
-    os_instances = nova.servers.list(search_opts={'id': os_instances_ids})
+    os_instances = []
+    for instance in instances:
+        try:
+            os_instances.append(nova.servers.get(instance['os_id']))
+        except nova_exception.NotFound:
+            if exactly:
+                raise exception.InvalidInstanceIDNotFound(i_id=instance['id'])
 
-    if len(instances) > len(os_instances):
-        raise exception.InvalidInstanceIDNotFound(
-                instance_id=any(i['id'] for i in instances
-                                if all(i['os_id'] != os_i.id
-                                       for os_i in os_instances)))
     return os_instances
-
 
 # NOTE(ft): following functions are copied from various parts of Nova
 

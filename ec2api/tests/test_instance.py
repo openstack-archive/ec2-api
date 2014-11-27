@@ -339,16 +339,35 @@ class InstanceTestCase(base.ApiTestCase):
                   fakes.EC2_NETWORK_INTERFACE_1['networkInterfaceId']},
                  new_port=False)
 
-    def test_terminate_instances(self):
+    @mock.patch('ec2api.api.address._disassociate_address_item')
+    @mock.patch('ec2api.api.network_interface.detach_network_interface')
+    def test_terminate_instances(self, detach_network_interface,
+                                 dissassociate_address_item):
         """Terminate 2 instances in one request."""
         self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1,
                                                      fakes.DB_INSTANCE_2]
-        self.nova_servers.list.return_value = [fakes.OS_INSTANCE_1,
+        self.nova_servers.get.side_effect = [fakes.OS_INSTANCE_1,
                                                fakes.OS_INSTANCE_2]
-        self.db_api.get_items.return_value = (
-            [copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1),
-             copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2)])
-        self.neutron.list_ports.return_value = {'ports': [fakes.OS_PORT_2]}
+        self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
+            {'eni': [copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1),
+                     copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2)],
+             'eipalloc': [copy.deepcopy(fakes.DB_ADDRESS_1),
+                          copy.deepcopy(fakes.DB_ADDRESS_2)]})
+
+        instance1_delete_patcher = mock.patch.object(fakes.OS_INSTANCE_1,
+                                                     'delete')
+        instance1_delete = instance1_delete_patcher.start()
+        self.addCleanup(instance1_delete.stop)
+        instance2_delete_patcher = mock.patch.object(fakes.OS_INSTANCE_2,
+                                                     'delete')
+        instance2_delete = instance2_delete_patcher.start()
+        self.addCleanup(instance2_delete.stop)
+        instance1_get_patcher = mock.patch.object(fakes.OS_INSTANCE_1, 'get')
+        instance1_get = instance1_get_patcher.start()
+        self.addCleanup(instance1_get.stop)
+        instance2_get_patcher = mock.patch.object(fakes.OS_INSTANCE_2, 'get')
+        instance2_get = instance2_get_patcher.start()
+        self.addCleanup(instance2_get.stop)
 
         resp = self.execute('TerminateInstances',
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
@@ -370,26 +389,21 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.get_items_by_ids.assert_called_once_with(
             mock.ANY, 'i',
             set([fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]))
-        self.nova_servers.list.assert_called_once_with(
-            search_opts={'id': [fakes.ID_OS_INSTANCE_1,
-                                fakes.ID_OS_INSTANCE_2]})
-        self._assert_list_ports_is_called_with_filter(
-            [fakes.ID_OS_INSTANCE_1, fakes.ID_OS_INSTANCE_2])
-        self.db_api.get_items.assert_called_once_with(mock.ANY, 'eni')
-        self.neutron.update_port.assert_called_once_with(
-            fakes.ID_OS_PORT_2,
-            {'port': {'device_id': '',
-                      'device_owner': ''}})
-        self.db_api.update_item.assert_called_once_with(
-            mock.ANY, tools.purge_dict(fakes.DB_NETWORK_INTERFACE_2,
-                                       ('instance_id', 'attach_time',
-                                        'delete_on_termination')))
-        self.nova_servers.delete.assert_any_call(fakes.ID_OS_INSTANCE_1)
-        self.nova_servers.delete.assert_any_call(fakes.ID_OS_INSTANCE_2)
-        self.assertEqual(2, self.nova_servers.delete.call_count)
+        self.assertEqual(2, self.db_api.get_items.call_count)
+        self.db_api.get_items.assert_any_call(mock.ANY, 'eni')
+        self.db_api.get_items.assert_any_call(mock.ANY, 'eipalloc')
+        detach_network_interface.assert_called_once_with(
+            mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH)
+        self.nova_servers.get.assert_any_call(fakes.ID_OS_INSTANCE_1)
+        self.nova_servers.get.assert_any_call(fakes.ID_OS_INSTANCE_2)
+        self.assertEqual(0, dissassociate_address_item.call_count)
+        self.assertEqual(2, self.db_api.delete_item.call_count)
         for inst_id in (fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2):
             self.db_api.delete_item.assert_any_call(mock.ANY, inst_id)
-        self.assertEqual(2, self.db_api.delete_item.call_count)
+        instance1_delete.assert_called_once_with()
+        instance2_delete.assert_called_once_with()
+        instance1_get.assert_called_once_with()
+        instance2_get.assert_called_once_with()
 
     # TODO(ft): restore test after finish extraction of Nova EC2 API
     def _test_terminate_instances_multiple_networks(self):

@@ -540,6 +540,9 @@ class OSInstance(object):
     def get(self):
         None
 
+    def delete(self):
+        None
+
 
 OS_INSTANCE_1 = OSInstance(
     ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},

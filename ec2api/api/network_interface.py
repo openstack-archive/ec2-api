@@ -354,12 +354,11 @@ def attach_network_interface(context, network_interface_id,
                     network_interface['id'], 'eni-attach')}
 
 
-def detach_network_interface(context, attachment_id,
-                             force=None):
-    network_interface = db_api.get_item_by_id(context, 'eni', attachment_id)
+def detach_network_interface(context, attachment_id, force=None):
+    network_interface = db_api.get_item_by_id(
+            context, 'eni', ec2utils.change_ec2_id_kind(attachment_id, 'eni'))
     if 'instance_id' not in network_interface:
-        raise exception.InvalidAttachmentIDNotFound(
-            attachment_id=attachment_id)
+        raise exception.InvalidAttachmentIDNotFound(attach_id=attachment_id)
     # TODO(Alex) Check that device index is not 0 (when we support it) and
     # forbid detaching.
     neutron = clients.neutron(context)

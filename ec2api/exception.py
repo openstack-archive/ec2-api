@@ -168,7 +168,7 @@ class NovaDbInstanceNotFound(EC2NotFound):
 
 class InvalidInstanceIDNotFound(EC2NotFound):
     ec2_code = 'InvalidInstanceID.NotFound'
-    msg_fmt = _("The instance ID '%(instance_id)s' does not exist")
+    msg_fmt = _("The instance ID '%(i_id)s' does not exist")
 
 
 class InvalidVpcIDNotFound(EC2NotFound):
@@ -194,7 +194,7 @@ class InvalidNetworkInterfaceIDNotFound(EC2NotFound):
 
 class InvalidAttachmentIDNotFound(EC2NotFound):
     ec2_code = 'InvalidAttachmentID.NotFound'
-    msg_fmt = _("Attachment %(eni-attach_id)s could not "
+    msg_fmt = _("Attachment %(attach_id)s could not "
                 "be found.")
 
 
