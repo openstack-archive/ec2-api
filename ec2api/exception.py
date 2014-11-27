@@ -94,6 +94,11 @@ class EC2Exception(Exception):
         return self.args[0]
 
 
+class Unsupported(EC2Exception):
+    msg_fmt = _("The specified request is unsupported. %(reason)s")
+    code = 400
+
+
 class Invalid(EC2Exception):
     msg_fmt = _("Unacceptable parameters.")
     code = 400

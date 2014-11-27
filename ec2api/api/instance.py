@@ -131,17 +131,21 @@ def run_instances(context, image_id, min_count, max_count,
     _check_network_interface_parameters(
                     vpc_network_parameters, min_count, min_count)
 
-    neutron = clients.neutron(context)
     (vpc_id,
      network_interfaces,
      create_network_interfaces_args,
      delete_on_termination_flags) = _parse_network_interface_parameters(
-                    context, neutron, vpc_network_parameters)
+                    context, vpc_network_parameters)
 
     # NOTE(ft): workaround for Launchpad Bug #1384347 in Icehouse
     if not security_groups_names and vpc_network_parameters:
         security_groups_names = _get_vpc_default_security_group_id(
                 context, vpc_id)
+
+    neutron = clients.neutron(context)
+    if not vpc_id:
+        ec2_classic_nics = [
+            {'net-id': _get_ec2_classic_os_network(context, neutron)['id']}]
 
     instances_info = []
     ec2_reservation_id = _generate_reservation_id()
@@ -184,7 +188,9 @@ def run_instances(context, image_id, min_count, max_count,
         # NOTE(ft): run instances one by one using created ports
         for (launch_index,
              network_interfaces) in enumerate(instance_network_interfaces):
-            nics = [{'port-id': eni['os_id']} for eni in network_interfaces]
+            nics = ([{'port-id': eni['os_id']} for eni in network_interfaces]
+                    if vpc_id else
+                    ec2_classic_nics)
 
             os_instance = nova.servers.create(
                 'EC2 server', os_image.id, os_flavor,
@@ -764,7 +770,7 @@ def _check_network_interface_parameters(params,
             raise exception.InvalidParameterCombination(msg)
 
 
-def _parse_network_interface_parameters(context, neutron, params):
+def _parse_network_interface_parameters(context, params):
     network_interfaces = []
     network_interface_id_set = set()
     create_network_interfaces_args = []
@@ -899,6 +905,27 @@ def _get_os_instances_by_instances(context, instances, exactly=False):
                 raise exception.InvalidInstanceIDNotFound(i_id=instance['id'])
 
     return os_instances
+
+
+def _get_ec2_classic_os_network(context, neutron):
+    os_subnet_ids = [eni['os_id']
+                     for eni in db_api.get_items(context, 'subnet')]
+    os_subnets = neutron.list_subnets(id=os_subnet_ids,
+                                      fields=['network_id'])['subnets']
+    vpc_os_network_ids = set(sn['network_id'] for sn in os_subnets)
+    os_networks = neutron.list_networks(**{'router:external': False,
+                                           'fields': ['id']})['networks']
+    ec2_classic_os_networks = [n for n in os_networks
+                               if n['id'] not in vpc_os_network_ids]
+    if len(ec2_classic_os_networks) == 0:
+        raise exception.Unsupported(
+                reason=_('There are no available networks '
+                         'for EC2 Classic mode'))
+    if len(ec2_classic_os_networks) > 1:
+        raise exception.Unsupported(
+                reason=_('There is more than one available network '
+                         'for EC2 Classic mode'))
+    return ec2_classic_os_networks[0]
 
 # NOTE(ft): following functions are copied from various parts of Nova
 
