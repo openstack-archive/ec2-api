@@ -93,9 +93,12 @@ def run_instances(context, image_id, min_count, max_count,
                   key_name=None, security_group_id=None,
                   security_group=None, user_data=None, instance_type=None,
                   placement=None, kernel_id=None, ramdisk_id=None,
-                  block_device_mapping=None, subnet_id=None,
+                  block_device_mapping=None, monitoring=None,
+                  subnet_id=None, disable_api_termination=None,
+                  instance_initiated_shutdown_behavior=None,
                   private_ip_address=None, client_token=None,
-                  network_interface=None, **kwargs):
+                  network_interface=None, iam_instance_profile=None,
+                  ebs_optimized=None):
     # TODO(ft): fix passing complex network parameters create_network_interface
     # TODO(ft): check the compatibility of complex network parameters and
     # multiple running

@@ -1009,9 +1009,12 @@ class CloudController(object):
                       key_name=None, security_group_id=None,
                       security_group=None, user_data=None, instance_type=None,
                       placement=None, kernel_id=None, ramdisk_id=None,
-                      block_device_mapping=None, subnet_id=None,
+                      block_device_mapping=None, monitoring=None,
+                      subnet_id=None, disable_api_termination=None,
+                      instance_initiated_shutdown_behavior=None,
                       private_ip_address=None, client_token=None,
-                      network_interface=None, **kwargs):
+                      network_interface=None, iam_instance_profile=None,
+                      ebs_optimized=None):
         """Launches the specified number of instances using an AMI.
 
         Args:
@@ -1033,6 +1036,10 @@ class CloudController(object):
             instance_type (str): The instance type.
             placement (dict): Dict can contain:
                 availability_zone (str): Availability Zone for the instance.
+                group_name (str): The name of an existing placement group.
+                    Not used now.
+                tenancy (str): The tenancy of the instance.
+                    Not used now.
             kernel_id (str): The ID of the kernel.
             ramdisk_id (str): The ID of the RAM disk.
             block_device_mapping (list of dict): Dict can contain:
@@ -1045,8 +1052,23 @@ class CloudController(object):
                     volume_size (str): The size of the volume, in GiBs.
                     delete_on_termination (bool): Indicates whether to delete
                         the volume on instance termination.
+                    iops (int): he number of IOPS to provision for the volume.
+                        Not used now.
+                    encrypted (boolean): Whether the volume is encrypted.
+                        Not used now.
                 no_device (str): Suppresses the device mapping.
+            monitoring (dict): Dict can contains:
+                enabled (boolean): Enables monitoring for the instance.
+                        Not used now.
             subnet_id (str): The ID of the subnet to launch the instance into.
+            disable_api_termination (boolean): If you set this parameter to
+                true, you can't terminate the instance using the GUI console,
+                CLI, or API.
+                Not used now.
+            instance_initiated_shutdown_behavior (str): Indicates whether an
+                instance stops or terminates when you initiate shutdown from
+                the instance.
+                Not used now.
             private_ip_address (str): The primary IP address.
                 You must specify a value from the IP address range
                 of the subnet.
@@ -1080,7 +1102,13 @@ class CloudController(object):
                         IP address using private_ip_address.
                 associate_public_ip_address (boolean): Indicates whether
                     to assign a public IP address to an instance in a VPC.
-            kwargs: Other arguments supported by AWS EC2.
+            iam_instance_profile (dict): Dict can contains:
+                arn (str): ARN to associate with the instances.
+                    Not used now.
+                name (str): Name of the IIP to associate with the instances.
+                    Not used now.
+            ebs_optimized (boolean): Whether the instance is optimized for EBS.
+                Not used now.
 
         Returns:
             The instance reservation that was created.
@@ -1092,9 +1120,12 @@ class CloudController(object):
                                       key_name, security_group_id,
                                       security_group, user_data, instance_type,
                                       placement, kernel_id, ramdisk_id,
-                                      block_device_mapping, subnet_id,
+                                      block_device_mapping, monitoring,
+                                      subnet_id, disable_api_termination,
+                                      instance_initiated_shutdown_behavior,
                                       private_ip_address, client_token,
-                                      network_interface, **kwargs)
+                                      network_interface, iam_instance_profile,
+                                      ebs_optimized)
 
     def terminate_instances(self, context, instance_id):
         """Shuts down one or more instances.
@@ -1112,7 +1143,7 @@ class CloudController(object):
         return instance.terminate_instances(context, instance_id)
 
     def describe_instances(self, context, instance_id=None, filter=None,
-                           **kwargs):
+                           max_results=None, next_token=None):
         """Describes one or more of your instances.
 
         Args:
@@ -1120,6 +1151,10 @@ class CloudController(object):
             instance_id (list of str): One or more instance IDs.
             filter (list of filter dict): You can specify filters so that the
                 response includes information for only certain instances.
+            max_results (int): The maximum number of items to return.
+                Not used now.
+            next_token (str): The token for the next set of items to return.
+                Not used now.
 
         Returns:
             A list of reservations.
@@ -1131,7 +1166,7 @@ class CloudController(object):
         don't own, we don't include it in the results.
         """
         return instance.describe_instances(context, instance_id, filter,
-                                           **kwargs)
+                                           max_results, next_token)
 
     def reboot_instances(self, context, instance_id):
         """Requests a reboot of one or more instances.
