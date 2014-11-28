@@ -660,6 +660,16 @@ OS_FLOATING_IP_2 = {
 
 
 # security group objects
+
+class NovaSecurityGroup(object):
+
+    def __init__(self, nova_group_dict):
+        self.id = nova_group_dict['id']
+        self.name = nova_group_dict['name']
+        self.description = nova_group_dict['description']
+        self.tenant_id = ID_OS_PROJECT
+        self.rules = nova_group_dict['security_group_rules']
+
 DB_SECURITY_GROUP_1 = {
     'id': ID_EC2_SECURITY_GROUP_1,
     'os_id': ID_OS_SECURITY_GROUP_1,
@@ -727,6 +737,48 @@ OS_SECURITY_GROUP_2 = {
     'description': 'Group description',
     'tenant_id': ID_OS_PROJECT
 }
+NOVA_SECURITY_GROUP_RULE_1 = {
+    'id': random_os_id(),
+    'from_port': 10,
+    'to_port': 10,
+    'ip_protocol': 'tcp',
+    'group': None,
+    'ip_range': {'cidr': '192.168.1.0/24'},
+    'parent_group_id': ID_OS_SECURITY_GROUP_2
+}
+NOVA_SECURITY_GROUP_RULE_2 = {
+    'id': random_os_id(),
+    'from_port': None,
+    'to_port': None,
+    'ip_protocol': 'icmp',
+    'group': {'name': 'groupname'},
+    'ip_range': None,
+    'parent_group_id': ID_OS_SECURITY_GROUP_2
+}
+NOVA_SECURITY_GROUP_1 = {
+    'id': ID_OS_SECURITY_GROUP_1,
+    'name': 'groupname',
+    'security_group_rules':
+    [{'group': None,
+      'ip_range': None,
+      'ip_protocol': None,
+      'to_port': None,
+      'parent_group_id': ID_OS_SECURITY_GROUP_1,
+      'from_port': None,
+      'id': random_os_id()}],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
+NOVA_SECURITY_GROUP_2 = {
+    'id': ID_OS_SECURITY_GROUP_2,
+    'name': 'groupname2',
+    'security_group_rules': [
+        NOVA_SECURITY_GROUP_RULE_1,
+        NOVA_SECURITY_GROUP_RULE_2
+    ],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
 EC2_SECURITY_GROUP_1 = {
     'vpcId': ID_EC2_VPC_1,
     'groupDescription': 'Group description',
@@ -761,6 +813,41 @@ EC2_SECURITY_GROUP_2 = {
       }],
     'ownerId': ID_OS_PROJECT,
     'groupId': ID_EC2_SECURITY_GROUP_2
+}
+EC2_NOVA_SECURITY_GROUP_1 = {
+    'groupDescription': 'Group description',
+    'ipPermissions': None,
+    'groupName': 'groupname',
+    'ipPermissions':
+    [{'toPort': 65535,
+      'ipProtocol': 'tcp',
+      'fromPort': 1},
+     {'toPort': 65535,
+      'ipProtocol': 'udp',
+      'fromPort': 1},
+     {'toPort': -1,
+      'ipProtocol': 'icmp',
+      'fromPort': -1}],
+    'ownerId': ID_OS_PROJECT,
+}
+EC2_NOVA_SECURITY_GROUP_2 = {
+    'groupDescription': 'Group description',
+    'groupName': 'groupname2',
+    'ipPermissions':
+    [{'toPort': 10,
+      'ipProtocol': 'tcp',
+      'fromPort': 10,
+      'ipRanges':
+      [{'cidrIp': '192.168.1.0/24'}]
+      },
+     {'toPort': -1,
+      'ipProtocol': 'icmp',
+      'fromPort': -1,
+      'groups':
+      [{'groupName': 'groupname',
+        'userId': ID_OS_PROJECT}]
+      }],
+    'ownerId': ID_OS_PROJECT,
 }
 
 

@@ -40,6 +40,9 @@ class ApiTestCase(test_base.BaseTestCase):
         nova_mock = nova_patcher.start()
         self.nova_servers = nova_mock.return_value.servers
         self.nova_flavors = nova_mock.return_value.flavors
+        self.nova_security_groups = nova_mock.return_value.security_groups
+        self.nova_security_group_rules = (
+            nova_mock.return_value.security_group_rules)
         self.addCleanup(nova_patcher.stop)
         db_api_patcher = mock.patch('ec2api.db.api.IMPL')
         self.db_api = db_api_patcher.start()
