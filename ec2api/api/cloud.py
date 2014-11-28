@@ -31,6 +31,7 @@ from ec2api.api import network_interface
 from ec2api.api import route_table
 from ec2api.api import security_group
 from ec2api.api import subnet
+from ec2api.api import volume
 from ec2api.api import vpc
 from ec2api.openstack.common import log as logging
 
@@ -1258,3 +1259,114 @@ class CloudController(object):
 
     def get_console_output(self, context, instance_id):
         return instance.get_console_output(context, instance_id)
+
+    def create_volume(self, context, availability_zone, size=None,
+                      snapshot_id=None, volume_type=None, name=None,
+                      description=None, metadata=None, iops=None,
+                      encrypted=None, kms_key_id=None):
+        """Creates an EBS volume.
+
+        Args:
+            context (RequestContext): The request context.
+            availability_zone (str): The Availability Zone in which to create
+                the volume.
+            instance_id (str): The size of the volume, in GiBs.
+                Valid values: 1-1024
+                If you're creating the volume from a snapshot and don't specify
+                a volume size, the default is the snapshot size.
+            snapshot_id (str): The snapshot from which to create the volume.
+                Required if you are creating a volume from a snapshot.
+            volume_type (str): The volume type. One of volume types created
+                in used Block Storage.
+            name (str): Name of the volume (Nova extension).
+            description (str): Description of the volume (Nova extension).
+            metadata (str): Metadata of the volume (Nova extension).
+            iops (int): The number of IOPS to provision for the volume.
+                Valid values: Range is 100 to 4,000.
+                Not used now.
+            encrypted (boolean): Whether the volume should be encrypted.
+                Not used now.
+            kms_key_id (str): The full ARN of AWS KMS master key to use when
+                creating the encrypted volume.
+                Not used now.
+
+        Returns:
+            Information about the volume.
+
+        You can create a new empty volume or restore a volume from an EBS
+        snapshot.
+        """
+        return volume.create_volume(context, availability_zone, size,
+                                    snapshot_id, volume_type, name,
+                                    description, metadata, iops,
+                                    encrypted, kms_key_id)
+
+    def attach_volume(self, context, volume_id, instance_id, device):
+        """Attaches an EBS volume to a running or stopped instance.
+
+        Args:
+            context (RequestContext): The request context.
+            volume_id (str): The ID of the volume.
+            instance_id (str): The ID of the instance.
+            device_name (str): The device name to expose to the instance.
+
+        Returns:
+            Information about the attachment.
+
+        The instance and volume must be in the same Availability Zone.
+        """
+        return volume.attach_volume(context, volume_id, instance_id, device)
+
+    def detach_volume(self, context, volume_id, instance_id=None, device=None,
+                      force=None):
+        """Detaches an EBS volume from an instance.
+
+        Args:
+            context (RequestContext): The request context.
+            volume_id (str): The ID of the volume.
+            instance_id (str): The ID of the instance.
+                Not used now.
+            device (str): The device name.
+                Not used now.
+            force (boolean): Forces detachment.
+                Not used now.
+
+        Returns:
+            Information about the detachment.
+        """
+        return volume.detach_volume(context, volume_id, instance_id, device,
+                                    force)
+
+    def delete_volume(self, context, volume_id):
+        """Deletes the specified EBS volume.
+
+        Args:
+            context (RequestContext): The request context.
+            volume_id (str): The ID of the volume.
+
+        Returns:
+            Returns true if the request succeeds.
+
+        The volume must be in the available state.
+        """
+        return volume.delete_volume(context, volume_id)
+
+    def describe_volumes(self, context, volume_id=None, filter=None,
+                         max_results=None, next_token=None):
+        """Describes the specified EBS volumes.
+
+        Args:
+            context (RequestContext): The request context.
+            volume_id (list of str): One or more volume IDs.
+            filter (list of filter dict): You can specify filters so that the
+                response includes information for only certain volumes.
+            max_results (int): The maximum number of items to return.
+                Not used now.
+            next_token (str): The token for the next set of items to return.
+                Not used now.
+
+        Returns:
+            A list of volumes.
+        """
+        return volume.describe_volumes(context, volume_id, filter,
+                                       max_results, next_token)

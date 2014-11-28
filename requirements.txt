@@ -13,6 +13,7 @@ PasteDeploy>=1.5.0
 pbr>=0.6,!=0.7,<1.0
 pyasn1
 python-keystoneclient>=0.9.0
+python-cinderclient>=1.1.0
 python-glanceclient>=0.14.0
 python-neutronclient>=2.3.6,<3
 python-novaclient>=2.17.0

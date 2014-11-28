@@ -244,6 +244,11 @@ class InvalidPermissionNotFound(EC2NotFound):
     msg_fmg = _("The specified permission does not exist")
 
 
+class InvalidVolumeNotFound(EC2NotFound):
+    ec2_code = 'InvalidVolume.NotFound'
+    msg_fmt = _("The volume '%(id)s' does not exist.")
+
+
 class IncorrectState(EC2Exception):
     ec2_code = 'IncorrectState'
     code = 400

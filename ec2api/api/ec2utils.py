@@ -334,7 +334,8 @@ _NOT_FOUND_EXCEPTION_MAP = {
     'rtb': exception.InvalidRouteTableIDNotFound,
     'i': exception.InvalidInstanceIDNotFound,
     'kp': exception.InvalidKeypairNotFound,
-    'az': exception.InvalidAvailabilityZoneNotFound
+    'az': exception.InvalidAvailabilityZoneNotFound,
+    'vol': exception.InvalidVolumeNotFound,
 }
 
 
