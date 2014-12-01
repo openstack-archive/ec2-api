@@ -249,6 +249,11 @@ class InvalidVolumeNotFound(EC2NotFound):
     msg_fmt = _("The volume '%(id)s' does not exist.")
 
 
+class InvalidSnapshotNotFound(EC2NotFound):
+    ec2_code = 'InvalidSnapshot.NotFound'
+    msg_fmt = _("Snapshot %(id)s could not be found.")
+
+
 class IncorrectState(EC2Exception):
     ec2_code = 'IncorrectState'
     code = 400

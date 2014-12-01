@@ -30,6 +30,7 @@ from ec2api.api import key_pair
 from ec2api.api import network_interface
 from ec2api.api import route_table
 from ec2api.api import security_group
+from ec2api.api import snapshot
 from ec2api.api import subnet
 from ec2api.api import volume
 from ec2api.api import vpc
@@ -1370,3 +1371,50 @@ class CloudController(object):
         """
         return volume.describe_volumes(context, volume_id, filter,
                                        max_results, next_token)
+
+    def create_snapshot(self, context, volume_id, description=None):
+        """Creates a snapshot of an EBS volume.
+
+        Args:
+            context (RequestContext): The request context.
+            volume_id (str): The ID of the volume.
+            description (str): A description for the snapshot.
+
+        Returns:
+            Information about the snapshot.
+        """
+        return snapshot.create_snapshot(context, volume_id, description)
+
+    def delete_snapshot(self, context, snapshot_id):
+        """Deletes the specified snapshot.
+
+        Args:
+            context (RequestContext): The request context.
+            snapshot_id (str): The ID of the snapshot.
+
+        Returns:
+            Returns true if the request succeeds.
+        """
+        return snapshot.delete_snapshot(context, snapshot_id)
+
+    def describe_snapshots(self, context, snapshot_id=None, owner=None,
+                           restorable_by=None, filter=None):
+        """Describes one or more of the snapshots available to you.
+
+        Args:
+            context (RequestContext): The request context.
+            snapshot_id (list of str): One or more snapshot IDs.
+            owner (list of str): Returns the snapshots owned by the specified
+                owner.
+                Not used now.
+            restorable_by (list of str): One or more accounts IDs that can
+                create volumes from the snapshot.
+                Not used now.
+            filter (list of filter dict): You can specify filters so that the
+                response includes information for only certain snapshots.
+
+        Returns:
+            A list of snapshots.
+        """
+        return snapshot.describe_snapshots(context, snapshot_id, owner,
+                                           restorable_by, filter)

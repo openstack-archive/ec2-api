@@ -336,6 +336,7 @@ _NOT_FOUND_EXCEPTION_MAP = {
     'kp': exception.InvalidKeypairNotFound,
     'az': exception.InvalidAvailabilityZoneNotFound,
     'vol': exception.InvalidVolumeNotFound,
+    'snap': exception.InvalidSnapshotNotFound,
 }
 
 

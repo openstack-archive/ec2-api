@@ -94,6 +94,8 @@ def add_item(context, kind, data):
         obj_id = ec2utils.id_to_ec2_inst_id(data['os_id'])
     elif kind == 'vol':
         obj_id = ec2utils.id_to_ec2_vol_id(data['os_id'])
+    elif kind == 'snap':
+        obj_id = ec2utils.id_to_ec2_snap_id(data['os_id'])
     else:
         obj_id = "%(kind)s-%(id)08x" % {"kind": kind,
                                         "id": random.randint(1, 0xffffffff)}
