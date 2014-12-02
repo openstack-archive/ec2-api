@@ -358,6 +358,53 @@ def get_db_items(context, kind, ec2_ids):
     return items
 
 
+_auto_create_db_item_extensions = {}
+
+
+def register_auto_create_db_item_extension(kind, extension):
+    _auto_create_db_item_extensions[kind] = extension
+
+
+def get_db_item_by_os_id(context, kind, os_id, items_by_os_id=None,
+                         **extension_kwargs):
+    """Get DB item by OS id (create if it doesn't exist).
+
+        Args:
+            context (RequestContext): The request context.
+            kind (str): The kind of item.
+            os_id (str): OS id of an object.
+            items_by_os_id (dict of items): The dict of known DB items,
+                OS id is used as a key.
+            extension_kwargs (dict): Additional parameters passed to
+                a registered extension at creating item.
+
+        Returns:
+            A found or created item.
+
+        Search item in passed dict. If it's not found - create a new item, and
+        add it to the dict (if it's passed).
+        If an extension is registered on corresponding item kind, call it
+        passing extension_kwargs to it.
+    """
+    if os_id is None:
+        return None
+    if items_by_os_id is not None:
+        item = items_by_os_id.get(os_id)
+        if item:
+            return item
+    item = next((i for i in db_api.get_items(context, kind)
+                 if i['os_id'] == os_id), None)
+    if not item:
+        item = {'os_id': os_id}
+        extension = _auto_create_db_item_extensions.get(kind)
+        if extension:
+            extension(context, item, **extension_kwargs)
+        item = db_api.add_item(context, kind, item)
+    if items_by_os_id is not None:
+        items_by_os_id[os_id] = item
+    return item
+
+
 _cidr_re = re.compile("^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")
 
 
