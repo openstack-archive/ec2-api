@@ -258,7 +258,6 @@ def terminate_instances(context, instance_id):
                         context,
                         ec2utils.change_ec2_id_kind(eni['id'], 'eni-attach'))
 
-    _remove_instances(context, instances, network_interfaces)
     nova = clients.nova(context)
     state_changes = []
     for instance in instances:
@@ -271,24 +270,26 @@ def terminate_instances(context, instance_id):
         state_change = _format_state_change(instance, os_instance)
         state_changes.append(state_change)
 
+    _remove_instances(context, instances, network_interfaces)
+
     return {'instancesSet': state_changes}
 
 
 def describe_instances(context, instance_id=None, filter=None,
                        max_results=None, next_token=None):
     instances = ec2utils.get_db_items(context, 'i', instance_id)
+    instances = dict((i['os_id'], i) for i in instances)
 
-    if instance_id:
-        os_instances = _get_os_instances_by_instances(context, instances)
-    else:
-        os_instances = clients.nova(context).servers.list()
-
-    instances_by_os_id = dict((i['os_id'], i) for i in instances)
+    os_instances = clients.nova(context).servers.list()
 
     reservations = collections.defaultdict(list)
     for os_instance in os_instances:
+        instance = instances.pop(os_instance.id, None)
+        if instance_id and not instance:
+            # NOTE(ft): os_instance is not requested by
+            # 'instance_id' filter
+            continue
         novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
-        instance = instances_by_os_id.pop(os_instance.id, None)
         if not instance:
             instance = ec2utils.get_db_item_by_os_id(
                     context, 'i', os_instance.id,
@@ -296,7 +297,12 @@ def describe_instances(context, instance_id=None, filter=None,
         reservations[instance['reservation_id']].append(
                 (instance, os_instance, novadb_instance,))
 
-    _remove_instances(context, instances_by_os_id.itervalues())
+    # NOTE(ft): delete obsolete instances
+    if instances:
+        _remove_instances(context, instances.itervalues())
+    # NOTE(ft): some requested instances are obsolete
+    if instance_id and instances:
+        raise exception.InvalidInstanceIDNotFound(i_id=instances[0]['id'])
 
     ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_id)
     reservation_filters = []
@@ -419,6 +425,8 @@ def _get_idempotent_run(context, client_token):
         novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
         instances_info.append((instance, os_instance, novadb_instance,))
         instance_ids.append(instance['id'])
+
+    # NOTE(ft): delete obsolete instances
     if instances:
         _remove_instances(context, instances.itervalues())
     if not instances_info:
@@ -898,12 +906,15 @@ def _foreach_instance(context, instance_ids, func):
 def _get_os_instances_by_instances(context, instances, exactly=False):
     nova = clients.nova(context)
     os_instances = []
+    found_obsolete_instance = False
     for instance in instances:
         try:
             os_instances.append(nova.servers.get(instance['os_id']))
         except nova_exception.NotFound:
-            if exactly:
-                raise exception.InvalidInstanceIDNotFound(id=instance['id'])
+            db_api.delete_item(context, instance['id'])
+            found_obsolete_instance = True
+    if found_obsolete_instance and exactly:
+        raise exception.InvalidInstanceIDNotFound(id=instance['id'])
 
     return os_instances
 
