@@ -52,7 +52,7 @@ def create_volume(context, availability_zone=None, size=None,
         if not name:
             os_volume.update(display_name=volume['id'])
 
-    return _format_volume(context, volume, os_volume)
+    return _format_volume(context, volume, os_volume, snapshot_id=snapshot_id)
 
 
 def attach_volume(context, volume_id, instance_id, device):
@@ -105,6 +105,9 @@ def describe_volumes(context, volume_id=None, filter=None,
     volumes = ec2utils.get_db_items(context, 'vol', volume_id)
     volumes = dict((vol['os_id'], vol) for vol in volumes)
     instances = dict((i['os_id'], i) for i in db_api.get_items(context, 'i'))
+    snapshots = dict((s['os_id'], s)
+                     for s in db_api.get_items(context, 'snap'))
+
     formatted_volumes = []
     cinder = clients.cinder(context)
     os_volumes = cinder.volumes.list()
@@ -118,7 +121,7 @@ def describe_volumes(context, volume_id=None, filter=None,
                 volume = ec2utils.get_db_item_by_os_id(context, 'vol',
                                                        os_volume.id)
         formatted_volume = _format_volume(context, volume, os_volume,
-                                          instances)
+                                          instances, snapshots)
         if not utils.filtered_out(formatted_volume, filter, FILTER_MAP):
             formatted_volumes.append(formatted_volume)
 
@@ -132,7 +135,8 @@ def describe_volumes(context, volume_id=None, filter=None,
     return {'volumeSet': formatted_volumes}
 
 
-def _format_volume(context, volume, os_volume, instances={}):
+def _format_volume(context, volume, os_volume, instances={},
+                   snapshots={}, snapshot_id=None):
     valid_ec2_api_volume_status_map = {
         'attaching': 'in-use',
         'detaching': 'in-use'}
@@ -148,11 +152,11 @@ def _format_volume(context, volume, os_volume, instances={}):
     if ec2_volume['status'] == 'in-use':
         ec2_volume['attachmentSet'] = (
                 _format_attachment(context, volume, os_volume, instances))
-    if os_volume.snapshot_id is None:
-        ec2_volume['snapshotId'] = None
-    else:
-        ec2_volume['snapshotId'] = (
-                ec2utils.id_to_ec2_snap_id(os_volume.snapshot_id))
+    if snapshot_id is None and os_volume.snapshot_id:
+        snapshot = ec2utils.get_db_item_by_os_id(
+                context, 'snap', os_volume.snapshot_id, snapshots)
+        snapshot_id = snapshot['id']
+    ec2_volume['snapshotId'] = snapshot_id
 
     return ec2_volume
 
