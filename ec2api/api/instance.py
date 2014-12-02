@@ -313,16 +313,17 @@ def describe_instances(context, instance_id=None, filter=None,
             reservation_filters.append(f)
         else:
             instance_filters.append(f)
-    ec2_reservations = []
+    formatted_reservations = []
     for reservation_id, instances_info in reservations.iteritems():
-        ec2_reservation = _format_reservation(
+        formatted_reservation = _format_reservation(
                 context, reservation_id, instances_info,
                 ec2_network_interfaces, instance_filters, volumes=volumes)
-        if (ec2_reservation['instancesSet'] and
-                not utils.filtered_out(ec2_reservation, reservation_filters,
+        if (formatted_reservation['instancesSet'] and
+                not utils.filtered_out(formatted_reservation,
+                                       reservation_filters,
                                        RESERVATION_FILTER_MAP)):
-            ec2_reservations.append(ec2_reservation)
-    return {'reservationSet': ec2_reservations}
+            formatted_reservations.append(formatted_reservation)
+    return {'reservationSet': formatted_reservations}
 
 
 def reboot_instances(context, instance_id):
@@ -439,20 +440,20 @@ def _get_idempotent_run(context, client_token):
 
 def _format_reservation(context, reservation_id, instances_info,
                         ec2_network_interfaces, filters=None, volumes={}):
-    ec2_instances = []
+    formatted_instances = []
     for (instance, os_instance, novadb_instance) in instances_info:
         ec2_instance = _format_instance(
                 context, instance, os_instance, novadb_instance,
                 ec2_network_interfaces.get(instance['id']), volumes)
         if not utils.filtered_out(ec2_instance, filters, INSTANCE_FILTER_MAP):
-            ec2_instances.append(ec2_instance)
-    ec2_reservation = {'reservationId': reservation_id,
+            formatted_instances.append(ec2_instance)
+    formatted_reservation = {'reservationId': reservation_id,
                        'ownerId': os_instance.tenant_id,
-                       'instancesSet': ec2_instances}
+                       'instancesSet': formatted_instances}
     if not instance['vpc_id']:
-        ec2_reservation['groupSet'] = _format_group_set(
+        formatted_reservation['groupSet'] = _format_group_set(
                 context, os_instance.security_groups)
-    return ec2_reservation
+    return formatted_reservation
 
 
 def _format_instance(context, instance, os_instance, novadb_instance,
