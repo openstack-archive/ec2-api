@@ -122,7 +122,7 @@ def run_instances(context, image_id, min_count, max_count,
         raise exception.InvalidParameterValue(value=instance_type,
                                               parameter='InstanceType')
 
-    bdm = _parse_block_device_mapping(block_device_mapping, os_image)
+    bdm = _parse_block_device_mapping(context, block_device_mapping, os_image)
 
     # TODO(ft): support auto_assign_floating_ip
 
@@ -305,6 +305,7 @@ def describe_instances(context, instance_id=None, filter=None,
         raise exception.InvalidInstanceIDNotFound(i_id=instances[0]['id'])
 
     ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_id)
+    volumes = dict((v['os_id'], v) for v in db_api.get_items(context, 'vol'))
     reservation_filters = []
     instance_filters = []
     for f in filter or []:
@@ -316,7 +317,7 @@ def describe_instances(context, instance_id=None, filter=None,
     for reservation_id, instances_info in reservations.iteritems():
         ec2_reservation = _format_reservation(
                 context, reservation_id, instances_info,
-                ec2_network_interfaces, instance_filters)
+                ec2_network_interfaces, instance_filters, volumes=volumes)
         if (ec2_reservation['instancesSet'] and
                 not utils.filtered_out(ec2_reservation, reservation_filters,
                                        RESERVATION_FILTER_MAP)):
@@ -437,12 +438,12 @@ def _get_idempotent_run(context, client_token):
 
 
 def _format_reservation(context, reservation_id, instances_info,
-                        ec2_network_interfaces, filters=None):
+                        ec2_network_interfaces, filters=None, volumes={}):
     ec2_instances = []
     for (instance, os_instance, novadb_instance) in instances_info:
         ec2_instance = _format_instance(
                 context, instance, os_instance, novadb_instance,
-                ec2_network_interfaces.get(instance['id']))
+                ec2_network_interfaces.get(instance['id']), volumes)
         if not utils.filtered_out(ec2_instance, filters, INSTANCE_FILTER_MAP):
             ec2_instances.append(ec2_instance)
     ec2_reservation = {'reservationId': reservation_id,
@@ -455,7 +456,7 @@ def _format_reservation(context, reservation_id, instances_info,
 
 
 def _format_instance(context, instance, os_instance, novadb_instance,
-                     ec2_network_interfaces):
+                     ec2_network_interfaces, volumes):
     ec2_instance = {}
     ec2_instance['instanceId'] = instance['id']
     image_uuid = os_instance.image['id'] if os_instance.image else ''
@@ -503,7 +504,8 @@ def _format_instance(context, instance, os_instance, novadb_instance,
     ec2_instance['rootDeviceName'] = _cloud_format_instance_root_device_name(
                                                             novadb_instance)
     _cloud_format_instance_bdm(context, instance['os_id'],
-                               ec2_instance['rootDeviceName'], ec2_instance)
+                               ec2_instance['rootDeviceName'], ec2_instance,
+                               volumes)
     ec2_instance['placement'] = {
         'availabilityZone': getattr(os_instance,
                                     'OS-EXT-AZ:availability_zone')
@@ -669,7 +671,7 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
     return os_image, kernel_id, ramdisk_id
 
 
-def _parse_block_device_mapping(block_device_mapping, os_image):
+def _parse_block_device_mapping(context, block_device_mapping, os_image):
     # NOTE(ft): The following code allows reconfiguration of devices
     # according to list of new parameters supplied in EC2 call.
     # This code merges these parameters with information taken from image.
@@ -682,7 +684,7 @@ def _parse_block_device_mapping(block_device_mapping, os_image):
         if bd.get('device_name') or bd.get('boot_index') == 0)
 
     for args_bd in (block_device_mapping or []):
-        _cloud_parse_block_device_mapping(args_bd)
+        _cloud_parse_block_device_mapping(context, args_bd)
         dev_name = _block_device_strip_dev(args_bd.get('device_name'))
         if (not dev_name or dev_name not in image_bdm or
                 'snapshot_id' in args_bd or 'volume_id' in args_bd):
@@ -1001,7 +1003,7 @@ def _block_device_prepend_dev(device_name):
     return device_name and '/dev/' + _block_device_strip_dev(device_name)
 
 
-def _cloud_parse_block_device_mapping(bdm):
+def _cloud_parse_block_device_mapping(context, bdm):
     """Parse BlockDeviceMappingItemType into flat hash
 
     BlockDevicedMapping.<N>.DeviceName
@@ -1017,9 +1019,11 @@ def _cloud_parse_block_device_mapping(bdm):
         ec2_id = ebs.pop('snapshot_id', None)
         if ec2_id:
             if ec2_id.startswith('snap-'):
-                bdm['snapshot_id'] = ec2utils.ec2_snap_id_to_uuid(ec2_id)
+                snapshot = ec2utils.get_db_item(context, 'snap', ec2_id)
+                bdm['snapshot_id'] = snapshot['id']
             elif ec2_id.startswith('vol-'):
-                bdm['volume_id'] = ec2utils.ec2_vol_id_to_uuid(ec2_id)
+                volume = ec2utils.get_db_item(context, 'vol', ec2_id)
+                bdm['volume_id'] = volume['id']
             else:
                 # NOTE(ft): AWS returns undocumented InvalidSnapshotID.NotFound
                 raise exception.InvalidSnapshotIDMalformed(snapshot_id=ec2_id)
@@ -1072,7 +1076,7 @@ block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
 
 
 def _cloud_format_instance_bdm(context, instance_uuid, root_device_name,
-                               result):
+                               result, volumes=None):
     """Format InstanceBlockDeviceMappingResponseItemType."""
     root_device_type = 'instance-store'
     root_device_short_name = _block_device_strip_dev(root_device_name)
@@ -1092,8 +1096,10 @@ def _cloud_format_instance_bdm(context, instance_uuid, root_device_name,
             root_device_type = 'ebs'
 
         vol = cinder.volumes.get(volume_id)
+        volume = ec2utils.get_db_item_by_os_id(context, 'vol', volume_id,
+                                               volumes)
         # TODO(yamahata): volume attach time
-        ebs = {'volumeId': ec2utils.id_to_ec2_vol_id(volume_id),
+        ebs = {'volumeId': volume['id'],
                'deleteOnTermination': bdm['delete_on_termination'],
                'attachTime': '',
                'status': _cloud_get_volume_attach_status(vol), }
