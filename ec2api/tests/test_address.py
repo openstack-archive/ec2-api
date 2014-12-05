@@ -34,8 +34,8 @@ class AddressTestCase(base.ApiTestCase):
         self.addCleanup(id_to_ec2_inst_id_patcher.stop)
 
     def test_allocate_ec2_classic_address(self):
-        self.ec2.allocate_address.return_value = (
-            copy.deepcopy(fakes.EC2OS_ADDRESS_1))
+        self.nova_floating_ips.create.return_value = (
+            copy.deepcopy(fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1)))
 
         resp = self.execute('AllocateAddress', {})
         self.assertEqual(200, resp['status'])
@@ -43,7 +43,7 @@ class AddressTestCase(base.ApiTestCase):
         self.assertEqual('standard', resp['domain'])
         self.assertNotIn('allocationId', resp)
         self.assertEqual(0, self.db_api.add_item.call_count)
-        self.ec2.allocate_address.assert_called_once_with()
+        self.nova_floating_ips.create.assert_called_once_with()
 
     def test_allocate_vpc_address(self):
         conf = cfg.CONF
@@ -107,20 +107,18 @@ class AddressTestCase(base.ApiTestCase):
 
     def test_associate_address_ec2_classic(self):
         self.db_api.get_items.return_value = []
-        self.ec2.associate_address.return_value = True
+        self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_1
+        self.nova_servers.add_floating_ip.return_value = True
 
         resp = self.execute('AssociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1,
                              'InstanceId': fakes.ID_EC2_INSTANCE_2})
         self.assertEqual(200, resp['status'])
         self.assertEqual(True, resp['return'])
-        self.assertNotIn('associationId', resp)
 
-        self.ec2.associate_address.assert_called_once_with(
-            public_ip=fakes.IP_ADDRESS_1,
-            instance_id=fakes.ID_EC2_INSTANCE_2,
-            network_interface_id=None, private_ip_address=None,
-            allow_reassociation=False)
+        self.nova_servers.add_floating_ip.assert_called_once_with(
+            fakes.ID_OS_INSTANCE_1,
+            fakes.IP_ADDRESS_1)
 
     def test_associate_address_vpc(self):
 
@@ -326,7 +324,8 @@ class AddressTestCase(base.ApiTestCase):
             lambda _, kind: [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2]
             if kind == 'eipalloc' else [])
         self.neutron.show_floatingip.side_effect = neutron_exception.NotFound
-        self.ec2.associate_address.return_value = True
+        self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_2
+        self.nova_servers.add_floating_ip.return_value = True
 
         resp = self.execute('AssociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1,
@@ -335,11 +334,9 @@ class AddressTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
         self.assertNotIn('associationId', resp)
 
-        self.ec2.associate_address.assert_called_once_with(
-            public_ip=fakes.IP_ADDRESS_1,
-            instance_id=fakes.ID_EC2_INSTANCE_2,
-            network_interface_id=None, private_ip_address=None,
-            allow_reassociation=False)
+        self.nova_servers.add_floating_ip.assert_called_once_with(
+            fakes.ID_OS_INSTANCE_2,
+            fakes.IP_ADDRESS_1)
 
     def test_associate_address_vpc_rollback(self):
         self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
@@ -359,15 +356,19 @@ class AddressTestCase(base.ApiTestCase):
 
     def test_dissassociate_address_ec2_classic(self):
         self.db_api.get_items.return_value = []
-        self.ec2.disassociate_address.return_value = True
+        self.nova_servers.remove_floating_ip.return_value = True
+        self.nova_floating_ips.list.return_value = (
+            [fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
+             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)])
 
         resp = self.execute('DisassociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_2})
         self.assertEqual(200, resp['status'])
         self.assertEqual(True, resp['return'])
 
-        self.ec2.disassociate_address.assert_called_once_with(
-            public_ip=fakes.IP_ADDRESS_2)
+        self.nova_servers.remove_floating_ip.assert_called_once_with(
+            fakes.ID_OS_INSTANCE_2,
+            fakes.IP_ADDRESS_2)
 
     def test_dissassociate_address_vpc(self):
         self.db_api.get_item_by_id.return_value = (
@@ -448,15 +449,18 @@ class AddressTestCase(base.ApiTestCase):
 
     def test_release_address_ec2_classic(self):
         self.db_api.get_items.return_value = []
-        self.ec2.release_address.return_value = True
+        self.nova_floating_ips.delete.return_value = True
+        self.nova_floating_ips.list.return_value = (
+            [fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
+             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)])
 
         resp = self.execute('ReleaseAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1})
         self.assertEqual(200, resp['status'])
         self.assertEqual(True, resp['return'])
 
-        self.ec2.release_address.assert_called_once_with(
-            public_ip=fakes.IP_ADDRESS_1)
+        self.nova_floating_ips.delete.assert_called_once_with(
+            fakes.NOVA_FLOATING_IP_1['id'])
 
     def test_release_address_vpc(self):
         self.db_api.get_item_by_id.return_value = fakes.DB_ADDRESS_1

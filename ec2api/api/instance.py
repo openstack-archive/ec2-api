@@ -913,9 +913,12 @@ def _get_os_instances_by_instances(context, instances, exactly=False):
 def _get_ec2_classic_os_network(context, neutron):
     os_subnet_ids = [eni['os_id']
                      for eni in db_api.get_items(context, 'subnet')]
-    os_subnets = neutron.list_subnets(id=os_subnet_ids,
-                                      fields=['network_id'])['subnets']
-    vpc_os_network_ids = set(sn['network_id'] for sn in os_subnets)
+    if os_subnet_ids:
+        os_subnets = neutron.list_subnets(id=os_subnet_ids,
+                                          fields=['network_id'])['subnets']
+        vpc_os_network_ids = set(sn['network_id'] for sn in os_subnets)
+    else:
+        vpc_os_network_ids = []
     os_networks = neutron.list_networks(**{'router:external': False,
                                            'fields': ['id']})['networks']
     ec2_classic_os_networks = [n for n in os_networks
