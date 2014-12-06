@@ -905,7 +905,7 @@ def _get_os_instances_by_instances(context, instances, exactly=False):
             os_instances.append(nova.servers.get(instance['os_id']))
         except nova_exception.NotFound:
             if exactly:
-                raise exception.InvalidInstanceIDNotFound(i_id=instance['id'])
+                raise exception.InvalidInstanceIDNotFound(id=instance['id'])
 
     return os_instances
 

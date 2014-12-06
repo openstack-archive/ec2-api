@@ -52,7 +52,7 @@ def create_network_interface(context, subnet_id,
                              security_group_id=None):
     subnet = ec2utils.get_db_item(context, 'subnet', subnet_id)
     if subnet is None:
-        raise exception.InvalidSubnetIDNotFound
+        raise exception.InvalidSubnetIDNotFound(id=subnet_id)
     neutron = clients.neutron(context)
     os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
     # NOTE(Alex): Combine and check ip addresses. Neutron will accept
@@ -358,7 +358,7 @@ def detach_network_interface(context, attachment_id, force=None):
     network_interface = db_api.get_item_by_id(
             context, 'eni', ec2utils.change_ec2_id_kind(attachment_id, 'eni'))
     if 'instance_id' not in network_interface:
-        raise exception.InvalidAttachmentIDNotFound(attach_id=attachment_id)
+        raise exception.InvalidAttachmentIDNotFound(id=attachment_id)
     # TODO(Alex) Check that device index is not 0 (when we support it) and
     # forbid detaching.
     neutron = clients.neutron(context)

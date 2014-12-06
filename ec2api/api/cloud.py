@@ -22,6 +22,7 @@ datastore.
 from oslo.config import cfg
 
 from ec2api.api import address
+from ec2api.api import availability_zone
 from ec2api.api import dhcp_options
 from ec2api.api import instance
 from ec2api.api import internet_gateway
@@ -1240,3 +1241,14 @@ class CloudController(object):
     def import_key_pair(self, context, key_name, public_key_material):
         return key_pair.create_key_pair(context, key_name,
                                         public_key_material)
+
+    def describe_availability_zones(self, context, zone_name=None,
+                                    filter=None):
+        return availability_zone.describe_availability_zones(context,
+                                                             zone_name,
+                                                             filter)
+
+    def describe_regions(self, context, region_name=None, filter=None):
+        return availability_zone.describe_regions(context,
+                                                  region_name,
+                                                  filter)

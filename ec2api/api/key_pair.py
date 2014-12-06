@@ -44,7 +44,7 @@ def describe_key_pairs(context, key_name=None, filter=None):
     # If looking for non existent key pair
     if key_name is not None and not key_pairs:
         msg = _('Could not find key pair(s): %s') % ','.join(key_name)
-        raise exception.KeypairNotFound(message=msg)
+        raise exception.InvalidKeypairNotFound(message=msg)
 
     formatted_key_pairs = []
     for key_pair in key_pairs:

@@ -116,7 +116,7 @@ def replace_route_table_association(context, association_id, route_table_id):
                                                                 'vpc'))
         if vpc is None:
             raise exception.InvalidAssociationIDNotFound(
-                assoc_id=association_id)
+                id=association_id)
 
         rollabck_route_table_object = db_api.get_item_by_id(
             context, 'rtb', vpc['route_table_id'])
@@ -136,7 +136,7 @@ def replace_route_table_association(context, association_id, route_table_id):
                 ec2utils.change_ec2_id_kind(association_id, 'subnet'))
         if subnet is None or 'route_table_id' not in subnet:
             raise exception.InvalidAssociationIDNotFound(
-                assoc_id=association_id)
+                id=association_id)
         if subnet['vpc_id'] != route_table['vpc_id']:
             msg = _('Route table association %(rtbassoc_id)s and route table '
                     '%(rtb_id)s belong to different networks')
@@ -168,13 +168,13 @@ def disassociate_route_table(context, association_id):
                                                                 'vpc'))
         if vpc is None:
             raise exception.InvalidAssociationIDNotFound(
-                assoc_id=association_id)
+                id=association_id)
         msg = _('Cannot disassociate the main route table association '
                 '%(rtbassoc_id)s') % {'rtbassoc_id': association_id}
         raise exception.InvalidParameterValue(msg)
     if 'route_table_id' not in subnet:
         raise exception.InvalidAssociationIDNotFound(
-            assoc_id=association_id)
+            id=association_id)
 
     rollback_route_table_object = db_api.get_item_by_id(
         context, 'rtb', subnet['route_table_id'])

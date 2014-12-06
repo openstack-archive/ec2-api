@@ -17,6 +17,7 @@ from neutronclient.common import exceptions as neutron_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2client
 from ec2api.api import ec2utils
 from ec2api.api import utils
@@ -112,66 +113,84 @@ def describe_addresses(context, public_ip=None, allocation_id=None,
                     reason='Invalid public IP specified')
     os_floating_ips = address_engine.get_os_floating_ips(context)
     addresses = ec2utils.get_db_items(context, 'eipalloc', allocation_id)
-    address_pairs = []
-    for address in addresses:
-        os_floating_ip = next((ip for ip in os_floating_ips
-            if ip['id'] == address['os_id']), None)
-        if not os_floating_ip:
-            db_api.delete_item(context, address['id'])
-            continue
-        os_floating_ips.remove(os_floating_ip)
-        if public_ip:
-            if os_floating_ip['floating_ip_address'] in public_ip:
-                public_ip.remove(os_floating_ip['floating_ip_address'])
-            elif not allocation_id:
-                continue
-        address_pairs.append((address, os_floating_ip))
-    if allocation_id is None or public_ip:
-        for os_floating_ip in os_floating_ips:
-            if (public_ip is None or public_ip and
-                    os_floating_ip['floating_ip_address'] in public_ip):
-                address_pairs.append((None, os_floating_ip))
-                if public_ip:
-                    public_ip.remove(os_floating_ip['floating_ip_address'])
-    if public_ip:
-        raise exception.InvalidAddressNotFound(
-            ip=os_floating_ip['floating_ip_address'])
-    formatted_addresses = []
     os_ports = address_engine.get_os_ports(context)
-    for address_pair in address_pairs:
-        formatted_address = _format_address(
-            context, address_pair[0], address_pair[1], os_ports)
-        if not utils.filtered_out(formatted_address, filter,
-                                  FILTER_MAP):
-            formatted_addresses.append(formatted_address)
+    formatted_addresses = common.universal_describe(
+        context, _format_address, 'eipalloc',
+        os_items=os_floating_ips, items=addresses,
+        describe_all=not public_ip and not allocation_id,
+        pre_filter_func=_pre_filter_func,
+        filter=filter, filter_map=FILTER_MAP,
+        **{'item_id': allocation_id, 'public_ip': public_ip,
+           'os_ports': os_ports})
+#     address_pairs = []
+#     for address in addresses:
+#         os_floating_ip = next((ip for ip in os_floating_ips
+#             if ip['id'] == address['os_id']), None)
+#         if not os_floating_ip:
+#             db_api.delete_item(context, address['id'])
+#             continue
+#         os_floating_ips.remove(os_floating_ip)
+#         if public_ip:
+#             if os_floating_ip['floating_ip_address'] in public_ip:
+#                 public_ip.remove(os_floating_ip['floating_ip_address'])
+#             elif not allocation_id:
+#                 continue
+#         address_pairs.append((address, os_floating_ip))
+#     if allocation_id is None or public_ip:
+#         for os_floating_ip in os_floating_ips:
+#             if (public_ip is None or public_ip and
+#                     os_floating_ip['floating_ip_address'] in public_ip):
+#                 address_pairs.append((None, os_floating_ip))
+#                 if public_ip:
+#                     public_ip.remove(os_floating_ip['floating_ip_address'])
+#     if public_ip:
+#         raise exception.InvalidAddressNotFound(
+#             ip=os_floating_ip['floating_ip_address'])
+#     formatted_addresses = []
+#     os_ports = address_engine.get_os_ports(context)
+#     for address_pair in address_pairs:
+#         formatted_address = _format_address(
+#             context, address_pair[0], address_pair[1], os_ports)
+#         if not utils.filtered_out(formatted_address, filter,
+#                                   FILTER_MAP):
+#             formatted_addresses.append(formatted_address)
     return {'addressesSet': formatted_addresses}
 
 
-def _format_address(context, address, os_floating_ip, os_ports=[]):
-    ec2_address = {'publicIp': os_floating_ip['floating_ip_address']}
-    fixed_ip_address = os_floating_ip.get('fixed_ip_address')
+def _pre_filter_func(item=None, os_item=None, item_id=None, public_ip=None,
+                     **kwargs):
+        if public_ip and os_item['floating_ip_address'] in public_ip:
+            return False
+        if item_id:
+            return item is None or item['id'] not in item_id
+        return public_ip
+
+
+def _format_address(context, item, os_item, os_ports=[], **kwargs):
+    ec2_address = {'publicIp': os_item['floating_ip_address']}
+    fixed_ip_address = os_item.get('fixed_ip_address')
     if fixed_ip_address:
         ec2_address['privateIpAddress'] = fixed_ip_address
-        port_id = os_floating_ip.get('port_id')
+        port_id = os_item.get('port_id')
         if port_id:
             port = next((port for port in os_ports
                 if port['id'] == port_id), None)
             if port and port.get('device_id'):
                 ec2_address['instanceId'] = (
                     ec2utils.id_to_ec2_inst_id(port['device_id']))
-        elif os_floating_ip.get('instance_id'):
+        elif os_item.get('instance_id'):
                 ec2_address['instanceId'] = (
-                    ec2utils.id_to_ec2_inst_id(os_floating_ip['instance_id']))
-    if not address:
+                    ec2utils.id_to_ec2_inst_id(os_item['instance_id']))
+    if not item:
         ec2_address['domain'] = 'standard'
     else:
         ec2_address['domain'] = 'vpc'
-        ec2_address['allocationId'] = address['id']
-        if 'network_interface_id' in address:
+        ec2_address['allocationId'] = item['id']
+        if 'network_interface_id' in item:
             ec2_address.update({
                     'associationId': ec2utils.change_ec2_id_kind(
                             ec2_address['allocationId'], 'eipassoc'),
-                    'networkInterfaceId': address['network_interface_id'],
+                    'networkInterfaceId': item['network_interface_id'],
                     'networkInterfaceOwnerId': context.project_id})
 
     return ec2_address
@@ -240,7 +259,7 @@ class AddressEngineNeutron(object):
         address = ec2utils.get_db_item(context, 'eipalloc', allocation_id)
         if not _is_address_valid(context, neutron, address):
             raise exception.InvalidAllocationIDNotFound(
-                eipalloc_id=allocation_id)
+                id=allocation_id)
         if 'network_interface_id' in address:
             raise exception.InvalidIPAddressInUse(
                 ip_address=address['public_ip'])
@@ -305,7 +324,7 @@ class AddressEngineNeutron(object):
         address = ec2utils.get_db_item(context, 'eipalloc', allocation_id)
         if not _is_address_valid(context, neutron, address):
             raise exception.InvalidAllocationIDNotFound(
-                eipalloc_id=allocation_id)
+                id=allocation_id)
         if address.get('network_interface_id') == network_interface['id']:
             # NOTE(ft): idempotent call
             pass
@@ -350,7 +369,7 @@ class AddressEngineNeutron(object):
                                                              'eipalloc'))
         if address is None or not _is_address_valid(context, neutron, address):
             raise exception.InvalidAssociationIDNotFound(
-                    assoc_id=association_id)
+                    id=association_id)
         if 'network_interface_id' in address:
             with utils.OnCrashCleaner() as cleaner:
                 network_interface_id = address['network_interface_id']

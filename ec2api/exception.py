@@ -173,54 +173,54 @@ class NovaDbInstanceNotFound(EC2NotFound):
 
 class InvalidInstanceIDNotFound(EC2NotFound):
     ec2_code = 'InvalidInstanceID.NotFound'
-    msg_fmt = _("The instance ID '%(i_id)s' does not exist")
+    msg_fmt = _("The instance ID '%(id)s' does not exist")
 
 
 class InvalidVpcIDNotFound(EC2NotFound):
     ec2_code = 'InvalidVpcID.NotFound'
-    msg_fmt = _("The vpc ID '%(vpc_id)s' does not exist")
+    msg_fmt = _("The vpc ID '%(id)s' does not exist")
 
 
 class InvalidInternetGatewayIDNotFound(EC2NotFound):
     ec2_code = 'InvalidInternetGatewayID.NotFound'
-    msg_fmt = _("The internetGateway ID '%(igw_id)s' does not exist")
+    msg_fmt = _("The internetGateway ID '%(id)s' does not exist")
 
 
 class InvalidSubnetIDNotFound(EC2NotFound):
     ec2_code = 'InvalidSubnetID.NotFound'
-    msg_fmt = _("The subnet ID '%(subnet_id)s' does not exist")
+    msg_fmt = _("The subnet ID '%(id)s' does not exist")
 
 
 class InvalidNetworkInterfaceIDNotFound(EC2NotFound):
     ec2_code = 'InvalidNetworkInterfaceID.NotFound'
-    msg_fmt = _("Network interface %(eni_id)s could not "
+    msg_fmt = _("Network interface %(id)s could not "
                 "be found.")
 
 
 class InvalidAttachmentIDNotFound(EC2NotFound):
     ec2_code = 'InvalidAttachmentID.NotFound'
-    msg_fmt = _("Attachment %(attach_id)s could not "
+    msg_fmt = _("Attachment %(id)s could not "
                 "be found.")
 
 
 class InvalidDhcpOptionsIDNotFound(EC2NotFound):
     ec2_code = 'InvalidDhcpOptionsID.NotFound'
-    msg_fmt = _("The dhcp options ID '%(dopt_id)s' does not exist")
+    msg_fmt = _("The dhcp options ID '%(id)s' does not exist")
 
 
 class InvalidAllocationIDNotFound(EC2NotFound):
     ec2_code = 'InvalidAllocationID.NotFound'
-    msg_fmt = _("The allocation ID '%(eipalloc_id)s' does not exist")
+    msg_fmt = _("The allocation ID '%(id)s' does not exist")
 
 
 class InvalidAssociationIDNotFound(EC2NotFound):
     ec2_code = 'InvalidAssociationID.NotFound'
-    msg_fmt = _("The association ID '%(assoc_id)s' does not exist")
+    msg_fmt = _("The association ID '%(id)s' does not exist")
 
 
 class InvalidRouteTableIDNotFound(EC2NotFound):
     ec2_code = 'InvalidRouteTableID.NotFound'
-    msg_fmt = _("The routeTable ID '%(rtb_id)s' does not exist")
+    msg_fmt = _("The routeTable ID '%(id)s' does not exist")
 
 
 class InvalidRouteNotFound(EC2NotFound):
@@ -231,12 +231,12 @@ class InvalidRouteNotFound(EC2NotFound):
 
 class InvalidSecurityGroupIDNotFound(EC2NotFound):
     ec2_code = 'InvalidSecurityGroupID.NotFound'
-    msg_fmt = _("The securityGroup ID '%(sg_id)s' does not exist")
+    msg_fmt = _("The securityGroup ID '%(id)s' does not exist")
 
 
 class InvalidGroupNotFound(EC2NotFound):
     ec2_code = 'InvalidGroup.NotFound'
-    msg_fmg = _("The security group ID '%(sg_id)s' does not exist")
+    msg_fmg = _("The security group ID '%(id)s' does not exist")
 
 
 class InvalidPermissionNotFound(EC2NotFound):
@@ -340,12 +340,17 @@ class ImageNotActive(Invalid):
 class InvalidSnapshotIDMalformed(Invalid):
     ec2_code = 'InvalidSnapshotID.Malformed'
     # TODO(ft): Change the message with the real AWS message
-    msg_fmg = _('The snapshot %(snapshot_id)s ID is not valid')
+    msg_fmg = _('The snapshot %(id)s ID is not valid')
 
 
-class KeypairNotFound(NotFound):
+class InvalidKeypairNotFound(NotFound):
     ec2_code = 'InvalidKeyPair.NotFound'
-    msg_fmt = _("Keypair %(name)s not found for user %(user_id)s")
+    msg_fmt = _("Keypair %(id)s is not found")
+
+
+class InvalidAvailabilityZoneNotFound(NotFound):
+    ec2_code = 'InvalidAvailabilityZone.NotFound'
+    msg_fmt = _("Availability zone %(id)s not found")
 
 
 class KeyPairExists(Invalid):

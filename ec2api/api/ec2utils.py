@@ -333,13 +333,15 @@ _NOT_FOUND_EXCEPTION_MAP = {
     'sg': exception.InvalidGroupNotFound,
     'rtb': exception.InvalidRouteTableIDNotFound,
     'i': exception.InvalidInstanceIDNotFound,
+    'kp': exception.InvalidKeypairNotFound,
+    'az': exception.InvalidAvailabilityZoneNotFound
 }
 
 
 def get_db_item(context, kind, ec2_id):
     item = db_api.get_item_by_id(context, kind, ec2_id)
     if item is None:
-        params = {'%s_id' % kind: ec2_id}
+        params = {'id': ec2_id}
         raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
     return item
 
@@ -353,7 +355,7 @@ def get_db_items(context, kind, ec2_ids):
     items = db_api.get_items_by_ids(context, kind, ec2_ids)
     if len(items) < len(ec2_ids):
         missed_ids = ec2_ids - set((item['id'] for item in items))
-        params = {'%s_id' % kind: next(iter(missed_ids))}
+        params = {'id': next(iter(missed_ids))}
         raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
     return items
 

@@ -17,6 +17,7 @@ from neutronclient.common import exceptions as neutron_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import internet_gateway as internet_gateway_api
 from ec2api.api import route_table as route_table_api
@@ -111,21 +112,19 @@ def delete_vpc(context, vpc_id):
 
 
 def describe_vpcs(context, vpc_id=None, filter=None):
-    # TODO(ft): implement filters
     vpcs = ec2utils.get_db_items(context, 'vpc', vpc_id)
-    formatted_vpcs = []
-    for vpc in vpcs:
-        formatted_vpc = _format_vpc(vpc)
-        if not utils.filtered_out(formatted_vpc, filter, FILTER_MAP):
-            formatted_vpcs.append(formatted_vpc)
+    formatted_vpcs = common.universal_describe(
+        context, _format_vpc, 'vpc',
+        items=vpcs, describe_all=vpc_id,
+        filter=filter, filter_map=FILTER_MAP)
     return {'vpcSet': formatted_vpcs}
 
 
-def _format_vpc(vpc):
-    return {'vpcId': vpc['id'],
+def _format_vpc(item):
+    return {'vpcId': item['id'],
             'state': "available",
-            'cidrBlock': vpc['cidr_block'],
+            'cidrBlock': item['cidr_block'],
             'isDefault': 'false',
-            'dhcpOptionsId': vpc.get('dhcp_options_id', 'default'),
+            'dhcpOptionsId': item.get('dhcp_options_id', 'default'),
             # 'instanceTenancy': 'default', #TODO(Alex) implement
             }
