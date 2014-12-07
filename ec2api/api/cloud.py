@@ -1252,3 +1252,9 @@ class CloudController(object):
         return availability_zone.describe_regions(context,
                                                   region_name,
                                                   filter)
+
+    def get_password_data(self, context, instance_id):
+        return instance.get_password_data(context, instance_id)
+
+    def get_console_output(self, context, instance_id):
+        return instance.get_console_output(context, instance_id)

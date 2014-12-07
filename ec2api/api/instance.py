@@ -32,6 +32,7 @@ from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api import novadb
 from ec2api.openstack.common.gettextutils import _
+from ec2api.openstack.common import timeutils
 
 
 ec2_opts = [
@@ -932,6 +933,38 @@ def _get_ec2_classic_os_network(context, neutron):
                 reason=_('There is more than one available network '
                          'for EC2 Classic mode'))
     return ec2_classic_os_networks[0]
+
+
+def get_password_data(context, instance_id):
+    # NOTE(Alex): AWS supports one and only one instance_id here
+    instance = ec2utils.get_db_items(context, 'i', [instance_id])[0]
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+    # NOTE(Alex) Commented section is a legacy password getting code
+#     password = ''
+#     for key in sorted(os_instance.metadata.keys()):
+#         if key.startswith('password_'):
+#             password += os_instance.metadata[key]
+    password = os_instance.get_password()
+    # NOTE(vish): this should be timestamp from the metadata fields
+    #             but it isn't important enough to implement properly
+    now = timeutils.utcnow()
+    return {"instanceId": instance_id,
+            "timestamp": now,
+            "passwordData": password}
+
+
+def get_console_output(context, instance_id):
+    # NOTE(Alex): AWS supports one and only one instance_id here
+    instance = ec2utils.get_db_items(context, 'i', [instance_id])[0]
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+    console_output = os_instance.get_console_output()
+    now = timeutils.utcnow()
+    return {"instanceId": instance_id,
+            "timestamp": now,
+            "output": console_output}
+
 
 # NOTE(ft): following functions are copied from various parts of Nova
 
