@@ -290,12 +290,9 @@ def describe_instances(context, instance_id=None, filter=None,
         novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
         instance = instances_by_os_id.pop(os_instance.id, None)
         if not instance:
-            instance = db_api.add_item(
-                    context, 'i',
-                    {'os_id': os_instance.id,
-                     'vpc_id': None,
-                     'reservation_id': novadb_instance['reservation_id'],
-                     'launch_index': novadb_instance['launch_index']})
+            instance = ec2utils.get_db_item_by_os_id(
+                    context, 'i', os_instance.id,
+                    novadb_instance=novadb_instance)
         reservations[instance['reservation_id']].append(
                 (instance, os_instance, novadb_instance,))
 
@@ -909,6 +906,18 @@ def _get_os_instances_by_instances(context, instances, exactly=False):
                 raise exception.InvalidInstanceIDNotFound(id=instance['id'])
 
     return os_instances
+
+
+def _auto_create_instance_extension(context, instance, novadb_instance=None):
+    if not novadb_instance:
+        novadb_instance = novadb.instance_get_by_uuid(context,
+                                                      instance['os_id'])
+    instance['reservation_id'] = novadb_instance['reservation_id']
+    instance['launch_index'] = novadb_instance['launch_index']
+
+
+ec2utils.register_auto_create_db_item_extension(
+        'i', _auto_create_instance_extension)
 
 
 def _get_ec2_classic_os_network(context, neutron):
