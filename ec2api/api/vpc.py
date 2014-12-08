@@ -38,11 +38,6 @@ LOG = logging.getLogger(__name__)
 """
 
 
-FILTER_MAP = {'cidr': 'cidrBlock',
-              'state': 'state',
-              'vpc-id': 'vpcId'}
-
-
 def create_vpc(context, cidr_block, instance_tenancy='default'):
     ec2utils.validate_vpc_cidr(cidr_block, exception.InvalidVpcRange)
     neutron = clients.neutron(context)
@@ -111,20 +106,28 @@ def delete_vpc(context, vpc_id):
     return True
 
 
+class VpcDescriber(common.NonOpenstackItemsDescriber):
+
+    KIND = 'vpc'
+    FILTER_MAP = {'cidr': 'cidrBlock',
+                  'state': 'state',
+                  'vpc-id': 'vpcId'}
+
+    def format(self, item=None, os_item=None):
+        return _format_vpc(item)
+
+
 def describe_vpcs(context, vpc_id=None, filter=None):
-    vpcs = ec2utils.get_db_items(context, 'vpc', vpc_id)
-    formatted_vpcs = common.universal_describe(
-        context, _format_vpc, 'vpc',
-        items=vpcs, describe_all=vpc_id,
-        filter=filter, filter_map=FILTER_MAP)
+    formatted_vpcs = VpcDescriber().describe(
+        context, ids=vpc_id, filter=filter)
     return {'vpcSet': formatted_vpcs}
 
 
-def _format_vpc(item):
-    return {'vpcId': item['id'],
+def _format_vpc(vpc):
+    return {'vpcId': vpc['id'],
             'state': "available",
-            'cidrBlock': item['cidr_block'],
+            'cidrBlock': vpc['cidr_block'],
             'isDefault': 'false',
-            'dhcpOptionsId': item.get('dhcp_options_id', 'default'),
+            'dhcpOptionsId': vpc.get('dhcp_options_id', 'default'),
             # 'instanceTenancy': 'default', #TODO(Alex) implement
             }

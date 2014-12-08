@@ -44,11 +44,6 @@ SECURITY_GROUP_MAP = {'domain-name-servers': 'dns-servers',
                       'netbios-node-type': 'netbios-nodetype'}
 
 
-FILTER_MAP = {'vpc-id': 'vpcId',
-              'group-name': 'groupName',
-              'group-id': 'groupId'}
-
-
 def get_security_group_engine():
     if clients.neutronclient:
         return SecurityGroupEngineNeutron()
@@ -91,43 +86,26 @@ def delete_security_group(context, group_name=None, group_id=None):
     return True
 
 
+class SecurityGroupDescriber(common.UniversalDescriber):
+
+    KIND = 'sg'
+    FILTER_MAP = {'vpc-id': 'vpcId',
+                  'group-name': 'groupName',
+                  'group-id': 'groupId'}
+
+    def format(self, item=None, os_item=None):
+        return _format_security_group(item, os_item,
+                                      self.items, self.os_items)
+
+    def get_os_items(self):
+        return security_group_engine.get_os_groups(self.context)
+
+
 def describe_security_groups(context, group_name=None, group_id=None,
                              filter=None):
-    # TODO(Alex): implement filters
-    os_security_groups = security_group_engine.get_os_groups(context)
-    security_groups = ec2utils.get_db_items(context, 'sg', group_id)
-    formatted_security_groups = common.universal_describe(
-        context, _format_security_group, 'sg',
-        os_items=os_security_groups, items=security_groups,
-        describe_all=not group_name and not group_id,
-        pre_filter_func=_pre_filter_func,
-        filter=filter, filter_map=FILTER_MAP,
-        **{'item_id': group_id, 'item_name': group_name})
-#     for os_security_group in os_security_groups:
-#         security_group = next((g for g in security_groups
-#                                if g['os_id'] == os_security_group['id']),
-#                                 None)
-#         if group_id is not None and security_group is None:
-#             continue
-#         if group_name and not os_security_group['name'] in group_name:
-#             continue
-#         formatted_security_group = _format_security_group(
-#             context, security_group,
-#             os_security_group, os_security_groups,
-#             security_groups)
-#         if not utils.filtered_out(formatted_security_group, filter,
-#                                   FILTER_MAP):
-#             formatted_security_groups.append(formatted_security_group)
+    formatted_security_groups = SecurityGroupDescriber().describe(
+        context, group_id, group_name, filter)
     return {'securityGroupInfo': formatted_security_groups}
-
-
-def _pre_filter_func(item=None, os_item=None, item_id=None, item_name=None,
-                     **kwargs):
-        if item_name and os_item['name'] in item_name:
-            return False
-        if item_id:
-            return item is None or item['id'] not in item_id
-        return item_name
 
 
 def authorize_security_group_ingress(context, group_id,
@@ -252,18 +230,18 @@ def _format_security_groups_ids_names(context):
     return ec2_security_groups
 
 
-def _format_security_group(os_item, item,
-                           os_items, items, **kwargs):
+def _format_security_group(security_group, os_security_group,
+                           security_groups, os_security_groups):
     ec2_security_group = {}
-    if item is not None:
-        ec2_security_group['groupId'] = item['id']
-        ec2_security_group['vpcId'] = item['vpc_id']
-    ec2_security_group['ownerId'] = os_item['tenant_id']
-    ec2_security_group['groupName'] = os_item['name']
-    ec2_security_group['groupDescription'] = os_item['description']
+    if security_group is not None:
+        ec2_security_group['groupId'] = security_group['id']
+        ec2_security_group['vpcId'] = security_group['vpc_id']
+    ec2_security_group['ownerId'] = os_security_group['tenant_id']
+    ec2_security_group['groupName'] = os_security_group['name']
+    ec2_security_group['groupDescription'] = os_security_group['description']
     ingress_permissions = []
     egress_permissions = []
-    for os_rule in os_item.get('security_group_rules', []):
+    for os_rule in os_security_group.get('security_group_rules', []):
         # NOTE(Alex) We're skipping IPv6 rules because AWS doesn't support
         # them.
         if os_rule.get('ethertype', 'IPv4') == 'IPv6':
@@ -277,14 +255,14 @@ def _format_security_group(os_item, item,
         remote_group_id = os_rule['remote_group_id']
         if remote_group_id is not None:
             ec2_remote_group = {}
-            db_remote_group = next((g for g in items
+            db_remote_group = next((g for g in security_groups
                                     if g['os_id'] == remote_group_id), None)
             if db_remote_group is not None:
                 ec2_remote_group['groupId'] = db_remote_group['id']
             else:
                 # TODO(Alex) Log absence of remote_group
                 pass
-            os_remote_group = next((g for g in os_items
+            os_remote_group = next((g for g in os_security_groups
                                     if g['id'] == remote_group_id), None)
             if os_remote_group is not None:
                 ec2_remote_group['groupName'] = os_remote_group['name']
@@ -298,7 +276,7 @@ def _format_security_group(os_item, item,
         if os_rule.get('direction') == 'egress':
             egress_permissions.append(ec2_rule)
         else:
-            if item is None and os_rule['protocol'] is None:
+            if security_group is None and os_rule['protocol'] is None:
                 for protocol, min_port, max_port in (('icmp', -1, -1),
                                                      ('tcp', 1, 65535),
                                                      ('udp', 1, 65535)):
@@ -310,7 +288,7 @@ def _format_security_group(os_item, item,
                 ingress_permissions.append(ec2_rule)
 
     ec2_security_group['ipPermissions'] = ingress_permissions
-    if item is not None:
+    if security_group is not None:
         ec2_security_group['ipPermissionsEgress'] = egress_permissions
     return ec2_security_group
 
