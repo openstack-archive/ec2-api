@@ -36,7 +36,6 @@ from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import jsonutils
 from ec2api.openstack.common import log as logging
 from ec2api.openstack.common import timeutils
-from ec2api import utils
 from ec2api import wsgi
 
 
@@ -49,28 +48,6 @@ ec2_opts = [
     cfg.IntOpt('ec2_timestamp_expiry',
                default=300,
                help='Time in seconds before ec2 timestamp expires'),
-    cfg.StrOpt('my_ip',
-               default=utils._get_my_ip(),
-               help='IP address of this host'),
-    cfg.StrOpt('ec2_host',
-               default='$my_ip',
-               help='The IP address of the EC2 API server'),
-    cfg.StrOpt('ec2_dmz_host',
-               default='$my_ip',
-               help='The internal IP address of the EC2 API server'),
-    cfg.IntOpt('ec2_port',
-               default=8773,
-               help='The port of the EC2 API server'),
-    cfg.StrOpt('ec2_scheme',
-               default='http',
-               help='The protocol to use when connecting to the EC2 API '
-                    'server (http, https)'),
-    cfg.StrOpt('ec2_path',
-               default='/services/Cloud',
-               help='The path prefix used to call the ec2 API server'),
-    cfg.ListOpt('region_list',
-                default=[],
-                help='List of region=fqdn pairs separated by commas'),
 ]
 
 CONF = cfg.CONF

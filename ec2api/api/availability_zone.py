@@ -17,13 +17,33 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.openstack.common import log as logging
+from ec2api import utils
 
 
 availability_zone_opts = [
     cfg.StrOpt('internal_service_availability_zone',
                default='internal',
                help='The availability_zone to show internal services under'),
-    ]
+    cfg.StrOpt('my_ip',
+               default=utils._get_my_ip(),
+               help='IP address of this host'),
+    cfg.StrOpt('ec2_host',
+               default='$my_ip',
+               help='The IP address of the EC2 API server'),
+    cfg.IntOpt('ec2_port',
+               default=8788,
+               help='The port of the EC2 API server'),
+    cfg.StrOpt('ec2_scheme',
+               default='http',
+               help='The protocol to use when connecting to the EC2 API '
+                    'server (http, https)'),
+    cfg.StrOpt('ec2_path',
+               default='/services/Cloud',
+               help='The path prefix used to call the ec2 API server'),
+    cfg.ListOpt('region_list',
+                default=[],
+                help='List of region=fqdn pairs separated by commas'),
+]
 
 CONF = cfg.CONF
 CONF.register_opts(availability_zone_opts)

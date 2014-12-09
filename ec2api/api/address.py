@@ -13,7 +13,11 @@
 # limitations under the License.
 
 import netaddr
-from neutronclient.common import exceptions as neutron_exception
+try:
+    from neutronclient.common import exceptions as neutron_exception
+except ImportError:
+    pass  # clients will log absense of neutronclient in this case
+from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
@@ -365,7 +369,11 @@ class AddressEngineNova(object):
 
     def release_address(self, context, public_ip, allocation_id):
         nova = clients.nova(context)
-        nova.floating_ips.delete(self.get_ip_os_id(context, public_ip))
+        try:
+            nova.floating_ips.delete(self.get_ip_os_id(context, public_ip))
+        except nova_exception.NotFound:
+            # TODO(ft): catch FloatingIPNotFound
+            pass
 
     def associate_address(self, context, public_ip=None, instance_id=None,
                           allocation_id=None, network_interface_id=None,

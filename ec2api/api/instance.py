@@ -960,14 +960,9 @@ def _get_ec2_classic_os_network(context, neutron):
 
 def get_password_data(context, instance_id):
     # NOTE(Alex): AWS supports one and only one instance_id here
-    instance = ec2utils.get_db_items(context, 'i', [instance_id])[0]
+    instance = ec2utils.get_db_item(context, 'i', instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
-    # NOTE(Alex) Commented section is a legacy password getting code
-#     password = ''
-#     for key in sorted(os_instance.metadata.keys()):
-#         if key.startswith('password_'):
-#             password += os_instance.metadata[key]
     password = os_instance.get_password()
     # NOTE(vish): this should be timestamp from the metadata fields
     #             but it isn't important enough to implement properly
@@ -979,7 +974,7 @@ def get_password_data(context, instance_id):
 
 def get_console_output(context, instance_id):
     # NOTE(Alex): AWS supports one and only one instance_id here
-    instance = ec2utils.get_db_items(context, 'i', [instance_id])[0]
+    instance = ec2utils.get_db_item(context, 'i', instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
     console_output = os_instance.get_console_output()
