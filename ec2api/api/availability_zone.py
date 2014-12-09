@@ -33,8 +33,31 @@ LOG = logging.getLogger(__name__)
 """
 
 
-FILTER_MAP = {'state': 'zoneState',
-              'zone-name': 'zoneName'}
+class AvailabilityZoneDescriber(common.UniversalDescriber):
+
+    KIND = 'sg'
+    FILTER_MAP = {'state': 'zoneState',
+                  'zone-name': 'zoneName'}
+
+    def format(self, item=None, os_item=None):
+        return _format_availability_zone(os_item)
+
+    def get_db_items(self):
+        return []
+
+    def get_os_items(self):
+        nova = clients.nova(self.context)
+        zones = nova.availability_zones.list(detailed=False)
+        for zone in zones:
+            if zone.zoneName == CONF.internal_service_availability_zone:
+                zones.remove(zone)
+        return zones
+
+    def get_name(self, os_item):
+        return os_item.zoneName
+
+    def get_id(self, os_item):
+        return ''
 
 
 def describe_availability_zones(context, zone_name=None, filter=None):
@@ -43,35 +66,9 @@ def describe_availability_zones(context, zone_name=None, filter=None):
     if zone_name and 'verbose' in zone_name:
         return _describe_verbose(context)
 
-    nova = clients.nova(context)
-    availability_zones = nova.availability_zones.list(detailed=False)
-
-    formatted_availability_zones = common.universal_describe(
-        context, _format_availability_zone, 'az',
-        os_items=availability_zones, describe_all=not zone_name,
-        pre_filter_func=_pre_filter_func,
-        filter=filter, filter_map=FILTER_MAP,
-        **{'item_name': zone_name})
-#     formatted_availability_zones = []
-#     for availability_zone in availability_zones:
-#         # Hide internal_service_availability_zone
-#         if availability_zone.zoneName ==
-#                 CONF.internal_service_availability_zone:
-#             continue
-#         formatted_availability_zone = _format_availability_zone(
-#             availability_zone)
-#         if not utils.filtered_out(formatted_availability_zones, filter,
-#                                   FILTER_MAP):
-#             formatted_availability_zones.append(formatted_availability_zone)
-
-    # NOTE(Alex): Openstack extension, AWS-incompability
+    formatted_availability_zones = AvailabilityZoneDescriber().describe(
+        context, names=zone_name, filter=filter)
     return {'availabilityZoneInfo': formatted_availability_zones}
-
-
-def _pre_filter_func(os_item=None, item_name=[], **kwargs):
-    return (item_name and os_item.zoneName not in item_name or
-            os_item.zoneName ==
-                CONF.internal_service_availability_zone)
 
 
 def describe_regions(context, region_name=None, filter=None):
@@ -94,10 +91,10 @@ def describe_regions(context, region_name=None, filter=None):
     return {'regionInfo': regions}
 
 
-def _format_availability_zone(os_item, **kwargs):
-    return {'zoneName': os_item.zoneName,
+def _format_availability_zone(zone):
+    return {'zoneName': zone.zoneName,
             'zoneState': ('available'
-                          if os_item.zoneState.get('available')
+                          if zone.zoneState.get('available')
                           else 'unavailable')
             }
 
