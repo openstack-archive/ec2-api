@@ -15,13 +15,14 @@
 """
 Starting point for routing EC2 requests.
 """
+import functools
+import hashlib
 import sys
 
-from eventlet.green import httplib
 import netaddr
 from oslo.config import cfg
+import requests
 import six
-import six.moves.urllib.parse as urlparse
 import webob
 import webob.dec
 import webob.exc
@@ -53,6 +54,14 @@ ec2_opts = [
 CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
 CONF.import_opt('use_forwarded_for', 'ec2api.api.auth')
+
+
+EMPTY_SHA256_HASH = (
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+# This is the buffer size used when calculating sha256 checksums.
+# Experimenting with various buffer sizes showed that this value generally
+# gave the best result (in terms of performance).
+PAYLOAD_BUFFER = 1024 * 1024
 
 
 # Fault Wrapper around all EC2 requests #
@@ -112,6 +121,83 @@ class EC2KeystoneAuth(wsgi.Middleware):
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
         request_id = context.generate_request_id()
+
+        if 'Signature' in req.params:
+            cred_dict = self._get_creds(req, request_id)
+        else:
+            cred_dict = self._get_creds_v4(req, request_id)
+        access = cred_dict['access']
+        token_url = CONF.keystone_url + "/ec2tokens"
+        if "ec2" in token_url:
+            creds = {'ec2Credentials': cred_dict}
+        else:
+            creds = {'auth': {'OS-KSEC2:ec2Credentials': cred_dict}}
+        creds_json = jsonutils.dumps(creds)
+        headers = {'Content-Type': 'application/json'}
+
+        response = requests.request('POST', token_url,
+                                    data=creds_json, headers=headers)
+        status_code = response.status_code
+        if status_code != 200:
+            if status_code == 401:
+                msg = response.reason
+            else:
+                msg = _("Failure communicating with keystone")
+            return faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                             status=status_code)
+        result = response.json()
+
+        try:
+            token_id = result['access']['token']['id']
+            user_id = result['access']['user']['id']
+            project_id = result['access']['token']['tenant']['id']
+            user_name = result['access']['user'].get('name')
+            project_name = result['access']['token']['tenant'].get('name')
+            roles = [role['name'] for role
+                     in result['access']['user']['roles']]
+        except (AttributeError, KeyError) as e:
+            LOG.exception(_("Keystone failure: %s") % e)
+            msg = _("Failure communicating with keystone")
+            return faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                             status=400)
+
+        remote_address = req.remote_addr
+        if CONF.use_forwarded_for:
+            remote_address = req.headers.get('X-Forwarded-For',
+                                             remote_address)
+
+        headers["X-Auth-Token"] = token_id
+        url = CONF.keystone_url + ("/users/%s/credentials/OS-EC2/%s"
+            % (user_id, access))
+        response = requests.request('GET', url, headers=headers)
+        status_code = response.status_code
+        if status_code != 200:
+            if status_code == 401:
+                msg = response.reason
+            else:
+                msg = _("Failure communicating with keystone")
+            return faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                             status=status_code)
+        ec2_creds = response.json()
+
+        catalog = result['access']['serviceCatalog']
+        ctxt = context.RequestContext(user_id,
+                                      project_id,
+                                      ec2_creds["credential"]["access"],
+                                      ec2_creds["credential"]["secret"],
+                                      user_name=user_name,
+                                      project_name=project_name,
+                                      roles=roles,
+                                      auth_token=token_id,
+                                      remote_address=remote_address,
+                                      service_catalog=catalog,
+                                      api_version=req.params.get('Version'))
+
+        req.environ['ec2api.context'] = ctxt
+
+        return self.application
+
+    def _get_creds(self, req, request_id):
         signature = req.params.get('Signature')
         if not signature:
             msg = _("Signature not provided")
@@ -136,88 +222,66 @@ class EC2KeystoneAuth(wsgi.Middleware):
             'path': req.path,
             'params': auth_params,
         }
-        token_url = CONF.keystone_url + "/ec2tokens"
-        if "ec2" in token_url:
-            creds = {'ec2Credentials': cred_dict}
-        else:
-            creds = {'auth': {'OS-KSEC2:ec2Credentials': cred_dict}}
-        creds_json = jsonutils.dumps(creds)
-        headers = {'Content-Type': 'application/json'}
+        return cred_dict
 
-        o = urlparse.urlparse(token_url)
-        if o.scheme == "http":
-            conn = httplib.HTTPConnection(o.netloc)
-        else:
-            conn = httplib.HTTPSConnection(o.netloc)
-        conn.request('POST', o.path, body=creds_json, headers=headers)
-        response = conn.getresponse()
-        data = response.read()
-        if response.status != 200:
-            if response.status == 401:
-                msg = response.reason
-            else:
-                msg = _("Failure communicating with keystone")
+    def _get_creds_v4(self, req, request_id):
+        auth = req.environ['HTTP_AUTHORIZATION'].split(',')
+        auth = [a.strip() for a in auth]
+        if not auth[0].startswith('AWS4-HMAC-SHA256'):
+            msg = _("Invalid authorization parameters")
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=response.status)
-        result = jsonutils.loads(data)
-        conn.close()
-
-        try:
-            token_id = result['access']['token']['id']
-            user_id = result['access']['user']['id']
-            project_id = result['access']['token']['tenant']['id']
-            user_name = result['access']['user'].get('name')
-            project_name = result['access']['token']['tenant'].get('name')
-            roles = [role['name'] for role
-                     in result['access']['user']['roles']]
-        except (AttributeError, KeyError) as e:
-            LOG.exception(_("Keystone failure: %s") % e)
-            msg = _("Failure communicating with keystone")
+                                             status=400)
+        access = auth[0].split('=')[1].split('/')[0]
+        if not access:
+            msg = _("Access key not provided")
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=400)
 
-        remote_address = req.remote_addr
-        if CONF.use_forwarded_for:
-            remote_address = req.headers.get('X-Forwarded-For',
-                                             remote_address)
-
-        headers["X-Auth-Token"] = token_id
-        o = urlparse.urlparse(CONF.keystone_url
-                              + ("/users/%s/credentials/OS-EC2/%s"
-                                 % (user_id, access)))
-        if o.scheme == "http":
-            conn = httplib.HTTPConnection(o.netloc)
-        else:
-            conn = httplib.HTTPSConnection(o.netloc)
-        conn.request('GET', o.path, headers=headers)
-        response = conn.getresponse()
-        data = response.read()
-        if response.status != 200:
-            if response.status == 401:
-                msg = response.reason
-            else:
-                msg = _("Failure communicating with keystone")
+        for item in auth:
+            if item.startswith('Signature'):
+                signature = item.split('=')[1]
+        if not signature:
+            msg = _("Signature could not be found in request")
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=response.status)
-        ec2_creds = jsonutils.loads(data)
-        conn.close()
+                                             status=400)
 
-        catalog = result['access']['serviceCatalog']
-        ctxt = context.RequestContext(user_id,
-                                      project_id,
-                                      ec2_creds["credential"]["access"],
-                                      ec2_creds["credential"]["secret"],
-                                      user_name=user_name,
-                                      project_name=project_name,
-                                      roles=roles,
-                                      auth_token=token_id,
-                                      remote_address=remote_address,
-                                      service_catalog=catalog,
-                                      api_version=req.params.get('Version'))
+        headers = dict()
+        for key in req.headers:
+            headers[key] = req.headers.get(key)
 
-        req.environ['ec2api.context'] = ctxt
+        if 'X-Amz-Content-SHA256' in req.headers:
+            body_hash = req.headers['X-Amz-Content-SHA256']
+        else:
+            body_hash = self._payload(req)
 
-        return self.application
+        cred_dict = {
+            'access': access,
+            'signature': signature,
+            'host': req.host,
+            'verb': req.method,
+            'path': req.path,
+            # most clients do not use req.params(that stores body for now)
+            'params': dict(),
+            'headers': headers,
+            'body_hash': body_hash
+        }
+        return cred_dict
+
+    def _payload(self, request):
+        if request.body and hasattr(request.body, 'seek'):
+            position = request.body.tell()
+            read_chunksize = functools.partial(request.body.read,
+                                               PAYLOAD_BUFFER)
+            checksum = hashlib.sha256()
+            for chunk in iter(read_chunksize, b''):
+                checksum.update(chunk)
+            hex_checksum = checksum.hexdigest()
+            request.body.seek(position)
+            return hex_checksum
+        elif request.body:
+            return hashlib.sha256(request.body.encode('utf-8')).hexdigest()
+        else:
+            return EMPTY_SHA256_HASH
 
 
 class Requestify(wsgi.Middleware):
@@ -242,14 +306,13 @@ class Requestify(wsgi.Middleware):
             # Raise KeyError if omitted
             action = req.params['Action']
             # Fix bug lp:720157 for older (version 1) clients
-            version = req.params['SignatureVersion']
-            if int(version) == 1:
+            version = req.params.get('SignatureVersion')
+            if version and int(version) == 1:
                 non_args.remove('SignatureMethod')
                 if 'SignatureMethod' in args:
                     args.pop('SignatureMethod')
             for non_arg in non_args:
-                # Remove, but raise KeyError if omitted
-                args.pop(non_arg)
+                args.pop(non_arg, None)
         except KeyError:
             raise webob.exc.HTTPBadRequest()
         except exception.InvalidRequest as err:
