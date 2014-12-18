@@ -26,6 +26,23 @@ from ec2api.openstack.common import uuidutils
 LOG = logging.getLogger(__name__)
 
 
+def image_type(image_type):
+    """Converts to a three letter image type.
+
+    aki, kernel => aki
+    ari, ramdisk => ari
+    anything else => ami
+
+    """
+    if image_type == 'kernel':
+        return 'aki'
+    if image_type == 'ramdisk':
+        return 'ari'
+    if image_type not in ['aki', 'ari']:
+        return 'ami'
+    return image_type
+
+
 def resource_type_from_id(context, resource_id):
     """Get resource type by ID
 
@@ -337,6 +354,7 @@ _NOT_FOUND_EXCEPTION_MAP = {
     'az': exception.InvalidAvailabilityZoneNotFound,
     'vol': exception.InvalidVolumeNotFound,
     'snap': exception.InvalidSnapshotNotFound,
+    'ami': exception.InvalidAMIIDNotFound,
 }
 
 
@@ -369,6 +387,14 @@ def register_auto_create_db_item_extension(kind, extension):
     _auto_create_db_item_extensions[kind] = extension
 
 
+def auto_create_db_item(context, kind, os_id, **extension_kwargs):
+    item = {'os_id': os_id}
+    extension = _auto_create_db_item_extensions.get(kind)
+    if extension:
+        extension(context, item, **extension_kwargs)
+    return db_api.add_item(context, kind, item)
+
+
 def get_db_item_by_os_id(context, kind, os_id, items_by_os_id=None,
                          **extension_kwargs):
     """Get DB item by OS id (create if it doesn't exist).
@@ -396,17 +422,38 @@ def get_db_item_by_os_id(context, kind, os_id, items_by_os_id=None,
         item = items_by_os_id.get(os_id)
         if item:
             return item
-    item = next((i for i in db_api.get_items(context, kind)
-                 if i['os_id'] == os_id), None)
+    else:
+        item = next((i for i in db_api.get_items(context, kind)
+                     if i['os_id'] == os_id), None)
     if not item:
-        item = {'os_id': os_id}
-        extension = _auto_create_db_item_extensions.get(kind)
-        if extension:
-            extension(context, item, **extension_kwargs)
-        item = db_api.add_item(context, kind, item)
+        item = auto_create_db_item(context, kind, os_id, **extension_kwargs)
+    else:
+        pass
     if items_by_os_id is not None:
         items_by_os_id[os_id] = item
     return item
+
+
+def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
+                    ids_by_os_id=None):
+    if os_id is None:
+        return None
+    if ids_by_os_id is not None:
+        item_id = ids_by_os_id.get(os_id)
+        if item_id:
+            return item_id
+    if items_by_os_id is not None:
+        item = items_by_os_id.get(os_id)
+        if item:
+            return item['id']
+    ids = db_api.get_item_ids(context, kind, (os_id,))
+    if len(ids):
+        item_id, _os_id = ids[0]
+    else:
+        item_id = db_api.add_item_id(context, kind, os_id)
+    if ids_by_os_id is not None:
+        ids_by_os_id[os_id] = item_id
+    return item_id
 
 
 _cidr_re = re.compile("^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")

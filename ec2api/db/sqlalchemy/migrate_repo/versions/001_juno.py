@@ -28,7 +28,7 @@ def upgrade(migrate_engine):
         Column("os_id", String(length=36)),
         Column("data", Text()),
         PrimaryKeyConstraint('id'),
-        UniqueConstraint('id', name='items_os_id_idx'),
+        UniqueConstraint('os_id', name='items_os_id_idx'),
         mysql_engine="InnoDB",
         mysql_charset="utf8"
     )

@@ -439,7 +439,7 @@ def _get_idempotent_run(context, client_token):
 
 
 def _format_reservation(context, reservation_id, instances_info,
-                        ec2_network_interfaces, filters=None, volumes={}):
+                        ec2_network_interfaces, filters=None, volumes=None):
     formatted_instances = []
     for (instance, os_instance, novadb_instance) in instances_info:
         ec2_instance = _format_instance(
@@ -1065,10 +1065,10 @@ def _cloud_format_instance_type(context, os_instance):
 
 def _cloud_format_instance_root_device_name(novadb_instance):
     return (novadb_instance.get('root_device_name') or
-            block_device_DEFAULT_ROOT_DEV_NAME)
+            _block_device_DEFAULT_ROOT_DEV_NAME)
 
 
-block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
+_block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
 
 
 def _cloud_format_instance_bdm(context, instance_uuid, root_device_name,

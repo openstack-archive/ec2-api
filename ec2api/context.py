@@ -121,9 +121,9 @@ class RequestContext(object):
         return self.user_id
 
 
-def get_admin_context(read_deleted="no"):
+def get_admin_context(project_id=None, read_deleted="no"):
     return RequestContext(user_id=None,
-                          project_id=None,
+                          project_id=project_id,
                           access_key=None,
                           secret_key=None,
                           is_admin=True,

@@ -254,6 +254,11 @@ class InvalidSnapshotNotFound(EC2NotFound):
     msg_fmt = _("Snapshot %(id)s could not be found.")
 
 
+class InvalidAMIIDNotFound(EC2NotFound):
+    ec2_code = 'InvalidAMIID.NotFound'
+    msg_fmt = _("The image id '[%(id)s]' does not exist")
+
+
 class IncorrectState(EC2Exception):
     ec2_code = 'IncorrectState'
     code = 400

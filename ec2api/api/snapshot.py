@@ -15,21 +15,12 @@
 from cinderclient import exceptions as cinder_exception
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
-
-
-FILTER_MAP = {'description': 'description',
-              'owner-id': 'ownerId',
-              'progress': 'progress',
-              'snapshot-id': 'snapshotId',
-              'start-time': 'startTime',
-              'status': 'status',
-              'volume-id': 'volumeId',
-              'volume-size': 'volumeSize'}
 
 
 def create_snapshot(context, volume_id, description=None):
@@ -50,7 +41,7 @@ def create_snapshot(context, volume_id, description=None):
                 display_description=description)
         cleaner.addCleanup(os_snapshot.delete)
         snapshot = db_api.add_item(context, 'snap', {'os_id': os_snapshot.id})
-        cleaner.addCleanup(db_api.delete_item(context, snapshot['id']))
+        cleaner.addCleanup(db_api.delete_item, context, snapshot['id'])
         os_snapshot.update(display_name=snapshot['id'])
 
     return _format_snapshot(context, snapshot, os_snapshot,
@@ -68,40 +59,38 @@ def delete_snapshot(context, snapshot_id):
     return True
 
 
+class SnapshotDescriber(common.UniversalDescriber):
+
+    KIND = 'snap'
+    FILTER_MAP = {'description': 'description',
+                  'owner-id': 'ownerId',
+                  'progress': 'progress',
+                  'snapshot-id': 'snapshotId',
+                  'start-time': 'startTime',
+                  'status': 'status',
+                  'volume-id': 'volumeId',
+                  'volume-size': 'volumeSize'}
+
+    def format(self, snapshot, os_snapshot):
+        return _format_snapshot(self.context, snapshot, os_snapshot,
+                                self.volumes)
+
+    def get_db_items(self):
+        self.volumes = dict((vol['os_id'], vol)
+                            for vol in db_api.get_items(self.context, 'vol'))
+        return super(SnapshotDescriber, self).get_db_items()
+
+    def get_os_items(self):
+        return clients.cinder(self.context).volume_snapshots.list()
+
+    def get_name(self, os_item):
+        return ''
+
+
 def describe_snapshots(context, snapshot_id=None, owner=None,
                        restorable_by=None, filter=None):
-    snapshots = ec2utils.get_db_items(context, 'snap', snapshot_id)
-    snapshots = dict((snap['os_id'], snap) for snap in snapshots)
-    volumes = dict((vol['os_id'], vol)
-                   for vol in db_api.get_items(context, 'vol'))
-
-    formatted_snapshots = []
-    cinder = clients.cinder(context)
-    os_snapshots = cinder.volume_snapshots.list()
-    for os_snapshot in os_snapshots:
-        snapshot = snapshots.pop(os_snapshot.id, None)
-        if not snapshot:
-            if snapshot_id:
-                # NOTE(ft): os_snapshot is not requested by
-                # 'snapshot_id' filter
-                continue
-            else:
-                snapshot = ec2utils.get_db_item_by_os_id(context, 'snap',
-                                                         os_snapshot.id)
-        formatted_snapshot = _format_snapshot(context, snapshot, os_snapshot,
-                                              volumes)
-        if (formatted_snapshot and
-                not utils.filtered_out(formatted_snapshot, filter,
-                                       FILTER_MAP)):
-            formatted_snapshots.append(formatted_snapshot)
-
-    # NOTE(ft): delete obsolete snapshots
-    for snap in snapshots.itervalues():
-        db_api.delete_item(context, snap['id'])
-    # NOTE(ft): some requested snapshots are obsolete
-    if snapshot_id and snapshots:
-        raise exception.InvalidSnapshotNotFound(id=snap['id'])
-
+    formatted_snapshots = SnapshotDescriber().describe(
+        context, ids=snapshot_id, filter=filter)
     return {'snapshotSet': formatted_snapshots}
 
 

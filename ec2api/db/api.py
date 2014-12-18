@@ -86,6 +86,10 @@ def add_item(context, kind, data):
     return IMPL.add_item(context, kind, data)
 
 
+def add_item_id(context, kind, os_id):
+    return IMPL.add_item_id(context, kind, os_id)
+
+
 def update_item(context, item):
     IMPL.update_item(context, item)
 
@@ -108,3 +112,11 @@ def get_item_by_id(context, kind, item_id):
 
 def get_items_by_ids(context, kind, item_ids):
     return IMPL.get_items_by_ids(context, kind, item_ids)
+
+
+def get_public_items(context, kind, item_ids):
+    return IMPL.get_public_items(context, kind, item_ids)
+
+
+def get_item_ids(context, kind, os_ids):
+    return IMPL.get_item_ids(context, kind, os_ids)

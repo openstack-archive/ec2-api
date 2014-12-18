@@ -24,6 +24,8 @@ from ec2api.openstack.common.db.sqlalchemy import models
 
 BASE = declarative_base()
 
+ITEMS_OS_ID_INDEX_NAME = 'items_os_id_idx'
+
 
 class EC2Base(models.ModelBase):
     metadata = None
@@ -41,7 +43,7 @@ class Item(BASE, EC2Base):
     __tablename__ = 'items'
     __table_args__ = (
         PrimaryKeyConstraint('id'),
-        UniqueConstraint('id', name='items_os_id_idx'),
+        UniqueConstraint('os_id', name=ITEMS_OS_ID_INDEX_NAME),
     )
     id = Column(String(length=30))
     project_id = Column(String(length=64))

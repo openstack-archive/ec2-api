@@ -15,6 +15,7 @@
 from cinderclient import exceptions as cinder_exception
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
@@ -48,7 +49,7 @@ def create_volume(context, availability_zone=None, size=None,
         cleaner.addCleanup(os_volume.delete)
 
         volume = db_api.add_item(context, 'vol', {'os_id': os_volume.id})
-        cleaner.addCleanup(db_api.delete_item(context, volume['id']))
+        cleaner.addCleanup(db_api.delete_item, context, volume['id'])
         if not name:
             os_volume.update(display_name=volume['id'])
 
@@ -100,38 +101,38 @@ def delete_volume(context, volume_id):
     return True
 
 
+class VolumeDescriber(common.UniversalDescriber):
+
+    KIND = 'vol'
+    FILTER_MAP = {'availability-zone': 'availabilityZone',
+                  'create-time': 'createTime',
+                  'size': 'size',
+                  'snapshot-id': 'snapshotId',
+                  'status': 'status',
+                  'volume-id': 'volumeId'}
+
+    def format(self, volume, os_volume):
+        return _format_volume(self.context, volume, os_volume,
+                              self.instances, self.snapshots)
+
+    def get_db_items(self):
+        self.instances = dict((i['os_id'], i)
+                              for i in db_api.get_items(self.context, 'i'))
+        self.snapshots = dict((s['os_id'], s)
+                              for s in db_api.get_items(self.context, 'snap'))
+        return super(VolumeDescriber, self).get_db_items()
+
+    def get_os_items(self):
+        return clients.cinder(self.context).volumes.list()
+
+    def get_name(self, os_item):
+        return ''
+
+
 def describe_volumes(context, volume_id=None, filter=None,
                      max_results=None, next_token=None):
-    volumes = ec2utils.get_db_items(context, 'vol', volume_id)
-    volumes = dict((vol['os_id'], vol) for vol in volumes)
-    instances = dict((i['os_id'], i) for i in db_api.get_items(context, 'i'))
-    snapshots = dict((s['os_id'], s)
-                     for s in db_api.get_items(context, 'snap'))
-
-    formatted_volumes = []
-    cinder = clients.cinder(context)
-    os_volumes = cinder.volumes.list()
-    for os_volume in os_volumes:
-        volume = volumes.pop(os_volume.id, None)
-        if not volume:
-            if volume_id:
-                # NOTE(ft): os_volume is not requested by 'volume_id' filter
-                continue
-            else:
-                volume = ec2utils.get_db_item_by_os_id(context, 'vol',
-                                                       os_volume.id)
-        formatted_volume = _format_volume(context, volume, os_volume,
-                                          instances, snapshots)
-        if not utils.filtered_out(formatted_volume, filter, FILTER_MAP):
-            formatted_volumes.append(formatted_volume)
-
-    # NOTE(ft): delete obsolete volumes
-    for vol in volumes.itervalues():
-        db_api.delete_item(context, vol['id'])
-    # NOTE(ft): some requested volumes are obsolete
-    if volume_id and volumes:
-        raise exception.InvalidVolumeNotFound(id=vol['id'])
-
+    formatted_volumes = VolumeDescriber().describe(
+        context, ids=volume_id, filter=filter)
     return {'volumeSet': formatted_volumes}
 
 
