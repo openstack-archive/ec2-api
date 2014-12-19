@@ -186,6 +186,21 @@ function iniget() {
     echo ${line#*=}
 }
 
+# Copy an option from Nova INI file or from environment if it's set
+function copynovaopt() {
+    local option_name=$1
+    local env_var
+    local option
+    env_var=${option_name^^}
+    if [ ${!env_var+x} ]; then
+        option=${!env_var}
+    elif ini_has_option "$NOVA_CONF" DEFAULT $option_name; then
+        option=$(iniget $NOVA_CONF DEFAULT $option_name)
+    else
+        return 0
+    fi
+    iniset $CONF_FILE DEFAULT $option_name $option
+}
 
 #get nova settings
 if [[ -z "$NOVA_CONNECTION" ]]; then
@@ -204,11 +219,7 @@ if [[ -z "$NOVA_CONNECTION" ]]; then
             NOVA_CONNECTION=$(iniget $NOVA_CONF sql connection)
         fi
     fi
-    if [[ -z "$NOVA_CONNECTION" ]]; then
-        echo "$reason"
-        echo "Please set NOVA_CONNECTION environment variable to the connection string to Nova DB"
-        exit 1
-    fi
+    die_if_not_set $LINENO NOVA_CONNECTION "$reason. Please set NOVA_CONNECTION environment variable to the connection string to Nova DB"
 fi
 if [[ -z "$EXTERNAL_NETWORK" ]]; then
     declare -a newtron_output
@@ -220,13 +231,8 @@ if [[ -z "$EXTERNAL_NETWORK" ]]; then
     else
         EXTERNAL_NETWORK=$(echo $newtron_output | awk -F '|' '{ print $3 }')
     fi
-    if [[ -z "$EXTERNAL_NETWORK" ]]; then
-        echo $reason
-        echo "Please set PUBLIC_NETWORK environment variable to the external network dedicated to EC2 elastic IP operations"
-        exit 1
-    fi
+    die_if_not_set $LINENO EXTERNAL_NETWORK "$reason. Please set PUBLIC_NETWORK environment variable to the external network dedicated to EC2 elastic IP operations"
 fi
-
 
 #create keystone user with admin privileges
 ADMIN_ROLE=$(get_data 2 admin 1 keystone role-list)
@@ -284,6 +290,16 @@ iniset $CONF_FILE keystone_authtoken admin_tenant_name $SERVICE_TENANT
 iniset $CONF_FILE keystone_authtoken auth_protocol $AUTH_PROTO
 iniset $CONF_FILE keystone_authtoken auth_port $AUTH_PORT
 
+if [[ -f "$NOVA_CONF" ]]; then
+    copynovaopt s3_host
+    copynovaopt s3_port
+    copynovaopt s3_affix_tenant
+    copynovaopt s3_use_ssl
+    copynovaopt cert_topic
+    copynovaopt rabbit_hosts
+    copynovaopt rabbit_password
+    # TODO(ft): it's necessary to support other available messaging implementations
+fi
 
 #init cache dir
 echo Creating signing dir

@@ -12,16 +12,185 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+import binascii
 import itertools
 import json
+import os
 import re
+import shutil
+import tarfile
+import tempfile
+import time
+
+import boto.s3.connection
+import eventlet
+from glanceclient import exc as glance_exception
+from lxml import etree
+from oslo.config import cfg
+from oslo_concurrency import processutils
 
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
+from ec2api.api import instance as instance_api
+from ec2api.api import utils
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
+from ec2api.openstack.common.gettextutils import _
+from ec2api.openstack.common import timeutils
+
+
+s3_opts = [
+    cfg.StrOpt('image_decryption_dir',
+               default='/tmp',
+               help='Parent directory for tempdir used for image decryption'),
+    cfg.StrOpt('s3_host',
+               default='$my_ip',
+               help='Hostname or IP for OpenStack to use when accessing '
+                    'the S3 api'),
+    cfg.IntOpt('s3_port',
+               default=3333,
+               help='Port used when accessing the S3 api'),
+    cfg.BoolOpt('s3_use_ssl',
+               default=False,
+               help='Whether to use SSL when talking to S3'),
+    cfg.BoolOpt('s3_affix_tenant',
+               default=False,
+               help='Whether to affix the tenant id to the access key '
+                    'when downloading from S3'),
+    ]
+
+CONF = cfg.CONF
+CONF.register_opts(s3_opts)
+
+rpcapi_opts = [
+    cfg.StrOpt('cert_topic',
+               default='cert',
+               help='The topic cert nodes listen on'),
+]
+
+CONF.register_opts(rpcapi_opts)
+
+
+# TODO(yamahata): race condition
+# At the moment there is no way to prevent others from
+# manipulating instances/volumes/snapshots.
+# As other code doesn't take it into consideration, here we don't
+# care of it for now. Ostrich algorithm
+def create_image(context, instance_id, name=None, description=None,
+                 no_reboot=False, block_device_mapping=None):
+    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+
+    if not instance_api._is_ebs_instance(context, os_instance):
+        # TODO(ft): Change the error code and message with the real AWS ones
+        msg = _('The instance is not an EBS-backed instance.')
+        raise exception.InvalidParameterValue(value=instance_id,
+                                              parameter='InstanceId',
+                                              reason=msg)
+
+    restart_instance = False
+    if not no_reboot:
+        vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
+
+        if vm_state not in (instance_api.vm_states_ACTIVE,
+                            instance_api.vm_states_STOPPED):
+            # TODO(ft): Change the error code and message with the real AWS
+            # ones
+            msg = _('Instance must be run or stopped')
+            raise exception.IncorrectState(reason=msg)
+
+        if vm_state == instance_api.vm_states_ACTIVE:
+            restart_instance = True
+            os_instance.stop()
+
+        # wait instance for really stopped
+        start_time = time.time()
+        while vm_state != instance_api.vm_states_STOPPED:
+            time.sleep(1)
+            os_instance.get()
+            vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
+            # NOTE(yamahata): timeout and error. 1 hour for now for safety.
+            #                 Is it too short/long?
+            #                 Or is there any better way?
+            timeout = 1 * 60 * 60
+            if time.time() > start_time + timeout:
+                err = _("Couldn't stop instance within %d sec") % timeout
+                raise exception.EC2Exception(message=err)
+
+    # meaningful image name
+    name_map = dict(instance=instance['os_id'], now=timeutils.isotime())
+    name = name or _('image of %(instance)s at %(now)s') % name_map
+
+    with utils.OnCrashCleaner() as cleaner:
+        os_image = os_instance.create_image(name)
+        cleaner.addCleanup(os_image.delete)
+        image = db_api.add_item(context, 'ami', {'os_id': os_image.id,
+                                                 'is_public': False})
+
+    if restart_instance:
+        os_instance.start()
+
+    return {'imageId': image['id']}
+
+
+def register_image(context, name=None, image_location=None,
+                   description=None, architecture=None,
+                   root_device_name=None, block_device_mapping=None,
+                   virtualization_type=None, kernel_id=None,
+                   ramdisk_id=None, sriov_net_support=None):
+    if image_location is None and name:
+        image_location = name
+    if image_location is None:
+        msg = _('imageLocation is required')
+        raise exception.MissingParameter(msg)
+
+    metadata = {'properties': {'image_location': image_location}}
+
+    if name:
+        metadata['name'] = name
+    else:
+        metadata['name'] = image_location
+
+    if root_device_name:
+        metadata['properties']['root_device_name'] = root_device_name
+
+    mappings = [instance_api._cloud_parse_block_device_mapping(context, bdm)
+                for bdm in block_device_mapping or []]
+    if mappings:
+        metadata['properties']['block_device_mapping'] = mappings
+
+    with utils.OnCrashCleaner() as cleaner:
+        os_image = _s3_create(context, metadata)
+        cleaner.addCleanup(os_image.delete)
+        image_type = ec2utils.image_type(os_image.container_format)
+        image = db_api.add_item(context, image_type, {'os_id': os_image.id,
+                                                      'is_public': False})
+    return {'imageId': image['id']}
+
+
+def deregister_image(context, image_id):
+    # TODO(ft): AWS returns AuthFailure for public images,
+    # but we return NotFound due searching for local images only
+    kind = image_id.split('-')[0]
+    image = ec2utils.get_db_item(context, kind, image_id)
+    glance = clients.glance(context)
+    try:
+        glance.images.delete(image['os_id'])
+    except glance_exception.HTTPNotFound:
+        pass
+    db_api.delete_item(context, image['id'])
+    return True
+
+
+def update_image(context, image_id, **kwargs):
+    kind = image_id.split('-')[0]
+    image = ec2utils.get_db_item(context, kind, image_id)
+    glance = clients.glance(context)
+    return glance.images.update(image['os_id'], **kwargs)
 
 
 class ImageDescriber(common.UniversalDescriber):
@@ -53,9 +222,8 @@ class ImageDescriber(common.UniversalDescriber):
                                                        public_images)))
         if len(images) < len(self.ids):
             missed_ids = set(self.ids) - set(i['id']
-                                             for i in images.itervalues())
-            raise exception.InvalidAMIIDNotFound(
-                    {'id': next(iter(missed_ids))})
+                                             for i in images)
+            raise exception.InvalidAMIIDNotFound(id=next(iter(missed_ids)))
         self.images = images
         self.snapshot_ids = dict((s['os_id'], s['id'])
                               for s in db_api.get_items(self.context, 'snap'))
@@ -95,6 +263,91 @@ def describe_images(context, executable_by=None, image_id=None,
     formatted_images = ImageDescriber().describe(
         context, ids=image_id, filter=filter)
     return {'imagesSet': formatted_images}
+
+
+def describe_image_attribute(context, image_id, attribute):
+    def _block_device_mapping_attribute(image, result):
+        _cloud_format_mappings(image['properties'], result)
+
+    def _launch_permission_attribute(image, result):
+        result['launchPermission'] = []
+        if image['is_public']:
+            result['launchPermission'].append({'group': 'all'})
+
+    def _root_device_name_attribute(image, result):
+        _prop_root_dev_name = _block_device_properties_root_device_name
+        result['rootDeviceName'] = _prop_root_dev_name(image['properties'])
+        if result['rootDeviceName'] is None:
+            result['rootDeviceName'] = _block_device_DEFAULT_ROOT_DEV_NAME
+
+    def _kernel_attribute(image, result):
+        kernel_id = image['properties'].get('kernel_id')
+        if kernel_id:
+            result['kernel'] = {
+                'value': ec2utils.os_id_to_ec2_id(context, 'aki', kernel_id)
+            }
+
+    def _ramdisk_attribute(image, result):
+        ramdisk_id = image['properties'].get('ramdisk_id')
+        if ramdisk_id:
+            result['ramdisk'] = {
+                'value': ec2utils.os_id_to_ec2_id(context, 'ari', ramdisk_id)
+            }
+
+    supported_attributes = {
+        'blockDeviceMapping': _block_device_mapping_attribute,
+        'launchPermission': _launch_permission_attribute,
+        'rootDeviceName': _root_device_name_attribute,
+        'kernel': _kernel_attribute,
+        'ramdisk': _ramdisk_attribute,
+        }
+
+    # TODO(ft): AWS returns AuthFailure for public images,
+    # but we return NotFound due searching for local images only
+    kind = image_id.split('-')[0]
+    image = ec2utils.get_db_item(context, kind, image_id)
+    fn = supported_attributes.get(attribute)
+    if fn is None:
+        raise exception.InvalidAttribute(attr=attribute)
+    glance = clients.glance(context)
+    os_image = glance.images.get(image['os_id'])
+
+    result = {'imageId': image_id}
+    fn(os_image, result)
+    return result
+
+
+def modify_image_attribute(context, image_id, attribute,
+                           user_group, operation_type,
+                           description=None, launch_permission=None,
+                           product_code=None, user_id=None, value=None):
+    if attribute != 'launchPermission':
+        # TODO(ft): Change the error code and message with the real AWS ones
+        raise exception.InvalidAttribute(attr=attribute)
+    if not user_group:
+        msg = _('user or group not specified')
+        # TODO(ft): Change the error code and message with the real AWS ones
+        raise exception.MissingParameter(msg)
+    if len(user_group) != 1 and user_group[0] != 'all':
+        msg = _('only group "all" is supported')
+        raise exception.InvalidParameterValue(parameter='UserGroup',
+                                              value=user_group,
+                                              reason=msg)
+    if operation_type not in ['add', 'remove']:
+        msg = _('operation_type must be add or remove')
+        raise exception.InvalidParameterValue(parameter='OperationType',
+                                              value='operation_type',
+                                              reason=msg)
+
+    # TODO(ft): AWS returns AuthFailure for public images,
+    # but we return NotFound due searching for local images only
+    kind = image_id.split('-')[0]
+    image = ec2utils.get_db_item(context, kind, image_id)
+    glance = clients.glance(context)
+    image = glance.images.get(image['os_id'])
+
+    image.update(is_public=(operation_type == 'add'))
+    return True
 
 
 def _format_image(context, image, os_image, images_dict, ids_dict,
@@ -288,3 +541,236 @@ _ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
 
 def _block_device_is_ephemeral(device_name):
     return _ephemeral.match(device_name) is not None
+
+
+def _s3_create(context, metadata):
+    """Gets a manifest from s3 and makes an image."""
+    image_path = tempfile.mkdtemp(dir=CONF.image_decryption_dir)
+
+    image_location = metadata['properties']['image_location'].lstrip('/')
+    bucket_name = image_location.split('/')[0]
+    manifest_path = image_location[len(bucket_name) + 1:]
+    bucket = _s3_conn(context).get_bucket(bucket_name)
+    key = bucket.get_key(manifest_path)
+    manifest = key.get_contents_as_string()
+
+    manifest, image = _s3_parse_manifest(context, metadata, manifest)
+
+    def _update_image_state(image_state):
+        image.update(properties={'image_state': image_state})
+
+    def delayed_create():
+        """This handles the fetching and decrypting of the part files."""
+        context.update_store()
+
+        try:
+            _update_image_state('downloading')
+
+            try:
+                parts = []
+                elements = manifest.find('image').getiterator('filename')
+                for fn_element in elements:
+                    part = _s3_download_file(bucket, fn_element.text,
+                                             image_path)
+                    parts.append(part)
+
+                # NOTE(vish): this may be suboptimal, should we use cat?
+                enc_filename = os.path.join(image_path, 'image.encrypted')
+                with open(enc_filename, 'w') as combined:
+                    for filename in parts:
+                        with open(filename) as part:
+                            shutil.copyfileobj(part, combined)
+
+            except Exception:
+                _update_image_state('failed_download')
+                return
+
+            _update_image_state('decrypting')
+
+            try:
+                hex_key = manifest.find('image/ec2_encrypted_key').text
+                encrypted_key = binascii.a2b_hex(hex_key)
+                hex_iv = manifest.find('image/ec2_encrypted_iv').text
+                encrypted_iv = binascii.a2b_hex(hex_iv)
+
+                dec_filename = os.path.join(image_path, 'image.tar.gz')
+                _s3_decrypt_image(context, enc_filename, encrypted_key,
+                                  encrypted_iv, dec_filename)
+            except Exception:
+                _update_image_state('failed_decrypt')
+                return
+
+            _update_image_state('untarring')
+
+            try:
+                unz_filename = _s3_untarzip_image(image_path, dec_filename)
+            except Exception:
+                _update_image_state('failed_untar')
+                return
+
+            _update_image_state('uploading')
+            try:
+                with open(unz_filename) as image_file:
+                    image.update(data=image_file)
+            except Exception:
+                _update_image_state('failed_upload')
+                return
+
+            _update_image_state('available')
+
+            shutil.rmtree(image_path)
+        except glance_exception.HTTPNotFound:
+            return
+
+    eventlet.spawn_n(delayed_create)
+
+    return image
+
+
+def _s3_parse_manifest(context, metadata, manifest):
+    manifest = etree.fromstring(manifest)
+    image_format = 'ami'
+
+    try:
+        kernel_id = manifest.find('machine_configuration/kernel_id').text
+        if kernel_id == 'true':
+            image_format = 'aki'
+            kernel_id = None
+    except Exception:
+        kernel_id = None
+
+    try:
+        ramdisk_id = manifest.find('machine_configuration/ramdisk_id').text
+        if ramdisk_id == 'true':
+            image_format = 'ari'
+            ramdisk_id = None
+    except Exception:
+        ramdisk_id = None
+
+    try:
+        arch = manifest.find('machine_configuration/architecture').text
+    except Exception:
+        arch = 'x86_64'
+
+    # NOTE(yamahata):
+    # EC2 ec2-budlne-image --block-device-mapping accepts
+    # <virtual name>=<device name> where
+    # virtual name = {ami, root, swap, ephemeral<N>}
+    #                where N is no negative integer
+    # device name = the device name seen by guest kernel.
+    # They are converted into
+    # block_device_mapping/mapping/{virtual, device}
+    #
+    # Do NOT confuse this with ec2-register's block device mapping
+    # argument.
+    mappings = []
+    try:
+        block_device_mapping = manifest.findall('machine_configuration/'
+                                                'block_device_mapping/'
+                                                'mapping')
+        for bdm in block_device_mapping:
+            mappings.append({'virtual': bdm.find('virtual').text,
+                             'device': bdm.find('device').text})
+    except Exception:
+        mappings = []
+
+    properties = metadata['properties']
+    properties['architecture'] = arch
+
+    def _translate_dependent_image_id(image_key, image_id):
+        image_uuid = ec2utils.ec2_id_to_glance_id(context, image_id)
+        properties[image_key] = image_uuid
+
+    if kernel_id:
+        _translate_dependent_image_id('kernel_id', kernel_id)
+
+    if ramdisk_id:
+        _translate_dependent_image_id('ramdisk_id', ramdisk_id)
+
+    if mappings:
+        properties['mappings'] = mappings
+
+    metadata.update({'disk_format': image_format,
+                     'container_format': image_format,
+                     'is_public': False,
+                     'properties': properties})
+    metadata['properties']['image_state'] = 'pending'
+
+    # TODO(bcwaldon): right now, this removes user-defined ids
+    # We need to re-enable this.
+    metadata.pop('id', None)
+
+    glance = clients.glance(context)
+    image = glance.images.create(**metadata)
+
+    return manifest, image
+
+
+def _s3_download_file(bucket, filename, local_dir):
+    key = bucket.get_key(filename)
+    local_filename = os.path.join(local_dir, os.path.basename(filename))
+    key.get_contents_to_filename(local_filename)
+    return local_filename
+
+
+def _s3_decrypt_image(context, encrypted_filename, encrypted_key,
+                      encrypted_iv, decrypted_filename):
+    cert_client = clients.nova_cert(context)
+    try:
+        key = cert_client.decrypt_text(base64.b64encode(encrypted_key))
+    except Exception as exc:
+        msg = _('Failed to decrypt private key: %s') % exc
+        raise exception.EC2Exception(msg)
+    try:
+        iv = cert_client.decrypt_text(base64.b64encode(encrypted_iv))
+    except Exception as exc:
+        msg = _('Failed to decrypt initialization vector: %s') % exc
+        raise exception.EC2Exception(msg)
+
+    try:
+        processutils.execute('openssl', 'enc',
+                             '-d', '-aes-128-cbc',
+                             '-in', '%s' % (encrypted_filename,),
+                             '-K', '%s' % (key,),
+                             '-iv', '%s' % (iv,),
+                             '-out', '%s' % (decrypted_filename,))
+    except processutils.ProcessExecutionError as exc:
+        raise exception.EC2Exception(_('Failed to decrypt image file '
+                                       '%(image_file)s: %(err)s') %
+                                     {'image_file': encrypted_filename,
+                                      'err': exc.stdout})
+
+
+def _s3_untarzip_image(path, filename):
+    _s3_test_for_malicious_tarball(path, filename)
+    tar_file = tarfile.open(filename, 'r|gz')
+    tar_file.extractall(path)
+    image_file = tar_file.getnames()[0]
+    tar_file.close()
+    return os.path.join(path, image_file)
+
+
+def _s3_test_for_malicious_tarball(path, filename):
+    """Raises exception if extracting tarball would escape extract path."""
+    tar_file = tarfile.open(filename, 'r|gz')
+    for n in tar_file.getnames():
+        if not os.path.abspath(os.path.join(path, n)).startswith(path):
+            tar_file.close()
+            raise exception.Invalid(_('Unsafe filenames in image'))
+    tar_file.close()
+
+
+def _s3_conn(context):
+    # NOTE(vish): access and secret keys for s3 server are not
+    #             checked in nova-objectstore
+    access = context.access_key
+    if CONF.s3_affix_tenant:
+        access = '%s:%s' % (access, context.project_id)
+    secret = context.secret_key
+    calling = boto.s3.connection.OrdinaryCallingFormat()
+    return boto.s3.connection.S3Connection(aws_access_key_id=access,
+                                           aws_secret_access_key=secret,
+                                           is_secure=CONF.s3_use_ssl,
+                                           calling_format=calling,
+                                           port=CONF.s3_port,
+                                           host=CONF.s3_host)

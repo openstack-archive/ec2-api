@@ -1054,6 +1054,8 @@ class CloudController(object):
                     volume_id (str): The ID of the volume (Nova extension).
                     snapshot_id (str): The ID of the snapshot.
                     volume_size (str): The size of the volume, in GiBs.
+                    volume_type (str): The volume type.
+                        Not used now.
                     delete_on_termination (bool): Indicates whether to delete
                         the volume on instance termination.
                     iops (int): he number of IOPS to provision for the volume.
@@ -1262,7 +1264,7 @@ class CloudController(object):
     def get_console_output(self, context, instance_id):
         return instance.get_console_output(context, instance_id)
 
-    def create_volume(self, context, availability_zone, size=None,
+    def create_volume(self, context, availability_zone=None, size=None,
                       snapshot_id=None, volume_type=None, name=None,
                       description=None, metadata=None, iops=None,
                       encrypted=None, kms_key_id=None):
@@ -1272,6 +1274,7 @@ class CloudController(object):
             context (RequestContext): The request context.
             availability_zone (str): The Availability Zone in which to create
                 the volume.
+                It's required by AWS but optional for legacy Nova EC2 API.
             instance_id (str): The size of the volume, in GiBs.
                 Valid values: 1-1024
                 If you're creating the volume from a snapshot and don't specify
@@ -1420,6 +1423,121 @@ class CloudController(object):
         return snapshot.describe_snapshots(context, snapshot_id, owner,
                                            restorable_by, filter)
 
+    def create_image(self, context, instance_id, name=None, description=None,
+                     no_reboot=False, block_device_mapping=None):
+        """Creates an EBS-backed AMI from an EBS-backed instance.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (str): The ID of the instance.
+            name (str): A name for the new image.
+                It's required by AWS but optional for legacy Nova EC2 API.
+            description (str): A description for the new image.
+                Not used now.
+            no_reboot (boolean): When the parameter is set to false, EC2
+                attempts to shut down the instance cleanly before image
+                creation and then reboots the instance.
+            block_device_mapping (list of dict): Dict can contain:
+                device_name (str): The device name exposed to the instance
+                    (for example, /dev/sdh or xvdh).
+                virtual_name (str): The virtual device name (ephemeral[0..3]).
+                ebs (dict): Dict can contain:
+                    volume_id (str): The ID of the volume (Nova extension).
+                    snapshot_id (str): The ID of the snapshot.
+                    volume_size (str): The size of the volume, in GiBs.
+                    volume_type (str): The volume type.
+                        Not used now.
+                    delete_on_termination (bool): Indicates whether to delete
+                        the volume on instance termination.
+                    iops (int): he number of IOPS to provision for the volume.
+                        Not used now.
+                    encrypted (boolean): Whether the volume is encrypted.
+                        Not used now.
+                no_device (str): Suppresses the device mapping.
+
+        Returns:
+            The ID of the new AMI.
+        """
+        return image.create_image(context, instance_id, name, description,
+                                  no_reboot, block_device_mapping)
+
+    def register_image(self, context, name=None, image_location=None,
+                       description=None, architecture=None,
+                       root_device_name=None, block_device_mapping=None,
+                       virtualization_type=None, kernel_id=None,
+                       ramdisk_id=None, sriov_net_support=None):
+        """Registers an AMI.
+
+        Args:
+            context (RequestContext): The request context.
+            name (str): A name for your AMI.
+                It's required by AWS but optional for legacy Nova EC2 API.
+            image_location (str): The full path to AMI manifest in S3 storage.
+            description (str): A description for your AMI.
+                Not used now.
+            architecture (str): The architecture of the AMI.
+                Not used now.
+            root_device_name (str): The name of the root device
+            block_device_mapping (list of dict): Dict can contain:
+                device_name (str): The device name exposed to the instance
+                    (for example, /dev/sdh or xvdh).
+                virtual_name (str): The virtual device name (ephemeral[0..3]).
+                ebs (dict): Dict can contain:
+                    volume_id (str): The ID of the volume (Nova extension).
+                    snapshot_id (str): The ID of the snapshot.
+                    volume_size (str): The size of the volume, in GiBs.
+                    volume_type (str): The volume type.
+                        Not used now.
+                    delete_on_termination (bool): Indicates whether to delete
+                        the volume on instance termination.
+                    iops (int): he number of IOPS to provision for the volume.
+                        Not used now.
+                    encrypted (boolean): Whether the volume is encrypted.
+                        Not used now.
+                no_device (str): Suppresses the device mapping.
+            virtualization_type (str): The type of virtualization.
+                Not used now.
+            kernel_id (str): The ID of the kernel.
+                Not used now.
+            ramdisk_id (str): The ID of the RAM disk.
+                Not used now.
+            sriov_net_support (str): SR-IOV mode for networking.
+                Not used now.
+
+        Returns:
+            The ID of the new AMI.
+        """
+        return image.register_image(context, name, image_location,
+                                    description, architecture,
+                                    root_device_name, block_device_mapping,
+                                    virtualization_type, kernel_id,
+                                    ramdisk_id, sriov_net_support)
+
+    def deregister_image(self, context, image_id):
+        """Deregisters the specified AMI.
+
+        Args:
+            context (RequestContext): The request context.
+            image_id (str): The ID of the AMI.
+
+        Returns:
+            true if the request succeeds.
+        """
+        return image.deregister_image(context, image_id)
+
+    def update_image(self, context, image_id, **kwargs):
+        """Update image metadata (Nova EC2 extension).
+
+        Args:
+            context (RequestContext): The request context.
+            image_id (str): The ID of the image.
+            **kwargs: Metadata key-value pairs to be added/updated.
+
+        Returns:
+            The updated image.
+        """
+        pass
+
     def describe_images(self, context, executable_by=None, image_id=None,
                         owner=None, filter=None):
         """Describes one or more of the images available to you.
@@ -1431,6 +1549,7 @@ class CloudController(object):
                 Not used now.
             image_id (list of str): One or more image IDs.
             owner (list of str): Filters the images by the owner.
+                Not used now.
             filter (list of filter dict): You can specify filters so that the
                 response includes information for only certain images.
 
@@ -1439,3 +1558,50 @@ class CloudController(object):
         """
         return image.describe_images(context, executable_by, image_id,
                                      owner, filter)
+
+    def describe_image_attribute(self, context, image_id, attribute):
+        """Describes the specified attribute of the specified AMI.
+
+        Args:
+            context (RequestContext): The request context.
+            image_id (str): The ID of the image.
+            attribute (str): The attribute of the network interface.
+                Valid values: description (unsupported now)| kernel | ramdisk |
+                    launchPermission | productCodes (unsupported now)|
+                    blockDeviceMapping | rootDeviceName (Nova EC2 extension)
+
+        Returns:
+            Specified attribute.
+        """
+        return image.describe_image_attribute(context, image_id, attribute)
+
+    def modify_image_attribute(self, context, image_id, attribute,
+                               user_group, operation_type,
+                               description=None, launch_permission=None,
+                               product_code=None, user_id=None, value=None):
+        """Modifies the specified attribute of the specified AMI.
+
+        Args:
+            context (RequestContext): The request context.
+            image_id (str): The ID of the image.
+            attribute (str): The name of the attribute to modify.
+                It's optional for AWS but required for legacy Nova EC2 API.
+                Only 'launchPermission' is supported now.
+            user_group (list of str): One or more user groups.
+                It's optional for AWS but required for legacy Nova EC2 API.
+                Only 'all' group is supported now.
+            operation_type (str): The operation type.
+                It's optional for AWS but required for legacy Nova EC2 API.
+                Only 'add' and 'remove' operation types are supported now.
+            description: Not supported now.
+            launch_permission: : Not supported now.
+            product_code: : Not supported now.
+            user_id: : Not supported now.
+            value: : Not supported now.
+        Returns:
+            true if the request succeeds.
+        """
+        return image.modify_image_attribute(context, image_id, attribute,
+                                            user_group, operation_type,
+                                            description, launch_permission,
+                                            product_code, user_id, value)

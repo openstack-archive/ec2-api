@@ -341,6 +341,32 @@ def start_instances(context, instance_id):
                              lambda instance: instance.start())
 
 
+def get_password_data(context, instance_id):
+    # NOTE(Alex): AWS supports one and only one instance_id here
+    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+    password = os_instance.get_password()
+    # NOTE(vish): this should be timestamp from the metadata fields
+    #             but it isn't important enough to implement properly
+    now = timeutils.utcnow()
+    return {"instanceId": instance_id,
+            "timestamp": now,
+            "passwordData": password}
+
+
+def get_console_output(context, instance_id):
+    # NOTE(Alex): AWS supports one and only one instance_id here
+    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+    console_output = os_instance.get_console_output()
+    now = timeutils.utcnow()
+    return {"instanceId": instance_id,
+            "timestamp": now,
+            "output": console_output}
+
+
 def describe_instance_attribute(context, instance_id, attribute):
     instance = db_api.get_item_by_id(context, 'i', instance_id)
     nova = clients.nova(context)
@@ -922,18 +948,6 @@ def _get_os_instances_by_instances(context, instances, exactly=False):
     return os_instances
 
 
-def _auto_create_instance_extension(context, instance, novadb_instance=None):
-    if not novadb_instance:
-        novadb_instance = novadb.instance_get_by_uuid(context,
-                                                      instance['os_id'])
-    instance['reservation_id'] = novadb_instance['reservation_id']
-    instance['launch_index'] = novadb_instance['launch_index']
-
-
-ec2utils.register_auto_create_db_item_extension(
-        'i', _auto_create_instance_extension)
-
-
 def _get_ec2_classic_os_network(context, neutron):
     os_subnet_ids = [eni['os_id']
                      for eni in db_api.get_items(context, 'subnet')]
@@ -958,30 +972,35 @@ def _get_ec2_classic_os_network(context, neutron):
     return ec2_classic_os_networks[0]
 
 
-def get_password_data(context, instance_id):
-    # NOTE(Alex): AWS supports one and only one instance_id here
-    instance = ec2utils.get_db_item(context, 'i', instance_id)
-    nova = clients.nova(context)
-    os_instance = nova.servers.get(instance['os_id'])
-    password = os_instance.get_password()
-    # NOTE(vish): this should be timestamp from the metadata fields
-    #             but it isn't important enough to implement properly
-    now = timeutils.utcnow()
-    return {"instanceId": instance_id,
-            "timestamp": now,
-            "passwordData": password}
+def _is_ebs_instance(context, os_instance):
+    novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
+    root_device_name = _cloud_format_instance_root_device_name(novadb_instance)
+    root_device_short_name = _block_device_strip_dev(root_device_name)
+    if root_device_name == root_device_short_name:
+        root_device_name = _block_device_prepend_dev(root_device_name)
+    for bdm in novadb.block_device_mapping_get_all_by_instance(context,
+                                                               os_instance.id):
+        volume_id = bdm['volume_id']
+        if (volume_id is None or bdm['no_device']):
+            continue
+
+        if ((bdm['snapshot_id'] or bdm['volume_id']) and
+                (bdm['device_name'] == root_device_name or
+                 bdm['device_name'] == root_device_short_name)):
+            return True
+    return False
 
 
-def get_console_output(context, instance_id):
-    # NOTE(Alex): AWS supports one and only one instance_id here
-    instance = ec2utils.get_db_item(context, 'i', instance_id)
-    nova = clients.nova(context)
-    os_instance = nova.servers.get(instance['os_id'])
-    console_output = os_instance.get_console_output()
-    now = timeutils.utcnow()
-    return {"instanceId": instance_id,
-            "timestamp": now,
-            "output": console_output}
+def _auto_create_instance_extension(context, instance, novadb_instance=None):
+    if not novadb_instance:
+        novadb_instance = novadb.instance_get_by_uuid(context,
+                                                      instance['os_id'])
+    instance['reservation_id'] = novadb_instance['reservation_id']
+    instance['launch_index'] = novadb_instance['launch_index']
+
+
+ec2utils.register_auto_create_db_item_extension(
+        'i', _auto_create_instance_extension)
 
 
 # NOTE(ft): following functions are copied from various parts of Nova

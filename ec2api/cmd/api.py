@@ -20,6 +20,7 @@ import sys
 
 from oslo.config import cfg
 
+from ec2api.api import clients
 from ec2api import config
 from ec2api.openstack.common import log as logging
 from ec2api import service
@@ -31,6 +32,7 @@ CONF.import_opt('use_ssl', 'ec2api.service')
 def main():
     config.parse_args(sys.argv)
     logging.setup('ec2api')
+    clients.rpc_init(cfg.CONF)
 
     server = service.WSGIService(
         'ec2api', use_ssl=CONF.use_ssl, max_url_len=16384)

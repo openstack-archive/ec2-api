@@ -17,7 +17,9 @@ from keystoneclient.v2_0 import client as kc
 from novaclient import client as novaclient
 from novaclient import shell as novashell
 from oslo.config import cfg
+from oslo import messaging
 
+from ec2api import context as ec2_context
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 
@@ -121,6 +123,18 @@ def keystone(context):
     return _keystone
 
 
+def nova_cert(context):
+    _cert_api = _rpcapi_CertAPI(context)
+    return _cert_api
+
+
+def rpc_init(conf):
+    global _rpc_TRANSPORT
+    # NOTE(ft): set control_exchange parameter to use Nova cert topic
+    messaging.set_transport_defaults('nova')
+    _rpc_TRANSPORT = messaging.get_transport(conf)
+
+
 def _url_for(context, **kwargs):
     service_catalog = context.service_catalog
     if not service_catalog:
@@ -139,3 +153,39 @@ def _url_for(context, **kwargs):
             return None
 
     return None
+
+
+class _rpcapi_CertAPI(object):
+    '''Client side of the cert rpc API.'''
+
+    def __init__(self, context):
+        super(_rpcapi_CertAPI, self).__init__()
+        target = messaging.Target(topic=CONF.cert_topic, version='2.0')
+        self.client = _rpc_get_client(target)
+        self.context = context
+
+    def decrypt_text(self, text):
+        cctxt = self.client.prepare()
+        return cctxt.call(self.context, 'decrypt_text',
+                          project_id=self.context.project_id,
+                          text=text)
+
+
+_rpc_TRANSPORT = None
+
+
+def _rpc_get_client(target):
+    assert _rpc_TRANSPORT is not None
+    serializer = _rpc_RequestContextSerializer()
+    return messaging.RPCClient(_rpc_TRANSPORT,
+                               target,
+                               serializer=serializer)
+
+
+class _rpc_RequestContextSerializer(messaging.NoOpSerializer):
+
+    def serialize_context(self, context):
+        return context.to_dict()
+
+    def deserialize_context(self, context):
+        return ec2_context.RequestContext.from_dict(context)
