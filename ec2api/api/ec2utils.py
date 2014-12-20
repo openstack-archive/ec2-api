@@ -14,6 +14,8 @@
 
 import re
 
+import netaddr
+
 from ec2api import context
 from ec2api.db import api as db_api
 from ec2api import exception
@@ -454,6 +456,42 @@ def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
     if ids_by_os_id is not None:
         ids_by_os_id[os_id] = item_id
     return item_id
+
+
+def _is_valid_cidr(address):
+    """Check if address is valid
+
+    The provided address can be a IPv6 or a IPv4
+    CIDR address.
+    """
+    try:
+        # Validate the correct CIDR Address
+        netaddr.IPNetwork(address)
+    except netaddr.core.AddrFormatError:
+        return False
+    except UnboundLocalError:
+        # NOTE(MotoKen): work around bug in netaddr 0.7.5 (see detail in
+        # https://github.com/drkjam/netaddr/issues/2)
+        return False
+
+    # Prior validation partially verify /xx part
+    # Verify it here
+    ip_segment = address.split('/')
+
+    if (len(ip_segment) <= 1 or
+            ip_segment[1] == ''):
+        return False
+
+    return True
+
+
+def validate_cidr_with_ipv6(cidr, parameter_name):
+    invalid_format_exception = exception.InvalidParameterValue(
+        value=cidr,
+        parameter=parameter_name,
+        reason='This is not a valid CIDR block.')
+    if not _is_valid_cidr(cidr):
+        raise invalid_format_exception
 
 
 _cidr_re = re.compile("^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")

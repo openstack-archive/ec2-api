@@ -14,11 +14,13 @@
 
 
 import copy
+import re
 
 try:
     from neutronclient.common import exceptions as neutron_exception
 except ImportError:
     pass  # clients will log absense of neutronclient in this case
+from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
@@ -27,6 +29,7 @@ from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
+from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 
 
@@ -53,10 +56,14 @@ def get_security_group_engine():
 
 def create_security_group(context, group_name, group_description,
                           vpc_id=None):
+    _validate_security_group_naming(group_name, group_description, vpc_id)
     nova = clients.nova(context)
     with utils.OnCrashCleaner() as cleaner:
-        os_security_group = nova.security_groups.create(group_name,
-                                                        group_description)
+        try:
+            os_security_group = nova.security_groups.create(group_name,
+                                                            group_description)
+        except nova_exception.OverLimit:
+            raise exception.ResourceLimitExceeded(resource='security groups')
         cleaner.addCleanup(nova.security_groups.delete,
                            os_security_group.id)
         if vpc_id:
@@ -70,18 +77,53 @@ def create_security_group(context, group_name, group_description,
     return {'return': 'true'}
 
 
+def _validate_security_group_naming(group_name, group_description, vpc_id):
+    if group_name is None:
+        raise exception.MissingParameter(param='group name')
+    if group_description is None:
+        raise exception.MissingParameter(param='group description')
+    # NOTE(Alex) Amazon accepts any ASCII for EC2 classic;
+    # for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+    if vpc_id:
+        allowed = '^[a-zA-Z0-9\._\-:/\(\)#,@\[\]\+=&;\{\}!\$\*\ ]+$'
+    else:
+        allowed = r'^[\x20-\x7E]+$'
+    _validate_property(group_name, 'name', allowed)
+    _validate_property(group_description, 'description', allowed)
+
+
+def _validate_property(value, property, allowed):
+    msg = ''
+    try:
+        val = value.strip()
+    except AttributeError:
+        msg = _("Security group %s is not a string or unicode") % property
+    if not val:
+        msg = _("Security group %s cannot be empty.") % property
+    elif allowed and not re.match(allowed, val):
+        # Some validation to ensure that values match API spec.
+        # - Alphanumeric characters, spaces, dashes, and underscores.
+        # TODO(Daviey): LP: #813685 extend beyond group_name checking, and
+        #  probably create a param validator that can be used elsewhere.
+        msg = (_("Specified value for parameter Group%(property)s is "
+                 "invalid. Content limited to '%(allowed)s'.") %
+               {'allowed': 'allowed',
+                'property': property})
+    elif len(val) > 255:
+        msg = _("Security group %s should not be greater "
+                        "than 255 characters.") % property
+    if msg:
+        raise exception.ValidationError(reason=msg)
+
+
 def _create_default_security_group(context, vpc):
-    neutron = clients.neutron(context)
-    os_security_group = neutron.create_security_group(
-        {'security_group':
-         {'name': 'Default',
-          'description': 'Default VPC security group'}})['security_group']
-    security_group = db_api.add_item(context, 'sg',
-                                     {'vpc_id': vpc['id'],
-                                      'os_id': os_security_group['id']})
+    return create_security_group(context, 'Default',
+                                 'Default VPC security group', vpc['id'])
 
 
 def delete_security_group(context, group_name=None, group_id=None):
+    if group_name is None and group_id is None:
+        raise exception.MissingParameter(param='group id or name')
     security_group_engine.delete_group(context, group_name, group_id)
     return True
 
@@ -93,9 +135,14 @@ class SecurityGroupDescriber(common.UniversalDescriber):
                   'group-name': 'groupName',
                   'group-id': 'groupId'}
 
+    def __init__(self):
+        self.all_db_items = None
+
     def format(self, item=None, os_item=None):
+        if self.all_db_items is None:
+            self.all_db_items = ec2utils.get_db_items(self.context, 'sg', None)
         return _format_security_group(item, os_item,
-                                      self.items, self.os_items)
+                                      self.all_db_items, self.os_items)
 
     def get_os_items(self):
         return security_group_engine.get_os_groups(self.context)
@@ -128,7 +175,42 @@ def _authorize_security_group(context, group_id, group_name,
     return True
 
 
+def _validate_parameters(protocol, from_port, to_port):
+    if (not isinstance(protocol, int) and
+            protocol not in ['tcp', 'udp', 'icmp']):
+        raise exception.InvalidParameterValue(
+            _('Invalid value for IP protocol. Unknown protocol.'))
+    if (not isinstance(from_port, int) or
+            not isinstance(to_port, int)):
+        raise exception.InvalidParameterValue(
+            _('Integer values should be specified for ports'))
+    if protocol in ['tcp', 'udp', 6, 17]:
+        if from_port == -1 or to_port == -1:
+            raise exception.InvalidParameterValue(
+                _('Must specify both from and to ports with TCP/UDP.'))
+        if from_port > to_port:
+            raise exception.InvalidParameterValue(
+                _('Invalid TCP/UDP port range.'))
+        if from_port < 0 or from_port > 65535:
+            raise exception.InvalidParameterValue(
+                _('TCP/UDP from port is out of range.'))
+        if to_port < 0 or to_port > 65535:
+            raise exception.InvalidParameterValue(
+                _('TCP/UDP to port is out of range.'))
+    elif protocol in ['icmp', 1]:
+        if from_port < -1 or from_port > 255:
+            raise exception.InvalidParameterValue(
+                _('ICMP type is out of range.'))
+        if to_port < -1 or to_port > 255:
+            raise exception.InvalidParameterValue(
+                _('ICMP code is out of range.'))
+
+
 def _build_rules(context, group_id, group_name, ip_permissions, direction):
+    if group_name is None and group_id is None:
+        raise exception.MissingParameter(param='group id or name')
+    if ip_permissions is None:
+        raise exception.MissingParameter(param='source group or cidr')
     os_security_group_id = security_group_engine.get_group_os_id(context,
                                                                  group_id,
                                                                  group_name)
@@ -140,14 +222,19 @@ def _build_rules(context, group_id, group_name, ip_permissions, direction):
             {'security_group_id': os_security_group_id,
              'direction': direction,
              'ethertype': 'IPv4'})
-        if rule.get('ip_protocol', -1) != -1:
+        protocol = rule.get('ip_protocol', -1)
+        from_port = rule.get('from_port', -1)
+        to_port = rule.get('to_port', -1)
+        _validate_parameters(protocol, from_port, to_port)
+        if protocol != -1:
             os_security_group_rule_body['protocol'] = rule['ip_protocol']
-        if rule.get('from_port', -1) != -1:
+        if from_port != -1:
             os_security_group_rule_body['port_range_min'] = rule['from_port']
-        if rule.get('to_port', -1) != -1:
+        if to_port != -1:
             os_security_group_rule_body['port_range_max'] = rule['to_port']
+
         # TODO(Alex) AWS protocol claims support of multiple groups and cidrs,
-        # however, neither aws cli, nor neutron support it at the moment.
+        # however, neutron doesn't support it at the moment.
         # It's possible in the future to convert list values incoming from
         # REST API into several neutron rules and squeeze them back into one
         # for describing.
@@ -161,6 +248,10 @@ def _build_rules(context, group_id, group_name, ip_permissions, direction):
         elif rule.get('ip_ranges'):
             os_security_group_rule_body['remote_ip_prefix'] = (
                 rule['ip_ranges'][0]['cidr_ip'])
+            ec2utils.validate_cidr_with_ipv6(
+                os_security_group_rule_body['remote_ip_prefix'], 'cidr_ip')
+        else:
+            raise exception.MissingParameter(param='source group or cidr')
         os_security_group_rule_bodies.append(os_security_group_rule_body)
     return os_security_group_rule_bodies
 
@@ -326,8 +417,10 @@ class SecurityGroupEngineNeutron(object):
         try:
             os_security_group_rule = neutron.create_security_group_rule(
                 {'security_group_rule': rule_body})['security_group_rule']
+        except neutron_exception.OverQuotaClient:
+            raise exception.RulesPerSecurityGroupLimitExceeded()
         except neutron_exception.Conflict as ex:
-            raise exception.RuleAlreadyExists()
+            raise exception.InvalidPermissionDuplicate()
 
     def get_os_group_rules(self, context, os_id):
         neutron = clients.neutron(context)
@@ -351,10 +444,9 @@ class SecurityGroupEngineNova(object):
 
     def delete_group(self, context, group_name=None, group_id=None):
         nova = clients.nova(context)
+        os_id = self.get_group_os_id(context, group_id, group_name)
         try:
-            nova.security_groups.delete(self.get_group_os_id(context,
-                                                             group_id,
-                                                             group_name))
+            nova.security_groups.delete(os_id)
         except Exception as ex:
             # TODO(Alex): do log error
             # nova doesn't differentiate Conflict exception like neutron does
@@ -376,9 +468,10 @@ class SecurityGroupEngineNova(object):
                 rule_body.get('port_range_max', -1),
                 rule_body.get('remote_ip_prefix'),
                 rule_body.get('remote_group_id'))
-        except Exception as ex:
-            # TODO(Alex) resolve Conflict exceptions
-            raise ex
+        except nova_exception.Conflict:
+            raise exception.InvalidPermissionDuplicate()
+        except nova_exception.OverLimit:
+            raise exception.RulesPerSecurityGroupLimitExceeded()
 
     def get_os_group_rules(self, context, os_id):
         nova = clients.nova(context)
@@ -434,6 +527,8 @@ class SecurityGroupEngineNova(object):
 
     def get_group_os_id(self, context, group_id, group_name,
                          nova_security_groups=None):
+        if group_id:
+            return group_id
         nova_group = self.get_nova_group_by_name(context, group_name,
                                                  nova_security_groups)
         return nova_group.id

@@ -751,7 +751,7 @@ OS_SECURITY_GROUP_1 = {
 }
 OS_SECURITY_GROUP_2 = {
     'id': ID_OS_SECURITY_GROUP_2,
-    'name': 'groupname',
+    'name': 'groupname2',
     'security_group_rules': [
         OS_SECURITY_GROUP_RULE_1,
         OS_SECURITY_GROUP_RULE_2
@@ -823,7 +823,7 @@ EC2_SECURITY_GROUP_2 = {
       'ipRanges':
       [{'cidrIp': '192.168.1.0/24'}]
       }],
-    'groupName': 'groupname',
+    'groupName': 'groupname2',
     'ipPermissionsEgress':
     [{'toPort': -1,
       'ipProtocol': 100,

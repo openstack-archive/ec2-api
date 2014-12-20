@@ -111,7 +111,7 @@ def add_item(context, kind, data):
     item_ref = models.Item()
     item_ref.update({
         "project_id": context.project_id,
-        "id": _new_id(kind, data["os_id"]),
+        "id": _new_id(kind, data.get("os_id")),
     })
     item_ref.update(_pack_item_data(data))
     try:

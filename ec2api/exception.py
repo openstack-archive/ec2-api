@@ -99,6 +99,11 @@ class Unsupported(EC2Exception):
     code = 400
 
 
+class Overlimit(EC2Exception):
+    msg_fmt = _("Limit exceeded.")
+    code = 400
+
+
 class Invalid(EC2Exception):
     msg_fmt = _("Unacceptable parameters.")
     code = 400
@@ -145,6 +150,11 @@ class AuthFailure(Invalid):
 class NotFound(EC2Exception):
     msg_fmt = _("Resource could not be found.")
     code = 404
+
+
+class ValidationError(Invalid):
+    msg_fmt = _("The input fails to satisfy the constraints "
+                "specified by an AWS service: '%(reason)s'")
 
 
 class EC2NotFound(NotFound):
@@ -282,7 +292,7 @@ class InvalidSubnetConflict(Invalid):
 
 
 class MissingParameter(Invalid):
-    pass
+    msg_fmt = _("The required parameter '%(param)s' is missing")
 
 
 class InvalidParameterValue(Invalid):
@@ -304,7 +314,6 @@ class GatewayNotAttached(Invalid):
 
 
 class DependencyViolation(Invalid):
-    ec2_code = 'DependencyViolation'
     msg_fmt = _('Object %(obj1_id)s has dependent resource %(obj2_id)s')
 
 
@@ -335,15 +344,13 @@ class RouteAlreadyExists(Invalid):
                 'already exists.')
 
 
-class NetworkInterfaceLimitExceeded(Invalid):
-    ec2_code = 'NetworkInterfaceLimitExceeded'
+class NetworkInterfaceLimitExceeded(Overlimit):
     msg_fmt = _('You have reached the limit of network interfaces for subnet'
                 '%(subnet_id)s.')
 
 
-# TODO(Alex) Change next class with the real AWS exception
-class RuleAlreadyExists(Invalid):
-    msg_fmt = _('The rule already exists.')
+class ResourceLimitExceeded(Overlimit):
+    msg_fmt = _('You have reached the limit of %(resource)s')
 
 
 class ImageNotActive(Invalid):
@@ -371,3 +378,13 @@ class InvalidAvailabilityZoneNotFound(NotFound):
 class KeyPairExists(Invalid):
     ec2_code = 'InvalidKeyPair.Duplicate'
     msg_fmt = _("Key pair '%(key_name)s' already exists.")
+
+
+class InvalidPermissionDuplicate(Invalid):
+    ec2_code = 'InvalidPermission.Duplicate'
+    msg_fmt = _("The specified rule already exists for that security group.")
+
+
+class RulesPerSecurityGroupLimitExceeded(Overlimit):
+    msg_fmt = _("You've reached the limit on the number of rules that "
+                "you can add to a security group.")
