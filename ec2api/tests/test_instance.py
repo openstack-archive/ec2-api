@@ -75,6 +75,8 @@ class InstanceTestCase(base.ApiTestCase):
                 {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
                  fakes.ID_EC2_NETWORK_INTERFACE_1:
                     copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1)}))
+        self.db_api.get_item_ids.return_value = [
+                (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.create_network_interface.return_value = (
@@ -83,10 +85,9 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
 
-        self.glance.images.get.return_value = self.fake_image_class(
-                'fake_image_id', 'active', {})
-        self.ec2_id_to_glance_id.return_value = 'fake_image_id'
-        self.glance_id_to_ec2_id.return_value = None
+        self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
+#         self.ec2_id_to_glance_id.return_value = 'fake_image_id'
+#         self.glance_id_to_ec2_id.return_value = None
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.list.return_value = [fake_flavor]
         self.nova_servers.create.return_value = (
@@ -104,7 +105,7 @@ class InstanceTestCase(base.ApiTestCase):
         _get_vpc_default_security_group_id.return_value = None
 
         def do_check(params, new_port=True, delete_on_termination=None):
-            params.update({'ImageId': 'ami-00000001',
+            params.update({'ImageId': fakes.ID_EC2_IMAGE_1,
                            'InstanceType': 'fake_flavor',
                            'MinCount': '1', 'MaxCount': '1'})
             resp = self.execute('RunInstances', params)
@@ -140,7 +141,7 @@ class InstanceTestCase(base.ApiTestCase):
                 self.create_network_interface.assert_called_once_with(
                     mock.ANY, fakes.EC2_SUBNET_1['subnetId'])
             self.nova_servers.create.assert_called_once_with(
-                'EC2 server', 'fake_image_id', fake_flavor,
+                'EC2 server', fakes.ID_OS_IMAGE_1, fake_flavor,
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
@@ -148,6 +149,8 @@ class InstanceTestCase(base.ApiTestCase):
                 security_groups=None,
                 nics=[{'port-id': fakes.ID_OS_PORT_1}],
                 key_name=None, userdata=None)
+            self.db_api.get_item_ids.assert_called_once_with(
+                mock.ANY, 'ami', (fakes.ID_EC2_IMAGE_1,))
             self.db_api.update_item.assert_called_once_with(
                 mock.ANY, db_attached_eni)
             self.isotime.assert_called_once_with(None, True)
@@ -276,6 +279,8 @@ class InstanceTestCase(base.ApiTestCase):
                 {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
                  fakes.ID_EC2_NETWORK_INTERFACE_1:
                     copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1)}))
+        self.db_api.get_item_ids.return_value = [
+                (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.create_network_interface.return_value = (
@@ -284,13 +289,12 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
 
-        self.glance.images.get.return_value = self.fake_image_class(
-                'fake_image_id', 'active', {})
-        self.ec2_id_to_glance_id.return_value = 'fake_image_id'
+        self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.list.return_value = [fake_flavor]
         self.nova_servers.create.return_value = (
             fakes.OSInstance(fakes.ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
+                 image={'id': fakes.ID_OS_IMAGE_1},
                  addresses={
                     fakes.ID_EC2_SUBNET_1: [
                         {'addr': fakes.IP_NETWORK_INTERFACE_1,
@@ -299,7 +303,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.update_item.side_effect = Exception()
 
         def do_check(params, new_port=True, delete_on_termination=None):
-            params.update({'ImageId': 'ami-00000001',
+            params.update({'ImageId': fakes.ID_EC2_IMAGE_1,
                            'InstanceType': 'fake_flavor',
                            'MinCount': '1', 'MaxCount': '1'})
             self.execute('RunInstances', params)
@@ -512,7 +516,9 @@ class InstanceTestCase(base.ApiTestCase):
             [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2]
             if kind == 'eipalloc' else
             [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2]
-            if kind == 'i' else [])
+            if kind == 'i' else
+            [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]
+            if kind == 'ami' else [])
         self.neutron.list_floatingips.return_value = (
             {'floatingips': [fakes.OS_FLOATING_IP_1,
                              fakes.OS_FLOATING_IP_2]})
@@ -526,7 +532,6 @@ class InstanceTestCase(base.ApiTestCase):
                 instance_get_by_uuid(context, None, item_id))
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.get.return_value = fake_flavor
-        self.glance_id_to_ec2_id.return_value = None
         format_security_groups_ids_names.return_value = {}
         self.novadb.block_device_mapping_get_all_by_instance.return_value = []
 

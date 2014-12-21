@@ -220,7 +220,7 @@ def get_items_by_ids(context, kind, item_ids):
 
 
 @require_context
-def get_public_items(context, kind, item_ids):
+def get_public_items(context, kind, item_ids=None):
     query = (model_query(context, models.Item).
              filter(models.Item.id.like('%s-%%' % kind)).
              filter(models.Item.data.like('%\'is_public\': True%')))

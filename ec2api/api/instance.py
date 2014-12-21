@@ -19,6 +19,7 @@ import itertools
 import random
 import re
 
+from glanceclient import exc as glance_exception
 from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
@@ -240,7 +241,8 @@ def run_instances(context, image_id, min_count, max_count,
     ec2_network_interfaces = _format_network_interfaces(
                                         context, instance_network_interfaces)
     return _format_reservation(context, ec2_reservation_id, instances_info,
-                               ec2_network_interfaces)
+                               ec2_network_interfaces,
+                               image_ids={os_image.id: image_id})
 
 
 def terminate_instances(context, instance_id):
@@ -306,6 +308,10 @@ def describe_instances(context, instance_id=None, filter=None,
 
     ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_id)
     volumes = dict((v['os_id'], v) for v in db_api.get_items(context, 'vol'))
+    image_ids = dict((i['os_id'], i['id'])
+                     for i in itertools.chain(
+                          db_api.get_items(context, 'ami'),
+                          db_api.get_public_items(context, 'ami')))
     reservation_filters = []
     instance_filters = []
     for f in filter or []:
@@ -317,7 +323,8 @@ def describe_instances(context, instance_id=None, filter=None,
     for reservation_id, instances_info in reservations.iteritems():
         formatted_reservation = _format_reservation(
                 context, reservation_id, instances_info,
-                ec2_network_interfaces, instance_filters, volumes=volumes)
+                ec2_network_interfaces, instance_filters, volumes=volumes,
+                image_ids=image_ids)
         if (formatted_reservation['instancesSet'] and
                 not utils.filtered_out(formatted_reservation,
                                        reservation_filters,
@@ -461,16 +468,18 @@ def _get_idempotent_run(context, client_token):
         return
     ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_ids)
     return _format_reservation(context, instance['reservation_id'],
-                               instances_info, ec2_network_interfaces)
+                               instances_info, ec2_network_interfaces,
+                               image_ids={})
 
 
 def _format_reservation(context, reservation_id, instances_info,
-                        ec2_network_interfaces, filters=None, volumes=None):
+                        ec2_network_interfaces, filters=None, volumes=None,
+                        image_ids=None):
     formatted_instances = []
     for (instance, os_instance, novadb_instance) in instances_info:
         ec2_instance = _format_instance(
                 context, instance, os_instance, novadb_instance,
-                ec2_network_interfaces.get(instance['id']), volumes)
+                ec2_network_interfaces.get(instance['id']), volumes, image_ids)
         if not utils.filtered_out(ec2_instance, filters, INSTANCE_FILTER_MAP):
             formatted_instances.append(ec2_instance)
     formatted_reservation = {'reservationId': reservation_id,
@@ -483,15 +492,16 @@ def _format_reservation(context, reservation_id, instances_info,
 
 
 def _format_instance(context, instance, os_instance, novadb_instance,
-                     ec2_network_interfaces, volumes):
+                     ec2_network_interfaces, volumes, image_ids):
     ec2_instance = {}
     ec2_instance['instanceId'] = instance['id']
-    image_uuid = os_instance.image['id'] if os_instance.image else ''
-    ec2_instance['imageId'] = ec2utils.glance_id_to_ec2_id(context, image_uuid)
-    kernel_id = _cloud_format_kernel_id(context, novadb_instance)
+    os_image_id = os_instance.image['id'] if os_instance.image else None
+    ec2_instance['imageId'] = ec2utils.os_id_to_ec2_id(
+            context, 'ami', os_image_id, ids_by_os_id=image_ids)
+    kernel_id = _cloud_format_kernel_id(context, novadb_instance, image_ids)
     if kernel_id:
         ec2_instance['kernelId'] = kernel_id
-    ramdisk_id = _cloud_format_ramdisk_id(context, novadb_instance)
+    ramdisk_id = _cloud_format_ramdisk_id(context, novadb_instance, image_ids)
     if ramdisk_id:
         ec2_instance['ramdiskId'] = ramdisk_id
     ec2_instance['instanceState'] = _cloud_state_description(
@@ -673,29 +683,32 @@ def _check_min_max_count(min_count, max_count):
 
 
 def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
-
-    def get_os_image_id(ec2_image_id):
-        try:
-            return ec2utils.ec2_id_to_glance_id(context, ec2_image_id)
-        except exception.NovaDbImageNotFound:
-            raise exception.NovaDbImageNotFound(image_id=ec2_image_id)
-
     glance = clients.glance(context)
-    if kernel_id:
-        os_kernel_id = get_os_image_id(kernel_id)
-        glance.images.get(os_kernel_id)
-    if ramdisk_id:
-        os_ramdisk_id = get_os_image_id(ramdisk_id)
-        glance.images.get(os_ramdisk_id)
-    os_image_id = get_os_image_id(image_id)
-    os_image = glance.images.get(os_image_id)
+
+    # TODO(ft): we can't get all images from DB per one request due different
+    # kinds. It's need to refactor DB API and ec2utils functions to work with
+    # kind smarter
+    def get_os_image(kind, ec2_image_id):
+        try:
+            ids = db_api.get_item_ids(context, kind, (ec2_image_id,))
+            _id, os_image_id = ids[0]
+            os_image = glance.images.get(os_image_id)
+        except (IndexError, glance_exception.HTTPNotFound):
+            raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
+        return os_image
+
+    os_kernel_id = (get_os_image('aki', kernel_id)['os_id']
+                    if kernel_id else None)
+    os_ramdisk_id = (get_os_image('ari', ramdisk_id)['os_id']
+                     if ramdisk_id else None)
+    os_image = get_os_image('ami', image_id)
 
     if _cloud_get_image_state(os_image) != 'available':
         # TODO(ft): Change the message with the real AWS message
         msg = _('Image must be available')
         raise exception.ImageNotActive(message=msg)
 
-    return os_image, kernel_id, ramdisk_id
+    return os_image, os_kernel_id, os_ramdisk_id
 
 
 def _parse_block_device_mapping(context, block_device_mapping, os_image):
@@ -1064,18 +1077,20 @@ def _cloud_get_image_state(image):
     return image.properties.get('image_state', state)
 
 
-def _cloud_format_kernel_id(context, instance_ref):
+def _cloud_format_kernel_id(context, instance_ref, image_ids=None):
     kernel_uuid = instance_ref['kernel_id']
     if kernel_uuid is None or kernel_uuid == '':
         return
-    return ec2utils.glance_id_to_ec2_id(context, kernel_uuid, 'aki')
+    return ec2utils.os_id_to_ec2_id(context, 'aki', kernel_uuid,
+                                    ids_by_os_id=image_ids)
 
 
-def _cloud_format_ramdisk_id(context, instance_ref):
+def _cloud_format_ramdisk_id(context, instance_ref, image_ids=None):
     ramdisk_uuid = instance_ref['ramdisk_id']
     if ramdisk_uuid is None or ramdisk_uuid == '':
         return
-    return ec2utils.glance_id_to_ec2_id(context, ramdisk_uuid, 'ari')
+    return ec2utils.os_id_to_ec2_id(context, 'ari', ramdisk_uuid,
+                                    ids_by_os_id=image_ids)
 
 
 def _cloud_format_instance_type(context, os_instance):

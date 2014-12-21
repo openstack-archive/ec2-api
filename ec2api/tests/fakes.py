@@ -181,6 +181,13 @@ ID_EC2_ROUTE_TABLE_ASSOCIATION_2 = ID_EC2_SUBNET_2.replace('subnet',
 CIDR_EXTERNAL_NETWORK = '192.168.50.0/24'
 
 
+# image constants
+ID_EC2_IMAGE_1 = random_ec2_id('ami')
+ID_EC2_IMAGE_2 = random_ec2_id('ami')
+ID_OS_IMAGE_1 = random_os_id()
+ID_OS_IMAGE_2 = random_os_id()
+
+
 # Object constants section
 # Constant name notation:
 # [<subtype>]<object_name>
@@ -481,7 +488,7 @@ EC2_INSTANCE_1 = {
     'placement': {'availabilityZone': None},
     'dnsName': IP_ADDRESS_2,
     'instanceState': {'code': 0, 'name': 'pending'},
-    'imageId': None,
+    'imageId': ID_EC2_IMAGE_1,
     'productCodesSet': [],
     'privateDnsName': ID_EC2_INSTANCE_1,
     'keyName': None,
@@ -546,6 +553,7 @@ class OSInstance(object):
 
 OS_INSTANCE_1 = OSInstance(
     ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
+    image={'id': ID_OS_IMAGE_1},
     addresses={
         ID_EC2_SUBNET_2: [{'addr': IP_NETWORK_INTERFACE_2,
                            'version': 4,
@@ -921,6 +929,40 @@ EC2_ROUTE_TABLE_2 = {
          'gatewayId': ID_EC2_IGW_1,
          'state': 'active',
          'origin': 'CreateRoute'}]
+}
+
+
+# image objects
+class OSImage(object):
+
+    def __init__(self, image_dict):
+        self.id = image_dict['id']
+        self.is_public = image_dict['is_public']
+        self.status = image_dict['status']
+        self.properties = image_dict['properties']
+
+DB_IMAGE_1 = {
+    'id': ID_EC2_IMAGE_1,
+    'os_id': ID_OS_IMAGE_1,
+    'public': False,
+}
+DB_IMAGE_2 = {
+    'id': ID_EC2_IMAGE_2,
+    'os_id': ID_OS_IMAGE_2,
+    'public': True,
+}
+
+OS_IMAGE_1 = {
+    'id': ID_OS_IMAGE_1,
+    'is_public': False,
+    'status': 'active',
+    'properties': {},
+}
+OS_IMAGE_2 = {
+    'id': ID_OS_IMAGE_2,
+    'public': True,
+    'status': 'active',
+    'properties': {},
 }
 
 

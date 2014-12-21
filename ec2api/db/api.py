@@ -114,7 +114,7 @@ def get_items_by_ids(context, kind, item_ids):
     return IMPL.get_items_by_ids(context, kind, item_ids)
 
 
-def get_public_items(context, kind, item_ids):
+def get_public_items(context, kind, item_ids=None):
     return IMPL.get_public_items(context, kind, item_ids)
 
 
