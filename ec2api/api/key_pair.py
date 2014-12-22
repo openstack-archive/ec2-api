@@ -14,6 +14,7 @@
 
 import base64
 
+from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
@@ -61,25 +62,38 @@ def describe_key_pairs(context, key_name=None, filter=None):
     return {'keySet': formatted_key_pairs}
 
 
+def _validate_name(name):
+    if len(name) > 255:
+        raise exception.InvalidParameterValue(
+            value=name,
+            parameter='KeyName',
+            reason='lenght is exceeds maximum of 255')
+
+
 def create_key_pair(context, key_name):
+    _validate_name(key_name)
     nova = clients.nova(context)
     try:
         key_pair = nova.keypairs.create(key_name)
-    except clients.novaclient.exceptions.Conflict as ex:
-        raise exception.KeyPairExists(key_name=key_name)
+    except nova_exception.OverLimit:
+        raise exception.ResourceLimitExceeded(resource='keypairs')
+    except nova_exception.Conflict:
+        raise exception.InvalidKeyPairDuplicate(key_name=key_name)
     formatted_key_pair = _format_key_pair(key_pair)
     formatted_key_pair['keyMaterial'] = key_pair.private_key
     return formatted_key_pair
 
 
 def import_key_pair(context, key_name, public_key_material):
+    _validate_name(key_name)
     nova = clients.nova(context)
     public_key = base64.b64decode(public_key_material)
     try:
         key_pair = nova.keypairs.create(key_name, public_key)
-    except clients.novaclient.exceptions.Conflict as ex:
-        raise exception.KeyPairExists(key_name=key_name)
-
+    except nova_exception.OverLimit:
+        raise exception.ResourceLimitExceeded(resource='keypairs')
+    except nova_exception.Conflict:
+        raise exception.InvalidKeyPairDuplicate(key_name=key_name)
     return _format_key_pair(key_pair)
 
 
@@ -87,7 +101,7 @@ def delete_key_pair(context, key_name):
     nova = clients.nova(context)
     try:
         nova.keypairs.delete(key_name)
-    except exception.NotFound:
+    except nova_exception.NotFound:
         # aws returns true even if the key doesn't exist
         pass
     return True

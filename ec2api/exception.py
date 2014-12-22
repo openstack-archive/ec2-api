@@ -353,6 +353,10 @@ class ResourceLimitExceeded(Overlimit):
     msg_fmt = _('You have reached the limit of %(resource)s')
 
 
+class SecurityGroupLimitExceeded(Overlimit):
+    msg_fmt = _('You have reached the limit of security groups')
+
+
 class ImageNotActive(Invalid):
     ec2_code = 'InvalidAMIID.Unavailable'
     # TODO(ft): Change the message with the real AWS message
@@ -375,7 +379,7 @@ class InvalidAvailabilityZoneNotFound(NotFound):
     msg_fmt = _("Availability zone %(id)s not found")
 
 
-class KeyPairExists(Invalid):
+class InvalidKeyPairDuplicate(Invalid):
     ec2_code = 'InvalidKeyPair.Duplicate'
     msg_fmt = _("Key pair '%(key_name)s' already exists.")
 

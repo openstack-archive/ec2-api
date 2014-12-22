@@ -1242,7 +1242,7 @@ class CloudController(object):
         return key_pair.delete_key_pair(context, key_name)
 
     def import_key_pair(self, context, key_name, public_key_material):
-        return key_pair.create_key_pair(context, key_name,
+        return key_pair.import_key_pair(context, key_name,
                                         public_key_material)
 
     def describe_availability_zones(self, context, zone_name=None,
