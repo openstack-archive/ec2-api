@@ -335,7 +335,7 @@ def validate_ec2_id(val):
         return False
     try:
         ec2utils.ec2_id_to_id(val)
-    except exception.InvalidEc2Id:
+    except exception.InvalidId:
         return False
     return True
 

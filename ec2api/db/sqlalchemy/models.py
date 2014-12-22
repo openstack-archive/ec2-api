@@ -50,3 +50,14 @@ class Item(BASE, EC2Base):
     vpc_id = Column(String(length=12))
     os_id = Column(String(length=36))
     data = Column(Text())
+
+
+class Tag(BASE, EC2Base):
+    __tablename__ = 'tags'
+    __table_args__ = (
+        PrimaryKeyConstraint('project_id', 'item_id', 'key'),
+    )
+    project_id = Column(String(length=64))
+    item_id = Column(String(length=30))
+    key = Column(String(length=127))
+    value = Column(String(length=255))

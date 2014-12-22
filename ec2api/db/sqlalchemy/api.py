@@ -21,7 +21,9 @@ import random
 import sys
 
 from oslo.config import cfg
+from sqlalchemy import and_
 from sqlalchemy import or_
+from sqlalchemy.sql import bindparam
 
 from ec2api.api import ec2utils
 import ec2api.context
@@ -171,10 +173,22 @@ def update_item(context, item):
 
 @require_context
 def delete_item(context, item_id):
-    (model_query(context, models.Item).
-                filter_by(project_id=context.project_id,
-                          id=item_id).
-                          delete())
+    session = get_session()
+    deleted_count = (model_query(context, models.Item, session=session).
+                     filter_by(project_id=context.project_id,
+                               id=item_id).
+                     delete(synchronize_session=False))
+    if not deleted_count:
+        return
+    try:
+        (model_query(context, models.Tag, session=session).
+                 filter_by(project_id=context.project_id,
+                           item_id=item_id).
+                 delete(synchronize_session=False))
+    except Exception:
+        # NOTE(ft): ignore all exceptions because DB integrity is insignificant
+        # for tags
+        pass
 
 
 @require_context
@@ -238,6 +252,68 @@ def get_item_ids(context, kind, os_ids):
         query = query.filter(models.Item.id.in_(os_ids))
     return [(item['id'], item['os_id'])
             for item in query.all()]
+
+
+@require_context
+def add_tags(context, tags):
+    session = get_session()
+    get_query = (model_query(context, models.Tag, session=session).
+                 filter_by(project_id=context.project_id,
+                           # NOTE(ft): item_id param name is reserved for
+                           # sqlalchemy internal use
+                           item_id=bindparam('tag_item_id'),
+                           key=bindparam('tag_key')))
+    with session.begin():
+        for tag in tags:
+            tag_ref = models.Tag(project_id=context.project_id,
+                                 item_id=tag['item_id'])
+            tag_ref.update(tag)
+            try:
+                with session.begin(nested=True):
+                    tag_ref.save(session)
+            except db_exception.DBDuplicateEntry as ex:
+                if 'PRIMARY' not in ex.columns:
+                    raise
+                (get_query.params(tag_item_id=tag['item_id'],
+                                  tag_key=tag['key']).
+                 update({'value': tag['value']}))
+
+
+@require_context
+def delete_tags(context, item_ids, tag_pairs=None):
+    if not item_ids:
+        return
+
+    query = (model_query(context, models.Tag).
+             filter_by(project_id=context.project_id).
+             filter(models.Tag.item_id.in_(item_ids)))
+
+    if tag_pairs:
+        tag_flt = None
+        for tag_pair in tag_pairs:
+            pair_flt = None
+            for col in ('key', 'value'):
+                if col in tag_pair:
+                    expr = getattr(models.Tag, col) == tag_pair[col]
+                    pair_flt = (expr if pair_flt is None else
+                                and_(pair_flt, expr))
+            if pair_flt is not None:
+                tag_flt = (pair_flt if tag_flt is None else
+                           or_(tag_flt, pair_flt))
+        if tag_flt is not None:
+            query = query.filter(tag_flt)
+
+    query.delete(synchronize_session=False)
+
+
+@require_context
+def get_tags(context):
+    query = (model_query(context, models.Tag).
+             filter_by(project_id=context.project_id))
+    return [dict(item_id=tag.item_id,
+                 key=tag.key,
+                 value=tag.value)
+            for tag in query.all()]
 
 
 def _pack_item_data(item_data):

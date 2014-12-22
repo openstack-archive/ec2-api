@@ -33,6 +33,7 @@ from ec2api.api import route_table
 from ec2api.api import security_group
 from ec2api.api import snapshot
 from ec2api.api import subnet
+from ec2api.api import tag as tag_api
 from ec2api.api import volume
 from ec2api.api import vpc
 from ec2api.openstack.common import log as logging
@@ -1605,3 +1606,56 @@ class CloudController(object):
                                             user_group, operation_type,
                                             description, launch_permission,
                                             product_code, user_id, value)
+
+    def create_tags(self, context, resource_id, tag):
+        """Adds or overwrites one or more tags for the specified resources.
+
+        Args:
+            context (RequestContext): The request context.
+            resource_id (list of str): The IDs of one or more resources to tag.
+            tag (list of dict): Dict can contain:
+                key (str): The key of the tag.
+                value (str): The value of the tag.
+
+        Returns:
+            true if the request succeeds.
+        """
+        return tag_api.create_tags(context, resource_id, tag)
+
+    def delete_tags(self, context, resource_id, tag=None):
+        """Deletes the specified tags from the specified resources.
+
+        Args:
+            context (RequestContext): The request context.
+            resource_id (list of str): The IDs of one or more resources to tag.
+            tag (list of dict): One or more tags to delete.
+                Dict can contain:
+                key (str): The key of the tag.
+                value (str): The value of the tag.
+
+        Returns:
+            true if the request succeeds.
+
+        If you omit the value in tag parameter, we delete the tag regardless of
+        its value. If you specify this parameter with an empty string as the
+        value, we delete the key only if its value is an empty string.
+        """
+        return tag_api.delete_tags(context, resource_id, tag)
+
+    def describe_tags(self, context, filter=None, max_results=None,
+                      next_token=None):
+        """Describes one or more of the tags for your EC2 resources.
+
+        Args:
+            context (RequestContext): The request context.
+            filter (list of filter dict): You can specify filters so that the
+                response includes information for only certain tags.
+            max_results (int): The maximum number of items to return.
+                Not used now.
+            next_token (str): The token for the next set of items to return.
+                Not used now.
+
+        Returns:
+            A list of tags.
+        """
+        return tag_api.describe_tags(context, filter, max_results, next_token)

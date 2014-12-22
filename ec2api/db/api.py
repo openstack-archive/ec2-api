@@ -120,3 +120,15 @@ def get_public_items(context, kind, item_ids=None):
 
 def get_item_ids(context, kind, os_ids):
     return IMPL.get_item_ids(context, kind, os_ids)
+
+
+def add_tags(context, tags):
+    return IMPL.add_tags(context, tags)
+
+
+def delete_tags(context, item_ids, tag_pairs=None):
+    return IMPL.delete_tags(context, item_ids, tag_pairs)
+
+
+def get_tags(context):
+    return IMPL.get_tags(context)

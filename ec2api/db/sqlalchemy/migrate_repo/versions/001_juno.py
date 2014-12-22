@@ -34,6 +34,17 @@ def upgrade(migrate_engine):
     )
     items.create()
 
+    tags = Table('tags', meta,
+        Column("project_id", String(length=64)),
+        Column("item_id", String(length=30)),
+        Column("key", String(length=127)),
+        Column("value", String(length=255)),
+        PrimaryKeyConstraint('project_id', 'item_id', 'key'),
+        mysql_engine="InnoDB",
+        mysql_charset="utf8"
+    )
+    tags.create()
+
     if migrate_engine.name == "mysql":
         # In Folsom we explicitly converted migrate_version to UTF8.
         sql = "ALTER TABLE migrate_version CONVERT TO CHARACTER SET utf8;"

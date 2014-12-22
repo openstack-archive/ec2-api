@@ -45,31 +45,6 @@ def image_type(image_type):
     return image_type
 
 
-def resource_type_from_id(context, resource_id):
-    """Get resource type by ID
-
-    Returns a string representation of the Amazon resource type, if known.
-    Returns None on failure.
-
-    :param context: context under which the method is called
-    :param resource_id: resource_id to evaluate
-    """
-
-    known_types = {
-        'i': 'instance',
-        'r': 'reservation',
-        'vol': 'volume',
-        'snap': 'snapshot',
-        'ami': 'image',
-        'aki': 'image',
-        'ari': 'image'
-    }
-
-    type_marker = resource_id.split('-')[0]
-
-    return known_types.get(type_marker)
-
-
 _c2u = re.compile('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))')
 
 
@@ -226,7 +201,7 @@ def ec2_id_to_id(ec2_id):
     try:
         return int(ec2_id.split('-')[-1], 16)
     except ValueError:
-        raise exception.InvalidEc2Id(ec2_id=ec2_id)
+        raise exception.InvalidId(id=ec2_id)
 
 
 def image_ec2_id(image_id, image_type='ami'):
