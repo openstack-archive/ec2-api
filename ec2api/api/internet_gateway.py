@@ -22,6 +22,7 @@ from neutronclient.common import exceptions as neutron_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
@@ -44,11 +45,6 @@ CONF.register_opts(ec2_opts)
 
 """Internet gateway related API implementation
 """
-
-
-FILTER_MAP = {'internet-gateway-id': 'id',
-              'attachment.state': ['attachmentSet', 'state'],
-              'attachment.vpc-id': ['attachmentSet', 'vpcId']}
 
 
 def create_internet_gateway(context):
@@ -122,15 +118,21 @@ def delete_internet_gateway(context, internet_gateway_id):
     return True
 
 
+class InternetGatewayDescriber(common.NonOpenstackItemsDescriber):
+
+    KIND = 'igw'
+    FILTER_MAP = {'internet-gateway-id': 'id',
+                  'attachment.state': ['attachmentSet', 'state'],
+                  'attachment.vpc-id': ['attachmentSet', 'vpcId']}
+
+    def format(self, igw):
+        return _format_internet_gateway(igw)
+
+
 def describe_internet_gateways(context, internet_gateway_id=None,
                                filter=None):
-    # TODO(ft): implement filters
-    igws = ec2utils.get_db_items(context, 'igw', internet_gateway_id)
-    formatted_igws = []
-    for igw in igws:
-        formatted_igw = _format_internet_gateway(igw)
-        if not utils.filtered_out(formatted_igw, filter, FILTER_MAP):
-            formatted_igws.append(formatted_igw)
+    formatted_igws = InternetGatewayDescriber().describe(
+            context, ids=internet_gateway_id, filter=filter)
     return {'internetGatewaySet': formatted_igws}
 
 

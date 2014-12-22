@@ -104,7 +104,14 @@ def release_address(context, public_ip=None, allocation_id=None):
 class AddressDescriber(common.UniversalDescriber):
 
     KIND = 'eipalloc'
-    FILTER_MAP = {'vpc-id': 'vpcId'}
+    FILTER_MAP = {'allocation-id': 'allocationId',
+                  'association-id': 'associationId',
+                  'domain': 'domain',
+                  'instance-id': 'instanceId',
+                  'network-interface-id': 'networkInterfaceId',
+                  'network-interface-owner-id': 'networkInterfaceOwnerId',
+                  'privateIpAddress': 'privateIpAddress',
+                  'public-ip': 'publicIp'}
 
     def __init__(self, os_ports):
         self.os_ports = os_ports

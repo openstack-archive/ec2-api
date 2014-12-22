@@ -18,6 +18,7 @@ from neutronclient.common import exceptions as neutron_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import route_table as route_table_api
@@ -34,12 +35,6 @@ LOG = logging.getLogger(__name__)
 
 """Subnet related API implementation
 """
-
-
-FILTER_MAP = {'cidr': 'cidrBlock',
-              'subnet-id': 'id',
-              'state': 'state',
-              'vpc-id': 'vpcId'}
 
 
 def create_subnet(context, vpc_id, cidr_block,
@@ -135,28 +130,40 @@ def delete_subnet(context, subnet_id):
     return True
 
 
-def describe_subnets(context, subnet_id=None, filter=None):
-    # TODO(ft): implement filters
-    neutron = clients.neutron(context)
-    os_subnets = neutron.list_subnets()['subnets']
-    os_networks = neutron.list_networks()['networks']
-    os_ports = neutron.list_ports()['ports']
-    subnets = ec2utils.get_db_items(context, 'subnet', subnet_id)
-    formatted_subnets = []
-    for subnet in subnets:
-        os_subnet = next((s for s in os_subnets
-                          if s['id'] == subnet['os_id']), None)
-        if not os_subnet:
-            db_api.delete_item(context, subnet['id'])
-            continue
-        os_network = next((n for n in os_networks
+class SubnetDescriber(common.UniversalDescriber):
+
+    KIND = 'subnet'
+    FILTER_MAP = {'available-ip-address-count': 'availableIpAddressCount',
+                  'cidr': 'cidrBlock',
+                  'cidrBlock': 'cidrBlock',
+                  'cidr-block': 'cidrBlock',
+                  'subnet-id': 'id',
+                  'state': 'state',
+                  'vpc-id': 'vpcId'}
+
+    def format(self, subnet, os_subnet):
+        os_network = next((n for n in self.os_networks
                            if n['id'] == os_subnet['network_id']),
                           None)
-        if os_network:
-            formatted_subnet = _format_subnet(
-                context, subnet, os_subnet, os_network, os_ports)
-            if not utils.filtered_out(formatted_subnet, filter, FILTER_MAP):
-                formatted_subnets.append(formatted_subnet)
+        if not os_network:
+            self.delete_obsolete_item(subnet)
+            return None
+        return _format_subnet(self.context, subnet, os_subnet, os_network,
+                              self.os_ports)
+
+    def get_name(self, os_item):
+        return ''
+
+    def get_os_items(self):
+        neutron = clients.neutron(self.context)
+        self.os_networks = neutron.list_networks()['networks']
+        self.os_ports = neutron.list_ports()['ports']
+        return neutron.list_subnets()['subnets']
+
+
+def describe_subnets(context, subnet_id=None, filter=None):
+    formatted_subnets = SubnetDescriber().describe(context, ids=subnet_id,
+                                                   filter=filter)
     return {'subnetSet': formatted_subnets}
 
 

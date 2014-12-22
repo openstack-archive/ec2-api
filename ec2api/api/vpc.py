@@ -110,6 +110,8 @@ class VpcDescriber(common.NonOpenstackItemsDescriber):
 
     KIND = 'vpc'
     FILTER_MAP = {'cidr': 'cidrBlock',
+                  'dhcp-options-id': 'dhcpOptionsId',
+                  'is-default': 'isDefault',
                   'state': 'state',
                   'vpc-id': 'vpcId'}
 

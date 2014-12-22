@@ -104,7 +104,7 @@ class NonOpenstackItemsDescriber(UniversalDescriber):
         formatted_items = []
 
         for item in self.items:
-            formatted_item = self.format(item=item)
+            formatted_item = self.format(item)
             if not utils.filtered_out(formatted_item, filter,
                                       self.FILTER_MAP):
                 formatted_items.append(formatted_item)

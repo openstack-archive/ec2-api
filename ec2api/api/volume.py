@@ -23,14 +23,6 @@ from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 
 
-FILTER_MAP = {'availability-zone': 'availabilityZone',
-              'create-time': 'createTime',
-              'size': 'size',
-              'snapshot-id': 'snapshotId',
-              'status': 'status',
-              'volume-id': 'volumeId'}
-
-
 def create_volume(context, availability_zone=None, size=None,
                   snapshot_id=None, volume_type=None, name=None,
                   description=None, metadata=None, iops=None, encrypted=None,

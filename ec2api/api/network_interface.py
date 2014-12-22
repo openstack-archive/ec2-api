@@ -21,6 +21,7 @@ from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import dhcp_options
 from ec2api.api import ec2utils
 from ec2api.api import security_group as security_group_api
@@ -38,10 +39,6 @@ LOG = logging.getLogger(__name__)
 
 """Network interface related API implementation
 """
-
-
-FILTER_MAP = {'vpc-id': 'vpcId',
-              'subnet-id': 'subnetId'}
 
 
 def create_network_interface(context, subnet_id,
@@ -184,36 +181,52 @@ def delete_network_interface(context, network_interface_id):
     return True
 
 
+class NetworkInterfaceDescriber(common.UniversalDescriber):
+
+    KIND = 'eni'
+    FILTER_MAP = {'addresses.private-ip-address': ['privateIpAddressesSet',
+                                                   'privateIpAddress'],
+                  'addresses.primary': ['privateIpAddressesSet', 'primary'],
+                  'description': 'description',
+                  'group-id': ['groupSet', 'groupId'],
+                  'group-name': ['groupSet', 'groupName'],
+                  'mac-address': 'macAddress',
+                  'network-interface-id': 'networkInterfaceId',
+                  'owner-id': 'ownerId',
+                  'private-ip-address': 'privateIpAddress',
+                  'requester-managed': 'requesterManage',
+                  'source-dest-check': 'sourceDestCheck',
+                  'status': 'status',
+                  'vpc-id': 'vpcId',
+                  'subnet-id': 'subnetId'}
+
+    def format(self, network_interface, os_port):
+        return _format_network_interface(
+                self.context, network_interface, os_port,
+                self.addresses[network_interface['id']], self.security_groups)
+
+    def get_os_items(self):
+        neutron = clients.neutron(self.context)
+        os_floating_ips = neutron.list_floatingips()['floatingips']
+        os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
+        addresses = collections.defaultdict(list)
+        for address in db_api.get_items(self.context, 'eipalloc'):
+            if ('network_interface_id' in address and
+                    address['os_id'] in os_floating_ip_ids):
+                addresses[address['network_interface_id']].append(address)
+        self.addresses = addresses
+        self.security_groups = (
+            security_group_api._format_security_groups_ids_names(self.context))
+        return neutron.list_ports()['ports']
+
+    def get_name(self, os_item):
+        return ''
+
+
 def describe_network_interfaces(context, network_interface_id=None,
                                 filter=None):
-    # TODO(Alex): implement filters
-    neutron = clients.neutron(context)
-    os_ports = neutron.list_ports()['ports']
-    network_interfaces = ec2utils.get_db_items(context, 'eni',
-                                               network_interface_id)
-    os_floating_ips = neutron.list_floatingips()['floatingips']
-    os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
-    addresses = collections.defaultdict(list)
-    for address in db_api.get_items(context, 'eipalloc'):
-        if ('network_interface_id' in address and
-                address['os_id'] in os_floating_ip_ids):
-            addresses[address['network_interface_id']].append(address)
-    security_groups = security_group_api._format_security_groups_ids_names(
-        context)
-    formatted_network_interfaces = []
-    for network_interface in network_interfaces:
-        os_port = next((p for p in os_ports
-                        if p['id'] == network_interface['os_id']), None)
-        if not os_port:
-            db_api.delete_item(context, network_interface['id'])
-            continue
-        formatted_network_interface = _format_network_interface(
-            context, network_interface, os_port,
-            addresses[network_interface['id']],
-            security_groups)
-        if not utils.filtered_out(formatted_network_interface, filter,
-                                  FILTER_MAP):
-            formatted_network_interfaces.append(formatted_network_interface)
+    formatted_network_interfaces = NetworkInterfaceDescriber().describe(
+            context, ids=network_interface_id, filter=filter)
     return {'networkInterfaceSet': formatted_network_interfaces}
 
 
@@ -409,7 +422,6 @@ def _format_network_interface(context, network_interface, os_port,
         }
     else:
         ec2_network_interface['status'] = 'available'
-    ec2_network_interface['ownerId'] = context.project_id
     ec2_network_interface['macAddress'] = os_port['mac_address']
     if os_port['fixed_ips']:
         ipsSet = []

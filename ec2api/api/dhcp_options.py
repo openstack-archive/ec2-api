@@ -17,6 +17,7 @@ import netaddr
 from oslo.config import cfg
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
@@ -98,15 +99,20 @@ def delete_dhcp_options(context, dhcp_options_id):
     return True
 
 
+class DhcpOptionsDescriber(common.NonOpenstackItemsDescriber):
+
+    KIND = 'dopt'
+    FILTER_MAP = {'dhcp_options_id': 'dhcpOptionsId',
+                  'key': ['dhcpConfigurationSet', 'key']}
+
+    def format(self, dhcp_options):
+        return _format_dhcp_options(self.context, dhcp_options)
+
+
 def describe_dhcp_options(context, dhcp_options_id=None,
                           filter=None):
-    # TODO(Alex): implement filters
-    dhcp_options = ec2utils.get_db_items(context, 'dopt', dhcp_options_id)
-    formatted_dhcp_options = []
-    for dhcp_opts in dhcp_options:
-        formatted_dhcp_options.append(
-                _format_dhcp_options(
-                        context, dhcp_opts))
+    formatted_dhcp_options = DhcpOptionsDescriber().describe(
+            context, ids=dhcp_options_id, filter=filter)
     return {'dhcpOptionsSet': formatted_dhcp_options}
 
 

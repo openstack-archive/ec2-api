@@ -18,9 +18,8 @@ from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import clients
-from ec2api.api import utils
+from ec2api.api import common
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 
 
@@ -32,33 +31,41 @@ LOG = logging.getLogger(__name__)
 """
 
 
-FILTER_MAP = {'fingerprint': 'keyFingerprint',
-              'key-name': 'keyName'}
+class KeyPairDescriber(common.UniversalDescriber):
 
+    KIND = 'kp'
+    FILTER_MAP = {'fingerprint': 'keyFingerprint',
+                  'key-name': 'keyName'}
 
-def describe_key_pairs(context, key_name=None, filter=None):
-    nova = clients.nova(context)
-    key_pairs = nova.keypairs.list()
-    if key_name is not None:
-        key_pairs = [x for x in key_pairs if x.name in key_name]
+    def format(self, _item, key_pair):
+        return _format_key_pair(key_pair)
 
-    # If looking for non existent key pair
-    if key_name is not None and not key_pairs:
-        msg = _('Could not find key pair(s): %s') % ','.join(key_name)
-        raise exception.InvalidKeypairNotFound(message=msg)
+    def get_db_items(self):
+        return []
 
-    formatted_key_pairs = []
-    for key_pair in key_pairs:
+    def get_os_items(self):
         # Original EC2 in nova filters out vpn keys for admin user.
         # We're not filtering out the vpn keys for now.
         # In order to implement this we'd have to configure vpn_key_suffix
         # in our config which we consider an overkill.
         # suffix = CONF.vpn_key_suffix
         # if context.is_admin or not key_pair['name'].endswith(suffix):
-        formatted_key_pair = _format_key_pair(key_pair)
-        if not utils.filtered_out(formatted_key_pair, filter, FILTER_MAP):
-            formatted_key_pairs.append(formatted_key_pair)
+        nova = clients.nova(self.context)
+        return nova.keypairs.list()
 
+    def auto_update_db(self, item, os_item):
+        pass
+
+    def get_id(self, os_item):
+        return ''
+
+    def get_name(self, key_pair):
+        return key_pair.name
+
+
+def describe_key_pairs(context, key_name=None, filter=None):
+    formatted_key_pairs = KeyPairDescriber().describe(context, names=key_name,
+                                                      filter=filter)
     return {'keySet': formatted_key_pairs}
 
 

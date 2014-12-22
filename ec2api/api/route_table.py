@@ -19,14 +19,12 @@ import netaddr
 from novaclient import exceptions as nova_exception
 
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
-
-
-FILTER_MAP = {'vpc-id': 'vpcId'}
 
 
 def create_route_table(context, vpc_id):
@@ -200,33 +198,54 @@ def delete_route_table(context, route_table_id):
     return True
 
 
-def describe_route_tables(context, route_table_id=None, filter=None):
-    # TODO(ft): implement filters
-    route_tables = db_api.get_items(context, 'rtb')
-    associations = collections.defaultdict(list)
-    for subnet in db_api.get_items(context, 'subnet'):
-        if 'route_table_id' in subnet:
-            associations[subnet['route_table_id']].append(subnet['id'])
-    vpcs = db_api.get_items(context, 'vpc')
-    vpcs = dict((vpc['id'], vpc) for vpc in vpcs)
-    gateways = db_api.get_items(context, 'igw')
-    gateways = dict((igw['id'], igw) for igw in gateways)
-    # TODO(ft): scan route tables to get only used instances and
-    # network interfaces to reduce DB and Nova throughput
-    network_interfaces = db_api.get_items(context, 'eni')
-    network_interfaces = dict((eni['id'], eni) for eni in network_interfaces)
+class RouteTableDescriber(common.NonOpenstackItemsDescriber):
 
-    formatted_route_tables = []
-    for route_table in route_tables:
-        formatted_route_table = _format_route_table(
-            context, route_table,
-            associated_subnet_ids=associations[route_table['id']],
-            is_main=vpcs[route_table['vpc_id']]['route_table_id'] ==
-            route_table['id'],
-            gateways=gateways,
-            network_interfaces=network_interfaces)
-        if not utils.filtered_out(formatted_route_table, filter, FILTER_MAP):
-            formatted_route_tables.append(formatted_route_table)
+    KIND = 'rtb'
+    FILTER_MAP = {'association.route-table-association-id': (
+                        ['associationSet', 'routeTableAssociationId']),
+                  'association.route-table-id': ['associationSet',
+                                                 'routeTableId'],
+                  'association.subnet-id': ['associationSet', 'subnetId'],
+                  'association.main': ['association', 'main'],
+                  'route-table-id': 'routeTableId',
+                  'route.destination-cidr-block': ['routeSet',
+                                                   'destinationCidrBlock'],
+                  'route.gateway-id': ['routeSet', 'gatewayId'],
+                  'route.instance-id': ['routeSet', 'instanceId'],
+                  'route.origin': ['route', 'origin'],
+                  'route.state': ['route', 'state'],
+                  'vpc-id': 'vpcId'}
+
+    def format(self, route_table):
+        return _format_route_table(
+            self.context, route_table,
+            associated_subnet_ids=self.associations[route_table['id']],
+            is_main=(self.vpcs[route_table['vpc_id']]['route_table_id'] ==
+                     route_table['id']),
+            gateways=self.gateways,
+            network_interfaces=self.network_interfaces)
+
+    def get_db_items(self):
+        associations = collections.defaultdict(list)
+        for subnet in db_api.get_items(self.context, 'subnet'):
+            if 'route_table_id' in subnet:
+                associations[subnet['route_table_id']].append(subnet['id'])
+        self.associations = associations
+        vpcs = db_api.get_items(self.context, 'vpc')
+        self.vpcs = dict((vpc['id'], vpc) for vpc in vpcs)
+        gateways = db_api.get_items(self.context, 'igw')
+        self.gateways = dict((igw['id'], igw) for igw in gateways)
+        # TODO(ft): scan route tables to get only used instances and
+        # network interfaces to reduce DB and Nova throughput
+        network_interfaces = db_api.get_items(self.context, 'eni')
+        self.network_interfaces = dict((eni['id'], eni)
+                                       for eni in network_interfaces)
+        return super(RouteTableDescriber, self).get_db_items()
+
+
+def describe_route_tables(context, route_table_id=None, filter=None):
+    formatted_route_tables = RouteTableDescriber().describe(
+            context, ids=route_table_id, filter=filter)
     return {'routeTableSet': formatted_route_tables}
 
 
