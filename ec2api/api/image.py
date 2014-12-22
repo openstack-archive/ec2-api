@@ -193,7 +193,7 @@ def update_image(context, image_id, **kwargs):
     return glance.images.update(image['os_id'], **kwargs)
 
 
-class ImageDescriber(common.UniversalDescriber):
+class ImageDescriber(common.TaggableItemsDescriber):
 
     KIND = 'ami'
     FILTER_MAP = {'architecture': 'architecture',
@@ -256,6 +256,9 @@ class ImageDescriber(common.UniversalDescriber):
     def delete_obsolete_item(self, image):
         if image['os_id'] in self.local_images_os_ids:
             db_api.delete_item(self.context, image['id'])
+
+    def get_tags(self):
+        return db_api.get_tags(self.context, ('ami', 'ari', 'aki'), self.ids)
 
 
 def describe_images(context, executable_by=None, image_id=None,

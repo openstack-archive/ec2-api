@@ -130,5 +130,5 @@ def delete_tags(context, item_ids, tag_pairs=None):
     return IMPL.delete_tags(context, item_ids, tag_pairs)
 
 
-def get_tags(context):
-    return IMPL.get_tags(context)
+def get_tags(context, kinds=None, item_ids=None):
+    return IMPL.get_tags(context, kinds, item_ids)

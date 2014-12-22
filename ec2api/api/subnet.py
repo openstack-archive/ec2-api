@@ -130,7 +130,7 @@ def delete_subnet(context, subnet_id):
     return True
 
 
-class SubnetDescriber(common.UniversalDescriber):
+class SubnetDescriber(common.TaggableItemsDescriber):
 
     KIND = 'subnet'
     FILTER_MAP = {'available-ip-address-count': 'availableIpAddressCount',

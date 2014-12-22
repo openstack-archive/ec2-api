@@ -106,7 +106,8 @@ def delete_vpc(context, vpc_id):
     return True
 
 
-class VpcDescriber(common.NonOpenstackItemsDescriber):
+class VpcDescriber(common.NonOpenstackItemsDescriber,
+                   common.TaggableItemsDescriber):
 
     KIND = 'vpc'
     FILTER_MAP = {'cidr': 'cidrBlock',

@@ -99,7 +99,8 @@ def delete_dhcp_options(context, dhcp_options_id):
     return True
 
 
-class DhcpOptionsDescriber(common.NonOpenstackItemsDescriber):
+class DhcpOptionsDescriber(common.NonOpenstackItemsDescriber,
+                           common.TaggableItemsDescriber):
 
     KIND = 'dopt'
     FILTER_MAP = {'dhcp_options_id': 'dhcpOptionsId',

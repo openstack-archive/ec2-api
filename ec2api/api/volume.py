@@ -93,7 +93,7 @@ def delete_volume(context, volume_id):
     return True
 
 
-class VolumeDescriber(common.UniversalDescriber):
+class VolumeDescriber(common.TaggableItemsDescriber):
 
     KIND = 'vol'
     FILTER_MAP = {'availability-zone': 'availabilityZone',

@@ -181,7 +181,7 @@ def delete_network_interface(context, network_interface_id):
     return True
 
 
-class NetworkInterfaceDescriber(common.UniversalDescriber):
+class NetworkInterfaceDescriber(common.TaggableItemsDescriber):
 
     KIND = 'eni'
     FILTER_MAP = {'addresses.private-ip-address': ['privateIpAddressesSet',
@@ -452,6 +452,9 @@ def _format_network_interface(context, network_interface, os_port,
             primary_ip['privateIpAddress'])
         if 'association' in primary_ip:
             ec2_network_interface['association'] = primary_ip['association']
+    # NOTE(ft): AWS returns empty tag set for a network interface
+    # if no tag exists
+    ec2_network_interface['tagSet'] = []
     return ec2_network_interface
 
 

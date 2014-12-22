@@ -289,27 +289,35 @@ def delete_tags(context, item_ids, tag_pairs=None):
              filter(models.Tag.item_id.in_(item_ids)))
 
     if tag_pairs:
-        tag_flt = None
+        tag_fltr = None
         for tag_pair in tag_pairs:
-            pair_flt = None
+            pair_fltr = None
             for col in ('key', 'value'):
                 if col in tag_pair:
                     expr = getattr(models.Tag, col) == tag_pair[col]
-                    pair_flt = (expr if pair_flt is None else
-                                and_(pair_flt, expr))
-            if pair_flt is not None:
-                tag_flt = (pair_flt if tag_flt is None else
-                           or_(tag_flt, pair_flt))
-        if tag_flt is not None:
-            query = query.filter(tag_flt)
+                    pair_fltr = (expr if pair_fltr is None else
+                                 and_(pair_fltr, expr))
+            if pair_fltr is not None:
+                tag_fltr = (pair_fltr if tag_fltr is None else
+                            or_(tag_fltr, pair_fltr))
+        if tag_fltr is not None:
+            query = query.filter(tag_fltr)
 
     query.delete(synchronize_session=False)
 
 
 @require_context
-def get_tags(context):
+def get_tags(context, kinds=None, item_ids=None):
     query = (model_query(context, models.Tag).
              filter_by(project_id=context.project_id))
+    if kinds:
+        fltr = None
+        for kind in kinds:
+            expr = models.Tag.item_id.like('%s-%%' % kind)
+            fltr = expr if fltr is None else or_(fltr, expr)
+        query = query.filter(fltr)
+    if item_ids:
+        query = query.filter(models.Tag.item_id.in_(item_ids))
     return [dict(item_id=tag.item_id,
                  key=tag.key,
                  value=tag.value)

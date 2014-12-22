@@ -59,7 +59,7 @@ def delete_snapshot(context, snapshot_id):
     return True
 
 
-class SnapshotDescriber(common.UniversalDescriber):
+class SnapshotDescriber(common.TaggableItemsDescriber):
 
     KIND = 'snap'
     FILTER_MAP = {'description': 'description',

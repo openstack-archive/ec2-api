@@ -128,7 +128,7 @@ def delete_security_group(context, group_name=None, group_id=None):
     return True
 
 
-class SecurityGroupDescriber(common.UniversalDescriber):
+class SecurityGroupDescriber(common.TaggableItemsDescriber):
 
     KIND = 'sg'
     FILTER_MAP = {'vpc-id': 'vpcId',

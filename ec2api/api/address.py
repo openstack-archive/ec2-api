@@ -101,7 +101,7 @@ def release_address(context, public_ip=None, allocation_id=None):
     return True
 
 
-class AddressDescriber(common.UniversalDescriber):
+class AddressDescriber(common.TaggableItemsDescriber):
 
     KIND = 'eipalloc'
     FILTER_MAP = {'allocation-id': 'allocationId',

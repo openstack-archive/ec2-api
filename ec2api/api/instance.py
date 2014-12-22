@@ -560,6 +560,7 @@ def _format_instance(context, instance, os_instance, novadb_instance,
     for ec2_network_interface in ec2_network_interfaces:
         ec2_network_interface['attachment'].pop('instanceId')
         ec2_network_interface['attachment'].pop('instanceOwnerId')
+        ec2_network_interface.pop('tagSet')
         if (not main_ec2_network_interface and
                 any(address['privateIpAddress'] == instance_ip
                     for address in

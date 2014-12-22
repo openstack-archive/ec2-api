@@ -198,7 +198,8 @@ def delete_route_table(context, route_table_id):
     return True
 
 
-class RouteTableDescriber(common.NonOpenstackItemsDescriber):
+class RouteTableDescriber(common.NonOpenstackItemsDescriber,
+                          common.TaggableItemsDescriber):
 
     KIND = 'rtb'
     FILTER_MAP = {'association.route-table-association-id': (
@@ -390,7 +391,10 @@ def _format_route_table(context, route_table, is_main=False,
     ec2_route_table = {'routeTableId': route_table['id'],
                        'vpcId': vpc_id,
                        # TODO(ft): propagationVgwSet
-                       'routeSet': []}
+                       'routeSet': [],
+                       # NOTE(ft): AWS returns empty tag set for a route table
+                       # if no tag exists
+                       'tagSet': []}
     # TODO(ft): refactor to get Nova instances outside of this function
     nova = clients.nova(context)
     for route in route_table['routes']:

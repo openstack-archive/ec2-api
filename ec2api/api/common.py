@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 
 from ec2api.api import ec2utils
 from ec2api.api import utils
@@ -28,6 +29,9 @@ class UniversalDescriber(object):
     FILTER_MAP = {}
 
     def format(self, item=None, os_item=None):
+        pass
+
+    def post_format(self, formatted_item, item):
         pass
 
     def get_db_items(self):
@@ -67,18 +71,20 @@ class UniversalDescriber(object):
             os_item_id = self.get_id(os_item)
             item = self.items_dict.get(os_item_id, None)
             # NOTE(Alex): Filter out items not requested in names or ids
-            if selective_describe:
-                if os_item_name in self.names:
-                    self.names.remove(os_item_name)
-                elif item and item['id'] in self.ids:
-                    self.ids.remove(item['id'])
-                else:
-                    continue
+            if (selective_describe and
+                    not (os_item_name in self.names or
+                         (item and item['id'] in self.ids))):
+                continue
             # NOTE(Alex): Autoupdate DB for autoupdatable items
             item = self.auto_update_db(item, os_item)
             if item:
                 paired_items_ids.add(item['id'])
             formatted_item = self.format(item, os_item)
+            self.post_format(formatted_item, item)
+            if os_item_name in self.names:
+                self.names.remove(os_item_name)
+            if item and item['id'] in self.ids:
+                self.ids.remove(item['id'])
             if (formatted_item and
                     not utils.filtered_out(formatted_item, filter,
                                            self.FILTER_MAP)):
@@ -94,6 +100,33 @@ class UniversalDescriber(object):
         return formatted_items
 
 
+class TaggableItemsDescriber(UniversalDescriber):
+
+    tags = None
+
+    def get_tags(self):
+        return db_api.get_tags(self.context, (self.KIND,), self.ids)
+
+    def post_format(self, formatted_item, item):
+        if not item:
+            return
+
+        if self.tags is None:
+            tags = collections.defaultdict(list)
+            for tag in self.get_tags():
+                tags[tag['item_id']].append(tag)
+            self.tags = tags
+
+        formatted_tags = []
+        for tag in self.tags[item['id']]:
+            formatted_tags.append({'key': tag['key'],
+                                   'value': tag['value']})
+        if formatted_tags:
+            # NOTE(ft): AWS returns tagSet element for all objects (there are
+            # errors in AWS docs)
+            formatted_item['tagSet'] = formatted_tags
+
+
 class NonOpenstackItemsDescriber(UniversalDescriber):
     """Describer class for non-Openstack items Describe implementations."""
 
@@ -105,6 +138,7 @@ class NonOpenstackItemsDescriber(UniversalDescriber):
 
         for item in self.items:
             formatted_item = self.format(item)
+            self.post_format(formatted_item, item)
             if not utils.filtered_out(formatted_item, filter,
                                       self.FILTER_MAP):
                 formatted_items.append(formatted_item)

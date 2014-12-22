@@ -321,6 +321,7 @@ EC2_NETWORK_INTERFACE_1 = {
     'ownerId': ID_OS_PROJECT,
     'requesterManaged': False,
     'groupSet': [],
+    'tagSet': [],
 }
 EC2_NETWORK_INTERFACE_2 = {
     'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_2,
@@ -362,6 +363,7 @@ EC2_NETWORK_INTERFACE_2 = {
         'instanceOwnerId': ID_OS_PROJECT,
     },
     'groupSet': [],
+    'tagSet': [],
 }
 
 OS_PORT_1 = {'id': ID_OS_PORT_1,
@@ -910,6 +912,7 @@ EC2_ROUTE_TABLE_1 = {
         {'routeTableAssociationId': ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
          'routeTableId': ID_EC2_ROUTE_TABLE_1,
          'main': True}],
+    'tagSet': [],
 }
 EC2_ROUTE_TABLE_2 = {
     'routeTableId': ID_EC2_ROUTE_TABLE_2,
@@ -928,7 +931,8 @@ EC2_ROUTE_TABLE_2 = {
         {'destinationCidrBlock': '0.0.0.0/0',
          'gatewayId': ID_EC2_IGW_1,
          'state': 'active',
-         'origin': 'CreateRoute'}]
+         'origin': 'CreateRoute'}],
+    'tagSet': [],
 }
 
 
