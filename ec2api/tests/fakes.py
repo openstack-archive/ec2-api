@@ -641,12 +641,15 @@ DB_ADDRESS_2 = {
     'private_ip_address': IP_NETWORK_INTERFACE_2,
 }
 
-EC2OS_ADDRESS_1 = {
+EC2_ADDRESS_CLASSIC_1 = {
     'publicIp': IP_ADDRESS_1,
+    'domain': 'standard'
 }
-EC2OS_ADDRESS_2 = {
+EC2_ADDRESS_CLASSIC_2 = {
     'publicIp': IP_ADDRESS_2,
     'instanceId': ID_EC2_INSTANCE_1,
+    'domain': 'standard',
+    'privateIpAddress': IP_NETWORK_INTERFACE_2
 }
 EC2_ADDRESS_1 = {
     'allocationId': ID_EC2_ADDRESS_1,
