@@ -396,7 +396,13 @@ class AddressEngineNova(object):
         nova = clients.nova(context)
         os_instance_id = self.get_nova_ip_by_public_ip(context,
                                                        public_ip).instance_id
-        nova.servers.remove_floating_ip(os_instance_id, public_ip)
+        if os_instance_id:
+            try:
+                nova.servers.remove_floating_ip(os_instance_id, public_ip)
+            except nova_exception.Forbidden:
+                raise exception.AuthFailure(
+                    msg=_('The address %(public_ip)s does not belong to you') %
+                    {'public_ip': public_ip})
         return None
 
     def get_os_floating_ips(self, context):
