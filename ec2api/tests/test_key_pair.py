@@ -81,7 +81,7 @@ class KeyPairCase(base.ApiTestCase):
         self.assertEqual(200, resp['status'])
         self.nova_key_pairs.delete.assert_any_call('keyname1')
 
-    def test_describe_key_pair(self):
+    def test_describe_key_pairs(self):
         self.nova_key_pairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
         resp = self.execute('DescribeKeyPairs', {})
@@ -92,7 +92,7 @@ class KeyPairCase(base.ApiTestCase):
                                              {'keyMaterial'})]))
         self.nova_key_pairs.list.assert_called_once()
 
-    def test_describe_key_pair_invalid(self):
+    def test_describe_key_pairs_invalid(self):
         self.nova_key_pairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
         resp = self.execute('DescribeKeyPairs', {'KeyName': 'badname'})

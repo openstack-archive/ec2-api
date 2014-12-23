@@ -966,6 +966,38 @@ OS_IMAGE_2 = {
 }
 
 
+# availability zone objects
+
+class NovaAvailabilityZone(object):
+
+    def __init__(self, nova_availability_zone_dict):
+        self.zoneName = nova_availability_zone_dict['zoneName']
+        self.zoneState = {'available':
+            nova_availability_zone_dict['zoneState'] == 'available'}
+        self.hosts = nova_availability_zone_dict['hosts']
+
+OS_AVAILABILITY_ZONE = {'zoneName': 'nova',
+                        'zoneState': 'available',
+                        'hosts': {'host1': {'service1': {
+                                                'active': 'True',
+                                                'available': 'True',
+                                                'updated_at': 'now'},
+                                            'service2': {
+                                                'active': 'False',
+                                                'available': 'False',
+                                                'updated_at': 'now'}},
+                                  'host2': {'service1': {
+                                                'active': 'True',
+                                                'available': 'True',
+                                                'updated_at': 'now'}}
+                                   }}
+OS_AVAILABILITY_ZONE_INTERNAL = {'zoneName': 'internal',
+                                 'zoneState': 'available',
+                                 'hosts': {}}
+EC2_AVAILABILITY_ZONE = {'zoneName': 'nova',
+                         'zoneState': 'available'}
+
+
 # keypair objects
 
 class NovaKeyPair(object):

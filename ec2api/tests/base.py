@@ -38,6 +38,8 @@ class ApiTestCase(test_base.BaseTestCase):
         self.addCleanup(neutron_patcher.stop)
         nova_patcher = mock.patch('novaclient.v1_1.client.Client')
         nova_mock = nova_patcher.start()
+        self.nova_availability_zones = (
+            nova_mock.return_value.availability_zones)
         self.nova_servers = nova_mock.return_value.servers
         self.nova_flavors = nova_mock.return_value.flavors
         self.nova_floating_ips = nova_mock.return_value.floating_ips
