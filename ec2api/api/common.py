@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import collections
+import fnmatch
 
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.db import api as db_api
+from ec2api import exception
 
 
 VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb']
@@ -55,6 +56,34 @@ class UniversalDescriber(object):
     def delete_obsolete_item(self, item):
         db_api.delete_item(self.context, item['id'])
 
+    def is_filtering_value_found(self, filter_value, value):
+        if fnmatch.fnmatch(value, filter_value):
+            return True
+
+    def filtered_out(self, item, filters):
+        if filters is None:
+            return False
+        for filter in filters:
+            filter_name = self.FILTER_MAP.get(filter['name'])
+            if filter_name is None:
+                raise exception.InvalidParameterValue(
+                    value=filter['name'], parameter='filter',
+                    reason='invalid filter')
+            if isinstance(filter_name, list):
+                value_set = item.get(filter_name[0], [])
+                values = [value[filter_name[1]] for value in value_set]
+            else:
+                value = item.get(filter_name)
+                values = [value] if value else []
+            if not values:
+                return True
+            filter_values = filter['value']
+            for filter_value in filter_values:
+                for value in values:
+                    if self.is_filtering_value_found(filter_value, value):
+                        return False
+        return True
+
     def describe(self, context, ids=None, names=None, filter=None):
         self.context = context
         selective_describe = ids is not None or names is not None
@@ -86,8 +115,7 @@ class UniversalDescriber(object):
             if item and item['id'] in self.ids:
                 self.ids.remove(item['id'])
             if (formatted_item and
-                    not utils.filtered_out(formatted_item, filter,
-                                           self.FILTER_MAP)):
+                    not self.filtered_out(formatted_item, filter)):
                 formatted_items.append(formatted_item)
         # NOTE(Alex): delete obsolete items
         for item in self.items:
@@ -103,6 +131,12 @@ class UniversalDescriber(object):
 class TaggableItemsDescriber(UniversalDescriber):
 
     tags = None
+
+    def __init__(self):
+        super(TaggableItemsDescriber, self).__init__()
+        self.FILTER_MAP['tag-key'] = ['tagSet', 'key']
+        self.FILTER_MAP['tag-value'] = ['tagSet', 'value']
+        self.FILTER_MAP['tag'] = 'tagSet'
 
     def get_tags(self):
         return db_api.get_tags(self.context, (self.KIND,), self.ids)
@@ -126,6 +160,34 @@ class TaggableItemsDescriber(UniversalDescriber):
             # errors in AWS docs)
             formatted_item['tagSet'] = formatted_tags
 
+    def describe(self, context, ids=None, names=None, filter=None):
+        if filter:
+            for f in filter:
+                if f['name'].startswith('tag:'):
+                    tag_key = f['name'].split(':')[1]
+                    tag_values = f['value']
+                    f['name'] = 'tag'
+                    f['value'] = [{'key': tag_key,
+                                   'value': tag_values}]
+        return super(TaggableItemsDescriber, self).describe(
+            context, ids, names, filter)
+
+    def is_filtering_value_found(self, filter_value, value):
+        if isinstance(filter_value, dict):
+            for tag_pair in value:
+                if (not isinstance(tag_pair, dict) or
+                        filter_value.get('key') != tag_pair.get('key')):
+                    continue
+                for filter_dict_value in filter_value.get('value'):
+                    if super(TaggableItemsDescriber,
+                             self).is_filtering_value_found(
+                                filter_dict_value,
+                                tag_pair.get('value')):
+                        return True
+            return False
+        return super(TaggableItemsDescriber,
+            self).is_filtering_value_found(filter_value, value)
+
 
 class NonOpenstackItemsDescriber(UniversalDescriber):
     """Describer class for non-Openstack items Describe implementations."""
@@ -139,7 +201,6 @@ class NonOpenstackItemsDescriber(UniversalDescriber):
         for item in self.items:
             formatted_item = self.format(item)
             self.post_format(formatted_item, item)
-            if not utils.filtered_out(formatted_item, filter,
-                                      self.FILTER_MAP):
+            if not self.filtered_out(formatted_item, filter):
                 formatted_items.append(formatted_item)
         return formatted_items

@@ -118,8 +118,8 @@ def delete_internet_gateway(context, internet_gateway_id):
     return True
 
 
-class InternetGatewayDescriber(common.NonOpenstackItemsDescriber,
-                               common.TaggableItemsDescriber):
+class InternetGatewayDescriber(common.TaggableItemsDescriber,
+                               common.NonOpenstackItemsDescriber):
 
     KIND = 'igw'
     FILTER_MAP = {'internet-gateway-id': 'id',
