@@ -14,6 +14,7 @@
 
 
 import copy
+import json
 import random
 import uuid
 
@@ -38,7 +39,7 @@ def get_db_api_add_item(item_id_dict):
 
 
 def get_db_api_get_items(results_dict_by_kind):
-    def db_api_get_items(context, kind):
+    def db_api_get_items(context, kind, *args):
         return results_dict_by_kind.get(kind)
     return db_api_get_items
 
@@ -184,8 +185,26 @@ CIDR_EXTERNAL_NETWORK = '192.168.50.0/24'
 # image constants
 ID_EC2_IMAGE_1 = random_ec2_id('ami')
 ID_EC2_IMAGE_2 = random_ec2_id('ami')
+ID_EC2_IMAGE_AKI_1 = random_ec2_id('aki')
+ID_EC2_IMAGE_ARI_1 = random_ec2_id('ari')
 ID_OS_IMAGE_1 = random_os_id()
 ID_OS_IMAGE_2 = random_os_id()
+ID_OS_IMAGE_AKI_1 = random_os_id()
+ID_OS_IMAGE_ARI_1 = random_os_id()
+
+
+# volumes constants
+ID_EC2_VOLUME_1 = random_ec2_id('vol')
+ID_EC2_VOLUME_2 = random_ec2_id('vol')
+ID_OS_VOLUME_1 = random_os_id()
+ID_OS_VOLUME_2 = random_os_id()
+
+
+# snapshots constants
+ID_EC2_SNAPSHOT_1 = random_ec2_id('snap')
+ID_EC2_SNAPSHOT_2 = random_ec2_id('snap')
+ID_OS_SNAPSHOT_1 = random_os_id()
+ID_OS_SNAPSHOT_2 = random_os_id()
 
 
 # Object constants section
@@ -944,32 +963,153 @@ class OSImage(object):
 
     def __init__(self, image_dict):
         self.id = image_dict['id']
+        self.owner = image_dict['owner']
         self.is_public = image_dict['is_public']
         self.status = image_dict['status']
+        self.container_format = image_dict['container_format']
+        self.name = image_dict['name']
         self.properties = image_dict['properties']
+
+EC2_IMAGE_1 = {
+    'imageId': ID_EC2_IMAGE_1,
+    'imageOwnerId': ID_OS_PROJECT,
+    'isPublic': False,
+    'imageState': 'available',
+    'imageType': 'machine',
+    'name': 'fake_name',
+    'description': None,
+    'imageLocation': 'None (fake_name)',
+    'kernelId': ID_EC2_IMAGE_AKI_1,
+    'ramdiskId': ID_EC2_IMAGE_ARI_1,
+    'architecture': None,
+    'rootDeviceType': 'instance-store',
+    'rootDeviceName': '/dev/sda1',
+    'blockDeviceMapping': [
+        {'deviceName': '/dev/sdb0',
+         'virtualName': 'ephemeral0'},
+        {'deviceName': '/dev/sdb1',
+         'ebs': {'snapshotId': ID_EC2_SNAPSHOT_1}},
+        {'deviceName': '/dev/sdb2',
+         'ebs': {'snapshotId': ID_EC2_VOLUME_1}},
+        {'deviceName': '/dev/sdb3',
+         'virtualName': 'ephemeral5'},
+        {'deviceName': '/dev/sdc0',
+         'virtualName': 'swap'},
+        {'deviceName': '/dev/sdc1',
+         'ebs': {'snapshotId': ID_EC2_SNAPSHOT_2}},
+        {'deviceName': '/dev/sdc2',
+         'ebs': {'snapshotId': ID_EC2_VOLUME_2}},
+        {'deviceName': '/dev/sdc3',
+         'virtualName': 'ephemeral6'}],
+}
+EC2_IMAGE_2 = {
+    'imageId': ID_EC2_IMAGE_2,
+    'imageOwnerId': ID_OS_PROJECT,
+    'isPublic': True,
+    'imageState': 'available',
+    'imageType': 'machine',
+    'name': None,
+    'description': None,
+    'imageLocation': 'None (None)',
+    'architecture': None,
+    'rootDeviceType': 'instance-store',
+    'rootDeviceName': '/dev/sdb1',
+    'blockDeviceMapping': [
+        {'deviceName': '/dev/sdb1',
+         'ebs': {'snapshotId': ID_EC2_SNAPSHOT_1}}],
+}
+
 
 DB_IMAGE_1 = {
     'id': ID_EC2_IMAGE_1,
     'os_id': ID_OS_IMAGE_1,
-    'public': False,
+    'is_public': False,
 }
 DB_IMAGE_2 = {
     'id': ID_EC2_IMAGE_2,
     'os_id': ID_OS_IMAGE_2,
-    'public': True,
+    'is_public': True,
 }
 
 OS_IMAGE_1 = {
     'id': ID_OS_IMAGE_1,
+    'owner': ID_OS_PROJECT,
     'is_public': False,
     'status': 'active',
-    'properties': {},
+    'container_format': 'ami',
+    'name': 'fake_name',
+    'properties': {
+        'kernel_id': ID_OS_IMAGE_AKI_1,
+        'ramdisk_id': ID_OS_IMAGE_ARI_1,
+        'type': 'machine',
+        'image_state': 'available',
+        'mappings': json.dumps([
+            {'device': '/dev/sda1', 'virtual': 'root'},
+            {'device': 'sdb0', 'virtual': 'ephemeral0'},
+            {'device': 'sdb1', 'virtual': 'ephemeral1'},
+            {'device': 'sdb2', 'virtual': 'ephemeral2'},
+            {'device': 'sdb3', 'virtual': 'ephemeral3'},
+            {'device': 'sdb4', 'virtual': 'ephemeral4'},
+            {'device': 'sdc0', 'virtual': 'swap'},
+            {'device': 'sdc1', 'virtual': 'swap'},
+            {'device': 'sdc2', 'virtual': 'swap'},
+            {'device': 'sdc3', 'virtual': 'swap'},
+            {'device': 'sdc4', 'virtual': 'swap'}]),
+        'block_device_mapping': json.dumps([
+            {'device_name': '/dev/sdb1',
+             'snapshot_id': ID_OS_SNAPSHOT_1},
+            {'device_name': '/dev/sdb2',
+             'volume_id': ID_OS_VOLUME_1},
+            {'device_name': '/dev/sdb3', 'virtual_name': 'ephemeral5'},
+            {'device_name': '/dev/sdb4', 'no_device': True},
+            {'device_name': '/dev/sdc1',
+             'snapshot_id': ID_OS_SNAPSHOT_2},
+            {'device_name': '/dev/sdc2',
+             'volume_id': ID_OS_VOLUME_2},
+            {'device_name': '/dev/sdc3', 'virtual_name': 'ephemeral6'},
+            {'device_name': '/dev/sdc4', 'no_device': True}]),
+        }
 }
 OS_IMAGE_2 = {
     'id': ID_OS_IMAGE_2,
-    'public': True,
+    'owner': ID_OS_PROJECT,
+    'is_public': True,
     'status': 'active',
-    'properties': {},
+    'container_format': 'ami',
+    'name': None,
+    'properties': {
+        'type': 'machine',
+        'root_device_name': '/dev/sdb1',
+        'mappings': json.dumps([{'device': '/dev/sda1',
+                      'virtual': 'root'}]),
+        'block_device_mapping': json.dumps([
+            {'device_name': '/dev/sdb1',
+             'snapshot_id': ID_OS_SNAPSHOT_1}]),
+    }
+}
+
+
+# snapshot objects
+class OSSnapshot(object):
+
+    def __init__(self, snapshot_dict):
+        self.id = snapshot_dict['id']
+
+
+DB_SNAPSHOT_1 = {
+    'id': ID_EC2_SNAPSHOT_1,
+    'os_id': ID_OS_SNAPSHOT_1,
+}
+DB_SNAPSHOT_2 = {
+    'id': ID_EC2_SNAPSHOT_2,
+    'os_id': ID_OS_SNAPSHOT_2,
+}
+
+OS_SNAPSHOT_1 = {
+    'id': ID_OS_SNAPSHOT_1,
+}
+OS_SNAPSHOT_2 = {
+    'id': ID_OS_SNAPSHOT_2,
 }
 
 

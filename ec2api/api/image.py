@@ -74,6 +74,16 @@ rpcapi_opts = [
 CONF.register_opts(rpcapi_opts)
 
 
+CONTAINER_TO_KIND = {'kernel': 'aki',
+                     'ramdisk': 'ari',
+                     'aki': 'aki',
+                     'ari': 'ari',
+                     'ami': 'ami'}
+KIND_TO_TYPE = {'aki': 'kernel',
+                'ari': 'ramdisk',
+                'ami': 'machine'}
+
+
 # TODO(yamahata): race condition
 # At the moment there is no way to prevent others from
 # manipulating instances/volumes/snapshots.
@@ -93,26 +103,21 @@ def create_image(context, instance_id, name=None, description=None,
                                               reason=msg)
 
     restart_instance = False
-    if not no_reboot:
-        vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
-
-        if vm_state not in (instance_api.vm_states_ACTIVE,
-                            instance_api.vm_states_STOPPED):
+    if not no_reboot and os_instance.status != 'SHUTOFF':
+        if os_instance.status != 'ACTIVE':
             # TODO(ft): Change the error code and message with the real AWS
             # ones
             msg = _('Instance must be run or stopped')
             raise exception.IncorrectState(reason=msg)
 
-        if vm_state == instance_api.vm_states_ACTIVE:
-            restart_instance = True
-            os_instance.stop()
+        restart_instance = True
+        os_instance.stop()
 
         # wait instance for really stopped
         start_time = time.time()
-        while vm_state != instance_api.vm_states_STOPPED:
+        while os_instance.status != 'SHUTOFF':
             time.sleep(1)
             os_instance.get()
-            vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
             # NOTE(yamahata): timeout and error. 1 hour for now for safety.
             #                 Is it too short/long?
             #                 Or is there any better way?
@@ -128,8 +133,9 @@ def create_image(context, instance_id, name=None, description=None,
     with utils.OnCrashCleaner() as cleaner:
         os_image = os_instance.create_image(name)
         cleaner.addCleanup(os_image.delete)
-        image = db_api.add_item(context, 'ami', {'os_id': os_image.id,
-                                                 'is_public': False})
+        image = db_api.add_item(context, _get_os_image_kind(os_image),
+                                {'os_id': os_image.id,
+                                 'is_public': False})
 
     if restart_instance:
         os_instance.start()
@@ -148,12 +154,8 @@ def register_image(context, name=None, image_location=None,
         msg = _('imageLocation is required')
         raise exception.MissingParameter(msg)
 
-    metadata = {'properties': {'image_location': image_location}}
-
-    if name:
-        metadata['name'] = name
-    else:
-        metadata['name'] = image_location
+    metadata = {'properties': {'image_location': image_location},
+                'name': name if name else image_location}
 
     if root_device_name:
         metadata['properties']['root_device_name'] = root_device_name
@@ -166,16 +168,16 @@ def register_image(context, name=None, image_location=None,
     with utils.OnCrashCleaner() as cleaner:
         os_image = _s3_create(context, metadata)
         cleaner.addCleanup(os_image.delete)
-        image_type = ec2utils.image_type(os_image.container_format)
-        image = db_api.add_item(context, image_type, {'os_id': os_image.id,
-                                                      'is_public': False})
+        kind = _get_os_image_kind(os_image)
+        image = db_api.add_item(context, kind, {'os_id': os_image.id,
+                                                'is_public': False})
     return {'imageId': image['id']}
 
 
 def deregister_image(context, image_id):
     # TODO(ft): AWS returns AuthFailure for public images,
     # but we return NotFound due searching for local images only
-    kind = image_id.split('-')[0]
+    kind = ec2utils.get_ec2_id_kind(image_id)
     image = ec2utils.get_db_item(context, kind, image_id)
     glance = clients.glance(context)
     try:
@@ -187,7 +189,7 @@ def deregister_image(context, image_id):
 
 
 def update_image(context, image_id, **kwargs):
-    kind = image_id.split('-')[0]
+    kind = ec2utils.get_ec2_id_kind(image_id)
     image = ec2utils.get_db_item(context, kind, image_id)
     glance = clients.glance(context)
     return glance.images.update(image['os_id'], **kwargs)
@@ -237,7 +239,7 @@ class ImageDescriber(common.TaggableItemsDescriber):
 
     def auto_update_db(self, image, os_image):
         if not image:
-            kind = ec2utils.image_type(os_image.container_format)
+            kind = _get_os_image_kind(os_image)
             ctx = (self.context if os_image.owner == self.context.project_id
                    else ec2_context.get_admin_context(
                             project_id=os_image.owner))
@@ -281,7 +283,8 @@ def describe_image_attribute(context, image_id, attribute):
         _prop_root_dev_name = _block_device_properties_root_device_name
         result['rootDeviceName'] = _prop_root_dev_name(image['properties'])
         if result['rootDeviceName'] is None:
-            result['rootDeviceName'] = _block_device_DEFAULT_ROOT_DEV_NAME
+            result['rootDeviceName'] = (
+                    instance_api._block_device_DEFAULT_ROOT_DEV_NAME)
 
     def _kernel_attribute(image, result):
         kernel_id = image['properties'].get('kernel_id')
@@ -307,13 +310,14 @@ def describe_image_attribute(context, image_id, attribute):
 
     # TODO(ft): AWS returns AuthFailure for public images,
     # but we return NotFound due searching for local images only
-    kind = image_id.split('-')[0]
+    kind = ec2utils.get_ec2_id_kind(image_id)
     image = ec2utils.get_db_item(context, kind, image_id)
     fn = supported_attributes.get(attribute)
     if fn is None:
         raise exception.InvalidAttribute(attr=attribute)
     glance = clients.glance(context)
     os_image = glance.images.get(image['os_id'])
+    _prepare_mappings(os_image)
 
     result = {'imageId': image_id}
     fn(os_image, result)
@@ -344,7 +348,7 @@ def modify_image_attribute(context, image_id, attribute,
 
     # TODO(ft): AWS returns AuthFailure for public images,
     # but we return NotFound due searching for local images only
-    kind = image_id.split('-')[0]
+    kind = ec2utils.get_ec2_id_kind(image_id)
     image = ec2utils.get_db_item(context, kind, image_id)
     glance = clients.glance(context)
     image = glance.images.get(image['os_id'])
@@ -355,20 +359,20 @@ def modify_image_attribute(context, image_id, attribute,
 
 def _format_image(context, image, os_image, images_dict, ids_dict,
                   snapshot_ids=None):
-    image_type = ec2utils.image_type(os_image.container_format)
-    name = os_image.name
-    display_mapping = {'aki': 'kernel',
-                       'ari': 'ramdisk',
-                       'ami': 'machine'}
     ec2_image = {'imageId': image['id'],
                  'imageOwnerId': os_image.owner,
-                 'name': name,
-                 'imageState': _cloud_get_image_state(os_image),
                  'description': '',
-                 'imageType': display_mapping.get(image_type),
-                 'isPublic': not not os_image.is_public,
+                 'imageType': KIND_TO_TYPE[
+                                   ec2utils.get_ec2_id_kind(image['id'])],
+                 'isPublic': image['is_public'],
                  'architecture': os_image.properties.get('architecture'),
                  }
+    # NOTE(vish): fallback status if image_state isn't set
+    state = os_image.status
+    if state == 'active':
+        state = 'available'
+    ec2_image['imageState'] = os_image.properties.get('image_state', state)
+
     kernel_id = os_image.properties.get('kernel_id')
     if kernel_id:
         ec2_image['kernelId'] = ec2utils.os_id_to_ec2_id(
@@ -380,34 +384,51 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
                 context, 'ari', ramdisk_id,
                 items_by_os_id=images_dict, ids_by_os_id=ids_dict)
 
+    name = os_image.name
     img_loc = os_image.properties.get('image_location')
     if img_loc:
         ec2_image['imageLocation'] = img_loc
     else:
         ec2_image['imageLocation'] = "%s (%s)" % (img_loc, name)
-
     if not name and img_loc:
         # This should only occur for images registered with ec2 api
         # prior to that api populating the glance name
         ec2_image['name'] = img_loc
+    else:
+        ec2_image['name'] = name
 
+    _prepare_mappings(os_image)
     properties = os_image.properties
-    root_device_name = _block_device_properties_root_device_name(properties)
-    root_device_type = 'instance-store'
+    ec2_image['rootDeviceName'] = (
+            _block_device_properties_root_device_name(properties) or
+            instance_api._block_device_DEFAULT_ROOT_DEV_NAME)
 
-    for bdm in json.loads(properties.get('block_device_mapping', '[]')):
+    root_device_type = 'instance-store'
+    for bdm in properties.get('block_device_mapping', []):
         if (bdm.get('boot_index') == 0 and
             ('snapshot_id' in bdm or 'volume_id' in bdm) and
                 not bdm.get('no_device')):
             root_device_type = 'ebs'
-    ec2_image['rootDeviceName'] = (root_device_name or
-                                   _block_device_DEFAULT_ROOT_DEV_NAME)
+            break
     ec2_image['rootDeviceType'] = root_device_type
 
     _cloud_format_mappings(context, properties, ec2_image,
                            ec2_image['rootDeviceName'], snapshot_ids)
 
     return ec2_image
+
+
+def _prepare_mappings(os_image):
+    def prepare_property(property_name):
+        if property_name in os_image.properties:
+            os_image.properties[property_name] = json.loads(
+                    os_image.properties[property_name])
+    prepare_property('mappings')
+    prepare_property('block_device_mapping')
+
+
+def _get_os_image_kind(os_image):
+    return CONTAINER_TO_KIND.get(os_image.container_format, 'ami')
 
 
 def _auto_create_image_extension(context, image, os_image):
@@ -424,37 +445,6 @@ ec2utils.register_auto_create_db_item_extension(
 
 # NOTE(ft): following functions are copied from various parts of Nova
 
-def _cloud_get_image_state(os_image):
-    # NOTE(vish): fallback status if image_state isn't set
-    state = os_image.status
-    if state == 'active':
-        state = 'available'
-    return os_image.properties.get('image_state', state)
-
-
-_block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
-
-
-def _block_device_properties_root_device_name(properties):
-    """get root device name from image meta data.
-
-    If it isn't specified, return None.
-    """
-    root_device_name = None
-
-    # NOTE(yamahata): see image_service.s3.s3create()
-    for bdm in properties.get('mappings', []):
-        if bdm['virtual'] == 'root':
-            root_device_name = bdm['device']
-
-    # NOTE(yamahata): register_image's command line can override
-    #                 <machine>.manifest.xml
-    if 'root_device_name' in properties:
-        root_device_name = properties['root_device_name']
-
-    return root_device_name
-
-
 def _cloud_properties_get_mappings(properties):
     return _block_device_mappings_prepend_dev(properties.get('mappings', []))
 
@@ -469,7 +459,7 @@ def _cloud_format_mappings(context, properties, result, root_device_name=None,
     block_device_mapping = [
         _cloud_format_block_device_mapping(context, bdm, root_device_name,
                                            snapshot_ids)
-        for bdm in json.loads(properties.get('block_device_mapping', '[]'))]
+        for bdm in properties.get('block_device_mapping', [])]
 
     # NOTE(yamahata): overwrite mappings with block_device_mapping
     for bdm in block_device_mapping:
@@ -522,6 +512,26 @@ def _cloud_format_block_device_mapping(context, bdm, root_device_name=None,
         assert 'snapshotId' in ebs
         item['ebs'] = ebs
     return item
+
+
+def _block_device_properties_root_device_name(properties):
+    """get root device name from image meta data.
+
+    If it isn't specified, return None.
+    """
+    root_device_name = None
+
+    # NOTE(yamahata): see image_service.s3.s3create()
+    for bdm in properties.get('mappings', []):
+        if bdm['virtual'] == 'root':
+            root_device_name = bdm['device']
+
+    # NOTE(yamahata): register_image's command line can override
+    #                 <machine>.manifest.xml
+    if 'root_device_name' in properties:
+        root_device_name = properties['root_device_name']
+
+    return root_device_name
 
 
 def _block_device_mappings_prepend_dev(mappings):

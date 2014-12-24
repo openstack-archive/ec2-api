@@ -56,7 +56,7 @@ def create_tags(context, resource_id, tag):
                     parameter='Tag', value=str(tag_pair), reason=reason)
 
     for item_id in resource_id:
-        kind = item_id.split('-')[0]
+        kind = ec2utils.get_ec2_id_kind(item_id)
         if kind not in RESOURCE_TYPES:
             raise exception.InvalidId(id=item_id)
         # NOTE(ft): check items exist (excluding images because AWS allows to
@@ -99,7 +99,7 @@ def describe_tags(context, filter=None, max_results=None, next_token=None):
 
 
 def _format_tag(tag):
-    kind = tag['item_id'].split('-')[0]
+    kind = ec2utils.get_ec2_id_kind(tag['item_id'])
     return {
         'resourceType': RESOURCE_TYPES.get(kind, kind),
         'resourceId': tag['item_id'],

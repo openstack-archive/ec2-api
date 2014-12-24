@@ -48,6 +48,9 @@ class ApiTestCase(test_base.BaseTestCase):
         self.nova_security_group_rules = (
             nova_mock.return_value.security_group_rules)
         self.addCleanup(nova_patcher.stop)
+        glance_patcher = mock.patch('glanceclient.client.Client')
+        self.glance = glance_patcher.start().return_value
+        self.addCleanup(glance_patcher.stop)
         db_api_patcher = mock.patch('ec2api.db.api.IMPL')
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)

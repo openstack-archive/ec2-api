@@ -15,6 +15,8 @@
 
 import copy
 
+import mock
+
 
 def update_dict(dict1, dict2):
     """Get a copy of union of two dicts."""
@@ -36,3 +38,16 @@ def patch_dict(dict1, dict2, trash_iter):
     res = update_dict(dict1, dict2)
     res = purge_dict(res, trash_iter)
     return res
+
+
+class CopyingMock(mock.MagicMock):
+    """Mock class for calls with mutable arguments.
+
+    See https://docs.python.org/3/library/unittest.mock-examples.html#
+        coping-with-mutable-arguments
+    """
+
+    def __call__(self, *args, **kwargs):
+        args = copy.deepcopy(args)
+        kwargs = copy.deepcopy(kwargs)
+        return super(CopyingMock, self).__call__(*args, **kwargs)

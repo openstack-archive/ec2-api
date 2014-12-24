@@ -28,23 +28,6 @@ from ec2api.openstack.common import uuidutils
 LOG = logging.getLogger(__name__)
 
 
-def image_type(image_type):
-    """Converts to a three letter image type.
-
-    aki, kernel => aki
-    ari, ramdisk => ari
-    anything else => ami
-
-    """
-    if image_type == 'kernel':
-        return 'aki'
-    if image_type == 'ramdisk':
-        return 'ari'
-    if image_type not in ['aki', 'ari']:
-        return 'ami'
-    return image_type
-
-
 _c2u = re.compile('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))')
 
 
@@ -311,6 +294,10 @@ def get_int_id_from_snapshot_uuid(context, snapshot_uuid):
 
 # NOTE(ft): extra functions to use in vpc specific code or instead of
 # malformed existed functions
+
+
+def get_ec2_id_kind(obj_id):
+    return obj_id.split('-')[0]
 
 
 def change_ec2_id_kind(obj_id, new_kind):

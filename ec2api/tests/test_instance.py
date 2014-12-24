@@ -37,9 +37,6 @@ class InstanceTestCase(base.ApiTestCase):
         self.create_network_interface = (
             create_network_interface_patcher.start())
         self.addCleanup(create_network_interface_patcher.stop)
-        glance_patcher = mock.patch('glanceclient.client.Client')
-        self.glance = glance_patcher.start().return_value
-        self.addCleanup(glance_patcher.stop)
         ec2_id_to_glance_id_patcher = (
             mock.patch('ec2api.api.ec2utils.ec2_id_to_glance_id'))
         self.ec2_id_to_glance_id = ec2_id_to_glance_id_patcher.start()
