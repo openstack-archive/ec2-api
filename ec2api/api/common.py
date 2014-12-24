@@ -142,7 +142,7 @@ class TaggableItemsDescriber(UniversalDescriber):
         return db_api.get_tags(self.context, (self.KIND,), self.ids)
 
     def post_format(self, formatted_item, item):
-        if not item:
+        if not item or not formatted_item:
             return
 
         if self.tags is None:

@@ -201,6 +201,8 @@ class NetworkInterfaceDescriber(common.TaggableItemsDescriber):
                   'subnet-id': 'subnetId'}
 
     def format(self, network_interface, os_port):
+        if not network_interface:
+            return None
         return _format_network_interface(
                 self.context, network_interface, os_port,
                 self.addresses[network_interface['id']], self.security_groups)

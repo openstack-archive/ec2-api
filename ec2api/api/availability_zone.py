@@ -55,7 +55,7 @@ LOG = logging.getLogger(__name__)
 
 class AvailabilityZoneDescriber(common.UniversalDescriber):
 
-    KIND = 'sg'
+    KIND = 'az'
     FILTER_MAP = {'state': 'zoneState',
                   'zone-name': 'zoneName'}
 
@@ -78,6 +78,9 @@ class AvailabilityZoneDescriber(common.UniversalDescriber):
 
     def get_id(self, os_item):
         return ''
+
+    def auto_update_db(self, item, os_item):
+        pass
 
 
 def describe_availability_zones(context, zone_name=None, filter=None):
