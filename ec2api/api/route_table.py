@@ -198,8 +198,8 @@ def delete_route_table(context, route_table_id):
     return True
 
 
-class RouteTableDescriber(common.NonOpenstackItemsDescriber,
-                          common.TaggableItemsDescriber):
+class RouteTableDescriber(common.TaggableItemsDescriber,
+                          common.NonOpenstackItemsDescriber):
 
     KIND = 'rtb'
     FILTER_MAP = {'association.route-table-association-id': (
