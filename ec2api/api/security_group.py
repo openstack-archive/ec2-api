@@ -48,7 +48,7 @@ SECURITY_GROUP_MAP = {'domain-name-servers': 'dns-servers',
 
 
 def get_security_group_engine():
-    if clients.neutronclient:
+    if CONF.full_vpc_support:
         return SecurityGroupEngineNeutron()
     else:
         return SecurityGroupEngineNova()

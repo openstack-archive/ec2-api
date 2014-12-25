@@ -15,10 +15,21 @@
 import collections
 import fnmatch
 
+from oslo.config import cfg
+
 from ec2api.api import ec2utils
 from ec2api.db import api as db_api
 from ec2api import exception
 
+
+ec2_opts = [
+    cfg.BoolOpt('full_vpc_support',
+                default=True,
+                help='True if server supports Neutron for full VPC access'),
+]
+
+CONF = cfg.CONF
+CONF.register_opts(ec2_opts)
 
 VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb']
 

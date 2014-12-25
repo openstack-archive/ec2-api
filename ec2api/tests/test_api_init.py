@@ -40,7 +40,7 @@ class ApiInitTestCase(test_base.BaseTestCase):
         self.requester = self.requester_class.return_value
         self.addCleanup(requester_patcher.stop)
 
-        controller_patcher = mock.patch('ec2api.api.cloud.CloudController')
+        controller_patcher = mock.patch('ec2api.api.cloud.VpcCloudController')
         self.controller_class = controller_patcher.start()
         self.controller = self.controller_class.return_value
         self.addCleanup(controller_patcher.stop)

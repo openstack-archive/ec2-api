@@ -35,7 +35,7 @@ CONF.import_opt('external_network', 'ec2api.api.internet_gateway')
 
 
 def get_address_engine():
-    if clients.neutronclient:
+    if CONF.full_vpc_support:
         return AddressEngineNeutron()
     else:
         return AddressEngineNova()

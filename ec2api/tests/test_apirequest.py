@@ -39,7 +39,7 @@ class EC2RequesterTestCase(test_base.BaseTestCase):
         self.requester = requester_patcher.start().return_value
         self.addCleanup(requester_patcher.stop)
 
-        controller_patcher = mock.patch('ec2api.api.cloud.CloudController')
+        controller_patcher = mock.patch('ec2api.api.cloud.VpcCloudController')
         self.controller = controller_patcher.start().return_value
         self.addCleanup(controller_patcher.stop)
 

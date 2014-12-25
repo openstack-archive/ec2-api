@@ -21,6 +21,7 @@ import datetime
 from xml.dom import minidom
 
 from lxml import etree
+from oslo.config import cfg
 
 from ec2api.api import cloud
 from ec2api.api import ec2utils
@@ -29,6 +30,7 @@ from ec2api import exception
 from ec2api.openstack.common import log as logging
 
 
+CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 
@@ -52,7 +54,10 @@ class APIRequest(object):
         self.action = action
         self.version = version
         self.args = args
-        self.controller = cloud.CloudController()
+        if CONF.full_vpc_support:
+            self.controller = cloud.VpcCloudController()
+        else:
+            self.controller = cloud.CloudController()
         self.proxyController = proxy.ProxyController()
 
     def invoke(self, context):
