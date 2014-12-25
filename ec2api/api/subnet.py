@@ -142,6 +142,8 @@ class SubnetDescriber(common.TaggableItemsDescriber):
                   'vpc-id': 'vpcId'}
 
     def format(self, subnet, os_subnet):
+        if not subnet:
+            return None
         os_network = next((n for n in self.os_networks
                            if n['id'] == os_subnet['network_id']),
                           None)
