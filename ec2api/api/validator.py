@@ -69,17 +69,17 @@ def validate_int(max_value=None):
     return _do
 
 
-def validate_url_path(val, **kwargs):
+def validate_url_path(val, parameter_name=None, **kwargs):
     """True if val is matched by the path component grammar in rfc3986."""
 
-    if not validate_str()(val):
+    if not validate_str()(val, parameter_name):
         return False
 
     return VALIDATE_PATH_RE.match(val).end() == len(val)
 
 
-def validate_image_path(val, **kwargs):
-    if not validate_str()(val):
+def validate_image_path(val, parameter_name=None, **kwargs):
+    if not validate_str()(val, parameter_name):
         return False
 
     bucket_name = val.split('/')[0]

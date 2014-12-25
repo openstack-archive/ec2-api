@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
+import copy
 
+import mock
+from oslotest import base as test_base
+
+from ec2api.api import image as image_api
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
@@ -21,6 +25,63 @@ from ec2api.tests import tools
 
 
 class ImageTestCase(base.ApiTestCase):
+
+    @mock.patch('ec2api.api.image._s3_create')
+    def test_register_image(self, s3_create):
+        s3_create.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
+        self.db_api.add_item.side_effect = (
+            fakes.get_db_api_add_item(fakes.ID_EC2_IMAGE_1))
+
+        resp = self.execute(
+            'RegisterImage',
+            {'ImageLocation': fakes.LOCATION_IMAGE_1})
+        self.assertThat(resp, matchers.DictMatches(
+            {'status': 200,
+            'imageId': fakes.ID_EC2_IMAGE_1}))
+
+        s3_create.assert_called_once_with(
+            mock.ANY,
+            {'name': fakes.LOCATION_IMAGE_1,
+             'properties': {'image_location': fakes.LOCATION_IMAGE_1}})
+        s3_create.reset_mock()
+
+        resp = self.execute(
+            'RegisterImage',
+            {'ImageLocation': fakes.LOCATION_IMAGE_1,
+             'Name': 'an image name'})
+        self.assertThat(resp, matchers.DictMatches(
+            {'status': 200,
+            'imageId': fakes.ID_EC2_IMAGE_1}))
+
+        s3_create.assert_called_once_with(
+            mock.ANY,
+            {'name': 'an image name',
+             'properties': {'image_location': fakes.LOCATION_IMAGE_1}})
+
+    def test_register_image_invalid_parameters(self):
+        resp = self.execute('RegisterImage', {})
+        self.assertEqual(400, resp['status'])
+        self.assertEqual('MissingParameter', resp['Error']['Code'])
+
+    def test_deregister_image(self):
+        self._setup_model()
+
+        resp = self.execute('DeregisterImage',
+                            {'ImageId': fakes.ID_EC2_IMAGE_1})
+        self.assertThat(resp, matchers.DictMatches({'status': 200,
+                                                    'return': True}))
+        self.db_api.delete_item.assert_called_once_with(
+            mock.ANY, fakes.ID_EC2_IMAGE_1)
+        self.glance.images.delete.assert_called_once_with(
+            fakes.ID_OS_IMAGE_1)
+
+    def test_deregister_image_invalid_parameters(self):
+        self._setup_model()
+
+        resp = self.execute('DeregisterImage',
+                            {'ImageId': fakes.random_ec2_id('ami')})
+        self.assertEqual(400, resp['status'])
+        self.assertEqual('InvalidAMIID.NotFound', resp['Error']['Code'])
 
     def test_describe_images(self):
         self._setup_model()
@@ -162,3 +223,78 @@ class ImageTestCase(base.ApiTestCase):
                            fakes.OSImage(fakes.OS_IMAGE_2)
                            if os_id == fakes.ID_OS_IMAGE_2 else
                            None))
+
+
+class ImagePrivateTestCase(test_base.BaseTestCase):
+
+    def test_format_image(self):
+        image_ids = {fakes.ID_OS_IMAGE_1: fakes.ID_EC2_IMAGE_1,
+                     fakes.ID_OS_IMAGE_AKI_1: fakes.ID_EC2_IMAGE_AKI_1,
+                     fakes.ID_OS_IMAGE_ARI_1: fakes.ID_EC2_IMAGE_ARI_1}
+
+        os_image = copy.deepcopy(fakes.OS_IMAGE_1)
+        os_image['properties'] = {'image_location': 'location'}
+        os_image['name'] = None
+
+        image = image_api._format_image(
+                'fake_context', fakes.DB_IMAGE_1, fakes.OSImage(os_image),
+                None, image_ids)
+
+        self.assertEqual('location', image['imageLocation'])
+        self.assertEqual('location', image['name'])
+
+        os_image['properties'] = {}
+        os_image['name'] = 'fake_name'
+
+        image = image_api._format_image(
+                'fake_context', fakes.DB_IMAGE_1, fakes.OSImage(os_image),
+                None, image_ids)
+
+        self.assertEqual('None (fake_name)', image['imageLocation'])
+        self.assertEqual('fake_name', image['name'])
+
+    def test_cloud_format_mappings(self):
+        properties = {
+            'mappings': [
+                {'virtual': 'ami', 'device': '/dev/sda'},
+                {'virtual': 'root', 'device': 'sda'},
+                {'virtual': 'ephemeral0', 'device': 'sdb'},
+                {'virtual': 'swap', 'device': 'sdc'},
+                {'virtual': 'ephemeral1', 'device': 'sdd'},
+                {'virtual': 'ephemeral2', 'device': 'sde'},
+                {'virtual': 'ephemeral', 'device': 'sdf'},
+                {'virtual': '/dev/sdf1', 'device': 'root'}],
+        }
+        expected = {
+            'blockDeviceMapping': [
+                {'virtualName': 'ephemeral0', 'deviceName': '/dev/sdb'},
+                {'virtualName': 'swap', 'deviceName': '/dev/sdc'},
+                {'virtualName': 'ephemeral1', 'deviceName': '/dev/sdd'},
+                {'virtualName': 'ephemeral2', 'deviceName': '/dev/sde'},
+            ]
+        }
+
+        result = {}
+        image_api._cloud_format_mappings('fake_context', properties, result)
+
+        self.assertThat(result,
+                        matchers.DictMatches(expected, orderless_lists=True))
+
+    def test_block_device_properties_root_device_name(self):
+        root_device0 = '/dev/sda'
+        root_device1 = '/dev/sdb'
+        mappings = [{'virtual': 'root',
+                     'device': root_device0}]
+
+        properties0 = {'mappings': mappings}
+        properties1 = {'mappings': mappings,
+                       'root_device_name': root_device1}
+
+        self.assertIsNone(
+            image_api._block_device_properties_root_device_name({}))
+        self.assertEqual(
+            image_api._block_device_properties_root_device_name(properties0),
+            root_device0)
+        self.assertEqual(
+            image_api._block_device_properties_root_device_name(properties1),
+            root_device1)
