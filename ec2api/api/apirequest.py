@@ -25,10 +25,9 @@ from oslo.config import cfg
 
 from ec2api.api import cloud
 from ec2api.api import ec2utils
-from ec2api.api import proxy
 from ec2api import exception
+from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
-
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -58,14 +57,15 @@ class APIRequest(object):
             self.controller = cloud.VpcCloudController()
         else:
             self.controller = cloud.CloudController()
-        self.proxyController = proxy.ProxyController()
 
     def invoke(self, context):
         try:
             method = getattr(self.controller,
                              ec2utils.camelcase_to_underscore(self.action))
         except AttributeError:
-            raise exception.MethodNotFound(name=self.action)
+            LOG.exception(_('Unsupported API request: action = %(action)s'),
+                          {'action': self.action})
+            raise exception.InvalidRequest()
 
         args = ec2utils.dict_from_dotted_str(self.args.items())
 
@@ -90,9 +90,6 @@ class APIRequest(object):
         args = convert_dicts_to_lists(args)
         result = method(context, **args)
         return self._render_response(result, context.request_id)
-
-    def proxy(self, req):
-        return self.proxyController.proxy(req, self.args)
 
     def _render_response(self, response_data, request_id):
         xml = minidom.Document()

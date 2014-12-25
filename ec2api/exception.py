@@ -133,10 +133,6 @@ class PasteAppNotFound(EC2Exception):
     msg_fmt = _("Could not load paste app '%(name)s' from %(path)s")
 
 
-class MethodNotFound(EC2Exception):
-    msg_fmt = _("Could not find method '%(name)s'")
-
-
 class Forbidden(EC2Exception):
     ec2_code = 'AuthFailure'
     msg_fmt = _("Not authorized.")
@@ -164,16 +160,6 @@ class EC2NotFound(NotFound):
 class NovaDbImageNotFound(EC2NotFound):
     ec2_code = 'InvalidAMIID.NotFound'
     msg_fmt = _("The image id '[%(image_id)s]' does not exist")
-
-
-class NovaDbVolumeNotFound(EC2NotFound):
-    ec2_code = 'InvalidVolume.NotFound'
-    msg_fmt = _("Volume %(volume_id)s could not be found.")
-
-
-class NovaDbSnapshotNotFound(EC2NotFound):
-    ec2_code = 'InvalidSnapshot.NotFound'
-    msg_fmt = _("Snapshot %(snapshot_id)s could not be found.")
 
 
 class NovaDbInstanceNotFound(EC2NotFound):

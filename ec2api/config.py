@@ -18,12 +18,12 @@ from ec2api.openstack.common.db import options
 from ec2api import paths
 from ec2api import version
 
-_DEFAULT_SQL_CONNECTION = 'sqlite:///' + paths.state_path_def('nova.sqlite')
+_DEFAULT_SQL_CONNECTION = 'sqlite:///' + paths.state_path_def('ec2api.sqlite')
 
 
 def parse_args(argv, default_config_files=None):
     options.set_defaults(sql_connection=_DEFAULT_SQL_CONNECTION,
-                         sqlite_db='nova.sqlite')
+                         sqlite_db='ec2api.sqlite')
     cfg.CONF(argv[1:],
              project='ec2api',
              version=version.version_info.version_string(),

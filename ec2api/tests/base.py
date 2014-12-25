@@ -17,9 +17,9 @@ import mock
 from oslotest import base as test_base
 
 import ec2api.api.apirequest
-from ec2api.api import ec2client
 from ec2api.tests import fakes
 from ec2api.tests import matchers
+from ec2api.tests import tools
 import ec2api.wsgi
 
 
@@ -58,14 +58,6 @@ class ApiTestCase(test_base.BaseTestCase):
             mock.patch('ec2api.api.ec2utils.ec2_inst_id_to_uuid'))
         self.ec2_inst_id_to_uuid = ec2_inst_id_to_uuid_patcher.start()
         self.addCleanup(ec2_inst_id_to_uuid_patcher.stop)
-        # TODO(ft): patch EC2Client object instead of ec2client function
-        # to make this similar to other patchers (neutron)
-        # Now it's impossible since tests use EC2Client._parse_xml
-        # Or patch neutron client function too, and make tests on client
-        # functions
-        ec2_patcher = mock.patch('ec2api.api.ec2client.ec2client')
-        self.ec2 = ec2_patcher.start().return_value
-        self.addCleanup(ec2_patcher.stop)
         isotime_patcher = mock.patch('ec2api.openstack.common.timeutils.'
                                      'isotime')
         self.isotime = isotime_patcher.start()
@@ -90,7 +82,7 @@ class ApiTestCase(test_base.BaseTestCase):
                               'endpoints': [{'publicUrl': 'fake_url'}]}])
 
     def _check_and_transform_response(self, response, action):
-        body = ec2client.EC2Client._parse_xml(response.body)
+        body = tools.parse_xml(response.body)
         if response.status_code == 200:
             action_tag = '%sResponse' % action
             self.assertIn(action_tag, body)

@@ -421,7 +421,7 @@ def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
         log_msg = _("%(ex_name)s raised: %(ex_str)s")
         # NOTE(jruzicka): For compatibility with EC2 API, treat expected
         # exceptions as client (4xx) errors. The exception error code is 500
-        # by default and most exceptions inherit this from NovaException even
+        # by default and most exceptions inherit this from EC2Exception even
         # though they are actually client errors in most cases.
         if status >= 500:
             status = 400
@@ -468,34 +468,9 @@ class Executor(wsgi.Application):
             ec2_id = ec2utils.id_to_ec2_inst_id(ex.kwargs['instance_id'])
             message = ex.msg_fmt % {'instance_id': ec2_id}
             return ec2_error_ex(ex, req, message=message)
-        except exception.NovaDbVolumeNotFound as ex:
-            ec2_id = ec2utils.id_to_ec2_vol_id(ex.kwargs['volume_id'])
-            message = ex.msg_fmt % {'volume_id': ec2_id}
-            return ec2_error_ex(ex, req, message=message)
-        except exception.NovaDbSnapshotNotFound as ex:
-            ec2_id = ec2utils.id_to_ec2_snap_id(ex.kwargs['snapshot_id'])
-            message = ex.msg_fmt % {'snapshot_id': ec2_id}
-            return ec2_error_ex(ex, req, message=message)
-        except exception.MethodNotFound:
-            try:
-                http, response = api_request.proxy(req)
-                resp = webob.Response()
-                resp.status = http["status"]
-                resp.headers["content-type"] = http["content-type"]
-                resp.body = str(response)
-                return resp
-            except Exception as ex:
-                return ec2_error_ex(ex, req, unexpected=True)
-        except exception.EC2ServerError as ex:
-            resp = webob.Response()
-            resp.status = ex.response['status']
-            resp.headers['Content-Type'] = ex.response['content-type']
-            resp.body = ex.content
-            return resp
         except Exception as ex:
-            return ec2_error_ex(ex, req,
-                                unexpected=not isinstance(
-                                        ex, exception.EC2Exception))
+            return ec2_error_ex(
+                ex, req, unexpected=not isinstance(ex, exception.EC2Exception))
         else:
             resp = webob.Response()
             resp.status = 200

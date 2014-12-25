@@ -4,3 +4,4 @@
 .pydevproject
 ec2_api.egg-info
 .tox
+.testrepository

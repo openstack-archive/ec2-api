@@ -14,8 +14,12 @@
 
 
 import copy
+import re
 
+from lxml import etree
 import mock
+
+from ec2api.api import ec2utils
 
 
 def update_dict(dict1, dict2):
@@ -51,3 +55,29 @@ class CopyingMock(mock.MagicMock):
         args = copy.deepcopy(args)
         kwargs = copy.deepcopy(kwargs)
         return super(CopyingMock, self).__call__(*args, **kwargs)
+
+
+_xml_scheme = re.compile('\sxmlns=".*"')
+
+
+def parse_xml(xml_string):
+    xml_string = _xml_scheme.sub('', xml_string)
+    xml = etree.fromstring(xml_string)
+
+    def convert_node(node):
+        children = list(node)
+        if len(children):
+            if children[0].tag == 'item':
+                val = list(convert_node(child)[1] for child in children)
+            else:
+                val = dict(convert_node(child) for child in children)
+        elif node.tag.endswith('Set'):
+            val = []
+        else:
+            # TODO(ft): do not use private function
+            val = (ec2utils._try_convert(node.text)
+                   if node.text
+                   else node.text)
+        return node.tag, val
+
+    return dict([convert_node(xml)])

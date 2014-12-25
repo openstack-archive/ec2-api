@@ -22,7 +22,6 @@ from oslo.config import cfg
 
 from ec2api.api import clients
 from ec2api.api import common
-from ec2api.api import ec2client
 from ec2api.api import ec2utils
 from ec2api.api import utils
 from ec2api.db import api as db_api
@@ -275,7 +274,6 @@ class AddressEngineNeutron(object):
                 msg = _("The address '%(public_ip)s' does not belong to you.")
                 raise exception.AuthFailure(msg % {'public_ip': public_ip})
 
-            ec2 = ec2client.ec2client(context)
             # NOTE(ft): in fact only the first two parameters are used to
             # associate an address in EC2 Classic mode. Other parameters are
             # sent to validate them for EC2 Classic mode and raise an error.

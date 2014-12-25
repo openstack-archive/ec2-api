@@ -20,7 +20,6 @@ from oslotest import base as test_base
 
 from ec2api import api
 from ec2api.api import apirequest
-from ec2api.api import cloud
 from ec2api import exception
 from ec2api.tests import fakes_request_response as fakes
 from ec2api.tests import matchers
@@ -35,10 +34,6 @@ class ApiInitTestCase(test_base.BaseTestCase):
 
     def setUp(self):
         super(ApiInitTestCase, self).setUp()
-        requester_patcher = mock.patch('ec2api.api.ec2client.EC2Requester')
-        self.requester_class = requester_patcher.start()
-        self.requester = self.requester_class.return_value
-        self.addCleanup(requester_patcher.stop)
 
         controller_patcher = mock.patch('ec2api.api.cloud.VpcCloudController')
         self.controller_class = controller_patcher.start()
@@ -94,36 +89,3 @@ class ApiInitTestCase(test_base.BaseTestCase):
                  'KeyError', 'Unknown error occurred.')
         do_check(exception.InvalidVpcIDNotFound('fake_msg'), 400,
                  'InvalidVpcID.NotFound', 'fake_msg')
-
-    def test_execute_proxy(self):
-        self.controller_class.return_value = mock.create_autospec(
-            cloud.CloudController, instance=True)
-        # NOTE(ft): recreate APIRequest to use mock with autospec
-        ec2_request = apirequest.APIRequest('FakeAction', 'fake_v1',
-                                            {'Param': 'fake_param'})
-        self.environ['ec2.request'] = ec2_request
-        self.environ['QUERY_STRING'] = 'Version=fake_v1&Action=FakeAction'
-        self.requester.request.return_value = ({'status': 200,
-                                                'content-type': 'fake_type'},
-                                               'fake_data')
-
-        res = self.request.send(self.application)
-
-        self.requester_class.assert_called_once_with('fake_v1', 'FAKE')
-        self.requester.request.assert_called_once_with(self.fake_context,
-                                                       'FakeAction',
-                                                       {'Param': 'fake_param'})
-        self.assertEqual(200, res.status_code)
-        self.assertEqual('fake_type', res.content_type)
-        self.assertEqual('fake_data', res.body)
-
-    def test_execute_proxy_error(self):
-        self.controller.fake_action.side_effect = exception.EC2ServerError(
-            {'status': 400, 'content-type': 'fake_type'},
-            'fake_content')
-
-        res = self.request.send(self.application)
-
-        self.assertEqual(400, res.status_code)
-        self.assertEqual('fake_type', res.content_type)
-        self.assertEqual('fake_content', res.body)

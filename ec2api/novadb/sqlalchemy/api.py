@@ -26,7 +26,6 @@ from sqlalchemy import or_
 import ec2api.context
 from ec2api import exception
 from ec2api.novadb.sqlalchemy import models
-from ec2api.openstack.common.db import exception as db_exc
 from ec2api.openstack.common.db.sqlalchemy import session as db_session
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
@@ -179,118 +178,6 @@ def s3_image_get(context, image_id):
     return result
 
 
-def s3_image_get_by_uuid(context, image_uuid):
-    """Find local s3 image represented by the provided uuid."""
-    result = (model_query(context, models.S3Image, read_deleted="yes").
-                 filter_by(uuid=image_uuid).
-                 first())
-
-    if not result:
-        raise exception.NovaDbImageNotFound(image_id=image_uuid)
-
-    return result
-
-
-def s3_image_create(context, image_uuid):
-    """Create local s3 image represented by provided uuid."""
-    try:
-        s3_image_ref = models.S3Image()
-        s3_image_ref.update({'uuid': image_uuid})
-        s3_image_ref.save()
-    except Exception as e:
-        raise db_exc.DBError(e)
-
-    return s3_image_ref
-
-
-##################
-
-
-def _ec2_volume_get_query(context, session=None):
-    return model_query(context, models.VolumeIdMapping,
-                       session=session, read_deleted='yes')
-
-
-def _ec2_snapshot_get_query(context, session=None):
-    return model_query(context, models.SnapshotIdMapping,
-                       session=session, read_deleted='yes')
-
-
-@require_context
-def ec2_volume_create(context, volume_uuid, id=None):
-    """Create ec2 compatible volume by provided uuid."""
-    ec2_volume_ref = models.VolumeIdMapping()
-    ec2_volume_ref.update({'uuid': volume_uuid})
-    if id is not None:
-        ec2_volume_ref.update({'id': id})
-
-    ec2_volume_ref.save()
-
-    return ec2_volume_ref
-
-
-@require_context
-def get_ec2_volume_id_by_uuid(context, volume_id):
-    result = (_ec2_volume_get_query(context).
-                    filter_by(uuid=volume_id).
-                    first())
-
-    if not result:
-        raise exception.NovaDbVolumeNotFound(volume_id=volume_id)
-
-    return result['id']
-
-
-@require_context
-def get_volume_uuid_by_ec2_id(context, ec2_id):
-    result = (model_query(context, models.VolumeIdMapping, read_deleted='yes').
-              filter_by(id=ec2_id).
-              first())
-
-    if not result:
-        raise exception.NovaDbVolumeNotFound(volume_id=ec2_id)
-
-    return result['uuid']
-
-
-@require_context
-def ec2_snapshot_create(context, snapshot_uuid, id=None):
-    """Create ec2 compatible snapshot by provided uuid."""
-    ec2_snapshot_ref = models.SnapshotIdMapping()
-    ec2_snapshot_ref.update({'uuid': snapshot_uuid})
-    if id is not None:
-        ec2_snapshot_ref.update({'id': id})
-
-    ec2_snapshot_ref.save()
-
-    return ec2_snapshot_ref
-
-
-@require_context
-def get_ec2_snapshot_id_by_uuid(context, snapshot_id):
-    result = (_ec2_snapshot_get_query(context).
-                    filter_by(uuid=snapshot_id).
-                    first())
-
-    if not result:
-        raise exception.NovaDbSnapshotNotFound(snapshot_id=snapshot_id)
-
-    return result['id']
-
-
-@require_context
-def get_snapshot_uuid_by_ec2_id(context, ec2_id):
-    result = (model_query(context, models.SnapshotIdMapping,
-                          read_deleted='yes').
-              filter_by(id=ec2_id).
-              first())
-
-    if not result:
-        raise exception.NovaDbSnapshotNotFound(snapshot_id=ec2_id)
-
-    return result['uuid']
-
-
 ###################
 
 
@@ -308,7 +195,7 @@ def ec2_instance_create(context, instance_uuid, id=None):
 
 
 @require_context
-def ec2_instance_get_by_uuid(context, instance_uuid):
+def _ec2_instance_get_by_uuid(context, instance_uuid):
     result = (_ec2_instance_get_query(context).
               filter_by(uuid=instance_uuid).
               first())
@@ -321,12 +208,12 @@ def ec2_instance_get_by_uuid(context, instance_uuid):
 
 @require_context
 def get_ec2_instance_id_by_uuid(context, instance_id):
-    result = ec2_instance_get_by_uuid(context, instance_id)
+    result = _ec2_instance_get_by_uuid(context, instance_id)
     return result['id']
 
 
 @require_context
-def ec2_instance_get_by_id(context, instance_id):
+def _ec2_instance_get_by_id(context, instance_id):
     result = (_ec2_instance_get_query(context).
               filter_by(id=instance_id).
               first())
@@ -339,7 +226,7 @@ def ec2_instance_get_by_id(context, instance_id):
 
 @require_context
 def get_instance_uuid_by_ec2_id(context, ec2_id):
-    result = ec2_instance_get_by_id(context, ec2_id)
+    result = _ec2_instance_get_by_id(context, ec2_id)
     return result['uuid']
 
 

@@ -28,7 +28,8 @@ def create_volume(context, availability_zone=None, size=None,
                   description=None, metadata=None, iops=None, encrypted=None,
                   kms_key_id=None):
     if snapshot_id is not None:
-        os_snapshot_id = ec2utils.ec2_snap_id_to_uuid(snapshot_id)
+        snapshot = ec2utils.get_db_item(context, 'snap', snapshot_id)
+        os_snapshot_id = snapshot['os_id']
     else:
         os_snapshot_id = None
 

@@ -85,43 +85,6 @@ def s3_image_get(context, image_id):
     return IMPL.s3_image_get(context, image_id)
 
 
-def s3_image_get_by_uuid(context, image_uuid):
-    """Find local s3 image represented by the provided uuid."""
-    return IMPL.s3_image_get_by_uuid(context, image_uuid)
-
-
-def s3_image_create(context, image_uuid):
-    """Create local s3 image represented by provided uuid."""
-    return IMPL.s3_image_create(context, image_uuid)
-
-
-###################
-
-
-def get_ec2_volume_id_by_uuid(context, volume_id):
-    return IMPL.get_ec2_volume_id_by_uuid(context, volume_id)
-
-
-def get_volume_uuid_by_ec2_id(context, ec2_id):
-    return IMPL.get_volume_uuid_by_ec2_id(context, ec2_id)
-
-
-def ec2_volume_create(context, volume_id, forced_id=None):
-    return IMPL.ec2_volume_create(context, volume_id, forced_id)
-
-
-def get_snapshot_uuid_by_ec2_id(context, ec2_id):
-    return IMPL.get_snapshot_uuid_by_ec2_id(context, ec2_id)
-
-
-def get_ec2_snapshot_id_by_uuid(context, snapshot_id):
-    return IMPL.get_ec2_snapshot_id_by_uuid(context, snapshot_id)
-
-
-def ec2_snapshot_create(context, snapshot_id, forced_id=None):
-    return IMPL.ec2_snapshot_create(context, snapshot_id, forced_id)
-
-
 ###################
 
 
@@ -138,14 +101,6 @@ def get_instance_uuid_by_ec2_id(context, ec2_id):
 def ec2_instance_create(context, instance_uuid, id=None):
     """Create the ec2 id to instance uuid mapping on demand."""
     return IMPL.ec2_instance_create(context, instance_uuid, id)
-
-
-def ec2_instance_get_by_uuid(context, instance_uuid):
-    return IMPL.ec2_instance_get_by_uuid(context, instance_uuid)
-
-
-def ec2_instance_get_by_id(context, instance_id):
-    return IMPL.ec2_instance_get_by_id(context, instance_id)
 
 
 def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):

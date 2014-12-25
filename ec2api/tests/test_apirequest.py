@@ -20,7 +20,6 @@ import mock
 from oslotest import base as test_base
 
 from ec2api.api import apirequest
-from ec2api.api import ec2client
 from ec2api.tests import fakes_request_response as fakes
 from ec2api.tests import matchers
 from ec2api.tests import tools
@@ -35,9 +34,6 @@ class EC2RequesterTestCase(test_base.BaseTestCase):
 
     def setUp(self):
         super(EC2RequesterTestCase, self).setUp()
-        requester_patcher = mock.patch('ec2api.api.ec2client.EC2Requester')
-        self.requester = requester_patcher.start().return_value
-        self.addCleanup(requester_patcher.stop)
 
         controller_patcher = mock.patch('ec2api.api.cloud.VpcCloudController')
         self.controller = controller_patcher.start().return_value
@@ -89,7 +85,7 @@ class EC2RequesterTestCase(test_base.BaseTestCase):
         # based on the order of tags
         xml = etree.fromstring(observed)
         self.assertEqual(xmlns, xml.nsmap.get(None))
-        observed_data = ec2client.EC2Client._parse_xml(observed)
+        observed_data = tools.parse_xml(observed)
         expected = {root_tag: tools.update_dict(dict_data,
                                                 {'requestId': request_id})}
         self.assertThat(observed_data, matchers.DictMatches(expected))

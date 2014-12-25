@@ -52,10 +52,6 @@ class InstanceTestCase(base.ApiTestCase):
         novadb_patcher = (mock.patch('ec2api.api.instance.novadb'))
         self.novadb = novadb_patcher.start()
         self.addCleanup(novadb_patcher.stop)
-        glance_id_to_ec2_id_patcher = (
-            mock.patch('ec2api.api.instance.ec2utils.glance_id_to_ec2_id'))
-        self.glance_id_to_ec2_id = glance_id_to_ec2_id_patcher.start()
-        self.addCleanup(glance_id_to_ec2_id_patcher.stop)
 
         self.fake_image_class = collections.namedtuple(
             'FakeImage', ['id', 'status', 'properties'])
@@ -83,8 +79,6 @@ class InstanceTestCase(base.ApiTestCase):
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
 
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
-#         self.ec2_id_to_glance_id.return_value = 'fake_image_id'
-#         self.glance_id_to_ec2_id.return_value = None
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.list.return_value = [fake_flavor]
         self.nova_servers.create.return_value = (
@@ -156,7 +150,6 @@ class InstanceTestCase(base.ApiTestCase):
 
             self.create_network_interface.reset_mock()
             self.nova_servers.reset_mock()
-            self.ec2.reset_mock()
             self.db_api.reset_mock()
             self.isotime.reset_mock()
 
@@ -217,13 +210,6 @@ class InstanceTestCase(base.ApiTestCase):
         self.create_network_interface.side_effect = (
             [{'networkInterface': eni}
              for eni in self.EC2_DETACHED_ENIS])
-        self.ec2.describe_instances.return_value = {
-            'reservationSet': [
-                fakes.gen_ec2_reservation(
-                    fakes.ID_EC2_RESERVATION_1,
-                    [fakes.gen_ec2_instance(ec2_instance_id,
-                                            private_ip_address=None)
-                     for ec2_instance_id in self.IDS_EC2_INSTANCE])]}
         self.nova_servers.create.side_effect = [
             self.fake_instance_class(os_instance_id)
             for os_instance_id in self.IDS_OS_INSTANCE]
@@ -422,8 +408,6 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.ID_EC2_INSTANCE_2: fakes.ID_OS_INSTANCE_2}
         self.ec2_inst_id_to_uuid.side_effect = (
             lambda _, inst_id: os_instance_ids_dict[inst_id])
-        self.ec2.terminate_instances.return_value = (
-            ec2_terminate_instances_result)
 
         def do_check(mock_port_list=[], mock_eni_list=[],
                      updated_ports=[], deleted_ports=[]):
@@ -443,8 +427,6 @@ class InstanceTestCase(base.ApiTestCase):
                 self.ec2_inst_id_to_uuid.assert_any_call(
                     mock.ANY, inst_id)
             self._assert_list_ports_is_called_with_filter(self.IDS_OS_INSTANCE)
-            self.ec2.terminate_instances.assert_called_once_with(
-                instance_id=self.IDS_EC2_INSTANCE)
             self.assertEqual(len(updated_ports),
                              self.neutron.update_port.call_count)
             self.assertEqual(len(updated_ports),
@@ -469,7 +451,6 @@ class InstanceTestCase(base.ApiTestCase):
             self.ec2_inst_id_to_uuid.reset_mock()
             self.neutron.list_ports.reset_mock()
             self.neutron.update_port.reset_mock()
-            self.ec2.terminate_instances.reset_mock()
             self.db_api.delete_item.reset_mock()
             self.db_api.update_item.reset_mock()
 
@@ -566,9 +547,6 @@ class InstanceTestCase(base.ApiTestCase):
                 self.IDS_EC2_INSTANCE, ips_instance)]
             reservation_set = gen_reservation_set([instances[0], instances[1]])
 
-            self.ec2.describe_instances.return_value = (
-                {'reservationSet': reservation_set,
-                 'fakeKey': 'fakeValue'})
             self.ec2_inst_id_to_uuid.side_effect = self.IDS_OS_INSTANCE
             self.neutron.list_ports.return_value = {'ports': mock_port_list}
             self.db_api.get_items.return_value = (
@@ -591,14 +569,11 @@ class InstanceTestCase(base.ApiTestCase):
             self.assertThat({'reservationSet': reservation_set,
                              'fakeKey': 'fakeValue'},
                             matchers.DictMatches(resp), verbose=True)
-            self.ec2.describe_instances.assert_called_once_with(
-                instance_id=None, filter=None)
             for inst_id in self.IDS_EC2_INSTANCE:
                 self.ec2_inst_id_to_uuid.assert_any_call(
                     mock.ANY, inst_id)
             self._assert_list_ports_is_called_with_filter(self.IDS_OS_INSTANCE)
 
-            self.ec2.describe_instances.reset_mock()
             self.neutron.list_ports.reset_mock()
 
         # NOTE(ft): 2 instances; the first has 2 correct ports;

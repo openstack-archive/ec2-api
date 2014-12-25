@@ -25,7 +25,6 @@ from sqlalchemy import and_
 from sqlalchemy import or_
 from sqlalchemy.sql import bindparam
 
-from ec2api.api import ec2utils
 import ec2api.context
 from ec2api.db.sqlalchemy import models
 from ec2api.openstack.common.db import exception as db_exception
@@ -91,20 +90,8 @@ def model_query(context, model, *args, **kwargs):
 
 
 def _new_id(kind, os_id):
-    # NOTE(ft): obtaining new id from Nova DB is temporary solution
-    # while we don't implmenet all Nova EC2 methods
-    if kind == 'i':
-        obj_id = ec2utils.id_to_ec2_inst_id(os_id)
-    elif kind == 'vol':
-        obj_id = ec2utils.id_to_ec2_vol_id(os_id)
-    elif kind == 'snap':
-        obj_id = ec2utils.id_to_ec2_snap_id(os_id)
-    elif kind in ('ami', 'ari', 'aki'):
-        obj_id = ec2utils.glance_id_to_ec2_id(
-                ec2api.context.get_admin_context(), os_id, kind)
-    else:
-        obj_id = "%(kind)s-%(id)08x" % {"kind": kind,
-                                        "id": random.randint(1, 0xffffffff)}
+    obj_id = "%(kind)s-%(id)08x" % {"kind": kind,
+                                    "id": random.randint(1, 0xffffffff)}
     return obj_id
 
 

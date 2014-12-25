@@ -152,29 +152,9 @@ def is_ec2_timestamp_expired(request, expires=None):
         return True
 
 
-def id_to_glance_id(context, image_id):
-    """Convert an internal (db) id to a glance id."""
-    return novadb.s3_image_get(context, image_id)['uuid']
-
-
-def glance_id_to_id(context, glance_id):
-    """Convert a glance id to an internal (db) id."""
-    if glance_id is None:
-        return
-    try:
-        return novadb.s3_image_get_by_uuid(context, glance_id)['id']
-    except exception.NotFound:
-        return novadb.s3_image_create(context, glance_id)['id']
-
-
 def ec2_id_to_glance_id(context, ec2_id):
     image_id = ec2_id_to_id(ec2_id)
-    return id_to_glance_id(context, image_id)
-
-
-def glance_id_to_ec2_id(context, glance_id, image_type='ami'):
-    image_id = glance_id_to_id(context, glance_id)
-    return image_ec2_id(image_id, image_type=image_type)
+    return novadb.s3_image_get(context, image_id)['uuid']
 
 
 # TODO(Alex) This function is copied as is from original cloud.py. It doesn't
@@ -185,12 +165,6 @@ def ec2_id_to_id(ec2_id):
         return int(ec2_id.split('-')[-1], 16)
     except ValueError:
         raise exception.InvalidId(id=ec2_id)
-
-
-def image_ec2_id(image_id, image_type='ami'):
-    """Returns image ec2_id using id and three letter type."""
-    template = image_type + '-%08x'
-    return id_to_ec2_id(image_id, template=template)
 
 
 def id_to_ec2_id(instance_id, template='i-%08x'):
@@ -204,7 +178,7 @@ def id_to_ec2_inst_id(instance_id):
         return None
     elif uuidutils.is_uuid_like(instance_id):
         ctxt = context.get_admin_context()
-        int_id = get_int_id_from_instance_uuid(ctxt, instance_id)
+        int_id = _get_int_id_from_instance_uuid(ctxt, instance_id)
         return id_to_ec2_id(int_id)
     else:
         return id_to_ec2_id(instance_id)
@@ -213,14 +187,14 @@ def id_to_ec2_inst_id(instance_id):
 def ec2_inst_id_to_uuid(context, ec2_id):
     """"Convert an instance id to uuid."""
     int_id = ec2_id_to_id(ec2_id)
-    return get_instance_uuid_from_int_id(context, int_id)
+    return _get_instance_uuid_from_int_id(context, int_id)
 
 
-def get_instance_uuid_from_int_id(context, int_id):
+def _get_instance_uuid_from_int_id(context, int_id):
     return novadb.get_instance_uuid_by_ec2_id(context, int_id)
 
 
-def get_int_id_from_instance_uuid(context, instance_uuid):
+def _get_int_id_from_instance_uuid(context, instance_uuid):
     if instance_uuid is None:
         return
     try:
@@ -228,69 +202,6 @@ def get_int_id_from_instance_uuid(context, instance_uuid):
     except exception.NotFound:
         return novadb.ec2_instance_create(context, instance_uuid)['id']
 
-
-def get_volume_uuid_from_int_id(context, int_id):
-    return novadb.get_volume_uuid_by_ec2_id(context, int_id)
-
-
-def id_to_ec2_snap_id(snapshot_id):
-    """Get or create an ec2 volume ID (vol-[base 16 number]) from uuid."""
-    if uuidutils.is_uuid_like(snapshot_id):
-        ctxt = context.get_admin_context()
-        int_id = get_int_id_from_snapshot_uuid(ctxt, snapshot_id)
-        return id_to_ec2_id(int_id, 'snap-%08x')
-    else:
-        return id_to_ec2_id(snapshot_id, 'snap-%08x')
-
-
-def id_to_ec2_vol_id(volume_id):
-    """Get or create an ec2 volume ID (vol-[base 16 number]) from uuid."""
-    if uuidutils.is_uuid_like(volume_id):
-        ctxt = context.get_admin_context()
-        int_id = get_int_id_from_volume_uuid(ctxt, volume_id)
-        return id_to_ec2_id(int_id, 'vol-%08x')
-    else:
-        return id_to_ec2_id(volume_id, 'vol-%08x')
-
-
-def get_int_id_from_volume_uuid(context, volume_uuid):
-    if volume_uuid is None:
-        return
-    try:
-        return novadb.get_ec2_volume_id_by_uuid(context, volume_uuid)
-    except exception.NotFound:
-        return novadb.ec2_volume_create(context, volume_uuid)['id']
-
-
-def ec2_vol_id_to_uuid(ec2_id):
-    """Get the corresponding UUID for the given ec2-id."""
-    ctxt = context.get_admin_context()
-
-    # NOTE(jgriffith) first strip prefix to get just the numeric
-    int_id = ec2_id_to_id(ec2_id)
-    return get_volume_uuid_from_int_id(ctxt, int_id)
-
-
-def get_snapshot_uuid_from_int_id(context, int_id):
-    return novadb.get_snapshot_uuid_by_ec2_id(context, int_id)
-
-
-def ec2_snap_id_to_uuid(ec2_id):
-    """Get the corresponding UUID for the given ec2-id."""
-    ctxt = context.get_admin_context()
-
-    # NOTE(jgriffith) first strip prefix to get just the numeric
-    int_id = ec2_id_to_id(ec2_id)
-    return get_snapshot_uuid_from_int_id(ctxt, int_id)
-
-
-def get_int_id_from_snapshot_uuid(context, snapshot_uuid):
-    if snapshot_uuid is None:
-        return
-    try:
-        return novadb.get_ec2_snapshot_id_by_uuid(context, snapshot_uuid)
-    except exception.NotFound:
-        return novadb.ec2_snapshot_create(context, snapshot_uuid)['id']
 
 # NOTE(ft): extra functions to use in vpc specific code or instead of
 # malformed existed functions
