@@ -26,6 +26,7 @@ from oslo.config import cfg
 
 from ec2api.api import address as address_api
 from ec2api.api import clients
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import security_group as security_group_api
@@ -51,45 +52,6 @@ CONF.register_opts(ec2_opts)
 """
 
 # TODO(ft): implement DeviceIndex
-
-INSTANCE_FILTER_MAP = {
-        'block-device-mapping.device-name': ['blockDeviceMapping',
-                                             'deviceName'],
-        'client-token': 'clientToken',
-        'dns-name': 'dnsName',
-        'image-id': 'imageId',
-        'instance-id': 'instanceId',
-        'instance-type': 'instanceType',
-        'ip-address': 'ipAddress',
-        'kernel-id': 'kernelId',
-        'key-name': 'keyName',
-        'launch-index': 'amiLaunchIndex',
-        'launch-time': 'launchTime',
-        'private-dns-name': 'privateDnsName',
-        'private-ip-address': 'privateIpAddress',
-        'ramdisk-id': 'ramdiskId',
-        'root-device-name': 'rootDeviceName',
-        'root-device-type': 'rootDeviceType',
-        'subnet-id': ['networkInterfaceSet', 'subnetId'],
-        'vpc-id': ['networkInterfaceSet', 'vpcId'],
-        'network-interface.description': ['networkInterfaceSet',
-                                          'description'],
-        'network-interface.subnet-id': ['networkInterfaceSet', 'subnetId'],
-        'network-interface.vpc-id': ['networkInterfaceSet', 'vpcId'],
-        'network-interface.network-interface.id': ['networkInterfaceSet',
-                                                   'networkInterfaceId'],
-        'network-interface.owner-id': ['networkInterfaceSet', 'ownerId'],
-        'network-interface.requester-managed': ['networkInterfaceSet',
-                                                'requesterManaged'],
-        'network-interface.status': ['networkInterfaceSet', 'status'],
-        'network-interface.mac-address': ['networkInterfaceSet', 'macAddress'],
-        'network-interface.source-destination-check': ['networkInterfaceSet',
-                                                       'sourceDestCheck'],
-}
-RESERVATION_FILTER_MAP = {
-        'reservation-id': 'reservationId',
-        'owner-id': 'ownerId',
-}
 
 
 def run_instances(context, image_id, min_count, max_count,
@@ -278,59 +240,164 @@ def terminate_instances(context, instance_id):
     return {'instancesSet': state_changes}
 
 
-def describe_instances(context, instance_id=None, filter=None,
-                       max_results=None, next_token=None):
-    instances = ec2utils.get_db_items(context, 'i', instance_id)
-    instances = dict((i['os_id'], i) for i in instances)
+class InstanceDescriber(common.TaggableItemsDescriber):
 
-    os_instances = clients.nova(context).servers.list()
+    KIND = 'i'
+    FILTER_MAP = {
+        'block-device-mapping.device-name': ['blockDeviceMapping',
+                                             'deviceName'],
+        'client-token': 'clientToken',
+        'dns-name': 'dnsName',
+        'image-id': 'imageId',
+        'instance-id': 'instanceId',
+        'instance-type': 'instanceType',
+        'ip-address': 'ipAddress',
+        'kernel-id': 'kernelId',
+        'key-name': 'keyName',
+        'launch-index': 'amiLaunchIndex',
+        'launch-time': 'launchTime',
+        'private-dns-name': 'privateDnsName',
+        'private-ip-address': 'privateIpAddress',
+        'ramdisk-id': 'ramdiskId',
+        'root-device-name': 'rootDeviceName',
+        'root-device-type': 'rootDeviceType',
+        'subnet-id': ['networkInterfaceSet', 'subnetId'],
+        'vpc-id': ['networkInterfaceSet', 'vpcId'],
+        'network-interface.description': ['networkInterfaceSet',
+                                          'description'],
+        'network-interface.subnet-id': ['networkInterfaceSet', 'subnetId'],
+        'network-interface.vpc-id': ['networkInterfaceSet', 'vpcId'],
+        'network-interface.network-interface.id': ['networkInterfaceSet',
+                                                   'networkInterfaceId'],
+        'network-interface.owner-id': ['networkInterfaceSet', 'ownerId'],
+        'network-interface.requester-managed': ['networkInterfaceSet',
+                                                'requesterManaged'],
+        'network-interface.status': ['networkInterfaceSet', 'status'],
+        'network-interface.mac-address': ['networkInterfaceSet',
+                                          'macAddress'],
+        'network-interface.source-destination-check': ['networkInterfaceSet',
+                                                       'sourceDestCheck'],
+    }
 
-    reservations = collections.defaultdict(list)
-    for os_instance in os_instances:
-        instance = instances.pop(os_instance.id, None)
-        if instance_id and not instance:
-            # NOTE(ft): os_instance is not requested by
-            # 'instance_id' filter
-            continue
-        novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
+    def __init__(self):
+        super(InstanceDescriber, self).__init__()
+        self.reservations = {}
+        self.reservation_instances = collections.defaultdict(list)
+        self.reservation_os_groups = {}
+        self.obsolete_instances = []
+
+    def format(self, instance, os_instance):
+        novadb_instance = self.novadb_instances[os_instance.id]
+        formatted_instance = _format_instance(
+                self.context, instance, os_instance, novadb_instance,
+                self.ec2_network_interfaces.get(instance['id']),
+                self.image_ids, self.volumes)
+
+        reservation_id = instance['reservation_id']
+        if reservation_id not in self.reservations:
+            reservation = {'id': reservation_id,
+                           'owner_id': os_instance.tenant_id}
+            self.reservations[reservation_id] = reservation
+            if not instance['vpc_id']:
+                self.reservation_os_groups[reservation_id] = (
+                        os_instance.security_groups)
+
+        self.reservation_instances[
+                reservation['id']].append(formatted_instance)
+
+        return formatted_instance
+
+    def get_db_items(self):
+        instances = super(InstanceDescriber, self).get_db_items()
+        self.ec2_network_interfaces = (
+                _get_ec2_network_interfaces(self.context, self.ids))
+        self.volumes = dict((v['os_id'], v)
+                            for v in db_api.get_items(self.context, 'vol'))
+        self.image_ids = dict((i['os_id'], i['id'])
+                              for i in itertools.chain(
+                                  db_api.get_items(self.context, 'ami'),
+                                  db_api.get_public_items(self.context,
+                                                          'ami')))
+        return instances
+
+    def get_os_items(self):
+        self.novadb_instances = {}
+        return clients.nova(self.context).servers.list()
+
+    def auto_update_db(self, instance, os_instance):
+        # TODO(ft): import and use instance_get_all_by_filters to
+        # reduce request DB count
+        novadb_instance = novadb.instance_get_by_uuid(self.context,
+                                                      os_instance.id)
+        self.novadb_instances[os_instance.id] = novadb_instance
         if not instance:
             instance = ec2utils.get_db_item_by_os_id(
-                    context, 'i', os_instance.id,
+                    self.context, 'i', os_instance.id,
                     novadb_instance=novadb_instance)
-        reservations[instance['reservation_id']].append(
-                (instance, os_instance, novadb_instance,))
+        return instance
 
-    # NOTE(ft): delete obsolete instances
-    if instances:
-        _remove_instances(context, instances.itervalues())
-    # NOTE(ft): some requested instances are obsolete
-    if instance_id and instances:
-        raise exception.InvalidInstanceIDNotFound(i_id=instances[0]['id'])
+    def get_name(self, os_item):
+        return ''
 
-    ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_id)
-    volumes = dict((v['os_id'], v) for v in db_api.get_items(context, 'vol'))
-    image_ids = dict((i['os_id'], i['id'])
-                     for i in itertools.chain(
-                          db_api.get_items(context, 'ami'),
-                          db_api.get_public_items(context, 'ami')))
-    reservation_filters = []
-    instance_filters = []
-    for f in filter or []:
-        if f.get('name') in RESERVATION_FILTER_MAP:
-            reservation_filters.append(f)
-        else:
-            instance_filters.append(f)
-    formatted_reservations = []
-    for reservation_id, instances_info in reservations.iteritems():
-        formatted_reservation = _format_reservation(
-                context, reservation_id, instances_info,
-                ec2_network_interfaces, instance_filters, volumes=volumes,
-                image_ids=image_ids)
-        if (formatted_reservation['instancesSet'] and
-                not utils.filtered_out(formatted_reservation,
-                                       reservation_filters,
-                                       RESERVATION_FILTER_MAP)):
-            formatted_reservations.append(formatted_reservation)
+    def delete_obsolete_item(self, instance):
+        self.obsolete_instances.append(instance)
+
+
+class ReservationDescriber(common.NonOpenstackItemsDescriber):
+
+    KIND = 'r'
+    FILTER_MAP = {
+        'reservation-id': 'reservationId',
+        'owner-id': 'ownerId',
+    }
+
+    def format(self, reservation):
+        formatted_instances = [i for i in self.instances[reservation['id']]
+                               if i['instanceId'] in self.suitable_instances]
+        if not formatted_instances:
+            return None
+        return _format_reservation_body(self.context, reservation,
+                                        formatted_instances,
+                                        self.os_groups.get(reservation['id']))
+
+    def get_db_items(self):
+        return self.reservations
+
+    def describe(self, context, ids=None, names=None, filter=None):
+        reservation_filters = []
+        instance_filters = []
+        for f in filter or []:
+            if f.get('name') in self.FILTER_MAP:
+                reservation_filters.append(f)
+            else:
+                instance_filters.append(f)
+        # NOTE(ft): set empty filter sets to None because Describer
+        # requires None for no filter case
+        if not instance_filters:
+            instance_filters = None
+        if not reservation_filters:
+            reservation_filters = None
+
+        instance_describer = InstanceDescriber()
+        formatted_instances = instance_describer.describe(
+                context, ids=ids, filter=instance_filters)
+
+        _remove_instances(context, instance_describer.obsolete_instances)
+
+        self.reservations = instance_describer.reservations.values()
+        self.instances = instance_describer.reservation_instances
+        self.os_groups = instance_describer.reservation_os_groups
+        self.suitable_instances = set(i['instanceId']
+                                      for i in formatted_instances)
+
+        return super(ReservationDescriber, self).describe(
+                context, filter=reservation_filters)
+
+
+def describe_instances(context, instance_id=None, filter=None,
+                       max_results=None, next_token=None):
+    formatted_reservations = ReservationDescriber().describe(
+            context, ids=instance_id, filter=filter)
     return {'reservationSet': formatted_reservations}
 
 
@@ -469,31 +536,38 @@ def _get_idempotent_run(context, client_token):
         return
     ec2_network_interfaces = _get_ec2_network_interfaces(context, instance_ids)
     return _format_reservation(context, instance['reservation_id'],
-                               instances_info, ec2_network_interfaces,
-                               image_ids={})
+                               instances_info, ec2_network_interfaces)
+
+
+def _format_reservation_body(context, reservation, formatted_instances,
+                             os_groups):
+    formatted_reservation = {'reservationId': reservation['id'],
+                             'ownerId': reservation['owner_id'],
+                             'instancesSet': formatted_instances}
+    if os_groups is not None:
+        formatted_reservation['groupSet'] = _format_group_set(
+                context, os_groups)
+    return formatted_reservation
 
 
 def _format_reservation(context, reservation_id, instances_info,
-                        ec2_network_interfaces, filters=None, volumes=None,
-                        image_ids=None):
+                        ec2_network_interfaces, image_ids={}):
     formatted_instances = []
     for (instance, os_instance, novadb_instance) in instances_info:
         ec2_instance = _format_instance(
                 context, instance, os_instance, novadb_instance,
-                ec2_network_interfaces.get(instance['id']), volumes, image_ids)
-        if not utils.filtered_out(ec2_instance, filters, INSTANCE_FILTER_MAP):
-            formatted_instances.append(ec2_instance)
-    formatted_reservation = {'reservationId': reservation_id,
-                       'ownerId': os_instance.tenant_id,
-                       'instancesSet': formatted_instances}
-    if not instance['vpc_id']:
-        formatted_reservation['groupSet'] = _format_group_set(
-                context, os_instance.security_groups)
-    return formatted_reservation
+                ec2_network_interfaces.get(instance['id']), image_ids)
+        formatted_instances.append(ec2_instance)
+
+    reservation = {'id': reservation_id,
+                   'owner_id': os_instance.tenant_id}
+    return _format_reservation_body(
+            context, reservation, formatted_instances,
+            None if instance['vpc_id'] else os_instance.security_groups)
 
 
 def _format_instance(context, instance, os_instance, novadb_instance,
-                     ec2_network_interfaces, volumes, image_ids):
+                     ec2_network_interfaces, image_ids, volumes=None):
     ec2_instance = {}
     ec2_instance['instanceId'] = instance['id']
     os_image_id = os_instance.image['id'] if os_instance.image else None
@@ -520,12 +594,6 @@ def _format_instance(context, instance, os_instance, novadb_instance,
         ec2_instance['ipAddress'] = floating_ip
     ec2_instance['dnsName'] = floating_ip
     ec2_instance['keyName'] = os_instance.key_name
-
-    # NOTE(ft): add tags
-#     i['tagSet'] = []
-#
-#     for k, v in utils.instance_meta(instance).iteritems():
-#         i['tagSet'].append({'key': k, 'value': v})
 
     if 'client_token' in instance:
         ec2_instance['clientToken'] = instance['client_token']
@@ -922,7 +990,9 @@ def _get_vpc_default_security_group_id(context, vpc_id):
 def _format_group_set(context, os_security_groups):
     if not os_security_groups:
         return None
-    # TODO(ft): add groupId
+    # TODO(ft): Euca tools uses 2010-08-31 AWS protocol version which doesn't
+    # contain groupId in groupSet of an instance structure
+    # Euca crashes if groupId is present here
     return [{'groupName': sg['name']} for sg in os_security_groups]
 
 
@@ -1007,6 +1077,10 @@ def _is_ebs_instance(context, os_instance):
     return False
 
 
+def _generate_reservation_id():
+    return _utils_generate_uid('r')
+
+
 def _auto_create_instance_extension(context, instance, novadb_instance=None):
     if not novadb_instance:
         novadb_instance = novadb.instance_get_by_uuid(context,
@@ -1020,19 +1094,6 @@ ec2utils.register_auto_create_db_item_extension(
 
 
 # NOTE(ft): following functions are copied from various parts of Nova
-
-_dev = re.compile('^/dev/')
-
-
-def _block_device_strip_dev(device_name):
-    """remove leading '/dev/'."""
-    return _dev.sub('', device_name) if device_name else device_name
-
-
-def _block_device_prepend_dev(device_name):
-    """Make sure there is a leading '/dev/'."""
-    return device_name and '/dev/' + _block_device_strip_dev(device_name)
-
 
 def _cloud_parse_block_device_mapping(context, bdm):
     """Parse BlockDeviceMappingItemType into flat hash
@@ -1061,16 +1122,6 @@ def _cloud_parse_block_device_mapping(context, bdm):
             ebs.setdefault('delete_on_termination', True)
         bdm.update(ebs)
     return bdm
-
-
-def _utils_generate_uid(topic, size=8):
-    characters = '01234567890abcdefghijklmnopqrstuvwxyz'
-    choices = [random.choice(characters) for _x in xrange(size)]
-    return '%s-%s' % (topic, ''.join(choices))
-
-
-def _generate_reservation_id():
-    return _utils_generate_uid('r')
 
 
 def _cloud_get_image_state(image):
@@ -1105,7 +1156,15 @@ def _cloud_format_instance_root_device_name(novadb_instance):
             _block_device_DEFAULT_ROOT_DEV_NAME)
 
 
-_block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
+def _cloud_state_description(vm_state):
+    """Map the vm state to the server status string."""
+    # Note(maoy): We do not provide EC2 compatibility
+    # in shutdown_terminate flag behavior. So we ignore
+    # it here.
+    name = _STATE_DESCRIPTION_MAP.get(vm_state, vm_state)
+
+    return {'code': inst_state_name_to_code(name),
+            'name': name}
 
 
 def _cloud_format_instance_bdm(context, instance_uuid, root_device_name,
@@ -1152,6 +1211,28 @@ def _cloud_get_volume_attach_status(volume):
         return 'attached'
     else:
         return 'detached'
+
+
+_dev = re.compile('^/dev/')
+
+
+def _block_device_strip_dev(device_name):
+    """remove leading '/dev/'."""
+    return _dev.sub('', device_name) if device_name else device_name
+
+
+def _block_device_prepend_dev(device_name):
+    """Make sure there is a leading '/dev/'."""
+    return device_name and '/dev/' + _block_device_strip_dev(device_name)
+
+
+_block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
+
+
+def _utils_generate_uid(topic, size=8):
+    characters = '01234567890abcdefghijklmnopqrstuvwxyz'
+    choices = [random.choice(characters) for _x in xrange(size)]
+    return '%s-%s' % (topic, ''.join(choices))
 
 
 # NOTE(ft): nova/compute/vm_states.py
@@ -1251,9 +1332,6 @@ def inst_state_name_to_code(name):
     return _NAME_TO_CODE.get(name, inst_state_PENDING_CODE)
 
 
-def inst_state_code_to_names(code):
-    return _CODE_TO_NAMES.get(code, [])
-
 # NOTE(ft): end of nova/api/ec2/inst_state.py
 
 # EC2 API can return the following values as documented in the EC2 API
@@ -1273,19 +1351,3 @@ _STATE_DESCRIPTION_MAP = {
     vm_states_RESCUED: inst_state_RESCUE,
     vm_states_RESIZED: inst_state_RESIZE,
 }
-_EC2_STATE_TO_VM = dict((state,
-                         [item[0]
-                          for item in _STATE_DESCRIPTION_MAP.iteritems()
-                          if item[1] == state])
-                        for state in set(_STATE_DESCRIPTION_MAP.itervalues()))
-
-
-def _cloud_state_description(vm_state):
-    """Map the vm state to the server status string."""
-    # Note(maoy): We do not provide EC2 compatibility
-    # in shutdown_terminate flag behavior. So we ignore
-    # it here.
-    name = _STATE_DESCRIPTION_MAP.get(vm_state, vm_state)
-
-    return {'code': inst_state_name_to_code(name),
-            'name': name}

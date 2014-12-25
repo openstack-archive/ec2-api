@@ -212,6 +212,7 @@ class NonOpenstackItemsDescriber(UniversalDescriber):
         for item in self.items:
             formatted_item = self.format(item)
             self.post_format(formatted_item, item)
-            if not self.filtered_out(formatted_item, filter):
+            if (formatted_item and
+                    not self.filtered_out(formatted_item, filter)):
                 formatted_items.append(formatted_item)
         return formatted_items
