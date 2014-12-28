@@ -39,8 +39,6 @@ LOG = logging.getLogger(__name__)
 
 def create_subnet(context, vpc_id, cidr_block,
                   availability_zone=None):
-    ec2utils.validate_vpc_cidr(cidr_block, exception.InvalidSubnetRange)
-
     vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
     vpc_ipnet = netaddr.IPNetwork(vpc['cidr_block'])
     subnet_ipnet = netaddr.IPNetwork(cidr_block)

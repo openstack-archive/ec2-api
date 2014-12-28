@@ -27,6 +27,7 @@ from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import utils
+from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -248,7 +249,7 @@ def _build_rules(context, group_id, group_name, ip_permissions, direction):
         elif rule.get('ip_ranges'):
             os_security_group_rule_body['remote_ip_prefix'] = (
                 rule['ip_ranges'][0]['cidr_ip'])
-            ec2utils.validate_cidr_with_ipv6(
+            validator.validate_cidr_with_ipv6(
                 os_security_group_rule_body['remote_ip_prefix'], 'cidr_ip')
         else:
             raise exception.MissingParameter(param='source group or cidr')

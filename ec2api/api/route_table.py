@@ -278,7 +278,6 @@ def _delete_route_table(context, route_table_id, vpc=None, cleaner=None):
 def _set_route(context, route_table_id, destination_cidr_block,
                gateway_id, instance_id, network_interface_id,
                vpc_peering_connection_id, do_replace):
-    ec2utils.validate_cidr(destination_cidr_block, 'destinationCidrBlock')
     route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
     vpc = db_api.get_item_by_id(context, 'vpc', route_table['vpc_id'])
     vpc_ipnet = netaddr.IPNetwork(vpc['cidr_block'])

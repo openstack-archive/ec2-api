@@ -39,7 +39,6 @@ LOG = logging.getLogger(__name__)
 
 
 def create_vpc(context, cidr_block, instance_tenancy='default'):
-    ec2utils.validate_vpc_cidr(cidr_block, exception.InvalidVpcRange)
     neutron = clients.neutron(context)
     # TODO(Alex): Handle errors like overlimit
     # TODO(ft) dhcp_options_id

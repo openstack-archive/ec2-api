@@ -245,14 +245,14 @@ class AddressTestCase(base.ApiTestCase):
         do_check({},
                  'MissingParameter')
 
-        do_check({'PublicIp': 'fake_ip',
-                  'AllocationId': 'fake_allocation_id'},
+        do_check({'PublicIp': '0.0.0.0',
+                  'AllocationId': 'eipalloc-0'},
                  'InvalidParameterCombination')
 
-        do_check({'PublicIp': 'fake_ip'},
+        do_check({'PublicIp': '0.0.0.0'},
                  'MissingParameter')
 
-        do_check({'AllocationId': 'fake_allocation_id'},
+        do_check({'AllocationId': 'eipalloc-0'},
                  'MissingParameter')
 
     def test_associate_address_invalid_ec2_classic_parameters(self):
@@ -261,7 +261,7 @@ class AddressTestCase(base.ApiTestCase):
         # NOTE(ft): ec2 classic instance vs allocation_id parameter
         self.db_api.get_items.return_value = []
         resp = self.execute('AssociateAddress',
-                            {'AllocationId': 'fake_allocation_id',
+                            {'AllocationId': 'eipalloc-0',
                              'InstanceId': fakes.ID_EC2_INSTANCE_1})
         self.assertEqual(400, resp['status'])
         self.assertEqual('InvalidParameterCombination', resp['Error']['Code'])
@@ -289,7 +289,7 @@ class AddressTestCase(base.ApiTestCase):
 
         # NOTE(ft): vpc instance vs public ip parmeter
         self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_2]
-        do_check({'PublicIp': 'fake_ip',
+        do_check({'PublicIp': '0.0.0.0',
                   'InstanceId': fakes.ID_EC2_INSTANCE_1},
                  'InvalidParameterCombination')
 
@@ -474,8 +474,8 @@ class AddressTestCase(base.ApiTestCase):
         do_check({},
                  'MissingParameter')
 
-        do_check({'PublicIp': 'fake_ip',
-                  'AssociationId': 'fake_allocation_id'},
+        do_check({'PublicIp': '0.0.0.0',
+                  'AssociationId': 'eipassoc-0'},
                  'InvalidParameterCombination')
 
         # NOTE(ft): vpc address vs public ip parameter
@@ -557,8 +557,8 @@ class AddressTestCase(base.ApiTestCase):
         do_check({},
                  'MissingParameter')
 
-        do_check({'PublicIp': 'fake_ip',
-                  'AllocationId': 'fake_allocation_id'},
+        do_check({'PublicIp': '0.0.0.0',
+                  'AllocationId': 'eipalloc-0'},
                  'InvalidParameterCombination')
 
         # NOTE(ft): vpc address vs public ip parameter

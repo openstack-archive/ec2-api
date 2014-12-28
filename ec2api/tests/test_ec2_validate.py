@@ -19,8 +19,44 @@ import datetime
 import testtools
 
 from ec2api.api import ec2utils
+from ec2api.api import validator
 from ec2api import exception
 from ec2api.openstack.common import timeutils
+
+
+class EC2ValidationTestCase(testtools.TestCase):
+    """Test case for various validations."""
+
+    def test_validate_cidr(self):
+        self.assertEqual(True, validator.validate_cidr('10.10.0.0/24', 'cidr'))
+
+        def check_raise_invalid_parameter(cidr):
+            self.assertRaises(exception.InvalidParameterValue,
+                              validator.validate_cidr, cidr, 'cidr')
+
+        check_raise_invalid_parameter('fake')
+        check_raise_invalid_parameter('10.10/24')
+        check_raise_invalid_parameter('10.10.0.0.0/24')
+        check_raise_invalid_parameter('10.10.0.0')
+        check_raise_invalid_parameter(' 10.10.0.0/24')
+        check_raise_invalid_parameter('10.10.0.0/24 ')
+        check_raise_invalid_parameter('.10.10.0.0/24 ')
+        check_raise_invalid_parameter('-1.10.0.0/24')
+        check_raise_invalid_parameter('10.256.0.0/24')
+        check_raise_invalid_parameter('10.10.0.0/33')
+        check_raise_invalid_parameter('10.10.0.0/-1')
+
+        def check_raise_invalid_vpc_range(cidr, ex_class, action):
+            self.assertRaises(ex_class,
+                              validator.validate_cidr_block, cidr,
+                              action)
+
+        check_raise_invalid_vpc_range('10.10.0.0/15',
+                                      exception.InvalidSubnetRange,
+                                      'CreateSubnet')
+        check_raise_invalid_vpc_range('10.10.0.0/29',
+                                      exception.InvalidVpcRange,
+                                      'CreateVpc')
 
 
 class EC2TimestampValidationTestCase(testtools.TestCase):

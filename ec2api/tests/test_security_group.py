@@ -191,13 +191,21 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.nova_security_groups.delete.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_1)
 
+    # NOTE(Alex) This test is disabled because it checks using non-AWS id.
+    @base.skip_not_implemented
+    def test_delete_security_group_nova_os_id(self):
+        security_group.security_group_engine = (
+            security_group.SecurityGroupEngineNova())
+        self.nova_security_groups.list.return_value = (
+            [fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_1),
+             fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_2)])
         resp = self.execute(
             'DeleteSecurityGroup',
             {'GroupId':
              fakes.ID_OS_SECURITY_GROUP_2})
         self.assertEqual(200, resp['status'])
         self.assertEqual(True, resp['return'])
-        self.nova_security_groups.delete.assert_any_call(
+        self.nova_security_groups.delete.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_2)
 
     def test_delete_security_group_invalid(self):
@@ -293,13 +301,15 @@ class SecurityGroupTestCase(base.ApiTestCase):
 
         def check_response(error_code, protocol, from_port, to_port, cidr,
                            group_id=fakes.ID_EC2_SECURITY_GROUP_2):
+            params = {'IpPermissions.1.FromPort': str(from_port),
+                      'IpPermissions.1.ToPort': str(to_port),
+                      'IpPermissions.1.IpProtocol': protocol}
+            if group_id is not None:
+                params['GroupId'] = group_id
+            if cidr is not None:
+                params['IpPermissions.1.IpRanges.1.CidrIp'] = cidr
             resp = self.execute(
-                'AuthorizeSecurityGroupIngress',
-                {'GroupId': group_id,
-                 'IpPermissions.1.FromPort': str(from_port),
-                 'IpPermissions.1.ToPort': str(to_port),
-                 'IpPermissions.1.IpProtocol': protocol,
-                 'IpPermissions.1.IpRanges.1.CidrIp': cidr})
+                'AuthorizeSecurityGroupIngress', params)
             self.assertEqual(400, resp['status'])
             self.assertEqual(error_code, resp['Error']['Code'])
             self.neutron.reset_mock()

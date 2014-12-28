@@ -15,6 +15,9 @@
 import base64
 import re
 
+import netaddr
+
+from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 
@@ -37,21 +40,26 @@ def _get_path_validator_regex():
 VALIDATE_PATH_RE = _get_path_validator_regex()
 
 
+def validate_dummy(val, **kwargs):
+    return True
+
+
 def validate_str(max_length=None):
 
-    def _do(val):
-        if not isinstance(val, basestring):
-            return False
-        if max_length and len(val) > max_length:
-            return False
-        return True
+    def _do(val, parameter_name, **kwargs):
+        if (isinstance(val, basestring) and
+                (max_length is None or max_length and len(val) <= max_length)):
+            return True
+        raise exception.ValidationError(
+            reason=_("%s should not be greater "
+                     "than 255 characters.") % parameter_name)
 
     return _do
 
 
 def validate_int(max_value=None):
 
-    def _do(val):
+    def _do(val, **kwargs):
         if not isinstance(val, int):
             return False
         if max_value and val > max_value:
@@ -61,7 +69,7 @@ def validate_int(max_value=None):
     return _do
 
 
-def validate_url_path(val):
+def validate_url_path(val, **kwargs):
     """True if val is matched by the path component grammar in rfc3986."""
 
     if not validate_str()(val):
@@ -70,7 +78,7 @@ def validate_url_path(val):
     return VALIDATE_PATH_RE.match(val).end() == len(val)
 
 
-def validate_image_path(val):
+def validate_image_path(val, **kwargs):
     if not validate_str()(val):
         return False
 
@@ -90,7 +98,7 @@ def validate_image_path(val):
     return True
 
 
-def validate_user_data(user_data):
+def validate_user_data(user_data, **kwargs):
     """Check if the user_data is encoded properly."""
     try:
         user_data = base64.b64decode(user_data)
@@ -99,7 +107,117 @@ def validate_user_data(user_data):
     return True
 
 
-def validate(args, validator):
+def _is_valid_cidr(address):
+    """Check if address is valid
+
+    The provided address can be a IPv6 or a IPv4
+    CIDR address.
+    """
+    try:
+        # Validate the correct CIDR Address
+        netaddr.IPNetwork(address)
+    except netaddr.core.AddrFormatError:
+        return False
+    except UnboundLocalError:
+        # NOTE(MotoKen): work around bug in netaddr 0.7.5 (see detail in
+        # https://github.com/drkjam/netaddr/issues/2)
+        return False
+
+    # Prior validation partially verify /xx part
+    # Verify it here
+    ip_segment = address.split('/')
+
+    if (len(ip_segment) <= 1 or
+            ip_segment[1] == ''):
+        return False
+
+    return True
+
+
+def validate_cidr_with_ipv6(cidr, parameter_name, **kwargs):
+    invalid_format_exception = exception.InvalidParameterValue(
+        value=cidr,
+        parameter=parameter_name,
+        reason='This is not a valid CIDR block.')
+    if not _is_valid_cidr(cidr):
+        raise invalid_format_exception
+    return True
+
+
+_cidr_re = re.compile("^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")
+
+
+def validate_cidr(cidr, parameter_name, **kwargs):
+    invalid_format_exception = exception.InvalidParameterValue(
+        value=cidr,
+        parameter=parameter_name,
+        reason='This is not a valid CIDR block.')
+    if not _cidr_re.match(cidr):
+        raise invalid_format_exception
+    address, size = cidr.split("/")
+    octets = address.split(".")
+    if any(int(octet) > 255 for octet in octets):
+        raise invalid_format_exception
+    size = int(size)
+    if size > 32:
+        raise invalid_format_exception
+    return True
+
+
+def validate_cidr_block(cidr, action, **kwargs):
+    validate_cidr(cidr, 'cidrBlock')
+    size = int(cidr.split("/")[-1])
+    if size > 28 or size < 16:
+        if action == 'CreateVpc':
+            raise exception.InvalidVpcRange(cidr_block=cidr)
+        elif action == 'CreateSubnet':
+            raise exception.InvalidSubnetRange(cidr_block=cidr)
+    return True
+
+
+# NOTE(Alex) Unfortunately Amazon returns various kinds of error for invalid
+# IDs (...ID.Malformed, ...Id.Malformed, ...ID.NotFound, InvalidParameterValue)
+# So we decided here to commonize invalid IDs to InvalidParameterValue error.
+
+def validate_ec2_id(prefices):
+
+    def _do(val, parameter_name, **kwargs):
+        if not validate_str()(val, parameter_name, **kwargs):
+            return False
+        try:
+            prefix, value = val.rsplit('-', 1)
+            int(value, 16)
+            if prefix in prefices:
+                return True
+        except Exception:
+            pass
+        raise exception.InvalidParameterValue(
+            value=val, parameter=parameter_name,
+            reason=_('Expected: %(prefix)s-...') % {'prefix': prefices[0]})
+
+    return _do
+
+
+def validate_ec2_association_id(id, parameter_name, action):
+    if action == 'DisassociateAddress':
+        return validate_ec2_id(['eipassoc'])(id, parameter_name)
+    else:
+        return validate_ec2_id(['rtbassoc'])(id, parameter_name)
+
+
+def validate_ipv4(address, parameter_name, **kwargs):
+    """Verify that address represents a valid IPv4 address."""
+    try:
+        if netaddr.valid_ipv4(address):
+            return True
+    except Exception:
+        pass
+    raise exception.InvalidParameterValue(
+        value=address, parameter=parameter_name,
+        reason=_('Not a valid IP address'))
+
+
+def validate(request, validator):
     """Validate values of args against validators in validator.
 
     :param args:      Dict of values to be validated.
@@ -117,14 +235,15 @@ def validate(args, validator):
 
     """
 
-    for key in validator:
-        if key not in args:
+    args = request.args
+    for key in args:
+        if key not in validator:
             continue
 
         f = validator[key]
         assert callable(f)
 
-        if not f(args[key]):
+        if not f(args[key], parameter_name=key, action=request.action):
             LOG.debug(_("%(key)s with value %(value)s failed"
                         " validator %(name)s"),
                       {'key': key, 'value': args[key], 'name': f.__name__})

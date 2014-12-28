@@ -19,7 +19,6 @@ import functools
 import hashlib
 import sys
 
-import netaddr
 from oslo.config import cfg
 import requests
 import six
@@ -330,40 +329,95 @@ class Requestify(wsgi.Middleware):
         return self.application
 
 
-def validate_ec2_id(val):
-    if not validator.validate_str()(val):
-        return False
-    try:
-        ec2utils.ec2_id_to_id(val)
-    except exception.InvalidId:
-        return False
-    return True
-
-
-def is_valid_ipv4(address):
-    """Verify that address represents a valid IPv4 address."""
-    try:
-        return netaddr.valid_ipv4(address)
-    except Exception:
-        return False
-
-
 class Validator(wsgi.Middleware):
 
-    validator.validate_ec2_id = validate_ec2_id
-
     validator.DEFAULT_VALIDATOR = {
-        'instance_id': validate_ec2_id,
-        'volume_id': validate_ec2_id,
-        'image_id': validate_ec2_id,
-        'attribute': validator.validate_str(),
-        'image_location': validator.validate_image_path,
-        'public_ip': is_valid_ipv4,
-        'region_name': validator.validate_str(),
-        'group_name': validator.validate_str(max_length=255),
-        'group_description': validator.validate_str(max_length=255),
-        'size': validator.validate_int(),
-        'user_data': validator.validate_user_data
+        'AllocationId': validator.validate_ec2_id(['eipalloc']),
+        'AllowReassignment': validator.validate_dummy,
+        'AllowReassociation': validator.validate_dummy,
+        'Architecture': validator.validate_dummy,
+        'AssociationId': validator.validate_ec2_association_id,
+        'AttachmentId': validator.validate_ec2_id(['eni-attach']),
+        'Attribute': validator.validate_dummy,
+        'AvailabilityZone': validator.validate_dummy,
+        'BlockDeviceMapping': validator.validate_dummy,
+        'CidrBlock': validator.validate_cidr_block,
+        'ClientToken': validator.validate_dummy,
+        'Description': validator.validate_dummy,
+        'DestinationCidrBlock': validator.validate_cidr_block,
+        'Device': validator.validate_dummy,
+        'DeviceIndex': validator.validate_dummy,
+        'DhcpConfiguration': validator.validate_dummy,
+        'Dhcp_optionsId': validator.validate_dummy,
+        'DisableApiTermination': validator.validate_dummy,
+        'Domain': validator.validate_dummy,
+        'Ebs_optimized': validator.validate_dummy,
+        'Encrypted': validator.validate_dummy,
+        'ExecutableBy': validator.validate_dummy,
+        'Filter': validator.validate_dummy,
+        'Force': validator.validate_dummy,
+        'GatewayId': validator.validate_dummy,
+        'GroupDescription': validator.validate_str(max_length=255),
+        'GroupId': validator.validate_ec2_id(['sg']),
+        'GroupName': validator.validate_str(max_length=255),
+        'IamInstanceProfile': validator.validate_dummy,
+        'ImageId': validator.validate_ec2_id(['ami', 'ari', 'aki']),
+        'ImageLocation': validator.validate_image_path,
+        'InstanceId': validator.validate_dummy,
+        'InstanceInitiatedShutdownBehavior': validator.validate_dummy,
+        'InstanceTenancy': validator.validate_dummy,
+        'InstanceType': validator.validate_dummy,
+        'InternetGatewayId': validator.validate_dummy,
+        'Iops': validator.validate_dummy,
+        'IpPermissions': validator.validate_dummy,
+        'KernelId': validator.validate_dummy,
+        'KeyName': validator.validate_dummy,
+        'KmsKeyId': validator.validate_dummy,
+        'LaunchPermission': validator.validate_dummy,
+        'MaxCount': validator.validate_dummy,
+        'MaxResults': validator.validate_dummy,
+        'Metadata': validator.validate_dummy,
+        'MinCount': validator.validate_dummy,
+        'Monitoring': validator.validate_dummy,
+        'Name': validator.validate_dummy,
+        'NetworkInterface': validator.validate_dummy,
+        'NetworkInterfaceId': validator.validate_dummy,
+        'NextToken': validator.validate_dummy,
+        'NoReboot': validator.validate_dummy,
+        'OperationType': validator.validate_dummy,
+        'Owner': validator.validate_dummy,
+        'Placement': validator.validate_dummy,
+        'PrivateIpAddress': validator.validate_dummy,
+        'PrivateIpAddresses': validator.validate_dummy,
+        'ProductCode': validator.validate_dummy,
+        'PublicIp': validator.validate_ipv4,
+        'PublicKey_material': validator.validate_dummy,
+        'RamdiskId': validator.validate_dummy,
+        'RemoteIpPrefix': validator.validate_dummy,
+        'RegionName': validator.validate_str(),
+        'ResourceId': validator.validate_dummy,
+        'RestorableBy': validator.validate_dummy,
+        'RootDeviceName': validator.validate_dummy,
+        'RouteTableId': validator.validate_dummy,
+        'SecondaryPrivateIpAddressCount': validator.validate_dummy,
+        'SecurityGroup': validator.validate_dummy,
+        'SecurityGroupId': validator.validate_dummy,
+        'Size': validator.validate_int(),
+        'SnapshotId': validator.validate_dummy,
+        'SourceDestCheck': validator.validate_dummy,
+        'SriovNetSupport': validator.validate_dummy,
+        'SubnetId': validator.validate_dummy,
+        'Tag': validator.validate_dummy,
+        'UserData': validator.validate_user_data,
+        'UserGroup': validator.validate_dummy,
+        'UserId': validator.validate_dummy,
+        'Value': validator.validate_dummy,
+        'VirtualizationType': validator.validate_dummy,
+        'VolumeId': validator.validate_dummy,
+        'VolumeType': validator.validate_dummy,
+        'VpcId': validator.validate_dummy,
+        'VpcPeeringConnectionId': validator.validate_dummy,
+        'ZoneName': validator.validate_dummy,
     }
 
     def __init__(self, application):
@@ -371,11 +425,15 @@ class Validator(wsgi.Middleware):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
-        if validator.validate(req.environ['ec2.request'].args,
-                              validator.DEFAULT_VALIDATOR):
-            return self.application
-        else:
-            raise webob.exc.HTTPBadRequest()
+        try:
+            if validator.validate(req.environ['ec2.request'],
+                                  validator.DEFAULT_VALIDATOR):
+                return self.application
+            else:
+                raise webob.exc.HTTPBadRequest()
+        except Exception as ex:
+            return ec2_error_ex(
+                ex, req, unexpected=not isinstance(ex, exception.EC2Exception))
 
 
 def exception_to_ec2code(ex):
