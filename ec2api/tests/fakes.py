@@ -708,7 +708,7 @@ NOVA_FLOATING_IP_1 = {
 NOVA_FLOATING_IP_2 = {
     'id': ID_OS_FLOATING_IP_2,
     'ip': IP_ADDRESS_2,
-    'instance_id': ID_OS_INSTANCE_2,
+    'instance_id': ID_OS_INSTANCE_1,
     'fixed_ip': IP_NETWORK_INTERFACE_2,
 }
 

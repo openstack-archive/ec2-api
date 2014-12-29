@@ -182,62 +182,6 @@ def s3_image_get(context, image_id):
 
 
 @require_context
-def ec2_instance_create(context, instance_uuid, id=None):
-    """Create ec2 compatible instance by provided uuid."""
-    ec2_instance_ref = models.InstanceIdMapping()
-    ec2_instance_ref.update({'uuid': instance_uuid})
-    if id is not None:
-        ec2_instance_ref.update({'id': id})
-
-    ec2_instance_ref.save()
-
-    return ec2_instance_ref
-
-
-@require_context
-def _ec2_instance_get_by_uuid(context, instance_uuid):
-    result = (_ec2_instance_get_query(context).
-              filter_by(uuid=instance_uuid).
-              first())
-
-    if not result:
-        raise exception.NovaDbInstanceNotFound(instance_id=instance_uuid)
-
-    return result
-
-
-@require_context
-def get_ec2_instance_id_by_uuid(context, instance_id):
-    result = _ec2_instance_get_by_uuid(context, instance_id)
-    return result['id']
-
-
-@require_context
-def _ec2_instance_get_by_id(context, instance_id):
-    result = (_ec2_instance_get_query(context).
-              filter_by(id=instance_id).
-              first())
-
-    if not result:
-        raise exception.NovaDbInstanceNotFound(instance_id=instance_id)
-
-    return result
-
-
-@require_context
-def get_instance_uuid_by_ec2_id(context, ec2_id):
-    result = _ec2_instance_get_by_id(context, ec2_id)
-    return result['uuid']
-
-
-def _ec2_instance_get_query(context, session=None):
-    return model_query(context,
-                       models.InstanceIdMapping,
-                       session=session,
-                       read_deleted='yes')
-
-
-@require_context
 def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):
     return _instance_get_by_uuid(context, uuid,
             columns_to_join=columns_to_join, use_slave=use_slave)
@@ -252,7 +196,8 @@ def _instance_get_by_uuid(context, uuid, session=None,
                 first())
 
     if not result:
-        raise exception.NovaDbInstanceNotFound(instance_id=uuid)
+        LOG.error("Instance %s could not be found in nova DB" % str(uuid))
+        raise exception.NovaDbInstanceNotFound()
 
     return result
 

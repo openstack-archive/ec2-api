@@ -414,9 +414,10 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertEqual(200, resp['status'])
 
     def test_attach_network_interface(self):
-        self.db_api.get_item_by_id.return_value = (
-            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2))
-        self.ec2_inst_id_to_uuid.return_value = fakes.ID_OS_INSTANCE_1
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_NETWORK_INTERFACE_2: fakes.DB_NETWORK_INTERFACE_2,
+                fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1}))
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
@@ -438,7 +439,6 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_attach_network_interface_rollback(self):
         self.db_api.get_item_by_id.return_value = (
             copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2))
-        self.ec2_inst_id_to_uuid.return_value = fakes.ID_OS_INSTANCE_1
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE

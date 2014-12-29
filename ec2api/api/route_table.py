@@ -423,15 +423,14 @@ def _format_route_table(context, route_table, is_main=False,
                            None)
             state = 'blackhole'
             if instance_id:
-                try:
-                    os_instance_id = ec2utils.ec2_inst_id_to_uuid(context,
-                                                                  instance_id)
-                    os_instance = nova.servers.get(os_instance_id)
-                except nova_exception.NotFound:
-                    pass
-                else:
-                    if os_instance.status == 'ACTIVE':
-                        state = 'active'
+                instance = db_api.get_item_by_id(context, 'i', instance_id)
+                if instance:
+                    try:
+                        os_instance = nova.servers.get(instance['os_id'])
+                        if os_instance and os_instance.status == 'ACTIVE':
+                            state = 'active'
+                    except nova_exception.NotFound:
+                        pass
                 ec2_route.update({'instanceId': instance_id,
                                   'instanceOwnerId': context.project_id})
             ec2_route.update({'networkInterfaceId': network_interface_id,

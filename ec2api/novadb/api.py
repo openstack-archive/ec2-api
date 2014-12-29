@@ -88,21 +88,6 @@ def s3_image_get(context, image_id):
 ###################
 
 
-def get_ec2_instance_id_by_uuid(context, instance_id):
-    """Get ec2 id through uuid from instance_id_mappings table."""
-    return IMPL.get_ec2_instance_id_by_uuid(context, instance_id)
-
-
-def get_instance_uuid_by_ec2_id(context, ec2_id):
-    """Get uuid through ec2 id from instance_id_mappings table."""
-    return IMPL.get_instance_uuid_by_ec2_id(context, ec2_id)
-
-
-def ec2_instance_create(context, instance_uuid, id=None):
-    """Create the ec2 id to instance uuid mapping on demand."""
-    return IMPL.ec2_instance_create(context, instance_uuid, id)
-
-
 def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):
     """Get an instance or raise if it does not exist."""
     return IMPL.instance_get_by_uuid(context, uuid,

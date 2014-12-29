@@ -162,11 +162,6 @@ class NovaDbImageNotFound(EC2NotFound):
     msg_fmt = _("The image id '[%(image_id)s]' does not exist")
 
 
-class NovaDbInstanceNotFound(EC2NotFound):
-    ec2_code = 'InvalidInstanceID.NotFound'
-    msg_fmt = _("Instance %(instance_id)s could not be found.")
-
-
 class InvalidInstanceIDNotFound(EC2NotFound):
     ec2_code = 'InvalidInstanceID.NotFound'
     msg_fmt = _("The instance ID '%(id)s' does not exist")
@@ -378,3 +373,7 @@ class InvalidPermissionDuplicate(Invalid):
 class RulesPerSecurityGroupLimitExceeded(Overlimit):
     msg_fmt = _("You've reached the limit on the number of rules that "
                 "you can add to a security group.")
+
+
+class NovaDbInstanceNotFound(EC2Exception):
+    pass

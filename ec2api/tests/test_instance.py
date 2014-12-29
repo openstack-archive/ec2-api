@@ -41,10 +41,6 @@ class InstanceTestCase(base.ApiTestCase):
             mock.patch('ec2api.api.ec2utils.ec2_id_to_glance_id'))
         self.ec2_id_to_glance_id = ec2_id_to_glance_id_patcher.start()
         self.addCleanup(ec2_id_to_glance_id_patcher.stop)
-        id_to_ec2_inst_id_patcher = (
-            mock.patch('ec2api.api.ec2utils.id_to_ec2_inst_id'))
-        self.id_to_ec2_inst_id = id_to_ec2_inst_id_patcher.start()
-        self.addCleanup(id_to_ec2_inst_id_patcher.stop)
         utils_generate_uid_patcher = (
             mock.patch('ec2api.api.instance._utils_generate_uid'))
         self.utils_generate_uid = utils_generate_uid_patcher.start()
@@ -403,12 +399,6 @@ class InstanceTestCase(base.ApiTestCase):
                              {'instanceId': fakes.ID_EC2_INSTANCE_2,
                               'fakeKey': 'fakeValue'}]}
 
-        os_instance_ids_dict = {
-            fakes.ID_EC2_INSTANCE_1: fakes.ID_OS_INSTANCE_1,
-            fakes.ID_EC2_INSTANCE_2: fakes.ID_OS_INSTANCE_2}
-        self.ec2_inst_id_to_uuid.side_effect = (
-            lambda _, inst_id: os_instance_ids_dict[inst_id])
-
         def do_check(mock_port_list=[], mock_eni_list=[],
                      updated_ports=[], deleted_ports=[]):
             self.neutron.list_ports.return_value = {'ports': mock_port_list}
@@ -423,9 +413,6 @@ class InstanceTestCase(base.ApiTestCase):
             resp.pop('status')
             self.assertThat(resp, matchers.DictMatches(
                 ec2_terminate_instances_result))
-            for inst_id in self.IDS_DB_INSTANCE:
-                self.ec2_inst_id_to_uuid.assert_any_call(
-                    mock.ANY, inst_id)
             self._assert_list_ports_is_called_with_filter(self.IDS_OS_INSTANCE)
             self.assertEqual(len(updated_ports),
                              self.neutron.update_port.call_count)
@@ -448,7 +435,6 @@ class InstanceTestCase(base.ApiTestCase):
             for inst_id in (fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2):
                 self.db_api.delete_item.assert_any_call(mock.ANY, inst_id)
 
-            self.ec2_inst_id_to_uuid.reset_mock()
             self.neutron.list_ports.reset_mock()
             self.neutron.update_port.reset_mock()
             self.db_api.delete_item.reset_mock()
@@ -547,7 +533,6 @@ class InstanceTestCase(base.ApiTestCase):
                 self.IDS_EC2_INSTANCE, ips_instance)]
             reservation_set = gen_reservation_set([instances[0], instances[1]])
 
-            self.ec2_inst_id_to_uuid.side_effect = self.IDS_OS_INSTANCE
             self.neutron.list_ports.return_value = {'ports': mock_port_list}
             self.db_api.get_items.return_value = (
                 mock_eni_list + [self.DB_FAKE_ENI])
@@ -569,9 +554,6 @@ class InstanceTestCase(base.ApiTestCase):
             self.assertThat({'reservationSet': reservation_set,
                              'fakeKey': 'fakeValue'},
                             matchers.DictMatches(resp), verbose=True)
-            for inst_id in self.IDS_EC2_INSTANCE:
-                self.ec2_inst_id_to_uuid.assert_any_call(
-                    mock.ANY, inst_id)
             self._assert_list_ports_is_called_with_filter(self.IDS_OS_INSTANCE)
 
             self.neutron.list_ports.reset_mock()

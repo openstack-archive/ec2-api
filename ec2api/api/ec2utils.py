@@ -14,14 +14,12 @@
 
 import re
 
-from ec2api import context
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api import novadb
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 from ec2api.openstack.common import timeutils
-from ec2api.openstack.common import uuidutils
 
 LOG = logging.getLogger(__name__)
 
@@ -151,54 +149,18 @@ def is_ec2_timestamp_expired(request, expires=None):
 
 
 def ec2_id_to_glance_id(context, ec2_id):
-    image_id = ec2_id_to_id(ec2_id)
+    image_id = _ec2_id_to_id(ec2_id)
     return novadb.s3_image_get(context, image_id)['uuid']
 
 
 # TODO(Alex) This function is copied as is from original cloud.py. It doesn't
 # check for the prefix which allows any prefix used for any object.
-def ec2_id_to_id(ec2_id):
+def _ec2_id_to_id(ec2_id):
     """Convert an ec2 ID (i-[base 16 number]) to an instance id (int)."""
     try:
         return int(ec2_id.split('-')[-1], 16)
     except ValueError:
         raise exception.InvalidId(id=ec2_id)
-
-
-def id_to_ec2_id(instance_id, template='i-%08x'):
-    """Convert an instance ID (int) to an ec2 ID (i-[base 16 number])."""
-    return template % int(instance_id)
-
-
-def id_to_ec2_inst_id(instance_id):
-    """Get or create an ec2 instance ID (i-[base 16 number]) from uuid."""
-    if instance_id is None:
-        return None
-    elif uuidutils.is_uuid_like(instance_id):
-        ctxt = context.get_admin_context()
-        int_id = _get_int_id_from_instance_uuid(ctxt, instance_id)
-        return id_to_ec2_id(int_id)
-    else:
-        return id_to_ec2_id(instance_id)
-
-
-def ec2_inst_id_to_uuid(context, ec2_id):
-    """"Convert an instance id to uuid."""
-    int_id = ec2_id_to_id(ec2_id)
-    return _get_instance_uuid_from_int_id(context, int_id)
-
-
-def _get_instance_uuid_from_int_id(context, int_id):
-    return novadb.get_instance_uuid_by_ec2_id(context, int_id)
-
-
-def _get_int_id_from_instance_uuid(context, instance_uuid):
-    if instance_uuid is None:
-        return
-    try:
-        return novadb.get_ec2_instance_id_by_uuid(context, instance_uuid)
-    except exception.NotFound:
-        return novadb.ec2_instance_create(context, instance_uuid)['id']
 
 
 # NOTE(ft): extra functions to use in vpc specific code or instead of
@@ -300,8 +262,6 @@ def get_db_item_by_os_id(context, kind, os_id, items_by_os_id=None,
                      if i['os_id'] == os_id), None)
     if not item:
         item = auto_create_db_item(context, kind, os_id, **extension_kwargs)
-    else:
-        pass
     if items_by_os_id is not None:
         items_by_os_id[os_id] = item
     return item

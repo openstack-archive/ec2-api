@@ -347,7 +347,7 @@ def attach_network_interface(context, network_interface_id,
     network_interface = ec2utils.get_db_item(context, 'eni',
                                              network_interface_id)
     neutron = clients.neutron(context)
-    os_instance_id = ec2utils.ec2_inst_id_to_uuid(context, instance_id)
+    os_instance_id = ec2utils.get_db_item(context, 'i', instance_id)['os_id']
     # TODO(Alex) Check that the instance is not yet attached to another VPC
     # TODO(Alex) Check that the instance is "our", not created via nova
     # (which means that it doesn't belong to any VPC and can't be attached)

@@ -28,13 +28,6 @@ from ec2api.tests import tools
 
 class AddressTestCase(base.ApiTestCase):
 
-    def setUp(self):
-        super(AddressTestCase, self).setUp()
-        id_to_ec2_inst_id_patcher = (
-            mock.patch('ec2api.api.ec2utils.id_to_ec2_inst_id'))
-        self.id_to_ec2_inst_id = id_to_ec2_inst_id_patcher.start()
-        self.addCleanup(id_to_ec2_inst_id_patcher.stop)
-
     def test_allocate_ec2_classic_address(self):
         address.address_engine = (
             address.AddressEngineNeutron())
@@ -398,7 +391,7 @@ class AddressTestCase(base.ApiTestCase):
         self.assertEqual(200, resp['status'])
         self.assertEqual(True, resp['return'])
         self.nova_servers.remove_floating_ip.assert_called_once_with(
-            fakes.ID_OS_INSTANCE_2,
+            fakes.ID_OS_INSTANCE_1,
             fakes.IP_ADDRESS_2)
 
         # NOTE(Alex) Disassociate unassociated address in EC2 classic
@@ -422,7 +415,7 @@ class AddressTestCase(base.ApiTestCase):
         self.assertEqual(400, resp['status'])
         self.assertEqual('AuthFailure', resp['Error']['Code'])
         self.nova_servers.remove_floating_ip.assert_called_once_with(
-            fakes.ID_OS_INSTANCE_2,
+            fakes.ID_OS_INSTANCE_1,
             fakes.IP_ADDRESS_2)
 
     def test_dissassociate_address_vpc(self):
@@ -615,8 +608,8 @@ class AddressTestCase(base.ApiTestCase):
             if kind == 'eipalloc' else
             [fakes.DB_NETWORK_INTERFACE_1,
              fakes.DB_NETWORK_INTERFACE_2]
-            if kind == 'eni' else [])
-        self.id_to_ec2_inst_id.return_value = fakes.ID_EC2_INSTANCE_1
+            if kind == 'eni' else [fakes.DB_INSTANCE_1]
+            if kind == 'i' else [])
 
         resp = self.execute('DescribeAddresses', {})
         self.assertEqual(200, resp['status'])
@@ -627,8 +620,7 @@ class AddressTestCase(base.ApiTestCase):
     def test_describe_addresses_ec2_classic(self):
         address.address_engine = (
             address.AddressEngineNova())
-        self.db_api.get_items.return_value = []
-        self.id_to_ec2_inst_id.return_value = fakes.ID_EC2_INSTANCE_1
+        self.db_api.get_items.return_value = [fakes.DB_INSTANCE_1]
         self.nova_floating_ips.list.return_value = [
             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)]

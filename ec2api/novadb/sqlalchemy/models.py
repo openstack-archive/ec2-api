@@ -59,16 +59,6 @@ class S3Image(BASE, NovaBase):
     uuid = Column(String(36), nullable=False)
 
 
-class InstanceIdMapping(BASE, NovaBase):
-    """Compatibility layer for the EC2 instance service."""
-    __tablename__ = 'instance_id_mappings'
-    __table_args__ = (
-        Index('ix_instance_id_mappings_uuid', 'uuid'),
-    )
-    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
-    uuid = Column(String(36), nullable=False)
-
-
 class Instance(BASE, NovaBase):
     """Represents a guest VM."""
     __tablename__ = 'instances'

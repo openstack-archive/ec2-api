@@ -54,10 +54,6 @@ class ApiTestCase(test_base.BaseTestCase):
         db_api_patcher = mock.patch('ec2api.db.api.IMPL')
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)
-        ec2_inst_id_to_uuid_patcher = (
-            mock.patch('ec2api.api.ec2utils.ec2_inst_id_to_uuid'))
-        self.ec2_inst_id_to_uuid = ec2_inst_id_to_uuid_patcher.start()
-        self.addCleanup(ec2_inst_id_to_uuid_patcher.stop)
         isotime_patcher = mock.patch('ec2api.openstack.common.timeutils.'
                                      'isotime')
         self.isotime = isotime_patcher.start()

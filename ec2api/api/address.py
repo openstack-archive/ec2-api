@@ -148,15 +148,16 @@ def _format_address(context, address, os_floating_ip, os_ports=[]):
     if fixed_ip_address:
         ec2_address['privateIpAddress'] = fixed_ip_address
         port_id = os_floating_ip.get('port_id')
+        os_fip = os_floating_ip.get('instance_id')
         if port_id:
             port = next((port for port in os_ports
                 if port['id'] == port_id), None)
             if port and port.get('device_id'):
                 ec2_address['instanceId'] = (
-                    ec2utils.id_to_ec2_inst_id(port['device_id']))
-        elif os_floating_ip.get('instance_id'):
-                ec2_address['instanceId'] = (
-                    ec2utils.id_to_ec2_inst_id(os_floating_ip['instance_id']))
+                    _get_instance_ec2_id_by_os_id(context, port['device_id']))
+        elif os_fip:
+            ec2_address['instanceId'] = (
+                _get_instance_ec2_id_by_os_id(context, os_fip))
     if not address:
         ec2_address['domain'] = 'standard'
     else:
@@ -169,6 +170,11 @@ def _format_address(context, address, os_floating_ip, os_ports=[]):
                     'networkInterfaceId': address['network_interface_id'],
                     'networkInterfaceOwnerId': context.project_id})
     return ec2_address
+
+
+def _get_instance_ec2_id_by_os_id(context, os_instance_id):
+    db_item = ec2utils.get_db_item_by_os_id(context, 'i', os_instance_id)
+    return db_item['id']
 
 
 def _is_address_valid(context, neutron, address):
