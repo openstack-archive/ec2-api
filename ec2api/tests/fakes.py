@@ -194,6 +194,7 @@ ID_OS_IMAGE_ARI_1 = random_os_id()
 
 ROOT_DEVICE_NAME_IMAGE_1 = '/dev/sda1'
 ROOT_DEVICE_NAME_IMAGE_2 = '/dev/sdb1'
+LOCATION_IMAGE_1 = 'fake_bucket/fake.img.manifest.xml'
 
 # volumes constants
 ID_EC2_VOLUME_1 = random_ec2_id('vol')
@@ -971,8 +972,17 @@ class OSImage(object):
         self.container_format = image_dict['container_format']
         self.name = image_dict['name']
         self.properties = copy.deepcopy(image_dict['properties'])
+        if 'mappings' in self.properties:
+            self.properties['mappings'] = (
+                json.dumps(self.properties['mappings']))
+        if 'block_device_mapping' in self.properties:
+            self.properties['block_device_mapping'] = (
+                json.dumps(self.properties['block_device_mapping']))
 
     def update(self, **kwargs):
+        pass
+
+    def delete(self):
         pass
 
 EC2_IMAGE_1 = {
@@ -983,7 +993,7 @@ EC2_IMAGE_1 = {
     'imageType': 'machine',
     'name': 'fake_name',
     'description': None,
-    'imageLocation': 'None (fake_name)',
+    'imageLocation': LOCATION_IMAGE_1,
     'kernelId': ID_EC2_IMAGE_AKI_1,
     'ramdiskId': ID_EC2_IMAGE_ARI_1,
     'architecture': None,
@@ -1017,7 +1027,7 @@ EC2_IMAGE_2 = {
     'description': None,
     'imageLocation': 'None (None)',
     'architecture': None,
-    'rootDeviceType': 'instance-store',
+    'rootDeviceType': 'ebs',
     'rootDeviceName': ROOT_DEVICE_NAME_IMAGE_2,
     'blockDeviceMapping': [
         {'deviceName': '/dev/sdb1',
@@ -1048,7 +1058,8 @@ OS_IMAGE_1 = {
         'ramdisk_id': ID_OS_IMAGE_ARI_1,
         'type': 'machine',
         'image_state': 'available',
-        'mappings': json.dumps([
+        'image_location': LOCATION_IMAGE_1,
+        'mappings': [
             {'device': '/dev/sda1', 'virtual': 'root'},
             {'device': 'sdb0', 'virtual': 'ephemeral0'},
             {'device': 'sdb1', 'virtual': 'ephemeral1'},
@@ -1059,8 +1070,8 @@ OS_IMAGE_1 = {
             {'device': 'sdc1', 'virtual': 'swap'},
             {'device': 'sdc2', 'virtual': 'swap'},
             {'device': 'sdc3', 'virtual': 'swap'},
-            {'device': 'sdc4', 'virtual': 'swap'}]),
-        'block_device_mapping': json.dumps([
+            {'device': 'sdc4', 'virtual': 'swap'}],
+        'block_device_mapping': [
             {'device_name': '/dev/sdb1',
              'snapshot_id': ID_OS_SNAPSHOT_1},
             {'device_name': '/dev/sdb2',
@@ -1072,7 +1083,7 @@ OS_IMAGE_1 = {
             {'device_name': '/dev/sdc2',
              'volume_id': ID_OS_VOLUME_2},
             {'device_name': '/dev/sdc3', 'virtual_name': 'ephemeral6'},
-            {'device_name': '/dev/sdc4', 'no_device': True}]),
+            {'device_name': '/dev/sdc4', 'no_device': True}],
         }
 }
 OS_IMAGE_2 = {
@@ -1085,11 +1096,11 @@ OS_IMAGE_2 = {
     'properties': {
         'type': 'machine',
         'root_device_name': '/dev/sdb1',
-        'mappings': json.dumps([{'device': '/dev/sda1',
-                      'virtual': 'root'}]),
-        'block_device_mapping': json.dumps([
+        'mappings': [{'device': '/dev/sda1',
+                      'virtual': 'root'}],
+        'block_device_mapping': [
             {'device_name': '/dev/sdb1',
-             'snapshot_id': ID_OS_SNAPSHOT_1}]),
+             'snapshot_id': ID_OS_SNAPSHOT_1}],
     }
 }
 

@@ -153,19 +153,20 @@ def register_image(context, name=None, image_location=None,
     if image_location is None and name:
         image_location = name
     if image_location is None:
-        msg = _('imageLocation is required')
-        raise exception.MissingParameter(msg)
+        raise exception.MissingParameter(param='ImageLocation')
 
-    metadata = {'properties': {'image_location': image_location},
+    properties = {'image_location': image_location}
+    metadata = {'properties': properties,
                 'name': name if name else image_location}
 
     if root_device_name:
-        metadata['properties']['root_device_name'] = root_device_name
+        properties['root_device_name'] = root_device_name
 
-    mappings = [instance_api._cloud_parse_block_device_mapping(context, bdm)
-                for bdm in block_device_mapping or []]
-    if mappings:
-        metadata['properties']['block_device_mapping'] = mappings
+    if block_device_mapping:
+        mappings = [instance_api._cloud_parse_block_device_mapping(context,
+                                                                   bdm)
+                    for bdm in block_device_mapping]
+        properties['block_device_mapping'] = mappings
 
     with utils.OnCrashCleaner() as cleaner:
         os_image = _s3_create(context, metadata)
@@ -188,13 +189,6 @@ def deregister_image(context, image_id):
         pass
     db_api.delete_item(context, image['id'])
     return True
-
-
-def update_image(context, image_id, **kwargs):
-    kind = ec2utils.get_ec2_id_kind(image_id)
-    image = ec2utils.get_db_item(context, kind, image_id)
-    glance = clients.glance(context)
-    return glance.images.update(image['os_id'], **kwargs)
 
 
 class ImageDescriber(common.TaggableItemsDescriber):
@@ -373,8 +367,8 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
                  'isPublic': image['is_public'],
                  'architecture': os_image.properties.get('architecture'),
                  }
-    # NOTE(vish): fallback status if image_state isn't set
     state = os_image.status
+    # NOTE(vish): fallback status if image_state isn't set
     if state == 'active':
         state = 'available'
     ec2_image['imageState'] = os_image.properties.get('image_state', state)
@@ -410,10 +404,14 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
             instance_api._block_device_DEFAULT_ROOT_DEV_NAME)
 
     root_device_type = 'instance-store'
+    root_device_name = instance_api._block_device_strip_dev(
+            ec2_image['rootDeviceName'])
     for bdm in properties.get('block_device_mapping', []):
-        if (bdm.get('boot_index') == 0 and
-            ('snapshot_id' in bdm or 'volume_id' in bdm) and
-                not bdm.get('no_device')):
+        if (('snapshot_id' in bdm or 'volume_id' in bdm) and
+                not bdm.get('no_device') and
+                (root_device_name ==
+                    instance_api._block_device_strip_dev(
+                        bdm.get('device_name')))):
             root_device_type = 'ebs'
             break
     ec2_image['rootDeviceType'] = root_device_type
@@ -451,29 +449,28 @@ ec2utils.register_auto_create_db_item_extension(
 
 # NOTE(ft): following functions are copied from various parts of Nova
 
-def _cloud_properties_get_mappings(properties):
-    return _block_device_mappings_prepend_dev(properties.get('mappings', []))
+_ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
 
 
 def _cloud_format_mappings(context, properties, result, root_device_name=None,
                            snapshot_ids=None):
     """Format multiple BlockDeviceMappingItemType."""
-    mappings = [{'virtualName': m['virtual'], 'deviceName': m['device']}
-                for m in _cloud_properties_get_mappings(properties)
-                if _block_device_is_swap_or_ephemeral(m['virtual'])]
+    mappings = [
+        {'virtualName': m['virtual'],
+         'deviceName': instance_api._block_device_prepend_dev(m['device'])}
+        for m in properties.get('mappings', [])
+        if (m['virtual'] and
+            (m['virtual'] == 'swap' or _ephemeral.match(m['virtual'])))]
 
-    block_device_mapping = [
-        _cloud_format_block_device_mapping(context, bdm, root_device_name,
-                                           snapshot_ids)
-        for bdm in properties.get('block_device_mapping', [])]
-
-    # NOTE(yamahata): overwrite mappings with block_device_mapping
-    for bdm in block_device_mapping:
+    for bdm in properties.get('block_device_mapping', []):
+        formatted_bdm = _cloud_format_block_device_mapping(
+                context, bdm, root_device_name, snapshot_ids)
+        # NOTE(yamahata): overwrite mappings with block_device_mapping
         for i in range(len(mappings)):
-            if bdm['deviceName'] == mappings[i]['deviceName']:
+            if formatted_bdm['deviceName'] == mappings[i]['deviceName']:
                 del mappings[i]
                 break
-        mappings.append(bdm)
+        mappings.append(formatted_bdm)
 
     # NOTE(yamahata): trim ebs.no_device == true. Is this necessary?
     mappings = [bdm for bdm in mappings if not (bdm.get('noDevice', False))]
@@ -484,37 +481,27 @@ def _cloud_format_mappings(context, properties, result, root_device_name=None,
 
 def _cloud_format_block_device_mapping(context, bdm, root_device_name=None,
                                        snapshot_ids=None):
-    """Construct BlockDeviceMappingItemType
-
-    {'device_name': '...', 'snapshot_id': , ...}
-    => BlockDeviceMappingItemType
-    """
+    """Construct BlockDeviceMappingItemType."""
     keys = (('deviceName', 'device_name'),
-             ('virtualName', 'virtual_name'))
-    item = {}
-    for name, k in keys:
-        if k in bdm:
-            item[name] = bdm[k]
+            ('virtualName', 'virtual_name'))
+    item = dict((name, bdm[k]) for name, k in keys
+                if k in bdm)
     if bdm.get('no_device'):
         item['noDevice'] = True
     if bdm.get('boot_index') == 0 and root_device_name:
         item['deviceName'] = root_device_name
     if ('snapshot_id' in bdm) or ('volume_id' in bdm):
-        ebs_keys = (('snapshotId', 'snapshot_id'),
-                    ('snapshotId', 'volume_id'),        # snapshotId is abused
-                    ('volumeSize', 'volume_size'),
+        ebs_keys = (('volumeSize', 'volume_size'),
                     ('deleteOnTermination', 'delete_on_termination'))
-        ebs = {}
-        for name, k in ebs_keys:
-            if bdm.get(k) is not None:
-                if k == 'snapshot_id':
-                    ebs[name] = ec2utils.os_id_to_ec2_id(
-                            context, 'snap', bdm[k], ids_by_os_id=snapshot_ids)
-                elif k == 'volume_id':
-                    ebs[name] = ec2utils.os_id_to_ec2_id(context, 'vol',
-                                                         bdm[k])
-                else:
-                    ebs[name] = bdm[k]
+        ebs = dict((name, bdm[k]) for name, k in ebs_keys
+                   if bdm.get(k) is not None)
+        if bdm.get('snapshot_id'):
+            ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
+                context, 'snap', bdm['snapshot_id'], ids_by_os_id=snapshot_ids)
+        # NOTE(ft): Openstack extension, AWS-incompability
+        elif bdm.get('volume_id'):
+            ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
+                context, 'vol', bdm['volume_id'])
         assert 'snapshotId' in ebs
         item['ebs'] = ebs
     return item
@@ -525,41 +512,13 @@ def _block_device_properties_root_device_name(properties):
 
     If it isn't specified, return None.
     """
-    root_device_name = None
-
-    # NOTE(yamahata): see image_service.s3.s3create()
-    for bdm in properties.get('mappings', []):
-        if bdm['virtual'] == 'root':
-            root_device_name = bdm['device']
-
-    # NOTE(yamahata): register_image's command line can override
-    #                 <machine>.manifest.xml
     if 'root_device_name' in properties:
-        root_device_name = properties['root_device_name']
-
-    return root_device_name
-
-
-def _block_device_mappings_prepend_dev(mappings):
-    """Prepend '/dev/' to 'device' entry of swap/ephemeral virtual type."""
-    for m in mappings:
-        virtual = m['virtual']
-        if (_block_device_is_swap_or_ephemeral(virtual) and
-                (not m['device'].startswith('/'))):
-            m['device'] = '/dev/' + m['device']
-    return mappings
-
-
-def _block_device_is_swap_or_ephemeral(device_name):
-    return (device_name and
-            (device_name == 'swap' or _block_device_is_ephemeral(device_name)))
-
-
-_ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
-
-
-def _block_device_is_ephemeral(device_name):
-    return _ephemeral.match(device_name) is not None
+        return properties.get('root_device_name')
+    elif 'mappings' in properties:
+        return next((bdm['device'] for bdm in properties['mappings']
+                     if bdm['virtual'] == 'root'), None)
+    else:
+        return None
 
 
 def _s3_create(context, metadata):

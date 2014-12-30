@@ -821,19 +821,6 @@ class CloudController(object):
         """
         return image.deregister_image(context, image_id)
 
-    def update_image(self, context, image_id, **kwargs):
-        """Update image metadata (Nova EC2 extension).
-
-        Args:
-            context (RequestContext): The request context.
-            image_id (str): The ID of the image.
-            **kwargs: Metadata key-value pairs to be added/updated.
-
-        Returns:
-            The updated image.
-        """
-        pass
-
     def describe_images(self, context, executable_by=None, image_id=None,
                         owner=None, filter=None):
         """Describes one or more of the images available to you.
