@@ -157,11 +157,6 @@ class EC2NotFound(NotFound):
     code = 400
 
 
-class NovaDbImageNotFound(EC2NotFound):
-    ec2_code = 'InvalidAMIID.NotFound'
-    msg_fmt = _("The image id '[%(image_id)s]' does not exist")
-
-
 class InvalidInstanceIDNotFound(EC2NotFound):
     ec2_code = 'InvalidInstanceID.NotFound'
     msg_fmt = _("The instance ID '%(id)s' does not exist")

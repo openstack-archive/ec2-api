@@ -16,7 +16,6 @@ import re
 
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api import novadb
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 from ec2api.openstack.common import timeutils
@@ -146,21 +145,6 @@ def is_ec2_timestamp_expired(request, expires=None):
     except ValueError:
         LOG.audit(_("Timestamp is invalid."))
         return True
-
-
-def ec2_id_to_glance_id(context, ec2_id):
-    image_id = _ec2_id_to_id(ec2_id)
-    return novadb.s3_image_get(context, image_id)['uuid']
-
-
-# TODO(Alex) This function is copied as is from original cloud.py. It doesn't
-# check for the prefix which allows any prefix used for any object.
-def _ec2_id_to_id(ec2_id):
-    """Convert an ec2 ID (i-[base 16 number]) to an instance id (int)."""
-    try:
-        return int(ec2_id.split('-')[-1], 16)
-    except ValueError:
-        raise exception.InvalidId(id=ec2_id)
 
 
 # NOTE(ft): extra functions to use in vpc specific code or instead of

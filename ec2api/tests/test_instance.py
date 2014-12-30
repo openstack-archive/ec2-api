@@ -37,10 +37,6 @@ class InstanceTestCase(base.ApiTestCase):
         self.create_network_interface = (
             create_network_interface_patcher.start())
         self.addCleanup(create_network_interface_patcher.stop)
-        ec2_id_to_glance_id_patcher = (
-            mock.patch('ec2api.api.ec2utils.ec2_id_to_glance_id'))
-        self.ec2_id_to_glance_id = ec2_id_to_glance_id_patcher.start()
-        self.addCleanup(ec2_id_to_glance_id_patcher.stop)
         utils_generate_uid_patcher = (
             mock.patch('ec2api.api.instance._utils_generate_uid'))
         self.utils_generate_uid = utils_generate_uid_patcher.start()
@@ -179,7 +175,6 @@ class InstanceTestCase(base.ApiTestCase):
 
         self.glance.images.get.return_value = self.fake_image_class(
                 'fake_image_id', 'active', {})
-        self.ec2_id_to_glance_id.return_value = 'fake_image_id'
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.list.return_value = [fake_flavor]
 

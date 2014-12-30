@@ -80,14 +80,6 @@ MAX_INT = 0x7FFFFFFF
 ####################
 
 
-def s3_image_get(context, image_id):
-    """Find local s3 image represented by the provided id."""
-    return IMPL.s3_image_get(context, image_id)
-
-
-###################
-
-
 def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):
     """Get an instance or raise if it does not exist."""
     return IMPL.instance_get_by_uuid(context, uuid,

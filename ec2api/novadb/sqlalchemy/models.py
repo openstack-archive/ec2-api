@@ -51,14 +51,6 @@ class NovaBase(models.SoftDeleteMixin,
         super(NovaBase, self).save(session=session)
 
 
-class S3Image(BASE, NovaBase):
-    """Compatibility layer for the S3 image service talking to Glance."""
-    __tablename__ = 's3_images'
-    __table_args__ = ()
-    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
-    uuid = Column(String(36), nullable=False)
-
-
 class Instance(BASE, NovaBase):
     """Represents a guest VM."""
     __tablename__ = 'instances'

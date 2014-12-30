@@ -166,21 +166,6 @@ def model_query(context, model, *args, **kwargs):
 ####################
 
 
-def s3_image_get(context, image_id):
-    """Find local s3 image represented by the provided id."""
-    result = (model_query(context, models.S3Image, read_deleted="yes").
-              filter_by(id=image_id).
-              first())
-
-    if not result:
-        raise exception.NovaDbImageNotFound(image_id=image_id)
-
-    return result
-
-
-###################
-
-
 @require_context
 def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):
     return _instance_get_by_uuid(context, uuid,
