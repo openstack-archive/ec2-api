@@ -106,16 +106,14 @@ def add_item(context, kind, data):
     try:
         item_ref.save()
     except db_exception.DBDuplicateEntry as ex:
-        if len(ex.columns) == 1 and 'PRIMARY' in ex.columns:
-            # NOTE(ft): temporary workaround for usage Nova for generating
-            # new EC2 identifiers
-            pass
-        elif models.ITEMS_OS_ID_INDEX_NAME not in ex.columns:
+        if (models.ITEMS_OS_ID_INDEX_NAME not in ex.columns and
+                'os_id' not in ex.columns):
             raise
         item_ref = (model_query(context, models.Item).
                     filter_by(os_id=data["os_id"]).
                     filter(or_(models.Item.project_id == context.project_id,
                                models.Item.project_id.is_(None))).
+                    filter(models.Item.id.like('%s-%%' % kind)).
                     one())
         item_data = _unpack_item_data(item_ref)
         item_data.update(data)
@@ -135,11 +133,8 @@ def add_item_id(context, kind, os_id):
     try:
         item_ref.save()
     except db_exception.DBDuplicateEntry as ex:
-        if len(ex.columns) == 1 and 'PRIMARY' in ex.columns:
-            # NOTE(ft): temporary workaround for usage Nova for generating
-            # new EC2 identifiers
-            pass
-        elif models.ITEMS_OS_ID_INDEX_NAME not in ex.columns:
+        if (models.ITEMS_OS_ID_INDEX_NAME not in ex.columns and
+                'os_id' not in ex.columns):
             raise
         item_ref = (model_query(context, models.Item).
                     filter_by(os_id=os_id).
@@ -169,9 +164,9 @@ def delete_item(context, item_id):
         return
     try:
         (model_query(context, models.Tag, session=session).
-                 filter_by(project_id=context.project_id,
-                           item_id=item_id).
-                 delete(synchronize_session=False))
+         filter_by(project_id=context.project_id,
+                   item_id=item_id).
+         delete(synchronize_session=False))
     except Exception:
         # NOTE(ft): ignore all exceptions because DB integrity is insignificant
         # for tags
@@ -193,10 +188,10 @@ def restore_item(context, kind, data):
 @require_context
 def get_items(context, kind):
     return [_unpack_item_data(item)
-            for item in model_query(context, models.Item).
-                    filter_by(project_id=context.project_id).
-                    filter(models.Item.id.like('%s-%%' % kind)).
-                    all()]
+            for item in (model_query(context, models.Item).
+                         filter_by(project_id=context.project_id).
+                         filter(models.Item.id.like('%s-%%' % kind)).
+                         all())]
 
 
 @require_context
@@ -215,9 +210,9 @@ def get_items_by_ids(context, kind, item_ids):
     return [_unpack_item_data(item)
             for item in (model_query(context, models.Item).
                          filter_by(project_id=context.project_id).
-                         filter(models.Item.id.in_(item_ids))).
+                         filter(models.Item.id.in_(item_ids)).
                          filter(models.Item.id.like('%s-%%' % kind)).
-                         all()]
+                         all())]
 
 
 @require_context
