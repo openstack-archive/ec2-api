@@ -87,7 +87,7 @@ class DbApiTestCase(test_base.BaseTestCase):
         self.assertIn('id', item)
         self.assertIsNotNone(item['id'])
         item_id = item.pop('id')
-        self.assertTrue(validator.validate_ec2_id(('fake',))(item_id, ''))
+        self.assertTrue(validator.validate_ec2_id(item_id, '', ['fake']))
         self.assertThat(item, matchers.DictMatches(new_item,
                                                    orderless_lists=True))
 
@@ -146,7 +146,7 @@ class DbApiTestCase(test_base.BaseTestCase):
     def test_add_item_id(self):
         os_id = fakes.random_os_id()
         item_id = db_api.add_item_id(self.context, 'fake', os_id)
-        self.assertTrue(validator.validate_ec2_id(('fake',))(item_id, ''))
+        self.assertTrue(validator.validate_ec2_id(item_id, '', ['fake']))
         item = db_api.get_item_by_id(self.context, 'fake', item_id)
         self.assertIsNone(item)
         item = db_api.add_item(self.context, 'fake', {'os_id': os_id})

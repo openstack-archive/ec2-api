@@ -46,17 +46,11 @@ class EC2ValidationTestCase(testtools.TestCase):
         check_raise_invalid_parameter('10.10.0.0/33')
         check_raise_invalid_parameter('10.10.0.0/-1')
 
-        def check_raise_invalid_vpc_range(cidr, ex_class, action):
-            self.assertRaises(ex_class,
-                              validator.validate_cidr_block, cidr,
-                              action)
+        self.assertRaises(exception.InvalidSubnetRange,
+                          validator.validate_subnet_cidr, '10.10.0.0/15')
 
-        check_raise_invalid_vpc_range('10.10.0.0/15',
-                                      exception.InvalidSubnetRange,
-                                      'CreateSubnet')
-        check_raise_invalid_vpc_range('10.10.0.0/29',
-                                      exception.InvalidVpcRange,
-                                      'CreateVpc')
+        self.assertRaises(exception.InvalidVpcRange,
+                          validator.validate_vpc_cidr, '10.10.0.0/29')
 
 
 class EC2TimestampValidationTestCase(testtools.TestCase):

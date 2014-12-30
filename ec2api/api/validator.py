@@ -44,17 +44,13 @@ def validate_dummy(val, **kwargs):
     return True
 
 
-def validate_str(max_length=None):
-
-    def _do(val, parameter_name, **kwargs):
-        if (isinstance(val, basestring) and
-                (max_length is None or max_length and len(val) <= max_length)):
-            return True
-        raise exception.ValidationError(
-            reason=_("%s should not be greater "
-                     "than 255 characters.") % parameter_name)
-
-    return _do
+def validate_str(val, parameter_name, max_length=None):
+    if (isinstance(val, basestring) and
+            (max_length is None or max_length and len(val) <= max_length)):
+        return True
+    raise exception.ValidationError(
+        reason=_("%s should not be greater "
+                 "than 255 characters.") % parameter_name)
 
 
 def validate_int(max_value=None):
@@ -96,6 +92,14 @@ def validate_image_path(val, parameter_name=None, **kwargs):
         return False
 
     return True
+
+
+def validate_list(items, parameter_name):
+    if not isinstance(items, list):
+        raise exception.InvalidParameterValue(
+            value=items,
+            parameter=parameter_name,
+            reason='Expected a list here')
 
 
 def validate_user_data(user_data, **kwargs):
@@ -164,38 +168,37 @@ def validate_cidr(cidr, parameter_name, **kwargs):
     return True
 
 
-def validate_cidr_block(cidr, action, **kwargs):
+def _validate_cidr_block(cidr):
     validate_cidr(cidr, 'cidrBlock')
     size = int(cidr.split("/")[-1])
-    if size > 28 or size < 16:
-        if action == 'CreateVpc':
-            raise exception.InvalidVpcRange(cidr_block=cidr)
-        elif action == 'CreateSubnet':
-            raise exception.InvalidSubnetRange(cidr_block=cidr)
-    return True
+    return size >= 16 and size <= 28
+
+
+def validate_vpc_cidr(cidr):
+    if not _validate_cidr_block(cidr):
+        raise exception.InvalidVpcRange(cidr_block=cidr)
+
+
+def validate_subnet_cidr(cidr):
+    if not _validate_cidr_block(cidr):
+        raise exception.InvalidSubnetRange(cidr_block=cidr)
 
 
 # NOTE(Alex) Unfortunately Amazon returns various kinds of error for invalid
 # IDs (...ID.Malformed, ...Id.Malformed, ...ID.NotFound, InvalidParameterValue)
 # So we decided here to commonize invalid IDs to InvalidParameterValue error.
 
-def validate_ec2_id(prefices):
-
-    def _do(val, parameter_name, **kwargs):
-        if not validate_str()(val, parameter_name, **kwargs):
-            return False
-        try:
-            prefix, value = val.rsplit('-', 1)
-            int(value, 16)
-            if prefix in prefices:
-                return True
-        except Exception:
-            pass
-        raise exception.InvalidParameterValue(
-            value=val, parameter=parameter_name,
-            reason=_('Expected: %(prefix)s-...') % {'prefix': prefices[0]})
-
-    return _do
+def validate_ec2_id(val, parameter_name, prefices):
+    try:
+        prefix, value = val.rsplit('-', 1)
+        int(value, 16)
+        if prefix in prefices:
+            return True
+    except Exception:
+        pass
+    raise exception.InvalidParameterValue(
+        value=val, parameter=parameter_name,
+        reason=_('Expected: %(prefix)s-...') % {'prefix': prefices[0]})
 
 
 def validate_ec2_association_id(id, parameter_name, action):
