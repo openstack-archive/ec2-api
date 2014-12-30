@@ -13,15 +13,81 @@
 # limitations under the License.
 
 import copy
+import os
+import tempfile
 
+import eventlet
 import mock
+from oslo.config import cfg
 from oslotest import base as test_base
 
 from ec2api.api import image as image_api
+from ec2api import exception
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
 from ec2api.tests import tools
+
+
+AMI_MANIFEST_XML = """<?xml version="1.0" ?>
+<manifest>
+        <version>2011-06-17</version>
+        <bundler>
+                <name>test-s3</name>
+                <version>0</version>
+                <release>0</release>
+        </bundler>
+        <machine_configuration>
+                <architecture>x86_64</architecture>
+                <block_device_mapping>
+                        <mapping>
+                                <virtual>ami</virtual>
+                                <device>sda1</device>
+                        </mapping>
+                        <mapping>
+                                <virtual>root</virtual>
+                                <device>/dev/sda1</device>
+                        </mapping>
+                        <mapping>
+                                <virtual>ephemeral0</virtual>
+                                <device>sda2</device>
+                        </mapping>
+                        <mapping>
+                                <virtual>swap</virtual>
+                                <device>sda3</device>
+                        </mapping>
+                </block_device_mapping>
+                <kernel_id>%(aki-id)s</kernel_id>
+                <ramdisk_id>%(ari-id)s</ramdisk_id>
+        </machine_configuration>
+        <image>
+                <ec2_encrypted_key>foo</ec2_encrypted_key>
+                <user_encrypted_key>foo</user_encrypted_key>
+                <ec2_encrypted_iv>foo</ec2_encrypted_iv>
+                <parts count="1">
+                        <part index="0">
+                               <filename>foo</filename>
+                        </part>
+                </parts>
+        </image>
+</manifest>
+""" % {'aki-id': fakes.ID_EC2_IMAGE_AKI_1,
+       'ari-id': fakes.ID_EC2_IMAGE_ARI_1}
+
+FILE_MANIFEST_XML = """<?xml version="1.0" ?>
+<manifest>
+        <image>
+                <ec2_encrypted_key>foo</ec2_encrypted_key>
+                <user_encrypted_key>foo</user_encrypted_key>
+                <ec2_encrypted_iv>foo</ec2_encrypted_iv>
+                <parts count="1">
+                        <part index="0">
+                               <filename>foo</filename>
+                        </part>
+                </parts>
+        </image>
+</manifest>
+"""
 
 
 class ImageTestCase(base.ApiTestCase):
@@ -298,3 +364,150 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual(
             image_api._block_device_properties_root_device_name(properties1),
             root_device1)
+
+
+class S3TestCase(base.ApiTestCase):
+    # TODO(ft): 'execute' feature isn't used here, but some mocks and
+    # fake context are. ApiTestCase should be split to some classes to use
+    # its feature optimally
+
+    def test_s3_parse_manifest(self):
+        self.db_api.get_public_items.side_effect = (
+            fakes.get_db_api_get_items({
+                'aki': ({'id': fakes.ID_EC2_IMAGE_AKI_1,
+                         'os_id': fakes.ID_OS_IMAGE_AKI_1},),
+                'ari': ({'id': fakes.ID_EC2_IMAGE_ARI_1,
+                         'os_id': fakes.ID_OS_IMAGE_ARI_1},)}))
+        self.db_api.get_item_by_id.return_value = None
+
+        fake_context = self._create_context()
+        metadata, image_parts, key, iv = image_api._s3_parse_manifest(
+            fake_context, AMI_MANIFEST_XML)
+
+        expected_metadata = {
+            'disk_format': 'ami',
+            'container_format': 'ami',
+            'properties': {'architecture': 'x86_64',
+                           'kernel_id': fakes.ID_OS_IMAGE_AKI_1,
+                           'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1,
+                           'mappings': [
+                                {"device": "sda1", "virtual": "ami"},
+                                {"device": "/dev/sda1", "virtual": "root"},
+                                {"device": "sda2", "virtual": "ephemeral0"},
+                                {"device": "sda3", "virtual": "swap"}]}}
+        self.assertThat(metadata,
+                        matchers.DictMatches(expected_metadata,
+                                             orderless_lists=True))
+        self.assertThat(image_parts,
+                        matchers.ListMatches(['foo']))
+        self.assertEqual('foo', key)
+        self.assertEqual('foo', iv)
+        self.db_api.get_public_items.assert_any_call(
+            mock.ANY, 'aki', (fakes.ID_EC2_IMAGE_AKI_1,))
+        self.db_api.get_public_items.assert_any_call(
+            mock.ANY, 'ari', (fakes.ID_EC2_IMAGE_ARI_1,))
+
+    @mock.patch.object(fakes.OSImage, 'update', autospec=True)
+    def test_s3_create_image_locations(self, osimage_update):
+        conf = cfg.CONF
+        conf.set_override('image_decryption_dir', None)
+        self.addCleanup(conf.reset)
+        _handle, tempf = tempfile.mkstemp()
+        fake_context = self._create_context()
+        with mock.patch(
+                'ec2api.api.image._s3_conn') as s3_conn, mock.patch(
+                'ec2api.api.image._s3_download_file'
+                    ) as s3_download_file, mock.patch(
+                'ec2api.api.image._s3_decrypt_image'
+                    ) as s3_decrypt_image, mock.patch(
+                'ec2api.api.image._s3_untarzip_image'
+                    ) as s3_untarzip_image:
+
+            (s3_conn.return_value.
+             get_bucket.return_value.
+             get_key.return_value.
+             get_contents_as_string.return_value) = FILE_MANIFEST_XML
+            s3_download_file.return_value = tempf
+            s3_untarzip_image.return_value = tempf
+            (self.glance.images.create.return_value) = (
+                fakes.OSImage({'id': fakes.random_os_id(),
+                               'owner': fakes.ID_OS_PROJECT,
+                               'is_public': False,
+                               'status': 'queued',
+                               'container_format': 'ami',
+                               'name': 'fake_name',
+                               'properties': {}}))
+
+            data = [
+                ({'properties': {
+                    'image_location': 'testbucket_1/test.img.manifest.xml'}},
+                 'testbucket_1', 'test.img.manifest.xml'),
+                ({'properties': {
+                    'image_location': '/testbucket_2/test.img.manifest.xml'}},
+                 'testbucket_2', 'test.img.manifest.xml')]
+            for mdata, bucket, manifest in data:
+                image = image_api._s3_create(fake_context, mdata)
+                eventlet.sleep()
+                osimage_update.assert_called_with(
+                    image, properties={'image_state': 'available'})
+                osimage_update.assert_any_call(
+                    image, data=mock.ANY)
+                s3_conn.return_value.get_bucket.assert_called_with(bucket)
+                (s3_conn.return_value.get_bucket.return_value.
+                 get_key.assert_called_with(manifest))
+                (s3_conn.return_value.get_bucket.return_value.
+                 get_key.return_value.
+                 get_contents_as_string.assert_called_with())
+                s3_download_file.assert_called_with(
+                    s3_conn.return_value.get_bucket.return_value,
+                    'foo', mock.ANY)
+                s3_decrypt_image.assert_called_with(
+                    fake_context, mock.ANY, 'foo', 'foo', mock.ANY)
+                s3_untarzip_image.assert_called_with(mock.ANY, mock.ANY)
+
+    @mock.patch('ec2api.api.image.eventlet.spawn_n')
+    def test_s3_create_bdm(self, spawn_n):
+        metadata = {'properties': {
+                        'image_location': 'fake_bucket/fake_manifest',
+                        'root_device_name': '/dev/sda1',
+                        'block_device_mapping': [
+                            {'device_name': '/dev/sda1',
+                             'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                             'delete_on_termination': True},
+                            {'device_name': '/dev/sda2',
+                             'virtual_name': 'ephemeral0'},
+                            {'device_name': '/dev/sdb0',
+                             'no_device': True}]}}
+        fake_context = self._create_context()
+        with mock.patch(
+                'ec2api.api.image._s3_conn') as s3_conn:
+
+            (s3_conn.return_value.
+             get_bucket.return_value.
+             get_key.return_value.
+             get_contents_as_string.return_value) = FILE_MANIFEST_XML
+
+            image_api._s3_create(fake_context, metadata)
+
+            self.glance.images.create.assert_called_once_with(
+                disk_format='ami', container_format='ami', is_public=False,
+                properties={'architecture': 'x86_64',
+                            'image_state': 'pending',
+                            'root_device_name': '/dev/sda1',
+                            'block_device_mapping': [
+                                {'device_name': '/dev/sda1',
+                                 'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                                 'delete_on_termination': True},
+                                {'device_name': '/dev/sda2',
+                                 'virtual_name': 'ephemeral0'},
+                                {'device_name': '/dev/sdb0',
+                                 'no_device': True}],
+                            'image_location': 'fake_bucket/fake_manifest'})
+
+    def test_s3_malicious_tarballs(self):
+        self.assertRaises(exception.Invalid,
+            image_api._s3_test_for_malicious_tarball,
+            "/unused", os.path.join(os.path.dirname(__file__), 'abs.tar.gz'))
+        self.assertRaises(exception.Invalid,
+            image_api._s3_test_for_malicious_tarball,
+            "/unused", os.path.join(os.path.dirname(__file__), 'rel.tar.gz'))

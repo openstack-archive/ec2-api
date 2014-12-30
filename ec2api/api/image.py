@@ -523,8 +523,6 @@ def _block_device_properties_root_device_name(properties):
 
 def _s3_create(context, metadata):
     """Gets a manifest from s3 and makes an image."""
-    image_path = tempfile.mkdtemp(dir=CONF.image_decryption_dir)
-
     image_location = metadata['properties']['image_location'].lstrip('/')
     bucket_name = image_location.split('/')[0]
     manifest_path = image_location[len(bucket_name) + 1:]
@@ -532,7 +530,21 @@ def _s3_create(context, metadata):
     key = bucket.get_key(manifest_path)
     manifest = key.get_contents_as_string()
 
-    manifest, image = _s3_parse_manifest(context, metadata, manifest)
+    (image_metadata, image_parts,
+     encrypted_key, encrypted_iv) = _s3_parse_manifest(context, manifest)
+    properties = metadata['properties']
+    properties.update(image_metadata['properties'])
+    properties['image_state'] = 'pending'
+    metadata.update(image_metadata)
+    metadata.update({'properties': properties,
+                     'is_public': False})
+
+    # TODO(bcwaldon): right now, this removes user-defined ids
+    # We need to re-enable this.
+    metadata.pop('id', None)
+
+    glance = clients.glance(context)
+    image = glance.images.create(**metadata)
 
     def _update_image_state(image_state):
         image.update(properties={'image_state': image_state})
@@ -540,16 +552,14 @@ def _s3_create(context, metadata):
     def delayed_create():
         """This handles the fetching and decrypting of the part files."""
         context.update_store()
-
         try:
-            _update_image_state('downloading')
+            image_path = tempfile.mkdtemp(dir=CONF.image_decryption_dir)
 
+            _update_image_state('downloading')
             try:
                 parts = []
-                elements = manifest.find('image').getiterator('filename')
-                for fn_element in elements:
-                    part = _s3_download_file(bucket, fn_element.text,
-                                             image_path)
+                for part_name in image_parts:
+                    part = _s3_download_file(bucket, part_name, image_path)
                     parts.append(part)
 
                 # NOTE(vish): this may be suboptimal, should we use cat?
@@ -564,13 +574,7 @@ def _s3_create(context, metadata):
                 return
 
             _update_image_state('decrypting')
-
             try:
-                hex_key = manifest.find('image/ec2_encrypted_key').text
-                encrypted_key = binascii.a2b_hex(hex_key)
-                hex_iv = manifest.find('image/ec2_encrypted_iv').text
-                encrypted_iv = binascii.a2b_hex(hex_iv)
-
                 dec_filename = os.path.join(image_path, 'image.tar.gz')
                 _s3_decrypt_image(context, enc_filename, encrypted_key,
                                   encrypted_iv, dec_filename)
@@ -579,7 +583,6 @@ def _s3_create(context, metadata):
                 return
 
             _update_image_state('untarring')
-
             try:
                 unz_filename = _s3_untarzip_image(image_path, dec_filename)
             except Exception:
@@ -598,6 +601,10 @@ def _s3_create(context, metadata):
 
             shutil.rmtree(image_path)
         except glance_exception.HTTPNotFound:
+            # TODO(ft): the image was deleted underneath us, add logging
+            return
+        except Exception:
+            # TODO(ft): add logging
             return
 
     eventlet.spawn_n(delayed_create)
@@ -605,42 +612,16 @@ def _s3_create(context, metadata):
     return image
 
 
-def _s3_parse_manifest(context, metadata, manifest):
+def _s3_parse_manifest(context, manifest):
     manifest = etree.fromstring(manifest)
-    image_format = 'ami'
-
-    try:
-        kernel_id = manifest.find('machine_configuration/kernel_id').text
-        if kernel_id == 'true':
-            image_format = 'aki'
-            kernel_id = None
-    except Exception:
-        kernel_id = None
-
-    try:
-        ramdisk_id = manifest.find('machine_configuration/ramdisk_id').text
-        if ramdisk_id == 'true':
-            image_format = 'ari'
-            ramdisk_id = None
-    except Exception:
-        ramdisk_id = None
 
     try:
         arch = manifest.find('machine_configuration/architecture').text
     except Exception:
         arch = 'x86_64'
 
-    # NOTE(yamahata):
-    # EC2 ec2-budlne-image --block-device-mapping accepts
-    # <virtual name>=<device name> where
-    # virtual name = {ami, root, swap, ephemeral<N>}
-    #                where N is no negative integer
-    # device name = the device name seen by guest kernel.
-    # They are converted into
-    # block_device_mapping/mapping/{virtual, device}
-    #
-    # Do NOT confuse this with ec2-register's block device mapping
-    # argument.
+    properties = {'architecture': arch}
+
     mappings = []
     try:
         block_device_mapping = manifest.findall('machine_configuration/'
@@ -652,36 +633,39 @@ def _s3_parse_manifest(context, metadata, manifest):
     except Exception:
         mappings = []
 
-    properties = metadata['properties']
-    properties['architecture'] = arch
-
-    def _translate_dependent_image_id(image_key, image_id):
-        image_uuid = ec2utils.ec2_id_to_glance_id(context, image_id)
-        properties[image_key] = image_uuid
-
-    if kernel_id:
-        _translate_dependent_image_id('kernel_id', kernel_id)
-
-    if ramdisk_id:
-        _translate_dependent_image_id('ramdisk_id', ramdisk_id)
-
     if mappings:
         properties['mappings'] = mappings
 
-    metadata.update({'disk_format': image_format,
-                     'container_format': image_format,
-                     'is_public': False,
-                     'properties': properties})
-    metadata['properties']['image_state'] = 'pending'
+    image_format = 'ami'
 
-    # TODO(bcwaldon): right now, this removes user-defined ids
-    # We need to re-enable this.
-    metadata.pop('id', None)
+    def set_dependent_image_id(image_key, kind):
+        try:
+            image_key_path = ('machine_configuration/%(image_key)s' %
+                              {'image_key': image_key})
+            image_id = manifest.find(image_key_path).text
+        except Exception:
+            return
+        if image_id == 'true':
+            image_format = kind
+        else:
+            images = db_api.get_public_items(context, kind, (image_id,))
+            image = (images[0] if len(images) else
+                     ec2utils.get_db_item(context, kind, image_id))
+            properties[image_key] = image['os_id']
 
-    glance = clients.glance(context)
-    image = glance.images.create(**metadata)
+    set_dependent_image_id('kernel_id', 'aki')
+    set_dependent_image_id('ramdisk_id', 'ari')
 
-    return manifest, image
+    metadata = {'disk_format': image_format,
+                'container_format': image_format,
+                'properties': properties}
+    image_parts = [
+           fn_element.text
+           for fn_element in manifest.find('image').getiterator('filename')]
+    encrypted_key = manifest.find('image/ec2_encrypted_key').text
+    encrypted_iv = manifest.find('image/ec2_encrypted_iv').text
+
+    return metadata, image_parts, encrypted_key, encrypted_iv
 
 
 def _s3_download_file(bucket, filename, local_dir):
@@ -693,6 +677,8 @@ def _s3_download_file(bucket, filename, local_dir):
 
 def _s3_decrypt_image(context, encrypted_filename, encrypted_key,
                       encrypted_iv, decrypted_filename):
+    encrypted_key = binascii.a2b_hex(encrypted_key)
+    encrypted_iv = binascii.a2b_hex(encrypted_iv)
     cert_client = clients.nova_cert(context)
     try:
         key = cert_client.decrypt_text(base64.b64encode(encrypted_key))
