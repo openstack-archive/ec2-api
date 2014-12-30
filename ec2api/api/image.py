@@ -74,14 +74,16 @@ rpcapi_opts = [
 CONF.register_opts(rpcapi_opts)
 
 
-CONTAINER_TO_KIND = {'kernel': 'aki',
-                     'ramdisk': 'ari',
-                     'aki': 'aki',
+CONTAINER_TO_KIND = {'aki': 'aki',
                      'ari': 'ari',
-                     'ami': 'ami'}
-KIND_TO_TYPE = {'aki': 'kernel',
-                'ari': 'ramdisk',
-                'ami': 'machine'}
+                     'ami': 'ami',
+                     # NOTE(ft): this mappings are ported from legacy Nova EC2
+                     # There is no idea about its actuality
+                     'kernel': 'aki',
+                     'ramdisk': 'ari'}
+IMAGE_TYPES = {'aki': 'kernel',
+               'ari': 'ramdisk',
+               'ami': 'machine'}
 
 
 # TODO(yamahata): race condition
@@ -271,49 +273,53 @@ def describe_images(context, executable_by=None, image_id=None,
 
 
 def describe_image_attribute(context, image_id, attribute):
-    def _block_device_mapping_attribute(image, result):
-        _cloud_format_mappings(image['properties'], result)
+    def _block_device_mapping_attribute(os_image, result):
+        _cloud_format_mappings(context, os_image.properties, result)
 
-    def _launch_permission_attribute(image, result):
+    def _launch_permission_attribute(os_image, result):
         result['launchPermission'] = []
-        if image['is_public']:
+        if os_image.is_public:
             result['launchPermission'].append({'group': 'all'})
 
-    def _root_device_name_attribute(image, result):
-        _prop_root_dev_name = _block_device_properties_root_device_name
-        result['rootDeviceName'] = _prop_root_dev_name(image['properties'])
-        if result['rootDeviceName'] is None:
-            result['rootDeviceName'] = (
-                    instance_api._block_device_DEFAULT_ROOT_DEV_NAME)
-
-    def _kernel_attribute(image, result):
-        kernel_id = image['properties'].get('kernel_id')
+    def _kernel_attribute(os_image, result):
+        kernel_id = os_image.properties.get('kernel_id')
         if kernel_id:
             result['kernel'] = {
                 'value': ec2utils.os_id_to_ec2_id(context, 'aki', kernel_id)
             }
 
     def _ramdisk_attribute(image, result):
-        ramdisk_id = image['properties'].get('ramdisk_id')
+        ramdisk_id = os_image.properties.get('ramdisk_id')
         if ramdisk_id:
             result['ramdisk'] = {
                 'value': ec2utils.os_id_to_ec2_id(context, 'ari', ramdisk_id)
             }
 
+    # NOTE(ft): Openstack extension, AWS-incompability
+    def _root_device_name_attribute(os_image, result):
+        _prop_root_dev_name = _block_device_properties_root_device_name
+        result['rootDeviceName'] = _prop_root_dev_name(os_image.properties)
+        if result['rootDeviceName'] is None:
+            result['rootDeviceName'] = (
+                    instance_api._block_device_DEFAULT_ROOT_DEV_NAME)
+
     supported_attributes = {
         'blockDeviceMapping': _block_device_mapping_attribute,
         'launchPermission': _launch_permission_attribute,
-        'rootDeviceName': _root_device_name_attribute,
         'kernel': _kernel_attribute,
         'ramdisk': _ramdisk_attribute,
+        # NOTE(ft): Openstack extension, AWS-incompability
+        'rootDeviceName': _root_device_name_attribute,
         }
 
-    # TODO(ft): AWS returns AuthFailure for public images,
-    # but we return NotFound due searching for local images only
+    # TODO(ft): AWS returns AuthFailure for not own public images,
+    # but we return NotFound for this case because we search for local images
+    # only
     kind = ec2utils.get_ec2_id_kind(image_id)
     image = ec2utils.get_db_item(context, kind, image_id)
     fn = supported_attributes.get(attribute)
     if fn is None:
+        # TODO(ft): Change the error code and message with the real AWS ones
         raise exception.InvalidAttribute(attr=attribute)
     glance = clients.glance(context)
     os_image = glance.images.get(image['os_id'])
@@ -362,7 +368,7 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
     ec2_image = {'imageId': image['id'],
                  'imageOwnerId': os_image.owner,
                  'description': '',
-                 'imageType': KIND_TO_TYPE[
+                 'imageType': IMAGE_TYPES[
                                    ec2utils.get_ec2_id_kind(image['id'])],
                  'isPublic': image['is_public'],
                  'architecture': os_image.properties.get('architecture'),

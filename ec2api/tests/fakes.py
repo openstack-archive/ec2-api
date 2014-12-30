@@ -192,6 +192,8 @@ ID_OS_IMAGE_2 = random_os_id()
 ID_OS_IMAGE_AKI_1 = random_os_id()
 ID_OS_IMAGE_ARI_1 = random_os_id()
 
+ROOT_DEVICE_NAME_IMAGE_1 = '/dev/sda1'
+ROOT_DEVICE_NAME_IMAGE_2 = '/dev/sdb1'
 
 # volumes constants
 ID_EC2_VOLUME_1 = random_ec2_id('vol')
@@ -968,7 +970,10 @@ class OSImage(object):
         self.status = image_dict['status']
         self.container_format = image_dict['container_format']
         self.name = image_dict['name']
-        self.properties = image_dict['properties']
+        self.properties = copy.deepcopy(image_dict['properties'])
+
+    def update(self, **kwargs):
+        pass
 
 EC2_IMAGE_1 = {
     'imageId': ID_EC2_IMAGE_1,
@@ -983,7 +988,7 @@ EC2_IMAGE_1 = {
     'ramdiskId': ID_EC2_IMAGE_ARI_1,
     'architecture': None,
     'rootDeviceType': 'instance-store',
-    'rootDeviceName': '/dev/sda1',
+    'rootDeviceName': ROOT_DEVICE_NAME_IMAGE_1,
     'blockDeviceMapping': [
         {'deviceName': '/dev/sdb0',
          'virtualName': 'ephemeral0'},
@@ -1013,7 +1018,7 @@ EC2_IMAGE_2 = {
     'imageLocation': 'None (None)',
     'architecture': None,
     'rootDeviceType': 'instance-store',
-    'rootDeviceName': '/dev/sdb1',
+    'rootDeviceName': ROOT_DEVICE_NAME_IMAGE_2,
     'blockDeviceMapping': [
         {'deviceName': '/dev/sdb1',
          'ebs': {'snapshotId': ID_EC2_SNAPSHOT_1}}],
