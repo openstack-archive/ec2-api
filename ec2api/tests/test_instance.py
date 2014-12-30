@@ -508,6 +508,16 @@ class InstanceTestCase(base.ApiTestCase):
                                 fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
 
+        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_2]
+        resp = self.execute('DescribeInstances', {'InstanceId.1':
+                                                  fakes.ID_EC2_INSTANCE_2})
+
+        self.assertEqual(200, resp['status'])
+        resp.pop('status')
+        self.assertThat(resp, matchers.DictMatches(
+            {'reservationSet': [fakes.EC2_RESERVATION_2]},
+            orderless_lists=True))
+
     # TODO(ft): restore test after finish extraction of Nova EC2 API
     def _test_describe_instances_mutliple_networks(self):
         """Describe 2 instances with various combinations of network."""

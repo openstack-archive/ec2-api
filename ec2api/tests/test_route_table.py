@@ -189,7 +189,7 @@ class RouteTableTestCase(base.ApiTestCase):
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
                   'DestinationCidrBlock': '0.0.0.0/0',
                   'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
-                  'GatewayId': fakes.ID_EC2_NETWORK_INTERFACE_1},
+                  'GatewayId': fakes.ID_EC2_IGW_1},
                  'InvalidParameterCombination')
 
         # NOTE(ft): gateway from different vpc

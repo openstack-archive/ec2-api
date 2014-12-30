@@ -37,6 +37,9 @@ LOG = logging.getLogger(__name__)
 """
 
 
+Validator = common.Validator
+
+
 def create_subnet(context, vpc_id, cidr_block,
                   availability_zone=None):
     vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)

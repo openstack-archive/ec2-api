@@ -19,6 +19,8 @@ dispatched to other nodes via AMQP RPC. State is via distributed
 datastore.
 """
 
+import itertools
+
 from oslo.config import cfg
 
 from ec2api.api import address
@@ -40,6 +42,29 @@ from ec2api.openstack.common import log as logging
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
+
+
+def module_and_param_types(module, *args, **kwargs):
+    """Decorator to check types and call function."""
+
+    param_types = args
+
+    def wrapped(func):
+
+        def func_wrapped(*args, **kwargs):
+            impl_func = getattr(module, func.func_name)
+            context = args[1]
+            for param_name, param_type in itertools.izip(
+                    func.func_code.co_varnames[2:], param_types):
+                param_value = kwargs.get(param_name)
+                if param_value:
+                    validator = module.Validator(param_name, func.func_name)
+                    validation_func = getattr(validator, param_type)
+                    is_valid = validation_func(param_value)
+            return impl_func(context, **kwargs)
+        return func_wrapped
+
+    return wrapped
 
 
 class CloudController(object):
@@ -305,6 +330,16 @@ class CloudController(object):
                                                 context, group_id,
                                                 group_name, ip_permissions)
 
+    @module_and_param_types(instance, 'ami_id', 'dummy', 'dummy',
+                            'str255', 'sg_ids',
+                            'str255s', 'dummy', 'dummy',
+                            'dummy', 'ami_id', 'ami_id',
+                            'dummy', 'dummy',
+                            'subnet_id', 'dummy',
+                            'dummy',
+                            'dummy', 'dummy',
+                            'dummy', 'dummy',
+                            'dummy')
     def run_instances(self, context, image_id, min_count, max_count,
                       key_name=None, security_group_id=None,
                       security_group=None, user_data=None, instance_type=None,
@@ -418,17 +453,8 @@ class CloudController(object):
         If you don't specify a security group when launching an instance, EC2
         uses the default security group.
         """
-        return instance.run_instances(context, image_id, min_count, max_count,
-                                      key_name, security_group_id,
-                                      security_group, user_data, instance_type,
-                                      placement, kernel_id, ramdisk_id,
-                                      block_device_mapping, monitoring,
-                                      subnet_id, disable_api_termination,
-                                      instance_initiated_shutdown_behavior,
-                                      private_ip_address, client_token,
-                                      network_interface, iam_instance_profile,
-                                      ebs_optimized)
 
+    @module_and_param_types(instance, 'i_ids')
     def terminate_instances(self, context, instance_id):
         """Shuts down one or more instances.
 
@@ -442,8 +468,8 @@ class CloudController(object):
         This operation is idempotent; if you terminate an instance more than
         once, each call succeeds.
         """
-        return instance.terminate_instances(context, instance_id)
 
+    @module_and_param_types(instance, 'i_ids', 'dummy', 'dummy', 'dummy')
     def describe_instances(self, context, instance_id=None, filter=None,
                            max_results=None, next_token=None):
         """Describes one or more of your instances.
@@ -467,9 +493,8 @@ class CloudController(object):
         instance ID, you receive an error. If you specify an instance that you
         don't own, we don't include it in the results.
         """
-        return instance.describe_instances(context, instance_id, filter,
-                                           max_results, next_token)
 
+    @module_and_param_types(instance, 'i_ids')
     def reboot_instances(self, context, instance_id):
         """Requests a reboot of one or more instances.
 
@@ -480,8 +505,8 @@ class CloudController(object):
         Returns:
             true if the request succeeds.
         """
-        return instance.reboot_instances(context, instance_id)
 
+    @module_and_param_types(instance, 'i_ids', 'dummy')
     def stop_instances(self, context, instance_id, force=False):
         """Stops one or more instances.
 
@@ -496,8 +521,8 @@ class CloudController(object):
         Returns:
             true if the request succeeds.
         """
-        return instance.stop_instances(context, instance_id, force)
 
+    @module_and_param_types(instance, 'i_ids')
     def start_instances(self, context, instance_id):
         """Starts one or more instances.
 
@@ -508,8 +533,8 @@ class CloudController(object):
         Returns:
             true if the request succeeds.
         """
-        return instance.start_instances(context, instance_id)
 
+    @module_and_param_types(instance, 'i_id', 'dummy')
     def describe_instance_attribute(self, context, instance_id, attribute):
         """Describes the specified attribute of the specified instance.
 
@@ -527,8 +552,6 @@ class CloudController(object):
         Returns:
             Specified attribute.
         """
-        return instance.describe_instance_attribute(context, instance_id,
-                                                    attribute)
 
     def describe_key_pairs(self, context, key_name=None, filter=None):
         return key_pair.describe_key_pairs(context, key_name, filter)
@@ -950,6 +973,7 @@ class VpcCloudController(CloudController):
         Adds full VPC functionality which requires Neutron to work.
     """
 
+    @module_and_param_types(vpc, 'vpc_cidr', 'str255')
     def create_vpc(self, context, cidr_block, instance_tenancy='default'):
         """Creates a VPC with the specified CIDR block.
 
@@ -968,7 +992,6 @@ class VpcCloudController(CloudController):
         The smallest VPC you can create uses a /28 netmask (16 IP addresses),
         and the largest uses a /16 netmask.
         """
-        return vpc.create_vpc(context, cidr_block, instance_tenancy)
 
     def delete_vpc(self, context, vpc_id):
         """Deletes the specified VPC.
@@ -1087,6 +1110,7 @@ class VpcCloudController(CloudController):
                                                           internet_gateway_id,
                                                           filter)
 
+    @module_and_param_types(subnet, 'vpc_id', 'subnet_cidr', 'str255')
     def create_subnet(self, context, vpc_id, cidr_block,
                       availability_zone=None):
         """Creates a subnet in an existing VPC.
@@ -1114,8 +1138,6 @@ class VpcCloudController(CloudController):
         If you add more than one subnet to a VPC, they're set up
         in a star topology with a logical router in the middle.
         """
-        return subnet.create_subnet(context, vpc_id,
-                                    cidr_block, availability_zone)
 
     def delete_subnet(self, context, subnet_id):
         """Deletes the specified subnet.
@@ -1163,6 +1185,8 @@ class VpcCloudController(CloudController):
         """
         return route_table.create_route_table(context, vpc_id)
 
+    @module_and_param_types(route_table, 'rtb_id', 'cidr',
+                            'igw_id', 'i_id', 'eni_id', 'dummy')
     def create_route(self, context, route_table_id, destination_cidr_block,
                      gateway_id=None, instance_id=None,
                      network_interface_id=None,
@@ -1191,10 +1215,6 @@ class VpcCloudController(CloudController):
         gateway attached to the VPC, a VPC peering connection, or a NAT
         instance in the VPC.
         """
-        return route_table.create_route(context, route_table_id,
-                                        destination_cidr_block, gateway_id,
-                                        instance_id, network_interface_id,
-                                        vpc_peering_connection_id)
 
     def replace_route(self, context, route_table_id, destination_cidr_block,
                       gateway_id=None, instance_id=None,

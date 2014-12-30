@@ -51,6 +51,10 @@ CONF.register_opts(ec2_opts)
 """Instance related API implementation
 """
 
+
+Validator = common.Validator
+
+
 # TODO(ft): implement DeviceIndex
 
 

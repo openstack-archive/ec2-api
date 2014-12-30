@@ -27,6 +27,9 @@ from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 
 
+Validator = common.Validator
+
+
 def create_route_table(context, vpc_id):
     vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
     route_table = _create_route_table(context, vpc)

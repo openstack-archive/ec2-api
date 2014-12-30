@@ -18,6 +18,7 @@ import fnmatch
 from oslo.config import cfg
 
 from ec2api.api import ec2utils
+from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
 
@@ -30,6 +31,88 @@ ec2_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
+
+
+class Validator(object):
+
+    def __init__(self, param_name="", action=""):
+        self.param_name = param_name
+        self.action = action
+
+    def dummy(self, value):
+        pass
+
+    def str255(self, value):
+        validator.validate_str(value, self.param_name, 255)
+
+    def multi(self, items, validation_func):
+        validator.validate_list(items, self.param_name)
+        for item in items:
+            validation_func(item)
+
+    def str255s(self, values):
+        self.multi(values, self.str_255)
+
+    def cidr(self, cidr):
+        validator.validate_cidr(cidr, self.param_name)
+
+    def subnet_cidr(self, cidr):
+        validator.validate_subnet_cidr(cidr)
+
+    def vpc_cidr(self, cidr):
+        validator.validate_vpc_cidr(cidr)
+
+    def ec2_id(self, id, prefices):
+        validator.validate_ec2_id(id, self.param_name, prefices)
+
+    def i_id(self, id):
+        self.ec2_id(id, ['i'])
+
+    def i_ids(self, ids):
+        self.multi(ids, self.i_id)
+
+    def ami_id(self, id):
+        self.ec2_id(id, ['ami', 'ari', 'aki'])
+
+    def ami_ids(self, ids):
+        self.multi(ids, self.aki_id)
+
+    def sg_id(self, id):
+        self.ec2_id(id, ['sg'])
+
+    def sg_ids(self, ids):
+        self.multi(ids, self.sg_id)
+
+    def subnet_id(self, id):
+        self.ec2_id(id, ['subnet'])
+
+    def subnet_ids(self, ids):
+        self.multi(ids, self.subnet_id)
+
+    def igw_id(self, id):
+        self.ec2_id(id, ['igw'])
+
+    def igw_ids(self, ids):
+        self.multi(ids, self.igw_id)
+
+    def rtb_id(self, id):
+        self.ec2_id(id, ['rtb'])
+
+    def rtb_ids(self, ids):
+        self.multi(ids, self.rtb_id)
+
+    def eni_id(self, id):
+        self.ec2_id(id, ['eni'])
+
+    def eni_ids(self, ids):
+        self.multi(ids, self.eni_id)
+
+    def vpc_id(self, id):
+        self.ec2_id(id, ['vpc'])
+
+    def vpc_ids(self, ids):
+        self.multi(ids, self.vpc_id)
+
 
 VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb']
 

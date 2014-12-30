@@ -38,6 +38,9 @@ LOG = logging.getLogger(__name__)
 """
 
 
+Validator = common.Validator
+
+
 def create_vpc(context, cidr_block, instance_tenancy='default'):
     neutron = clients.neutron(context)
     # TODO(Alex): Handle errors like overlimit
