@@ -134,7 +134,7 @@ def add_item_id(context, kind, os_id):
         item_ref.save()
     except db_exception.DBDuplicateEntry as ex:
         if (models.ITEMS_OS_ID_INDEX_NAME not in ex.columns and
-                'os_id' not in ex.columns):
+                ex.columns != ['os_id']):
             raise
         item_ref = (model_query(context, models.Item).
                     filter_by(os_id=os_id).
@@ -248,13 +248,15 @@ def add_tags(context, tags):
     with session.begin():
         for tag in tags:
             tag_ref = models.Tag(project_id=context.project_id,
-                                 item_id=tag['item_id'])
-            tag_ref.update(tag)
+                                 item_id=tag['item_id'],
+                                 key=tag['key'],
+                                 value=tag['value'])
             try:
                 with session.begin(nested=True):
                     tag_ref.save(session)
             except db_exception.DBDuplicateEntry as ex:
-                if 'PRIMARY' not in ex.columns:
+                if ('PRIMARY' not in ex.columns and
+                        ex.columns != ['project_id', 'item_id', 'key']):
                     raise
                 (get_query.params(tag_item_id=tag['item_id'],
                                   tag_key=tag['key']).
