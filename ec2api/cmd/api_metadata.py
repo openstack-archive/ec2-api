@@ -13,14 +13,11 @@
 # limitations under the License.
 
 """
-EC2api API Server
+EC2api API Metadata Server
 """
 
 import sys
 
-from oslo.config import cfg
-
-from ec2api.api import clients
 from ec2api import config
 from ec2api.openstack.common import log as logging
 from ec2api import service
@@ -28,13 +25,11 @@ from ec2api import service
 
 def main():
     config.parse_args(sys.argv)
-    logging.setup('ec2api')
-    clients.rpc_init(cfg.CONF)
+    logging.setup("ec2api")
 
-    server = service.WSGIService('ec2api', max_url_len=16384)
-    service.serve(server)
+    server = service.WSGIService('metadata')
+    service.serve(server, workers=server.workers)
     service.wait()
-
 
 if __name__ == '__main__':
     main()
