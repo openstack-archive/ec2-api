@@ -34,7 +34,7 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.get_db_api_add_item(fakes.ID_EC2_ROUTE_TABLE_1))
         resp = self.execute('CreateRouteTable',
                             {'VpcId': fakes.ID_EC2_VPC_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(
             resp['routeTable'],
             matchers.DictMatches(tools.purge_dict(fakes.EC2_ROUTE_TABLE_1,
@@ -52,7 +52,7 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.return_value = None
         resp = self.execute('CreateRouteTable',
                             {'VpcId': fakes.ID_EC2_VPC_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidVpcID.NotFound', resp['Error']['Code'])
 
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
@@ -72,7 +72,7 @@ class RouteTableTestCase(base.ApiTestCase):
 
         def do_check(params, route_table, rollback_route_table_state):
             resp = self.execute('CreateRoute', params)
-            self.assertEqual(200, resp['status'])
+            self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
 
             self.db_api.update_item.assert_called_once_with(
@@ -149,7 +149,7 @@ class RouteTableTestCase(base.ApiTestCase):
 
         def do_check(params, error_code):
             resp = self.execute('CreateRoute', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
 
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
@@ -275,7 +275,7 @@ class RouteTableTestCase(base.ApiTestCase):
                              'DestinationCidrBlock': '0.0.0.0/0',
                              'NetworkInterfaceId':
                              fakes.ID_EC2_NETWORK_INTERFACE_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
 
         rollback_route_table_state = route_table
@@ -299,7 +299,7 @@ class RouteTableTestCase(base.ApiTestCase):
             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
              'DestinationCidrBlock': '11.22.33.0/24',
              'GatewayId': fakes.ID_EC2_IGW_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
 
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
@@ -310,7 +310,7 @@ class RouteTableTestCase(base.ApiTestCase):
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
                              'DestinationCidrBlock':
                              fakes.CIDR_EXTERNAL_NETWORK})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_2)
         route_table['routes'] = [
@@ -325,7 +325,7 @@ class RouteTableTestCase(base.ApiTestCase):
         resp = self.execute('DeleteRoute',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
                              'DestinationCidrBlock': '11.22.33.0/24'})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidRouteTableID.NotFound', resp['Error']['Code'])
 
         self.db_api.get_item_by_id.return_value = (
@@ -333,7 +333,7 @@ class RouteTableTestCase(base.ApiTestCase):
         resp = self.execute('DeleteRoute',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
                              'DestinationCidrBlock': '11.22.33.0/24'})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidRoute.NotFound', resp['Error']['Code'])
 
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
@@ -360,7 +360,7 @@ class RouteTableTestCase(base.ApiTestCase):
         resp = self.execute('AssociateRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                              'SubnetId': fakes.ID_EC2_SUBNET_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.ID_EC2_SUBNET_1.replace('subnet', 'rtbassoc'),
                          resp['associationId'])
         subnet = tools.update_dict(
@@ -375,7 +375,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_associate_route_table_invalid_parameters(self):
         def do_check(params, error_code):
             resp = self.execute('AssociateRouteTable', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
 
         self.db_api.get_item_by_id.return_value = None
@@ -444,7 +444,7 @@ class RouteTableTestCase(base.ApiTestCase):
                             {'AssociationId':
                              fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
                              'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
                          resp['associationId'])
         subnet = tools.update_dict(
@@ -467,7 +467,7 @@ class RouteTableTestCase(base.ApiTestCase):
                             {'AssociationId':
                              fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
                              'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
                          resp['associationId'])
         vpc = tools.update_dict(
@@ -482,7 +482,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_replace_route_table_association_invalid_parameters(self):
         def do_check(params, error_code):
             resp = self.execute('ReplaceRouteTableAssociation', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
 
         self.db_api.get_item_by_id.return_value = None
@@ -578,7 +578,7 @@ class RouteTableTestCase(base.ApiTestCase):
         resp = self.execute(
             'DisassociateRouteTable',
             {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.update_item.assert_called_once_with(
             mock.ANY, fakes.DB_SUBNET_2)
@@ -590,7 +590,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_disassociate_route_table_invalid_parameter(self):
         def do_check(params, error_code):
             resp = self.execute('DisassociateRouteTable', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
 
         self.db_api.get_item_by_id.return_value = None
@@ -639,7 +639,7 @@ class RouteTableTestCase(base.ApiTestCase):
                                               fakes.DB_SUBNET_2]
         resp = self.execute('DeleteRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY,
@@ -649,7 +649,7 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.return_value = None
         resp = self.execute('DeleteRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidRouteTableID.NotFound', resp['Error']['Code'])
 
         self.db_api.get_item_by_id.side_effect = (
@@ -658,7 +658,7 @@ class RouteTableTestCase(base.ApiTestCase):
                 fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         resp = self.execute('DeleteRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('DependencyViolation', resp['Error']['Code'])
 
         self.db_api.get_item_by_id.side_effect = (
@@ -671,7 +671,7 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.get_items.return_value = [subnet]
         resp = self.execute('DeleteRouteTable',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('DependencyViolation', resp['Error']['Code'])
 
     def test_describe_route_tables(self):
@@ -691,7 +691,7 @@ class RouteTableTestCase(base.ApiTestCase):
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
         self.nova_servers.get.return_value = fake_server_class('ACTIVE')
         resp = self.execute('DescribeRouteTables', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['routeTableSet'],
                         matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1,
                                                   fakes.EC2_ROUTE_TABLE_2]))
@@ -737,7 +737,7 @@ class RouteTableTestCase(base.ApiTestCase):
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
         self.nova_servers.get.return_value = fake_server_class('DOWN')
         resp = self.execute('DescribeRouteTables', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         ec2_route_table_1 = copy.deepcopy(fakes.EC2_ROUTE_TABLE_1)
         ec2_route_table_1['routeSet'].append({
             'destinationCidrBlock': '0.0.0.0/0',

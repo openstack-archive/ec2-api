@@ -92,8 +92,8 @@ class InstanceTestCase(base.ApiTestCase):
                            'InstanceType': 'fake_flavor',
                            'MinCount': '1', 'MaxCount': '1'})
             resp = self.execute('RunInstances', params)
-            self.assertEqual(200, resp['status'])
-            resp.pop('status')
+            self.assertEqual(200, resp['http_status_code'])
+            resp.pop('http_status_code')
             delete_port_on_termination = (new_port
                                           if delete_on_termination is None
                                           else delete_on_termination)
@@ -218,8 +218,8 @@ class InstanceTestCase(base.ApiTestCase):
              'NetworkInterface.2.SubnetId': fakes.ID_EC2_SUBNET_2,
              'NetworkInterface.2.DeleteOnTermination': 'False'})
 
-        self.assertEqual(200, resp['status'])
-        resp.pop('status')
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(ec2_reservation))
 
         self.create_network_interface.assert_has_calls([
@@ -351,8 +351,8 @@ class InstanceTestCase(base.ApiTestCase):
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
                              'InstanceId.2': fakes.ID_EC2_INSTANCE_2})
 
-        self.assertEqual(200, resp['status'])
-        resp.pop('status')
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
         fake_state_change = {'previousState': {'code': 0,
                                                'name': 'pending'},
                              'currentState': {'code': 0,
@@ -404,8 +404,8 @@ class InstanceTestCase(base.ApiTestCase):
                                 {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
                                  'InstanceId.2': fakes.ID_EC2_INSTANCE_2})
 
-            self.assertEqual(200, resp['status'])
-            resp.pop('status')
+            self.assertEqual(200, resp['http_status_code'])
+            resp.pop('http_status_code')
             self.assertThat(resp, matchers.DictMatches(
                 ec2_terminate_instances_result))
             self._assert_list_ports_is_called_with_filter(self.IDS_OS_INSTANCE)
@@ -496,8 +496,8 @@ class InstanceTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeInstances', {})
 
-        self.assertEqual(200, resp['status'])
-        resp.pop('status')
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'reservationSet': [fakes.EC2_RESERVATION_1,
                                 fakes.EC2_RESERVATION_2]},
@@ -507,8 +507,8 @@ class InstanceTestCase(base.ApiTestCase):
         resp = self.execute('DescribeInstances', {'InstanceId.1':
                                                   fakes.ID_EC2_INSTANCE_2})
 
-        self.assertEqual(200, resp['status'])
-        resp.pop('status')
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'reservationSet': [fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
@@ -544,8 +544,8 @@ class InstanceTestCase(base.ApiTestCase):
 
             resp = self.execute('DescribeInstances', {})
 
-            self.assertEqual(200, resp['status'])
-            resp.pop('status')
+            self.assertEqual(200, resp['http_status_code'])
+            resp.pop('http_status_code')
 
             instances = [fakes.gen_ec2_instance(inst_id, private_ip_address=ip,
                                                 ec2_network_interfaces=enis,

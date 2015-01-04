@@ -35,7 +35,7 @@ class AddressTestCase(base.ApiTestCase):
             copy.deepcopy(fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1)))
 
         resp = self.execute('AllocateAddress', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.IP_ADDRESS_1, resp['publicIp'])
         self.assertEqual('standard', resp['domain'])
         self.assertNotIn('allocationId', resp)
@@ -56,7 +56,7 @@ class AddressTestCase(base.ApiTestCase):
 
         resp = self.execute('AllocateAddress', {'Domain': 'vpc'})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.IP_ADDRESS_1, resp['publicIp'])
         self.assertEqual('vpc', resp['domain'])
         self.assertEqual(fakes.ID_EC2_ADDRESS_1,
@@ -77,7 +77,7 @@ class AddressTestCase(base.ApiTestCase):
         address.address_engine = (
             address.AddressEngineNeutron())
         resp = self.execute('AllocateAddress', {'Domain': 'fake_domain'})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
         self.assertEqual(0, self.db_api.add_item.call_count)
         self.assertEqual(0, self.neutron.create_floatingip.call_count)
@@ -87,7 +87,7 @@ class AddressTestCase(base.ApiTestCase):
         address.address_engine = (
             address.AddressEngineNeutron())
         resp = self.execute('AllocateAddress', {})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('AddressLimitExceeded', resp['Error']['Code'])
 #        AddressLimitExceeded
 #        standard - Too many addresses allocated
@@ -120,7 +120,7 @@ class AddressTestCase(base.ApiTestCase):
         resp = self.execute('AssociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1,
                              'InstanceId': fakes.ID_EC2_INSTANCE_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
 
         self.nova_servers.add_floating_ip.assert_called_once_with(
@@ -133,7 +133,7 @@ class AddressTestCase(base.ApiTestCase):
 
         def do_check(params, fixed_ip):
             resp = self.execute('AssociateAddress', params)
-            self.assertEqual(200, resp['status'])
+            self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
             self.assertEqual(fakes.ID_EC2_ASSOCIATION_1, resp['associationId'])
 
@@ -201,7 +201,7 @@ class AddressTestCase(base.ApiTestCase):
 
         def do_check(params):
             resp = self.execute('AssociateAddress', params)
-            self.assertEqual(200, resp['status'])
+            self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
             self.assertEqual(fakes.ID_EC2_ASSOCIATION_2, resp['associationId'])
 
@@ -232,7 +232,7 @@ class AddressTestCase(base.ApiTestCase):
 
         def do_check(params, error):
             resp = self.execute('AssociateAddress', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error, resp['Error']['Code'])
 
         do_check({},
@@ -256,7 +256,7 @@ class AddressTestCase(base.ApiTestCase):
         resp = self.execute('AssociateAddress',
                             {'AllocationId': 'eipalloc-0',
                              'InstanceId': fakes.ID_EC2_INSTANCE_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidParameterCombination', resp['Error']['Code'])
 
         # NOTE(ft): ec2 classic instance vs vpc public ip
@@ -268,7 +268,7 @@ class AddressTestCase(base.ApiTestCase):
         resp = self.execute('AssociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1,
                              'InstanceId': fakes.ID_EC2_INSTANCE_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('AuthFailure', resp['Error']['Code'])
 
     def test_associate_address_invalid_vpc_parameters(self):
@@ -277,7 +277,7 @@ class AddressTestCase(base.ApiTestCase):
 
         def do_check(params, error):
             resp = self.execute('AssociateAddress', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error, resp['Error']['Code'])
 
         # NOTE(ft): vpc instance vs public ip parmeter
@@ -352,7 +352,7 @@ class AddressTestCase(base.ApiTestCase):
         resp = self.execute('AssociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1,
                              'InstanceId': fakes.ID_EC2_INSTANCE_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.assertNotIn('associationId', resp)
 
@@ -388,7 +388,7 @@ class AddressTestCase(base.ApiTestCase):
              fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)])
         resp = self.execute('DisassociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.nova_servers.remove_floating_ip.assert_called_once_with(
             fakes.ID_OS_INSTANCE_1,
@@ -397,7 +397,7 @@ class AddressTestCase(base.ApiTestCase):
         # NOTE(Alex) Disassociate unassociated address in EC2 classic
         resp = self.execute('DisassociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.assertEqual(1, self.nova_servers.remove_floating_ip.call_count)
 
@@ -412,7 +412,7 @@ class AddressTestCase(base.ApiTestCase):
              fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)])
         resp = self.execute('DisassociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_2})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('AuthFailure', resp['Error']['Code'])
         self.nova_servers.remove_floating_ip.assert_called_once_with(
             fakes.ID_OS_INSTANCE_1,
@@ -428,7 +428,7 @@ class AddressTestCase(base.ApiTestCase):
 
         resp = self.execute('DisassociateAddress',
                             {'AssociationId': fakes.ID_EC2_ASSOCIATION_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
 
         self.neutron.update_floatingip.assert_called_once_with(
@@ -449,7 +449,7 @@ class AddressTestCase(base.ApiTestCase):
 
         resp = self.execute('DisassociateAddress',
                             {'AssociationId': fakes.ID_EC2_ASSOCIATION_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
 
         self.assertEqual(0, self.neutron.update_floatingip.call_count)
@@ -461,7 +461,7 @@ class AddressTestCase(base.ApiTestCase):
 
         def do_check(params, error):
             resp = self.execute('DisassociateAddress', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error, resp['Error']['Code'])
 
         do_check({},
@@ -515,7 +515,7 @@ class AddressTestCase(base.ApiTestCase):
 
         resp = self.execute('ReleaseAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
 
         self.nova_floating_ips.delete.assert_called_once_with(
@@ -530,7 +530,7 @@ class AddressTestCase(base.ApiTestCase):
 
         resp = self.execute('ReleaseAddress',
                             {'AllocationId': fakes.ID_EC2_ADDRESS_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
 
         self.neutron.delete_floatingip.assert_called_once_with(
@@ -544,7 +544,7 @@ class AddressTestCase(base.ApiTestCase):
 
         def do_check(params, error):
             resp = self.execute('ReleaseAddress', params)
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error, resp['Error']['Code'])
 
         do_check({},
@@ -612,7 +612,7 @@ class AddressTestCase(base.ApiTestCase):
             if kind == 'i' else [])
 
         resp = self.execute('DescribeAddresses', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['addressesSet'],
                         matchers.ListMatches([fakes.EC2_ADDRESS_1,
                                                   fakes.EC2_ADDRESS_2]))
@@ -625,12 +625,12 @@ class AddressTestCase(base.ApiTestCase):
             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)]
         resp = self.execute('DescribeAddresses', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['addressesSet'],
                         matchers.ListMatches([fakes.EC2_ADDRESS_CLASSIC_1,
                                               fakes.EC2_ADDRESS_CLASSIC_2]))
         resp = self.execute('DescribeAddresses', {'PublicIp.1':
                                                   fakes.IP_ADDRESS_2})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['addressesSet'],
                         matchers.ListMatches([fakes.EC2_ADDRESS_CLASSIC_2]))

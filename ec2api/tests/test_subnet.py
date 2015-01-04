@@ -37,7 +37,7 @@ class SubnetTestCase(base.ApiTestCase):
                 fakes.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
 
         def check_response(resp):
-            self.assertEqual(200, resp['status'])
+            self.assertEqual(200, resp['http_status_code'])
             self.assertThat(fakes.EC2_SUBNET_1, matchers.DictMatches(
                     resp['subnet']))
             self.db_api.add_item.assert_called_once_with(
@@ -72,7 +72,7 @@ class SubnetTestCase(base.ApiTestCase):
 
     def test_create_subnet_invalid_parameters(self):
         def check_response(resp, error_code):
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
             self.assertEqual(0, self.neutron.create_network.call_count)
             self.assertEqual(0, self.neutron.create_subnet.call_count)
@@ -123,7 +123,7 @@ class SubnetTestCase(base.ApiTestCase):
                                 {'VpcId': fakes.ID_EC2_VPC_1,
                                  'CidrBlock': fakes.CIDR_SUBNET_1})
 
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual('SubnetLimitExceeded', resp['Error']['Code'])
             func.side_effect = saved_side_effect
 
@@ -175,7 +175,7 @@ class SubnetTestCase(base.ApiTestCase):
         resp = self.execute('DeleteSubnet',
                             {'subnetId': fakes.ID_EC2_SUBNET_1})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_has_call(
                 mock.ANY,
@@ -200,7 +200,7 @@ class SubnetTestCase(base.ApiTestCase):
         resp = self.execute('DeleteSubnet',
                             {'subnetId': fakes.ID_EC2_SUBNET_1})
 
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidSubnetID.NotFound', resp['Error']['Code'])
         self.assertEqual(0, self.neutron.delete_network.call_count)
         self.assertEqual(0, self.neutron.delete_subnet.call_count)
@@ -239,7 +239,7 @@ class SubnetTestCase(base.ApiTestCase):
 
         resp = self.execute('DeleteSubnet',
                             {'subnetId': fakes.ID_EC2_SUBNET_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('DependencyViolation', resp['Error']['Code'])
 
     def test_describe_subnets(self):
@@ -251,7 +251,7 @@ class SubnetTestCase(base.ApiTestCase):
                 {'networks': [fakes.OS_NETWORK_1, fakes.OS_NETWORK_2]})
 
         resp = self.execute('DescribeSubnets', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['subnetSet'],
                         matchers.ListMatches([fakes.EC2_SUBNET_1,
                                                   fakes.EC2_SUBNET_2]))
@@ -273,7 +273,7 @@ class SubnetTestCase(base.ApiTestCase):
                 {'networks': [fakes.OS_NETWORK_1]})
 
         resp = self.execute('DescribeSubnets', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual([], resp['subnetSet'])
 
     @base.skip_not_implemented

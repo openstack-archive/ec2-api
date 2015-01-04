@@ -35,7 +35,7 @@ class IgwTestCase(base.ApiTestCase):
 
         resp = self.execute('CreateInternetGateway', {})
 
-        self.assertEqual(resp['status'], 200)
+        self.assertEqual(resp['http_status_code'], 200)
         self.assertIn('internetGateway', resp)
         igw = resp['internetGateway']
         self.assertThat(fakes.EC2_IGW_2, matchers.DictMatches(igw))
@@ -63,7 +63,7 @@ class IgwTestCase(base.ApiTestCase):
                 {'VpcId': fakes.ID_EC2_VPC_2,
                  'InternetGatewayId': fakes.ID_EC2_IGW_2})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_any_call(mock.ANY, 'igw',
                                                    fakes.ID_EC2_IGW_2)
@@ -86,7 +86,7 @@ class IgwTestCase(base.ApiTestCase):
                     {'VpcId': fakes.ID_EC2_VPC_2,
                      'InternetGatewayId': fakes.ID_EC2_IGW_2})
 
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
             self.assertEqual(0, self.neutron.add_gateway_router.call_count)
             self.assertEqual(0, self.db_api.update_item.call_count)
@@ -152,7 +152,7 @@ class IgwTestCase(base.ApiTestCase):
                 {'VpcId': fakes.EC2_VPC_1['vpcId'],
                  'InternetGatewayId': fakes.EC2_IGW_1['internetGatewayId']})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_any_call(mock.ANY, 'igw',
                                                    fakes.ID_EC2_IGW_1)
@@ -170,7 +170,7 @@ class IgwTestCase(base.ApiTestCase):
                     {'VpcId': fakes.ID_EC2_VPC_1,
                      'InternetGatewayId': fakes.ID_EC2_IGW_1})
 
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
             self.assertEqual(0, self.neutron.remove_gateway_router.call_count)
             self.assertEqual(0, self.db_api.update_item.call_count)
@@ -209,7 +209,7 @@ class IgwTestCase(base.ApiTestCase):
                 {'VpcId': fakes.ID_EC2_VPC_1,
                  'InternetGatewayId': fakes.ID_EC2_IGW_1})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.neutron.remove_gateway_router.assert_called_once_with(
                 fakes.ID_OS_ROUTER_1)
@@ -236,7 +236,7 @@ class IgwTestCase(base.ApiTestCase):
                 'DeleteInternetGateway',
                 {'InternetGatewayId': fakes.ID_EC2_IGW_2})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_called_once_with(mock.ANY, 'igw',
                                                            fakes.ID_EC2_IGW_2)
@@ -250,7 +250,7 @@ class IgwTestCase(base.ApiTestCase):
                     {'InternetGatewayId':
                             fakes.EC2_IGW_1['internetGatewayId']})
 
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
             self.assertEqual(0, self.db_api.delete_item.call_count)
 
@@ -269,7 +269,7 @@ class IgwTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeInternetGateways', {})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['internetGatewaySet'],
                         matchers.ListMatches([fakes.EC2_IGW_1,
                                                   fakes.EC2_IGW_2]))

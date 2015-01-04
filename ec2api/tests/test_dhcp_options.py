@@ -47,7 +47,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
             resp = self.execute(
                     'CreateDhcpOptions',
                     gen_ec2_param_dhcp_options(ec2_fake))
-            self.assertEqual(200, resp['status'])
+            self.assertEqual(200, resp['http_status_code'])
             self.assertThat(ec2_fake, matchers.DictMatches(
                     resp['dhcpOptions'], orderless_lists=True))
             self.assert_any_call(self.db_api.add_item,
@@ -62,7 +62,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         resp = self.execute('CreateDhcpOptions',
                             {'DhcpConfiguration.1.Key': 'InvalidParameter',
                              'DhcpConfiguration.1.Value.1': 'Value'})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
 
     def test_delete_dhcp_options(self):
@@ -70,7 +70,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         self.db_api.get_items.return_value = []
         resp = self.execute('DeleteDhcpOptions',
                             {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_has_call(
                 mock.ANY,
@@ -89,14 +89,14 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                             {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1})]
         resp = self.execute('DeleteDhcpOptions',
                             {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('DependencyViolation', resp['Error']['Code'])
 
     def test_describe_dhcp_options(self):
         self.db_api.get_items.return_value = (
                 [fakes.DB_DHCP_OPTIONS_1, fakes.DB_DHCP_OPTIONS_2])
         resp = self.execute('DescribeDhcpOptions', {})
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['dhcpOptionsSet'],
                         matchers.ListMatches([fakes.EC2_DHCP_OPTIONS_1,
                                               fakes.EC2_DHCP_OPTIONS_2],
@@ -115,7 +115,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
             resp = self.execute('AssociateDhcpOptions',
                                 {'dhcpOptionsId': ec2_dhcp_options_id,
                                  'vpcId': fakes.ID_EC2_VPC_1})
-            self.assertEqual(200, resp['status'])
+            self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
             self.db_api.update_item.assert_has_call(
                     mock.ANY,

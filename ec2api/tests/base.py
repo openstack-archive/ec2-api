@@ -96,7 +96,7 @@ class ApiTestCase(test_base.BaseTestCase):
             self.assertEqual(1, len(body))
             self.assertIn('Error', body)
             self.assertEqual(2, len(body['Error']))
-        body['status'] = response.status_code
+        body['http_status_code'] = response.status_code
         return body
 
     def assert_any_call(self, func, *args, **kwargs):

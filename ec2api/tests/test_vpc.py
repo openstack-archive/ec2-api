@@ -37,7 +37,7 @@ class VpcTestCase(base.ApiTestCase):
             'security_group': fakes.OS_SECURITY_GROUP_1}
 
         def check_response(response):
-            self.assertEqual(response['status'], 200)
+            self.assertEqual(response['http_status_code'], 200)
             self.assertIn('vpc', response)
             vpc = resp['vpc']
             self.assertThat(fakes.EC2_VPC_1, matchers.DictMatches(vpc))
@@ -75,7 +75,7 @@ class VpcTestCase(base.ApiTestCase):
             fakes.ID_EC2_VPC_1)
 
         def check_response(resp, error_code):
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
             self.assertEqual(0, self.neutron.create_router.call_count)
 
@@ -96,7 +96,7 @@ class VpcTestCase(base.ApiTestCase):
 
         resp = self.execute('CreateVpc', {'CidrBlock': fakes.CIDR_VPC_1})
 
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('VpcLimitExceeded', resp['Error']['Code'])
         self.neutron.create_router.assert_called_with({'router': {}})
         self.assertEqual(0, self.db_api.add_item.call_count)
@@ -126,7 +126,7 @@ class VpcTestCase(base.ApiTestCase):
 
         resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.neutron.delete_router.assert_called_once_with(
             fakes.ID_OS_ROUTER_1)
@@ -141,7 +141,7 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.return_value = None
 
         resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
-        self.assertEqual(400, resp['status'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidVpcID.NotFound', resp['Error']['Code'])
         self.assertEqual(0, self.neutron.delete_router.call_count)
         self.assertEqual(0, self.db_api.delete_item.call_count)
@@ -150,7 +150,7 @@ class VpcTestCase(base.ApiTestCase):
         def do_check():
             resp = self.execute('DeleteVpc',
                                 {'VpcId': fakes.ID_EC2_VPC_1})
-            self.assertEqual(400, resp['status'])
+            self.assertEqual(400, resp['http_status_code'])
             self.assertEqual('DependencyViolation', resp['Error']['Code'])
             self.assertEqual(0, self.neutron.delete_router.call_count)
             self.assertEqual(0, self.db_api.delete_item.call_count)
@@ -182,7 +182,7 @@ class VpcTestCase(base.ApiTestCase):
                 fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
 
         def check_response(resp):
-            self.assertEqual(200, resp['status'])
+            self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
             self.neutron.delete_router.assert_called_once_with(
                 fakes.ID_OS_ROUTER_1)
@@ -225,7 +225,7 @@ class VpcTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeVpcs', {})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['vpcSet'],
                         matchers.ListMatches([fakes.EC2_VPC_1,
                                                   fakes.EC2_VPC_2]))
@@ -237,7 +237,7 @@ class VpcTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeVpcs', {})
 
-        self.assertEqual(200, resp['status'])
+        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['vpcSet'],
                         matchers.ListMatches([fakes.EC2_VPC_1]))
         self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')
