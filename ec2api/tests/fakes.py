@@ -1218,6 +1218,78 @@ EC2_KEY_PAIR = {'keyName': 'keyname',
                 'keyMaterial': PRIVATE_KEY}
 
 
+# volume objects
+class CinderVolume(object):
+
+    def __init__(self, volume):
+        self.id = volume['id']
+        self.status = volume['status']
+        self.availability_zone = volume['availability_zone']
+        self.size = volume['size']
+        self.created_at = volume['created_at']
+        self.display_name = volume['display_name']
+        self.display_description = volume['display_description']
+        self.snapshot_id = None
+
+    def get(self):
+        pass
+
+    def delete(self):
+        pass
+
+    def update(self, *args, **kwargs):
+        pass
+
+
+TIME_CREATE_VOLUME_1 = timeutils.isotime(None, True)
+TIME_CREATE_VOLUME_2 = timeutils.isotime(None, True)
+
+EC2_VOLUME_1 = {
+    'volumeId': ID_EC2_VOLUME_1,
+    'snapshotId': None,
+    'availabilityZone': 'fake_zone',
+    'createTime': TIME_CREATE_VOLUME_1,
+    'size': 1,
+    'status': 'available',
+}
+EC2_VOLUME_2 = {
+    'volumeId': ID_EC2_VOLUME_2,
+    'snapshotId': None,
+    'availabilityZone': 'fake_zone',
+    'createTime': TIME_CREATE_VOLUME_2,
+    'size': 1,
+    'status': 'available',
+}
+
+DB_VOLUME_1 = {
+    'id': ID_EC2_VOLUME_1,
+    'os_id': ID_OS_VOLUME_1,
+}
+DB_VOLUME_2 = {
+    'id': ID_EC2_VOLUME_2,
+    'os_id': ID_OS_VOLUME_2,
+}
+
+OS_VOLUME_1 = {
+    'id': ID_OS_VOLUME_1,
+    'status': 'available',
+    'availability_zone': 'fake_zone',
+    'size': 1,
+    'created_at': TIME_CREATE_VOLUME_1,
+    'display_name': 'test-vol-name',
+    'display_description': 'test-vol-desc'
+}
+OS_VOLUME_2 = {
+    'id': ID_OS_VOLUME_2,
+    'status': 'available',
+    'availability_zone': 'fake_zone',
+    'size': 1,
+    'created_at': TIME_CREATE_VOLUME_2,
+    'display_name': 'test-vol-name',
+    'display_description': 'test-vol-desc'
+}
+
+
 # Object generator functions section
 
 # internet gateway generator functions

@@ -33,9 +33,11 @@ class ApiTestCase(test_base.BaseTestCase):
 
     def setUp(self):
         super(ApiTestCase, self).setUp()
+
         neutron_patcher = mock.patch('neutronclient.v2_0.client.Client')
         self.neutron = neutron_patcher.start().return_value
         self.addCleanup(neutron_patcher.stop)
+
         nova_patcher = mock.patch('novaclient.v1_1.client.Client')
         nova_mock = nova_patcher.start()
         self.nova_availability_zones = (
@@ -48,12 +50,19 @@ class ApiTestCase(test_base.BaseTestCase):
         self.nova_security_group_rules = (
             nova_mock.return_value.security_group_rules)
         self.addCleanup(nova_patcher.stop)
+
         glance_patcher = mock.patch('glanceclient.client.Client')
         self.glance = glance_patcher.start().return_value
         self.addCleanup(glance_patcher.stop)
+
+        cinder_patcher = mock.patch('cinderclient.v1.client.Client')
+        self.cinder = cinder_patcher.start().return_value
+        self.addCleanup(cinder_patcher.stop)
+
         db_api_patcher = mock.patch('ec2api.db.api.IMPL')
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)
+
         isotime_patcher = mock.patch('ec2api.openstack.common.timeutils.'
                                      'isotime')
         self.isotime = isotime_patcher.start()

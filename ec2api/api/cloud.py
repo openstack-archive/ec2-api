@@ -584,8 +584,7 @@ class CloudController(object):
         return instance.get_console_output(context, instance_id)
 
     def create_volume(self, context, availability_zone=None, size=None,
-                      snapshot_id=None, volume_type=None, name=None,
-                      description=None, metadata=None, iops=None,
+                      snapshot_id=None, volume_type=None, iops=None,
                       encrypted=None, kms_key_id=None):
         """Creates an EBS volume.
 
@@ -602,9 +601,6 @@ class CloudController(object):
                 Required if you are creating a volume from a snapshot.
             volume_type (str): The volume type. One of volume types created
                 in used Block Storage.
-            name (str): Name of the volume (Nova extension).
-            description (str): Description of the volume (Nova extension).
-            metadata (str): Metadata of the volume (Nova extension).
             iops (int): The number of IOPS to provision for the volume.
                 Valid values: Range is 100 to 4,000.
                 Not used now.
@@ -621,8 +617,7 @@ class CloudController(object):
         snapshot.
         """
         return volume.create_volume(context, availability_zone, size,
-                                    snapshot_id, volume_type, name,
-                                    description, metadata, iops,
+                                    snapshot_id, volume_type, iops,
                                     encrypted, kms_key_id)
 
     def attach_volume(self, context, volume_id, instance_id, device):

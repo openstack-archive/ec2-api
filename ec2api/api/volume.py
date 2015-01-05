@@ -24,9 +24,8 @@ from ec2api.openstack.common.gettextutils import _
 
 
 def create_volume(context, availability_zone=None, size=None,
-                  snapshot_id=None, volume_type=None, name=None,
-                  description=None, metadata=None, iops=None, encrypted=None,
-                  kms_key_id=None):
+                  snapshot_id=None, volume_type=None, iops=None,
+                  encrypted=None, kms_key_id=None):
     if snapshot_id is not None:
         snapshot = ec2utils.get_db_item(context, 'snap', snapshot_id)
         os_snapshot_id = snapshot['os_id']
@@ -37,14 +36,12 @@ def create_volume(context, availability_zone=None, size=None,
     with utils.OnCrashCleaner() as cleaner:
         os_volume = cinder.volumes.create(
                 size, snapshot_id=os_snapshot_id, volume_type=volume_type,
-                display_name=name, display_description=description,
                 availability_zone=availability_zone)
         cleaner.addCleanup(os_volume.delete)
 
         volume = db_api.add_item(context, 'vol', {'os_id': os_volume.id})
         cleaner.addCleanup(db_api.delete_item, context, volume['id'])
-        if not name:
-            os_volume.update(display_name=volume['id'])
+        os_volume.update(display_name=volume['id'])
 
     return _format_volume(context, volume, os_volume, snapshot_id=snapshot_id)
 
@@ -151,6 +148,9 @@ def _format_volume(context, volume, os_volume, instances={},
                 context, 'snap', os_volume.snapshot_id, snapshots)
         snapshot_id = snapshot['id']
     ec2_volume['snapshotId'] = snapshot_id
+
+    # NOTE(apavlov): code doesn't support 'attachmentSet', 'volumeType' and
+    # 'encrypted' fields for volume.
 
     return ec2_volume
 
