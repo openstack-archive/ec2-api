@@ -75,8 +75,7 @@ class ApiTestCase(test_base.BaseTestCase):
                    'ec2.request': ec2_request,
                    'ec2api.context': ec2_context}
         request = ec2api.wsgi.Request(environ)
-        application = ec2api.api.Validator(ec2api.api.Executor())
-        response = request.send(application)
+        response = request.send(ec2api.api.Executor())
         return self._check_and_transform_response(response, action)
 
     def _create_context(self):

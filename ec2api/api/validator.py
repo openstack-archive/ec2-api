@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
 import re
 
 import netaddr
@@ -25,25 +24,6 @@ from ec2api.openstack.common import log as logging
 LOG = logging.getLogger(__name__)
 
 
-def _get_path_validator_regex():
-    # rfc3986 path validator regex from
-    # http://jmrware.com/articles/2009/uri_regexp/URI_regex.html
-    pchar = "([A-Za-z0-9\-._~!$&'()*+,;=:@]|%[0-9A-Fa-f]{2})"
-    path = "((/{pchar}*)*|"
-    path += "/({pchar}+(/{pchar}*)*)?|"
-    path += "{pchar}+(/{pchar}*)*|"
-    path += "{pchar}+(/{pchar}*)*|)"
-    path = path.format(pchar=pchar)
-    return re.compile(path)
-
-
-VALIDATE_PATH_RE = _get_path_validator_regex()
-
-
-def validate_dummy(val, **kwargs):
-    return True
-
-
 def validate_str(val, parameter_name, max_length=None):
     if (isinstance(val, basestring) and
             (max_length is None or max_length and len(val) <= max_length)):
@@ -53,62 +33,12 @@ def validate_str(val, parameter_name, max_length=None):
                  "than 255 characters.") % parameter_name)
 
 
-def validate_int(max_value=None):
-
-    def _do(val, **kwargs):
-        if not isinstance(val, int):
-            return False
-        if max_value and val > max_value:
-            return False
-        return True
-
-    return _do
-
-
-def validate_url_path(val, parameter_name=None, **kwargs):
-    """True if val is matched by the path component grammar in rfc3986."""
-
-    if not validate_str()(val, parameter_name):
-        return False
-
-    return VALIDATE_PATH_RE.match(val).end() == len(val)
-
-
-def validate_image_path(val, parameter_name=None, **kwargs):
-    if not validate_str()(val, parameter_name):
-        return False
-
-    bucket_name = val.split('/')[0]
-    manifest_path = val[len(bucket_name) + 1:]
-    if not len(bucket_name) or not len(manifest_path):
-        return False
-
-    if val[0] == '/':
-        return False
-
-    # make sure the image path if rfc3986 compliant
-    # prepend '/' to make input validate
-    if not validate_url_path('/' + val):
-        return False
-
-    return True
-
-
 def validate_list(items, parameter_name):
     if not isinstance(items, list):
         raise exception.InvalidParameterValue(
             value=items,
             parameter=parameter_name,
             reason='Expected a list here')
-
-
-def validate_user_data(user_data, **kwargs):
-    """Check if the user_data is encoded properly."""
-    try:
-        user_data = base64.b64decode(user_data)
-    except TypeError:
-        return False
-    return True
 
 
 def _is_valid_cidr(address):
@@ -218,37 +148,3 @@ def validate_ipv4(address, parameter_name, **kwargs):
     raise exception.InvalidParameterValue(
         value=address, parameter=parameter_name,
         reason=_('Not a valid IP address'))
-
-
-def validate(request, validator):
-    """Validate values of args against validators in validator.
-
-    :param args:      Dict of values to be validated.
-    :param validator: A dict where the keys map to keys in args
-                      and the values are validators.
-                      Applies each validator to ``args[key]``
-    :returns: True if validation succeeds. Otherwise False.
-
-    A validator should be a callable which accepts 1 argument and which
-    returns True if the argument passes validation. False otherwise.
-    A validator should not raise an exception to indicate validity of the
-    argument.
-
-    Only validates keys which show up in both args and validator.
-
-    """
-
-    args = request.args
-    for key in args:
-        if key not in validator:
-            continue
-
-        f = validator[key]
-        assert callable(f)
-
-        if not f(args[key], parameter_name=key, action=request.action):
-            LOG.debug(_("%(key)s with value %(value)s failed"
-                        " validator %(name)s"),
-                      {'key': key, 'value': args[key], 'name': f.__name__})
-            return False
-    return True

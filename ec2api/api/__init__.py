@@ -29,7 +29,6 @@ import webob.exc
 from ec2api.api import apirequest
 from ec2api.api import ec2utils
 from ec2api.api import faults
-from ec2api.api import validator
 from ec2api import context
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -327,27 +326,6 @@ class Requestify(wsgi.Middleware):
             action, req.params['Version'], args)
         req.environ['ec2.request'] = api_request
         return self.application
-
-
-class Validator(wsgi.Middleware):
-
-    validator.DEFAULT_VALIDATOR = {
-    }
-
-    def __init__(self, application):
-        super(Validator, self).__init__(application)
-
-    @webob.dec.wsgify(RequestClass=wsgi.Request)
-    def __call__(self, req):
-        try:
-            if validator.validate(req.environ['ec2.request'],
-                                  validator.DEFAULT_VALIDATOR):
-                return self.application
-            else:
-                raise webob.exc.HTTPBadRequest()
-        except Exception as ex:
-            return ec2_error_ex(
-                ex, req, unexpected=not isinstance(ex, exception.EC2Exception))
 
 
 def exception_to_ec2code(ex):
