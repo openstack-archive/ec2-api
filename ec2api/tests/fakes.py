@@ -171,6 +171,9 @@ ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
 ID_OS_SECURITY_GROUP_1 = random_os_id()
 ID_OS_SECURITY_GROUP_2 = random_os_id()
 
+NAME_DEFAULT_OS_SECURITY_GROUP = 'default'
+NAME_OTHER_OS_SECURITY_GROUP = 'other'
+
 
 # route table constants
 ID_EC2_ROUTE_TABLE_1 = random_ec2_id('rtb')
@@ -210,6 +213,46 @@ ID_EC2_SNAPSHOT_1 = random_ec2_id('snap')
 ID_EC2_SNAPSHOT_2 = random_ec2_id('snap')
 ID_OS_SNAPSHOT_1 = random_os_id()
 ID_OS_SNAPSHOT_2 = random_os_id()
+
+
+# key pair constans
+NAME_KEY_PAIR = 'keyname'
+PRIVATE_KEY_KEY_PAIR = (
+    '-----BEGIN RSA PRIVATE KEY-----\n'
+    'MIIEowIBAAKCAQEAgXvm1sZ9MDiAXvGraRFja0/WqyJ1gE6j/QPjreNryd34zBFcv2pQXLyvb'
+    'gQG\nFxN4rMGNScgKgLSgHjE/TNywkT8N7aYOiRmGkzQciP5t+zf8ZdCyl+hqgoQig1uY8sV/'
+    'fSxUWCB9\n8sF7Tpl0iGkWM6Wo0H/PvcwiS2+UPSzArj+b+Erb/JbBF4O8GgSmtLMeq60RuDM'
+    'dJi5JYCP66HUw\njtYb/f9y1Q9nEGVcxY2v0RI1n0yOaZDKPInLKHeR/ole2QVwPZB69mBj11'
+    'LErqb+jzCaSivnhy6g\nPzaSHdZaRmy1f+6ltFI1iKt+4y/iINOY0skYC1hc7IevE7j7dGQTD'
+    'wIDAQABAoIBAEbD2Vfd6MM2\nzemVuHFWoHggjRjAX2k9EWCRBJifJuSPXI7imka+qqbUNCgz'
+    'KMTpzlTT/wyouBy5Gp0Fmyu9nP30\ncP9FdsI04hiHLWUtcBwQ7+8RDNn6mmM0JcyWfdOIXnG'
+    'hjYMQVuUaGvLM6SQ4EnsteUJh57451zBV\nDbYVRES2Fbq+j8tPQj1KuD0HhZBboNPOxo6E5n'
+    'TxvMXnvuI+cb9D99lqATcb8c0zsLMl/5SKEBDc\nj72X4GPfE3Dc5/MO6L/89ms3TqF3lx8lh'
+    'wFSMfFfA3Nf5xrX3gnorGe81odXBXFveqMCemvfJYxg\nS9KPkM8CMnwn6yPS3ftW5xH3nMkC'
+    'gYEAvN4lQuOTy9RONCtfgZ6lhR00xfDiibOsE2jFXqXlXrZS\nunBx2WRwNuhAcYGbC4T71iC'
+    'BR+LJHECpFjEFX9cKjd8xZPdIzJmwMBylPnli8IxK9UMroxF/MDNy\nnJfdPIWagIrk9VRsQH'
+    'UOQW8Ab5dYJuP6c03L5xwmnFfeFnlz10MCgYEAr4Iu182bC2ppwr5AYD8T\n/QKVPZTmizbtG'
+    'H/7a2+WnfNCz2u0MOo2h1rF7/SOYR8nalTTsN1z4D8cRX7YQ0P4yBtNRNiN7WH3\n+smTWztI'
+    'VYvJA2RsOeP0zfGLJiFSMWLOjlqpJ7KbkEuPcxshGd+/w8upxgJeV8Dwz0ZWbY302kUC\ngYE'
+    'AhneTB+CHpaNuWm5W/S46ol9850DtySSG6vq5Kv3qJFii5eKQ7Do6Op145FdmT/lKY9WYtdmd'
+    '\nXeQbfpVAQlAUT5YM0NnOlv0FF/wNGkHKU4FPDPfZ5avbZjH688qb1S86JTK+eHy25d1xXNz'
+    'u7oRO\nWsIN2nIVLmI4iy90C4RFGYkCgYBXpKPtwk/VkItF46nUJku+Agcy3GOQS5p0rJyJ1w'
+    'yYzbykRf2S\nm7MlPpAvtqlPGLafI8MexEe0SO++SIyIcq4Oh4u7gITHcS/bfcPnQCBsD8UOu'
+    '5xMAGjkWuWI4gTg\ngp3xepaUK14B3anB6l9KQ3DIvrCGH/Kq0b+vUkmgpc4LHQKBgBtul9bN'
+    'KLF+LJf4JHYNFSurE8Y/\nn8FZ3dZo3T0Q3Sap9bP3ZHemoQ6QXbmpu3H4Mf+2kcNg6YKFW3p'
+    'hxW3cuAcZOMHPCrpr3mCdyhF0\nKM74ANEwg8MekBJTcWZUNFv9HZDvTuhp6HSrbMnNEQogkd'
+    '5PoubiusvAKpeb6NBGnLMq\n'
+    '-----END RSA PRIVATE KEY-----'
+)
+PUBLIC_KEY_KEY_PAIR = (
+              'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIkYwwXm8UeQXx1c2eFrDIB6b'
+              '6ApI0KTKs1wezDfFdSIs93vAt4Jx1MyaR/PwqwLk2CDyFoGJBWBI9YcodLAjoRg'
+              'Ovr6JigEv5V3yp+eEkeAJO0cPA21vN/KQ8Vxml68ZvvqbdqKZXc/rpFZ1OgCmHt'
+              'udo96uQiRB0FM3mdE8YOTswcfkJxTvCe3axX50pYXXfIb0dn9CzC1hyQWYPXvlv'
+              'qFNvr/Li7sSBycTBAh4Ar/uEigs/uOjhvzd7GpzY7qDqBVJFAmP7HiiOxoXPkKu'
+              'W62Ftd')
+FINGERPRINT_KEY_PAIR = (
+              '2a:72:dd:aa:0d:a6:45:4d:27:4f:75:28:73:0d:a6:10:35:88:e1:ce')
 
 
 # Object constants section
@@ -435,10 +478,11 @@ DB_INSTANCE_2 = {
 NOVADB_INSTANCE_1 = {
     'reservation_id': random_ec2_id('r'),
     'launch_index': 0,
-    'kernel_id': None,
-    'ramdisk_id': None,
+    'kernel_id': ID_OS_IMAGE_AKI_1,
+    'ramdisk_id': ID_OS_IMAGE_ARI_1,
     'root_device_name': '/dev/vda',
     'hostname': ID_EC2_INSTANCE_1,
+    'key_data': PUBLIC_KEY_KEY_PAIR,
 }
 NOVADB_INSTANCE_2 = {
     'reservation_id': ID_EC2_RESERVATION_2,
@@ -515,9 +559,11 @@ EC2_INSTANCE_1 = {
     'dnsName': IP_ADDRESS_2,
     'instanceState': {'code': 0, 'name': 'pending'},
     'imageId': ID_EC2_IMAGE_1,
+    'kernelId': ID_EC2_IMAGE_AKI_1,
+    'ramdiskId': ID_EC2_IMAGE_ARI_1,
     'productCodesSet': [],
     'privateDnsName': ID_EC2_INSTANCE_1,
-    'keyName': None,
+    'keyName': NAME_KEY_PAIR,
     'launchTime': None,
     'rootDeviceType': 'instance-store',
     'instanceType': 'fake_flavor',
@@ -548,7 +594,8 @@ EC2_RESERVATION_1 = {
 EC2_RESERVATION_2 = {
     'reservationId': ID_EC2_RESERVATION_2,
     'ownerId': ID_OS_PROJECT,
-    'groupSet': [],
+    'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP},
+                 {'groupName': NAME_OTHER_OS_SECURITY_GROUP}],
     'instancesSet': [EC2_INSTANCE_2],
 }
 
@@ -593,9 +640,12 @@ OS_INSTANCE_1 = OSInstance(
                           {'addr': IP_ADDRESS_2,
                            'version': 4,
                            'OS-EXT-IPS:type': 'floating'}]},
+    key_name=NAME_KEY_PAIR,
     )
 OS_INSTANCE_2 = OSInstance(
-    ID_OS_INSTANCE_2, {'id': 'fakeFlavorId'})
+    ID_OS_INSTANCE_2, {'id': 'fakeFlavorId'},
+    security_groups=[{'name': NAME_DEFAULT_OS_SECURITY_GROUP},
+                     {'name': NAME_OTHER_OS_SECURITY_GROUP}])
 
 # DHCP options objects
 DB_DHCP_OPTIONS_1 = {'id': ID_EC2_DHCP_OPTIONS_1,
@@ -1047,6 +1097,16 @@ DB_IMAGE_2 = {
     'os_id': ID_OS_IMAGE_2,
     'is_public': True,
 }
+DB_IMAGE_AKI_1 = {
+    'id': ID_EC2_IMAGE_AKI_1,
+    'os_id': ID_OS_IMAGE_AKI_1,
+    'is_public': True,
+}
+DB_IMAGE_ARI_1 = {
+    'id': ID_EC2_IMAGE_ARI_1,
+    'os_id': ID_OS_IMAGE_ARI_1,
+    'is_public': True,
+}
 
 OS_IMAGE_1 = {
     'id': ID_OS_IMAGE_1,
@@ -1182,95 +1242,6 @@ OS_SNAPSHOT_2 = {
 }
 
 
-# availability zone objects
-
-class NovaAvailabilityZone(object):
-
-    def __init__(self, nova_availability_zone_dict):
-        self.zoneName = nova_availability_zone_dict['zoneName']
-        self.zoneState = {'available':
-            nova_availability_zone_dict['zoneState'] == 'available'}
-        self.hosts = nova_availability_zone_dict['hosts']
-
-OS_AVAILABILITY_ZONE = {'zoneName': 'nova',
-                        'zoneState': 'available',
-                        'hosts': {'host1': {'service1': {
-                                                'active': 'True',
-                                                'available': 'True',
-                                                'updated_at': 'now'},
-                                            'service2': {
-                                                'active': 'False',
-                                                'available': 'False',
-                                                'updated_at': 'now'}},
-                                  'host2': {'service1': {
-                                                'active': 'True',
-                                                'available': 'True',
-                                                'updated_at': 'now'}}
-                                   }}
-OS_AVAILABILITY_ZONE_INTERNAL = {'zoneName': 'internal',
-                                 'zoneState': 'available',
-                                 'hosts': {}}
-EC2_AVAILABILITY_ZONE = {'zoneName': 'nova',
-                         'zoneState': 'available'}
-
-
-# keypair objects
-
-class NovaKeyPair(object):
-
-    def __init__(self, nova_keypair_dict):
-        self.name = nova_keypair_dict['name']
-        self.fingerprint = nova_keypair_dict['fingerprint']
-        self.private_key = nova_keypair_dict['private_key']
-        self.public_key = nova_keypair_dict['public_key']
-
-PRIVATE_KEY = (
-    '-----BEGIN RSA PRIVATE KEY-----\n'
-    'MIIEowIBAAKCAQEAgXvm1sZ9MDiAXvGraRFja0/WqyJ1gE6j/QPjreNryd34zBFcv2pQXLyvb'
-    'gQG\nFxN4rMGNScgKgLSgHjE/TNywkT8N7aYOiRmGkzQciP5t+zf8ZdCyl+hqgoQig1uY8sV/'
-    'fSxUWCB9\n8sF7Tpl0iGkWM6Wo0H/PvcwiS2+UPSzArj+b+Erb/JbBF4O8GgSmtLMeq60RuDM'
-    'dJi5JYCP66HUw\njtYb/f9y1Q9nEGVcxY2v0RI1n0yOaZDKPInLKHeR/ole2QVwPZB69mBj11'
-    'LErqb+jzCaSivnhy6g\nPzaSHdZaRmy1f+6ltFI1iKt+4y/iINOY0skYC1hc7IevE7j7dGQTD'
-    'wIDAQABAoIBAEbD2Vfd6MM2\nzemVuHFWoHggjRjAX2k9EWCRBJifJuSPXI7imka+qqbUNCgz'
-    'KMTpzlTT/wyouBy5Gp0Fmyu9nP30\ncP9FdsI04hiHLWUtcBwQ7+8RDNn6mmM0JcyWfdOIXnG'
-    'hjYMQVuUaGvLM6SQ4EnsteUJh57451zBV\nDbYVRES2Fbq+j8tPQj1KuD0HhZBboNPOxo6E5n'
-    'TxvMXnvuI+cb9D99lqATcb8c0zsLMl/5SKEBDc\nj72X4GPfE3Dc5/MO6L/89ms3TqF3lx8lh'
-    'wFSMfFfA3Nf5xrX3gnorGe81odXBXFveqMCemvfJYxg\nS9KPkM8CMnwn6yPS3ftW5xH3nMkC'
-    'gYEAvN4lQuOTy9RONCtfgZ6lhR00xfDiibOsE2jFXqXlXrZS\nunBx2WRwNuhAcYGbC4T71iC'
-    'BR+LJHECpFjEFX9cKjd8xZPdIzJmwMBylPnli8IxK9UMroxF/MDNy\nnJfdPIWagIrk9VRsQH'
-    'UOQW8Ab5dYJuP6c03L5xwmnFfeFnlz10MCgYEAr4Iu182bC2ppwr5AYD8T\n/QKVPZTmizbtG'
-    'H/7a2+WnfNCz2u0MOo2h1rF7/SOYR8nalTTsN1z4D8cRX7YQ0P4yBtNRNiN7WH3\n+smTWztI'
-    'VYvJA2RsOeP0zfGLJiFSMWLOjlqpJ7KbkEuPcxshGd+/w8upxgJeV8Dwz0ZWbY302kUC\ngYE'
-    'AhneTB+CHpaNuWm5W/S46ol9850DtySSG6vq5Kv3qJFii5eKQ7Do6Op145FdmT/lKY9WYtdmd'
-    '\nXeQbfpVAQlAUT5YM0NnOlv0FF/wNGkHKU4FPDPfZ5avbZjH688qb1S86JTK+eHy25d1xXNz'
-    'u7oRO\nWsIN2nIVLmI4iy90C4RFGYkCgYBXpKPtwk/VkItF46nUJku+Agcy3GOQS5p0rJyJ1w'
-    'yYzbykRf2S\nm7MlPpAvtqlPGLafI8MexEe0SO++SIyIcq4Oh4u7gITHcS/bfcPnQCBsD8UOu'
-    '5xMAGjkWuWI4gTg\ngp3xepaUK14B3anB6l9KQ3DIvrCGH/Kq0b+vUkmgpc4LHQKBgBtul9bN'
-    'KLF+LJf4JHYNFSurE8Y/\nn8FZ3dZo3T0Q3Sap9bP3ZHemoQ6QXbmpu3H4Mf+2kcNg6YKFW3p'
-    'hxW3cuAcZOMHPCrpr3mCdyhF0\nKM74ANEwg8MekBJTcWZUNFv9HZDvTuhp6HSrbMnNEQogkd'
-    '5PoubiusvAKpeb6NBGnLMq\n'
-    '-----END RSA PRIVATE KEY-----'
-)
-
-PUBLIC_KEY = ('ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIkYwwXm8UeQXx1c2eFrDIB6b'
-              '6ApI0KTKs1wezDfFdSIs93vAt4Jx1MyaR/PwqwLk2CDyFoGJBWBI9YcodLAjoRg'
-              'Ovr6JigEv5V3yp+eEkeAJO0cPA21vN/KQ8Vxml68ZvvqbdqKZXc/rpFZ1OgCmHt'
-              'udo96uQiRB0FM3mdE8YOTswcfkJxTvCe3axX50pYXXfIb0dn9CzC1hyQWYPXvlv'
-              'qFNvr/Li7sSBycTBAh4Ar/uEigs/uOjhvzd7GpzY7qDqBVJFAmP7HiiOxoXPkKu'
-              'W62Ftd')
-
-KEY_FINGERPRINT = '2a:72:dd:aa:0d:a6:45:4d:27:4f:75:28:73:0d:a6:10:35:88:e1:ce'
-
-OS_KEY_PAIR = {'name': 'keyname',
-               'private_key': PRIVATE_KEY,
-               'public_key': PUBLIC_KEY,
-               'fingerprint': KEY_FINGERPRINT}
-
-EC2_KEY_PAIR = {'keyName': 'keyname',
-                'keyFingerprint': KEY_FINGERPRINT,
-                'keyMaterial': PRIVATE_KEY}
-
-
 # volume objects
 class CinderVolume(object):
 
@@ -1373,6 +1344,59 @@ OS_VOLUME_3 = {
 }
 
 
+# availability zone objects
+
+class NovaAvailabilityZone(object):
+
+    def __init__(self, nova_availability_zone_dict):
+        self.zoneName = nova_availability_zone_dict['zoneName']
+        self.zoneState = {'available':
+            nova_availability_zone_dict['zoneState'] == 'available'}
+        self.hosts = nova_availability_zone_dict['hosts']
+
+OS_AVAILABILITY_ZONE = {'zoneName': 'nova',
+                        'zoneState': 'available',
+                        'hosts': {'host1': {'service1': {
+                                                'active': 'True',
+                                                'available': 'True',
+                                                'updated_at': 'now'},
+                                            'service2': {
+                                                'active': 'False',
+                                                'available': 'False',
+                                                'updated_at': 'now'}},
+                                  'host2': {'service1': {
+                                                'active': 'True',
+                                                'available': 'True',
+                                                'updated_at': 'now'}}
+                                   }}
+OS_AVAILABILITY_ZONE_INTERNAL = {'zoneName': 'internal',
+                                 'zoneState': 'available',
+                                 'hosts': {}}
+EC2_AVAILABILITY_ZONE = {'zoneName': 'nova',
+                         'zoneState': 'available'}
+
+
+# keypair objects
+
+class NovaKeyPair(object):
+
+    def __init__(self, nova_keypair_dict):
+        self.name = nova_keypair_dict['name']
+        self.fingerprint = nova_keypair_dict['fingerprint']
+        self.private_key = nova_keypair_dict['private_key']
+        self.public_key = nova_keypair_dict['public_key']
+
+
+OS_KEY_PAIR = {'name': NAME_KEY_PAIR,
+               'private_key': PRIVATE_KEY_KEY_PAIR,
+               'public_key': PUBLIC_KEY_KEY_PAIR,
+               'fingerprint': FINGERPRINT_KEY_PAIR}
+
+EC2_KEY_PAIR = {'keyName': NAME_KEY_PAIR,
+                'keyFingerprint': FINGERPRINT_KEY_PAIR,
+                'keyMaterial': PRIVATE_KEY_KEY_PAIR}
+
+
 # Object generator functions section
 
 # internet gateway generator functions
@@ -1459,7 +1483,8 @@ def gen_os_port(os_id, ec2_network_interface, os_subnet_id, fixed_ips,
 # instance generator functions
 def gen_ec2_instance(ec2_instance_id, private_ip_address='',
                      ec2_network_interfaces=None, is_private_ip_in_vpc=True,
-                     floating_ip=None):
+                     floating_ip=None, image_id=None, kernel_id=None,
+                     ramdisk_id=None):
     """Generate EC2 Instance dictionary.
 
     private_ip_address must be specified as IP value or None
@@ -1473,7 +1498,7 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
                     'placement': {'availabilityZone': None},
                     'dnsName': floating_ip,
                     'instanceState': {'code': 0, 'name': 'pending'},
-                    'imageId': None,
+                    'imageId': image_id,
                     'productCodesSet': [],
                     'privateDnsName': ec2_instance_id,
                     'keyName': None,
@@ -1489,6 +1514,10 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
         ec2_instance['vpcId'] = ec2_network_interfaces[0]['vpcId']
         if private_ip_address and is_private_ip_in_vpc:
             ec2_instance['subnetId'] = ec2_network_interfaces[0]['subnetId']
+    if kernel_id:
+        ec2_instance['kernelId'] = kernel_id
+    if ramdisk_id:
+        ec2_instance['ramdiskId'] = ramdisk_id
     return ec2_instance
 
 

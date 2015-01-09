@@ -43,7 +43,7 @@ class RequestContext(object):
                  is_admin=None, roles=None, remote_address=None,
                  auth_token=None, user_name=None, project_name=None,
                  overwrite=True, service_catalog=None, api_version=None,
-                 **kwargs):
+                 cross_tenants=None, **kwargs):
         """Parameters
 
             :param overwrite: Set to False to ensure that the greenthread local
@@ -79,6 +79,7 @@ class RequestContext(object):
         self.project_name = project_name
         self.is_admin = is_admin
         # TODO(ft): call policy.check_is_admin if is_admin is None
+        self.cross_tenants = cross_tenants
         self.api_version = api_version
         if overwrite or not hasattr(local.store, 'context'):
             self.update_store()

@@ -39,11 +39,16 @@ CONF = cfg.CONF
 CONF.register_opts(exc_log_opts)
 
 
-class EC2ServerError(Exception):
+class EC2MetadataException(Exception):
+    pass
 
-    def __init__(self, response, content):
-        self.response = response
-        self.content = content
+
+class EC2MetadataNotFound(EC2MetadataException):
+    pass
+
+
+class EC2MetadataInvalidAddress(EC2MetadataException):
+    pass
 
 
 class EC2Exception(Exception):

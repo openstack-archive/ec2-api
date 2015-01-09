@@ -16,6 +16,7 @@
 """Utilities and helper functions."""
 
 import contextlib
+import hmac
 import shutil
 import socket
 import tempfile
@@ -68,3 +69,21 @@ def tempdir(**kwargs):
             shutil.rmtree(tmpdir)
         except OSError as e:
             LOG.error(_('Could not remove tmpdir: %s'), str(e))
+
+
+if hasattr(hmac, 'compare_digest'):
+    constant_time_compare = hmac.compare_digest
+else:
+    def constant_time_compare(first, second):
+        """Returns True if both string inputs are equal, otherwise False.
+
+        This function should take a constant amount of time regardless of
+        how many characters in the strings match.
+
+        """
+        if len(first) != len(second):
+            return False
+        result = 0
+        for x, y in zip(first, second):
+            result |= ord(x) ^ ord(y)
+        return result == 0

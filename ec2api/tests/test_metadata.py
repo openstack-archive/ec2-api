@@ -18,7 +18,9 @@ from oslotest import base as test_base
 import testtools
 import webob
 
+from ec2api import exception
 from ec2api import metadata
+from ec2api.tests import fakes
 from ec2api.tests import matchers
 
 
@@ -43,9 +45,101 @@ class ProxyTestCase(test_base.BaseTestCase):
         conf.set_override('metadata_proxy_shared_secret', 'secret',
                           group='metadata')
 
+    @mock.patch('ec2api.metadata.api.get_version_list')
+    def test_callable(self, get_version_list):
+        get_version_list.return_value = 'foo'
+        request = webob.Request.blank('/')
+        response = request.get_response(self.handler)
+        self.assertEqual(200, response.status_int)
+        self.assertEqual('foo', response.body)
+
+    @mock.patch('ec2api.metadata.api.get_version_list')
+    def test_root(self, get_version_list):
+        get_version_list.return_value = 'fake_version'
+        request = webob.Request.blank('/')
+        response = request.get_response(self.handler)
+        self.assertEqual('fake_version', response.body)
+        response_ctype = response.headers['Content-Type']
+        self.assertTrue(response_ctype.startswith("text/plain"))
+        get_version_list.assert_called_with()
+
+        request = webob.Request.blank('/foo/../')
+        response = request.get_response(self.handler)
+        self.assertEqual('fake_version', response.body)
+
+    @mock.patch.object(metadata.MetadataRequestHandler, '_get_metadata')
+    def test_version_root(self, get_metadata):
+        get_metadata.return_value = 'fake'
+        request = webob.Request.blank('/latest')
+        response = request.get_response(self.handler)
+        self.assertEqual('fake', response.body)
+        response_ctype = response.headers['Content-Type']
+        self.assertTrue(response_ctype.startswith("text/plain"))
+        get_metadata.assert_called_with(mock.ANY, ['latest'])
+
+        get_metadata.side_effect = exception.EC2MetadataNotFound()
+        request = webob.Request.blank('/latest')
+        response = request.get_response(self.handler)
+        self.assertEqual(404, response.status_int)
+
+        with mock.patch.object(metadata, 'LOG') as log:
+            get_metadata.side_effect = Exception()
+            request = webob.Request.blank('/latest')
+            response = request.get_response(self.handler)
+            self.assertEqual(500, response.status_int)
+            self.assertEqual(len(log.mock_calls), 2)
+
+    @mock.patch('ec2api.metadata.api.get_metadata_item')
+    @mock.patch('ec2api.metadata.api.get_os_instance_and_project_id')
+    @mock.patch.object(metadata.MetadataRequestHandler, '_get_remote_ip')
+    @mock.patch.object(metadata.MetadataRequestHandler, '_get_context')
+    def test_get_metadata_by_ip(self, get_context, get_remote_ip, get_ids,
+                                get_metadata_item):
+        get_context.return_value = mock.Mock(project_id='fake_admin_project')
+        get_remote_ip.return_value = 'fake_instance_ip'
+        get_ids.return_value = ('fake_instance_id', 'fake_project_id')
+        get_metadata_item.return_value = 'fake_item'
+        req = mock.Mock(headers={})
+
+        retval = self.handler._get_metadata(req, ['fake_ver', 'fake_attr'])
+        self.assertEqual('fake_item', retval)
+        get_context.assert_called_with()
+        get_remote_ip.assert_called_with(req)
+        get_ids.assert_called_with(get_context.return_value,
+                                   'fake_instance_ip')
+        get_metadata_item.assert_called_with(get_context.return_value,
+                                             ['fake_ver', 'fake_attr'],
+                                             'fake_instance_id',
+                                             'fake_instance_ip')
+        self.assertEqual('fake_project_id',
+                         get_context.return_value.project_id)
+
+    @mock.patch('ec2api.metadata.api.get_metadata_item')
+    @mock.patch.object(metadata.MetadataRequestHandler,
+                       '_unpack_request_attributes')
+    @mock.patch.object(metadata.MetadataRequestHandler, '_get_context')
+    def test_get_metadata_by_instance_id(self, get_context, unpack_request,
+                                         get_metadata_item):
+        get_context.return_value = mock.Mock(project_id='fake_admin_project')
+        unpack_request.return_value = ('fake_instance_id', 'fake_project_id',
+                                       'fake_instance_ip')
+        get_metadata_item.return_value = 'fake_item'
+        req = mock.Mock(headers={'X-Instance-ID': 'fake_instance_id'})
+
+        retval = self.handler._get_metadata(req, ['fake_ver', 'fake_attr'])
+        self.assertEqual('fake_item', retval)
+        get_context.assert_called_with()
+        unpack_request.assert_called_with(req)
+        get_metadata_item.assert_called_with(get_context.return_value,
+                                             ['fake_ver', 'fake_attr'],
+                                             'fake_instance_id',
+                                             'fake_instance_ip')
+        self.assertEqual('fake_project_id',
+                         get_context.return_value.project_id)
+
     @mock.patch.object(metadata.MetadataRequestHandler, '_proxy_request')
-    def test_call(self, proxy):
-        req = mock.Mock()
+    def test_proxy_call(self, proxy):
+        req = mock.Mock(path_info='/openstack')
         proxy.return_value = 'value'
 
         retval = self.handler(req)
@@ -53,12 +147,23 @@ class ProxyTestCase(test_base.BaseTestCase):
 
     @mock.patch.object(metadata, 'LOG')
     @mock.patch.object(metadata.MetadataRequestHandler, '_proxy_request')
-    def test_call_internal_server_error(self, proxy, log):
-        req = mock.Mock()
-        proxy.side_effect = Exception
+    def test_proxy_call_internal_server_error(self, proxy, log):
+        req = mock.Mock(path_info='/openstack')
+        proxy.side_effect = Exception()
         retval = self.handler(req)
         self.assertIsInstance(retval, webob.exc.HTTPInternalServerError)
         self.assertEqual(len(log.mock_calls), 2)
+
+        proxy.side_effect = exception.EC2MetadataException()
+        retval = self.handler(req)
+        self.assertIsInstance(retval, webob.exc.HTTPInternalServerError)
+
+    @mock.patch.object(metadata.MetadataRequestHandler, '_proxy_request')
+    def test_proxy_call_no_instance(self, proxy):
+        req = mock.Mock(path_info='/openstack')
+        proxy.side_effect = exception.EC2MetadataNotFound()
+        retval = self.handler(req)
+        self.assertIsInstance(retval, webob.exc.HTTPNotFound)
 
     @mock.patch.object(metadata.MetadataRequestHandler,
                        '_build_proxy_request_headers')
@@ -67,7 +172,7 @@ class ProxyTestCase(test_base.BaseTestCase):
         hdrs = {'X-Forwarded-For': '8.8.8.8'}
         body = 'body'
 
-        req = mock.Mock(path_info='/the_path', query_string='', headers=hdrs,
+        req = mock.Mock(path_info='/openstack', query_string='', headers=hdrs,
                         method=method, body=body)
         resp = mock.MagicMock(status=response_code)
         req.response = resp
@@ -87,7 +192,7 @@ class ProxyTestCase(test_base.BaseTestCase):
                                cfg.CONF.metadata.nova_metadata_port)
                 ),
                 mock.call().request(
-                    'http://9.9.9.9:8775/the_path',
+                    'http://9.9.9.9:8775/openstack',
                     method=method,
                     headers={
                         'X-Forwarded-For': '8.8.8.8',
@@ -138,19 +243,10 @@ class ProxyTestCase(test_base.BaseTestCase):
         with testtools.ExpectedException(Exception):
             self._proxy_request_test_helper(response_code=302)
 
-    @mock.patch.object(metadata.MetadataRequestHandler,
-                       '_build_proxy_request_headers')
-    def test_proxy_request_no_headers(self, build_headers):
-        build_headers.return_value = None
-        self.assertIsInstance(
-            self.handler._proxy_request('fake_request'),
-            webob.exc.HTTPNotFound)
-        build_headers.assert_called_once_with('fake_request')
-
     @mock.patch.object(metadata.MetadataRequestHandler, '_sign_instance_id')
     @mock.patch.object(metadata.MetadataRequestHandler, '_get_context')
-    @mock.patch.object(metadata.MetadataRequestHandler, '_get_instance_ip')
-    def test_build_proxy_request_headers(self, get_instance_ip, get_context,
+    @mock.patch.object(metadata.MetadataRequestHandler, '_get_remote_ip')
+    def test_build_proxy_request_headers(self, get_remote_ip, get_context,
                                          sign_instance_id):
         req = mock.Mock(headers={})
 
@@ -161,15 +257,12 @@ class ProxyTestCase(test_base.BaseTestCase):
                         matchers.DictMatches(req.headers))
 
         req.headers = {'fake_key': 'fake_value'}
-        get_instance_ip.return_value = 'fake_instance_ip'
+        get_remote_ip.return_value = 'fake_instance_ip'
         get_context.return_value = 'fake_context'
         sign_instance_id.return_value = 'signed'
 
         with mock.patch('ec2api.metadata.api.'
-                        'get_instance_and_project_id') as get_ids:
-
-            get_ids.return_value = None, None
-            self.assertIsNone(self.handler._build_proxy_request_headers(req))
+                        'get_os_instance_and_project_id') as get_ids:
 
             get_ids.return_value = ('fake_instance_id', 'fake_project_id')
             self.assertThat(self.handler._build_proxy_request_headers(req),
@@ -178,31 +271,35 @@ class ProxyTestCase(test_base.BaseTestCase):
                                  'X-Instance-ID': 'fake_instance_id',
                                  'X-Tenant-ID': 'fake_project_id',
                                  'X-Instance-ID-Signature': 'signed'}))
-            get_instance_ip.assert_called_with(req)
+            get_remote_ip.assert_called_with(req)
             get_context.assert_called_with()
             sign_instance_id.assert_called_with('fake_instance_id')
             get_ids.assert_called_with('fake_context', 'fake_instance_ip')
 
+            get_ids.side_effect = exception.EC2MetadataNotFound()
+            self.assertRaises(exception.EC2MetadataNotFound,
+                              self.handler._build_proxy_request_headers, req)
+
     def test_sign_instance_id(self):
         self.assertEqual(
-            self.handler._sign_instance_id('foo'),
-            '773ba44693c7553d6ee20f61ea5d2757a9a4f4a44d2841ae4e95b52e4cd62db4'
+            '773ba44693c7553d6ee20f61ea5d2757a9a4f4a44d2841ae4e95b52e4cd62db4',
+            self.handler._sign_instance_id('foo')
         )
 
-    def test_get_instance_ip(self):
+    def test_get_remote_ip(self):
         req = mock.Mock(remote_addr='fake_addr', headers={})
 
-        self.assertEqual('fake_addr', self.handler._get_instance_ip(req))
+        self.assertEqual('fake_addr', self.handler._get_remote_ip(req))
 
         cfg.CONF.set_override('use_forwarded_for', True)
-        self.assertEqual('fake_addr', self.handler._get_instance_ip(req))
+        self.assertEqual('fake_addr', self.handler._get_remote_ip(req))
 
         req.headers['X-Forwarded-For'] = 'fake_forwarded_for'
         self.assertEqual('fake_forwarded_for',
-                         self.handler._get_instance_ip(req))
+                         self.handler._get_remote_ip(req))
 
         cfg.CONF.set_override('use_forwarded_for', False)
-        self.assertEqual('fake_addr', self.handler._get_instance_ip(req))
+        self.assertEqual('fake_addr', self.handler._get_remote_ip(req))
 
     @mock.patch('keystoneclient.v2_0.client.Client')
     def test_get_context(self, keystone):
@@ -217,9 +314,96 @@ class ProxyTestCase(test_base.BaseTestCase):
         self.assertEqual('fake_project_id', context.project_id)
         self.assertEqual('fake_token', context.auth_token)
         self.assertEqual('fake_service_catalog', context.service_catalog)
+        self.assertTrue(context.is_admin)
+        self.assertTrue(context.cross_tenants)
         conf = cfg.CONF
         keystone.assert_called_with(
                 username=conf.metadata.admin_user,
                 password=conf.metadata.admin_password,
                 tenant_name=conf.metadata.admin_tenant_name,
                 auth_url=conf.keystone_url)
+
+    def test_unpack_request_attributes(self):
+        sign = (
+            '97e7709481495f1a3a589e5ee03f8b5d51a3e0196768e300c441b58fe0382f4d')
+        req = mock.Mock(headers={'X-Instance-ID': 'fake_instance_id',
+                                 'X-Tenant-ID': 'fake_project_id',
+                                 'X-Forwarded-For': 'fake_instance_ip',
+                                 'X-Instance-ID-Signature': sign})
+        retval = self.handler._unpack_request_attributes(req)
+        self.assertEqual(
+            ('fake_instance_id', 'fake_project_id', 'fake_instance_ip'),
+            retval)
+
+        req.headers['X-Instance-ID-Signature'] = 'fake'
+        self.assertRaises(webob.exc.HTTPForbidden,
+                          self.handler._unpack_request_attributes, req)
+
+        req.headers.pop('X-Tenant-ID')
+        self.assertRaises(webob.exc.HTTPBadRequest,
+                          self.handler._unpack_request_attributes, req)
+
+        req.headers.pop('X-Forwarded-For')
+        self.assertRaises(exception.EC2MetadataInvalidAddress,
+                          self.handler._unpack_request_attributes, req)
+
+    @mock.patch('ec2api.utils.constant_time_compare')
+    def test_usage_of_constant_time_compare(self, constant_time_compare):
+        sign = (
+            '97e7709481495f1a3a589e5ee03f8b5d51a3e0196768e300c441b58fe0382f4d')
+        req = mock.Mock(headers={'X-Instance-ID': 'fake_instance_id',
+                                 'X-Tenant-ID': 'fake_project_id',
+                                 'X-Forwarded-For': 'fake_instance_ip',
+                                 'X-Instance-ID-Signature': sign})
+        self.handler._unpack_request_attributes(req)
+        self.assertEqual(1, constant_time_compare.call_count)
+
+    @mock.patch('keystoneclient.v2_0.client.Client')
+    @mock.patch('novaclient.v1_1.client.Client')
+    @mock.patch('ec2api.db.api.IMPL')
+    @mock.patch('ec2api.metadata.api.instance_api')
+    @mock.patch('ec2api.metadata.api.novadb')
+    def test_get_metadata(self, novadb, instance_api, db_api, nova, keystone):
+        service_catalog = mock.MagicMock()
+        service_catalog.get_data.return_value = []
+        keystone.return_value = mock.Mock(auth_user_id='fake_user_id',
+                                          auth_tenant_id='fake_project_id',
+                                          auth_token='fake_token',
+                                          service_catalog=service_catalog)
+        nova.return_value.fixed_ips.get.return_value = (
+                mock.Mock(hostname='fake_name'))
+        nova.return_value.servers.list.return_value = [fakes.OS_INSTANCE_1]
+        db_api.get_item_ids.return_value = [
+                (fakes.ID_EC2_INSTANCE_1, fakes.ID_OS_INSTANCE_1)]
+        instance_api.describe_instances.return_value = {
+               'reservationSet': [fakes.EC2_RESERVATION_1]}
+        instance_api.describe_instance_attribute.return_value = {
+                'instanceId': fakes.ID_EC2_INSTANCE_1,
+                'userData': {'value': 'fake_user_data'}}
+        novadb.instance_get_by_uuid.return_value = fakes.NOVADB_INSTANCE_1
+        novadb.block_device_mapping_get_all_by_instance.return_value = []
+        novadb.instance_get_by_uuid.return_value = fakes.NOVADB_INSTANCE_1
+
+        def _test_metadata_path(relpath):
+            # recursively confirm a http 200 from all meta-data elements
+            # available at relpath.
+            request = webob.Request.blank(
+                    relpath, remote_addr=fakes.IP_NETWORK_INTERFACE_2)
+            response = request.get_response(self.handler)
+            for item in response.body.split('\n'):
+                if 'public-keys' in relpath:
+                    # meta-data/public-keys/0=keyname refers to
+                    # meta-data/public-keys/0
+                    item = item.split('=')[0]
+                if item.endswith('/'):
+                    path = relpath + '/' + item
+                    _test_metadata_path(path)
+                    continue
+
+                path = relpath + '/' + item
+                request = webob.Request.blank(
+                        path, remote_addr=fakes.IP_NETWORK_INTERFACE_2)
+                response = request.get_response(self.handler)
+                self.assertEqual(200, response.status_int, message=path)
+
+        _test_metadata_path('/latest')

@@ -63,9 +63,14 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.get_db_api_get_item_by_id(
                 {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
                  fakes.ID_EC2_NETWORK_INTERFACE_1:
-                    copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1)}))
-        self.db_api.get_item_ids.return_value = [
-                (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
+                    copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1),
+                 fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1}))
+        self.db_api.get_item_ids.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
+                                              fakes.ID_OS_IMAGE_ARI_1)],
+                (fakes.ID_OS_IMAGE_AKI_1,): [(fakes.ID_EC2_IMAGE_AKI_1,
+                                              fakes.ID_OS_IMAGE_AKI_1)]}))
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.create_network_interface.return_value = (
@@ -83,7 +88,8 @@ class InstanceTestCase(base.ApiTestCase):
                     fakes.ID_EC2_SUBNET_1: [
                         {'addr': fakes.IP_NETWORK_INTERFACE_1,
                          'version': 4,
-                         'OS-EXT-IPS:type': 'fixed'}]}))
+                         'OS-EXT-IPS:type': 'fixed'}]},
+                 image={'id': fakes.ID_OS_IMAGE_1}))
         self.novadb.instance_get_by_uuid.return_value = fakes.NOVADB_INSTANCE_1
         self.novadb.block_device_mapping_get_all_by_instance.return_value = []
         fake_flavor = self.fake_flavor_class('fake_flavor')
@@ -122,7 +128,10 @@ class InstanceTestCase(base.ApiTestCase):
                 [fakes.gen_ec2_instance(
                     fakes.ID_EC2_INSTANCE_1,
                     private_ip_address=fakes.IP_NETWORK_INTERFACE_1,
-                    ec2_network_interfaces=[eni])])
+                    ec2_network_interfaces=[eni],
+                    image_id=fakes.ID_EC2_IMAGE_1,
+                    kernel_id=fakes.ID_EC2_IMAGE_AKI_1,
+                    ramdisk_id=fakes.ID_EC2_IMAGE_ARI_1)])
             self.assertThat(resp, matchers.DictMatches(expected_reservation))
             if new_port:
                 self.create_network_interface.assert_called_once_with(
@@ -136,8 +145,11 @@ class InstanceTestCase(base.ApiTestCase):
                 security_groups=None,
                 nics=[{'port-id': fakes.ID_OS_PORT_1}],
                 key_name=None, userdata=None)
-            self.db_api.get_item_ids.assert_called_once_with(
-                mock.ANY, 'ami', (fakes.ID_EC2_IMAGE_1,))
+            self.assertEqual(2, self.db_api.get_item_ids.call_count)
+            self.db_api.get_item_ids.assert_any_call(
+                mock.ANY, 'aki', (fakes.ID_OS_IMAGE_AKI_1,))
+            self.db_api.get_item_ids.assert_any_call(
+                mock.ANY, 'ari', (fakes.ID_OS_IMAGE_ARI_1,))
             self.db_api.update_item.assert_called_once_with(
                 mock.ANY, db_attached_eni)
             self.isotime.assert_called_once_with(None, True)
@@ -491,6 +503,12 @@ class InstanceTestCase(base.ApiTestCase):
             if kind == 'i' else
             [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]
             if kind == 'ami' else [])
+        self.db_api.get_item_ids.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
+                                              fakes.ID_OS_IMAGE_ARI_1)],
+                (fakes.ID_OS_IMAGE_AKI_1,): [(fakes.ID_EC2_IMAGE_AKI_1,
+                                              fakes.ID_OS_IMAGE_AKI_1)]}))
         self.neutron.list_floatingips.return_value = (
             {'floatingips': [fakes.OS_FLOATING_IP_1,
                              fakes.OS_FLOATING_IP_2]})

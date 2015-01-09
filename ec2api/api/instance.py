@@ -188,7 +188,8 @@ class InstanceDescriber(common.TaggableItemsDescriber):
             self.reservations[reservation_id] = reservation
             if not instance['vpc_id']:
                 self.reservation_os_groups[reservation_id] = (
-                        os_instance.security_groups)
+                        os_instance.security_groups
+                        if hasattr(os_instance, 'security_groups') else [])
 
         self.reservation_instances[
                 reservation['id']].append(formatted_instance)
@@ -211,7 +212,12 @@ class InstanceDescriber(common.TaggableItemsDescriber):
 
     def get_os_items(self):
         self.novadb_instances = {}
-        return clients.nova(self.context).servers.list()
+        return clients.nova(self.context).servers.list(
+                # NOTE(ft): these filters are needed for metadata server
+                # which calls describe_instances with an admin account
+                # (but project_id is substituted to an instance's one).
+                search_opts={'all_tenants': self.context.cross_tenants,
+                             'project_id': self.context.project_id})
 
     def auto_update_db(self, instance, os_instance):
         # TODO(ft): import and use instance_get_all_by_filters to
@@ -602,9 +608,12 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
     # kind smarter
     def get_os_image(kind, ec2_image_id):
         try:
-            ids = db_api.get_item_ids(context, kind, (ec2_image_id,))
-            _id, os_image_id = ids[0]
-            os_image = glance.images.get(os_image_id)
+            images = db_api.get_public_items(context, kind, (ec2_image_id,))
+            if images:
+                image = images[0]
+            else:
+                image = db_api.get_item_by_id(context, kind, ec2_image_id)
+            os_image = glance.images.get(image['os_id'])
         except (IndexError, glance_exception.HTTPNotFound):
             raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
         return os_image

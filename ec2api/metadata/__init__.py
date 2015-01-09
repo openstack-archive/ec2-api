@@ -14,18 +14,22 @@
 
 import hashlib
 import hmac
+import posixpath
 import urlparse
 
 import httplib2
 from keystoneclient.v2_0 import client as keystone_client
 from oslo.config import cfg
+import six
 import webob
 
 from ec2api import context as ec2context
+from ec2api import exception
 from ec2api.metadata import api
 from ec2api.openstack.common import gettextutils as textutils
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
+from ec2api import utils
 from ec2api import wsgi
 
 LOG = logging.getLogger(__name__)
@@ -77,10 +81,27 @@ class MetadataRequestHandler(wsgi.Application):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
-        try:
-            LOG.debug("Request: %s", req)
+        LOG.debug('Request: %s', req)
 
-            return self._proxy_request(req)
+        path = req.path_info
+        if path == '' or path[0] != '/':
+            path = '/' + path
+        path = posixpath.normpath(path)
+        path_tokens = path.split('/')[1:]
+
+        if path_tokens in ([''], ['ec2']):
+            resp = api.get_version_list()
+            return self._add_response_data(req.response, resp)
+
+        try:
+            if path_tokens[0] == 'openstack':
+                return self._proxy_request(req)
+            elif path_tokens[0] == 'ec2':
+                path_tokens = path_tokens[1:]
+            resp = self._get_metadata(req, path_tokens)
+            return self._add_response_data(req.response, resp)
+        except exception.EC2MetadataNotFound:
+            return webob.exc.HTTPNotFound()
         except Exception:
             LOG.exception(textutils._LE("Unexpected error."))
             msg = _('An unknown error has occurred. '
@@ -89,8 +110,6 @@ class MetadataRequestHandler(wsgi.Application):
 
     def _proxy_request(self, req):
         headers = self._build_proxy_request_headers(req)
-        if not headers:
-            return webob.exc.HTTPNotFound()
         nova_ip_port = '%s:%s' % (CONF.metadata.nova_metadata_ip,
                                   CONF.metadata.nova_metadata_port)
         url = urlparse.urlunsplit((
@@ -143,25 +162,24 @@ class MetadataRequestHandler(wsgi.Application):
         if req.headers.get('X-Instance-ID'):
             return req.headers
 
-        instance_ip = self._get_instance_ip(req)
+        remote_ip = self._get_remote_ip(req)
         context = self._get_context()
-        instance_id, project_id = api.get_instance_and_project_id(context,
-                                                                  instance_ip)
-        if not instance_id:
-            return None
-
+        instance_id, project_id = (
+            api.get_os_instance_and_project_id(context, remote_ip))
         return {
-            'X-Forwarded-For': instance_ip,
+            'X-Forwarded-For': remote_ip,
             'X-Instance-ID': instance_id,
             'X-Tenant-ID': project_id,
             'X-Instance-ID-Signature': self._sign_instance_id(instance_id),
         }
 
-    def _get_instance_ip(self, req):
-        instance_ip = req.remote_addr
+    def _get_remote_ip(self, req):
+        remote_ip = req.remote_addr
         if CONF.use_forwarded_for:
-            instance_ip = req.headers.get('X-Forwarded-For', instance_ip)
-        return instance_ip
+            remote_ip = req.headers.get('X-Forwarded-For', remote_ip)
+        if not remote_ip:
+            raise exception.EC2MetadataInvalidAddress()
+        return remote_ip
 
     def _get_context(self):
         # TODO(ft): make authentification token reusable
@@ -177,9 +195,81 @@ class MetadataRequestHandler(wsgi.Application):
                 keystone.auth_tenant_id,
                 None, None,
                 auth_token=keystone.auth_token,
-                service_catalog=service_catalog)
+                service_catalog=service_catalog,
+                is_admin=True,
+                cross_tenants=True)
 
     def _sign_instance_id(self, instance_id):
         return hmac.new(CONF.metadata.metadata_proxy_shared_secret,
                         instance_id,
                         hashlib.sha256).hexdigest()
+
+    def _get_metadata(self, req, path_tokens):
+        context = self._get_context()
+        if req.headers.get('X-Instance-ID'):
+            os_instance_id, project_id, remote_ip = (
+                self._unpack_request_attributes(req))
+        else:
+            remote_ip = self._get_remote_ip(req)
+            os_instance_id, project_id = (
+                api.get_os_instance_and_project_id(context, remote_ip))
+        # NOTE(ft): substitute project_id for context to instance's one.
+        # It's needed for correct describe and auto update DB operations.
+        # It doesn't affect operations via OpenStack's clients because
+        # these clients use auth_token field only
+        context.project_id = project_id
+        return api.get_metadata_item(context, path_tokens, os_instance_id,
+                                     remote_ip)
+
+    def _unpack_request_attributes(self, req):
+        os_instance_id = req.headers.get('X-Instance-ID')
+        project_id = req.headers.get('X-Tenant-ID')
+        signature = req.headers.get('X-Instance-ID-Signature')
+        remote_ip = req.headers.get('X-Forwarded-For')
+
+        if not remote_ip:
+            raise exception.EC2MetadataInvalidAddress()
+
+        if os_instance_id is None:
+            msg = _('X-Instance-ID header is missing from request.')
+        elif project_id is None:
+            msg = _('X-Tenant-ID header is missing from request.')
+        elif not isinstance(os_instance_id, six.string_types):
+            msg = _('Multiple X-Instance-ID headers found within request.')
+        elif not isinstance(project_id, six.string_types):
+            msg = _('Multiple X-Tenant-ID headers found within request.')
+        else:
+            msg = None
+
+        if msg:
+            raise webob.exc.HTTPBadRequest(explanation=msg)
+
+        expected_signature = hmac.new(
+            CONF.metadata.metadata_proxy_shared_secret,
+            os_instance_id,
+            hashlib.sha256).hexdigest()
+
+        if not utils.constant_time_compare(expected_signature, signature):
+            LOG.warning(textutils._LW(
+                            'X-Instance-ID-Signature: %(signature)s does '
+                            'not match the expected value: '
+                            '%(expected_signature)s for id: '
+                            '%(instance_id)s. Request From: '
+                            '%(remote_ip)s'),
+                        {'signature': signature,
+                         'expected_signature': expected_signature,
+                         'instance_id': os_instance_id,
+                         'remote_ip': remote_ip})
+
+            msg = _('Invalid proxy request signature.')
+            raise webob.exc.HTTPForbidden(explanation=msg)
+
+        return os_instance_id, project_id, remote_ip
+
+    def _add_response_data(self, response, data):
+        if isinstance(data, six.text_type):
+            response.text = data
+        else:
+            response.body = data
+        response.content_type = 'text/plain'
+        return response

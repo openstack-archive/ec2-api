@@ -221,7 +221,12 @@ if [[ -z "$NOVA_CONNECTION" ]]; then
     fi
     die_if_not_set $LINENO NOVA_CONNECTION "$reason. Please set NOVA_CONNECTION environment variable to the connection string to Nova DB"
 fi
-if [[ -z "$EXTERNAL_NETWORK" ]]; then
+if [[ -n $(keystone catalog --service network) ]]; then
+    VPC_SUPPORT="True"
+else
+    VPC_SUPPORT="False"
+fi
+if [[ "$VPC_SUPPORT" == "True" && -z "$EXTERNAL_NETWORK" ]]; then
     declare -a newtron_output
     readarray -s 3 -t newtron_output < <(neutron net-external-list)
     if ((${#newtron_output[@]} < 2)); then
@@ -231,7 +236,7 @@ if [[ -z "$EXTERNAL_NETWORK" ]]; then
     else
         EXTERNAL_NETWORK=$(echo $newtron_output | awk -F '|' '{ print $3 }')
     fi
-    die_if_not_set $LINENO EXTERNAL_NETWORK "$reason. Please set PUBLIC_NETWORK environment variable to the external network dedicated to EC2 elastic IP operations"
+    die_if_not_set $LINENO EXTERNAL_NETWORK "$reason. Please set EXTERNAL_NETWORK environment variable to the external network dedicated to EC2 elastic IP operations"
 fi
 
 #create keystone user with admin privileges
@@ -280,6 +285,7 @@ iniset $CONF_FILE DEFAULT verbose True
 iniset $CONF_FILE DEFAULT keystone_url "$OS_AUTH_URL"
 iniset $CONF_FILE database connection "$CONNECTION"
 iniset $CONF_FILE database connection_nova "$NOVA_CONNECTION"
+iniset $CONF_FILE DEFAULT full_vpc_support "$VPC_SUPPORT"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
 
 iniset $CONF_FILE keystone_authtoken signing_dir $SIGNING_DIR
@@ -289,6 +295,10 @@ iniset $CONF_FILE keystone_authtoken admin_password $SERVICE_PASSWORD
 iniset $CONF_FILE keystone_authtoken admin_tenant_name $SERVICE_TENANT
 iniset $CONF_FILE keystone_authtoken auth_protocol $AUTH_PROTO
 iniset $CONF_FILE keystone_authtoken auth_port $AUTH_PORT
+
+iniset $CONF_FILE metadata admin_user $SERVICE_USERNAME
+iniset $CONF_FILE metadata admin_password $SERVICE_PASSWORD
+iniset $CONF_FILE metadata admin_tenant_name $SERVICE_TENANT
 
 if [[ -f "$NOVA_CONF" ]]; then
     copynovaopt s3_host
