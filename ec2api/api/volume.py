@@ -151,9 +151,6 @@ def _format_volume(context, volume, os_volume, instances={},
         snapshot_id = snapshot['id']
     ec2_volume['snapshotId'] = snapshot_id
 
-    # NOTE(apavlov): code doesn't support 'volumeType' and
-    # 'encrypted' fields for volume.
-
     return ec2_volume
 
 

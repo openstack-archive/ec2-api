@@ -199,8 +199,10 @@ LOCATION_IMAGE_1 = 'fake_bucket/fake.img.manifest.xml'
 # volumes constants
 ID_EC2_VOLUME_1 = random_ec2_id('vol')
 ID_EC2_VOLUME_2 = random_ec2_id('vol')
+ID_EC2_VOLUME_3 = random_ec2_id('vol')
 ID_OS_VOLUME_1 = random_os_id()
 ID_OS_VOLUME_2 = random_os_id()
+ID_OS_VOLUME_3 = random_os_id()
 
 
 # snapshots constants
@@ -1108,9 +1110,48 @@ OS_IMAGE_2 = {
 # snapshot objects
 class OSSnapshot(object):
 
-    def __init__(self, snapshot_dict):
-        self.id = snapshot_dict['id']
+    def __init__(self, snapshot):
+        self.id = snapshot['id']
+        self.status = snapshot['status']
+        self.volume_id = snapshot['volume_id']
+        self.created_at = snapshot['created_at']
+        self.progress = snapshot['progress']
+        self.project_id = ID_OS_PROJECT
+        self.size = snapshot['size']
+        self.display_description = snapshot['description']
 
+    def get(self):
+        pass
+
+    def delete(self):
+        pass
+
+    def update(self, *args, **kwargs):
+        pass
+
+TIME_CREATE_SNAPSHOT_1 = timeutils.isotime(None, True)
+TIME_CREATE_SNAPSHOT_2 = timeutils.isotime(None, True)
+
+EC2_SNAPSHOT_1 = {
+    'description': None,
+    'volumeId': ID_EC2_VOLUME_2,
+    'status': 'completed',
+    'volumeSize': 1,
+    'progress': '100%',
+    'startTime': TIME_CREATE_SNAPSHOT_1,
+    'snapshotId': ID_EC2_SNAPSHOT_1,
+    'ownerId': ID_OS_PROJECT
+}
+EC2_SNAPSHOT_2 = {
+    'description': 'fake description',
+    'volumeId': ID_EC2_VOLUME_2,
+    'status': 'completed',
+    'volumeSize': 1,
+    'progress': '100%',
+    'startTime': TIME_CREATE_SNAPSHOT_2,
+    'snapshotId': ID_EC2_SNAPSHOT_2,
+    'ownerId': ID_OS_PROJECT
+}
 
 DB_SNAPSHOT_1 = {
     'id': ID_EC2_SNAPSHOT_1,
@@ -1123,9 +1164,21 @@ DB_SNAPSHOT_2 = {
 
 OS_SNAPSHOT_1 = {
     'id': ID_OS_SNAPSHOT_1,
+    'status': 'available',
+    'volume_id': ID_OS_VOLUME_2,
+    'created_at': TIME_CREATE_SNAPSHOT_1,
+    'progress': '100%',
+    'size': 1,
+    'description': None,
 }
 OS_SNAPSHOT_2 = {
     'id': ID_OS_SNAPSHOT_2,
+    'status': 'available',
+    'volume_id': ID_OS_VOLUME_2,
+    'created_at': TIME_CREATE_SNAPSHOT_2,
+    'progress': '100%',
+    'size': 1,
+    'description': 'fake description',
 }
 
 
@@ -1244,6 +1297,7 @@ class CinderVolume(object):
 
 TIME_CREATE_VOLUME_1 = timeutils.isotime(None, True)
 TIME_CREATE_VOLUME_2 = timeutils.isotime(None, True)
+TIME_CREATE_VOLUME_3 = timeutils.isotime(None, True)
 VOLUME_AVAILABILITY_ZONE = 'fake_zone'
 
 EC2_VOLUME_1 = {
@@ -1264,6 +1318,15 @@ EC2_VOLUME_2 = {
     'status': 'available',
     'attachmentSet': [],
 }
+EC2_VOLUME_3 = {
+    'volumeId': ID_EC2_VOLUME_3,
+    'snapshotId': ID_EC2_SNAPSHOT_1,
+    'availabilityZone': VOLUME_AVAILABILITY_ZONE,
+    'createTime': TIME_CREATE_VOLUME_3,
+    'size': 1,
+    'status': 'available',
+    'attachmentSet': [],
+}
 
 DB_VOLUME_1 = {
     'id': ID_EC2_VOLUME_1,
@@ -1273,6 +1336,10 @@ DB_VOLUME_2 = {
     'id': ID_EC2_VOLUME_2,
     'os_id': ID_OS_VOLUME_2,
 }
+DB_VOLUME_3 = {
+    'id': ID_EC2_VOLUME_3,
+    'os_id': ID_OS_VOLUME_3,
+}
 
 OS_VOLUME_1 = {
     'id': ID_OS_VOLUME_1,
@@ -1281,7 +1348,8 @@ OS_VOLUME_1 = {
     'size': 1,
     'created_at': TIME_CREATE_VOLUME_1,
     'display_name': 'test-vol-name',
-    'display_description': 'test-vol-desc'
+    'display_description': 'test-vol-desc',
+    'snapshot_id': None
 }
 OS_VOLUME_2 = {
     'id': ID_OS_VOLUME_2,
@@ -1290,7 +1358,18 @@ OS_VOLUME_2 = {
     'size': 1,
     'created_at': TIME_CREATE_VOLUME_2,
     'display_name': 'test-vol-name',
-    'display_description': 'test-vol-desc'
+    'display_description': 'test-vol-desc',
+    'snapshot_id': None
+}
+OS_VOLUME_3 = {
+    'id': ID_OS_VOLUME_3,
+    'status': 'available',
+    'availability_zone': VOLUME_AVAILABILITY_ZONE,
+    'size': 1,
+    'created_at': TIME_CREATE_VOLUME_3,
+    'display_name': 'test-vol-name',
+    'display_description': 'test-vol-desc',
+    'snapshot_id': ID_OS_SNAPSHOT_1
 }
 
 
