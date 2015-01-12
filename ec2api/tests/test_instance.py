@@ -19,6 +19,7 @@ import itertools
 
 import mock
 
+from ec2api.api import instance
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
@@ -52,9 +53,12 @@ class InstanceTestCase(base.ApiTestCase):
         self.fake_instance_class = collections.namedtuple(
             'FakeInstance', ['id'])
 
-    @mock.patch('ec2api.api.instance._get_vpc_default_security_group_id')
-    def test_run_instances(self, _get_vpc_default_security_group_id):
+    @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
+                'get_vpc_default_security_group_id')
+    def test_run_instances(self, get_vpc_default_security_group_id):
         """Run instance with various network interface settings."""
+        instance.instance_engine = (
+            instance.InstanceEngineNeutron())
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
                 {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
@@ -85,7 +89,7 @@ class InstanceTestCase(base.ApiTestCase):
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.get.return_value = fake_flavor
 
-        _get_vpc_default_security_group_id.return_value = None
+        get_vpc_default_security_group_id.return_value = None
 
         def do_check(params, new_port=True, delete_on_termination=None):
             params.update({'ImageId': fakes.ID_EC2_IMAGE_1,
@@ -159,11 +163,14 @@ class InstanceTestCase(base.ApiTestCase):
                   fakes.EC2_NETWORK_INTERFACE_1['networkInterfaceId']},
                  new_port=False)
 
-    @mock.patch('ec2api.api.instance._get_vpc_default_security_group_id')
+    @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
+                'get_vpc_default_security_group_id')
     # TODO(ft): restore test after finish extraction of Nova EC2 API
     def _test_run_instances_multiple_networks(
-                self, _get_vpc_default_security_group_id):
+                self, get_vpc_default_security_group_id):
         """Run 2 instances at once on 2 subnets in all combinations."""
+        instance.instance_engine = (
+            instance.InstanceEngineNeutron())
         self._build_multiple_data_model()
 
         self.db_api.add_item.side_effect = [
@@ -178,7 +185,7 @@ class InstanceTestCase(base.ApiTestCase):
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.list.return_value = [fake_flavor]
 
-        _get_vpc_default_security_group_id.return_value = None
+        get_vpc_default_security_group_id.return_value = None
 
         ec2_instances = [
             fakes.gen_ec2_instance(
@@ -248,6 +255,8 @@ class InstanceTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.network_interface.delete_network_interface')
     def test_run_instances_rollback(self, delete_network_interface):
+        instance.instance_engine = (
+            instance.InstanceEngineNeutron())
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
                 {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
@@ -322,6 +331,8 @@ class InstanceTestCase(base.ApiTestCase):
     def test_terminate_instances(self, detach_network_interface,
                                  dissassociate_address_item):
         """Terminate 2 instances in one request."""
+        instance.instance_engine = (
+            instance.InstanceEngineNeutron())
         self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1,
                                                      fakes.DB_INSTANCE_2]
         self.nova_servers.get.side_effect = [fakes.OS_INSTANCE_1,
@@ -467,6 +478,8 @@ class InstanceTestCase(base.ApiTestCase):
                 '_format_security_groups_ids_names')
     def test_describe_instances(self, format_security_groups_ids_names):
         """Describe 2 instances, one of which is vpc instance."""
+        instance.instance_engine = (
+            instance.InstanceEngineNeutron())
         self.neutron.list_ports.return_value = {'ports': [fakes.OS_PORT_2]}
         self.db_api.get_items.side_effect = (
             lambda _, kind: [fakes.DB_NETWORK_INTERFACE_1,
@@ -513,9 +526,42 @@ class InstanceTestCase(base.ApiTestCase):
             {'reservationSet': [fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
 
+    @mock.patch('ec2api.api.instance.security_group_api.'
+                '_format_security_groups_ids_names')
+    def test_describe_instances_ec2_classic(self,
+                                            format_security_groups_ids_names):
+        instance.instance_engine = (
+            instance.InstanceEngineNova())
+        self.db_api.get_items.side_effect = (
+            lambda _, kind:
+            [fakes.DB_INSTANCE_2]
+            if kind == 'i' else
+            [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]
+            if kind == 'ami' else [])
+        self.nova_servers.list.return_value = [fakes.OS_INSTANCE_2]
+        instance_get_by_uuid = fakes.get_db_api_get_item_by_id({
+            fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2})
+        self.novadb.instance_get_by_uuid.side_effect = (
+            lambda context, item_id:
+                instance_get_by_uuid(context, None, item_id))
+        fake_flavor = self.fake_flavor_class('fake_flavor')
+        self.nova_flavors.get.return_value = fake_flavor
+        format_security_groups_ids_names.return_value = {}
+        self.novadb.block_device_mapping_get_all_by_instance.return_value = []
+
+        resp = self.execute('DescribeInstances', {})
+
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
+        self.assertThat(resp, matchers.DictMatches(
+            {'reservationSet': [fakes.EC2_RESERVATION_2]},
+            orderless_lists=True))
+
     # TODO(ft): restore test after finish extraction of Nova EC2 API
     def _test_describe_instances_mutliple_networks(self):
         """Describe 2 instances with various combinations of network."""
+        instance.instance_engine = (
+            instance.InstanceEngineNeutron())
         self._build_multiple_data_model()
         ips_instance = [fakes.IP_FIRST_SUBNET_1, fakes.IP_FIRST_SUBNET_2]
 
@@ -733,4 +779,4 @@ class InstanceTestCase(base.ApiTestCase):
                          sorted(list_ports_kwargs['device_id']))
 
 
-# TODO(ft): add tests for _get_vpc_default_security_group_id
+# TODO(ft): add tests for get_vpc_default_security_group_id
