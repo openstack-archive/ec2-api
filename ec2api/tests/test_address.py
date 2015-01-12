@@ -166,7 +166,7 @@ class AddressTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
                 fakes.ID_EC2_ADDRESS_1:
-                copy.deepcopy(fakes.DB_ADDRESS_1),
+                    copy.deepcopy(fakes.DB_ADDRESS_1),
                 fakes.ID_EC2_NETWORK_INTERFACE_2:
                     fakes.DB_NETWORK_INTERFACE_2}))
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
