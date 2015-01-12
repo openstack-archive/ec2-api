@@ -1230,6 +1230,7 @@ class CinderVolume(object):
         self.display_name = volume['display_name']
         self.display_description = volume['display_description']
         self.snapshot_id = None
+        self.attachments = [{}]
 
     def get(self):
         pass
@@ -1243,22 +1244,25 @@ class CinderVolume(object):
 
 TIME_CREATE_VOLUME_1 = timeutils.isotime(None, True)
 TIME_CREATE_VOLUME_2 = timeutils.isotime(None, True)
+VOLUME_AVAILABILITY_ZONE = 'fake_zone'
 
 EC2_VOLUME_1 = {
     'volumeId': ID_EC2_VOLUME_1,
     'snapshotId': None,
-    'availabilityZone': 'fake_zone',
+    'availabilityZone': VOLUME_AVAILABILITY_ZONE,
     'createTime': TIME_CREATE_VOLUME_1,
     'size': 1,
     'status': 'available',
+    'attachmentSet': [],
 }
 EC2_VOLUME_2 = {
     'volumeId': ID_EC2_VOLUME_2,
     'snapshotId': None,
-    'availabilityZone': 'fake_zone',
+    'availabilityZone': VOLUME_AVAILABILITY_ZONE,
     'createTime': TIME_CREATE_VOLUME_2,
     'size': 1,
     'status': 'available',
+    'attachmentSet': [],
 }
 
 DB_VOLUME_1 = {
@@ -1273,7 +1277,7 @@ DB_VOLUME_2 = {
 OS_VOLUME_1 = {
     'id': ID_OS_VOLUME_1,
     'status': 'available',
-    'availability_zone': 'fake_zone',
+    'availability_zone': VOLUME_AVAILABILITY_ZONE,
     'size': 1,
     'created_at': TIME_CREATE_VOLUME_1,
     'display_name': 'test-vol-name',
@@ -1282,7 +1286,7 @@ OS_VOLUME_1 = {
 OS_VOLUME_2 = {
     'id': ID_OS_VOLUME_2,
     'status': 'available',
-    'availability_zone': 'fake_zone',
+    'availability_zone': VOLUME_AVAILABILITY_ZONE,
     'size': 1,
     'created_at': TIME_CREATE_VOLUME_2,
     'display_name': 'test-vol-name',

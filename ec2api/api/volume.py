@@ -143,13 +143,15 @@ def _format_volume(context, volume, os_volume, instances={},
     if ec2_volume['status'] == 'in-use':
         ec2_volume['attachmentSet'] = (
                 _format_attachment(context, volume, os_volume, instances))
+    else:
+        ec2_volume['attachmentSet'] = {}
     if snapshot_id is None and os_volume.snapshot_id:
         snapshot = ec2utils.get_db_item_by_os_id(
                 context, 'snap', os_volume.snapshot_id, snapshots)
         snapshot_id = snapshot['id']
     ec2_volume['snapshotId'] = snapshot_id
 
-    # NOTE(apavlov): code doesn't support 'attachmentSet', 'volumeType' and
+    # NOTE(apavlov): code doesn't support 'volumeType' and
     # 'encrypted' fields for volume.
 
     return ec2_volume

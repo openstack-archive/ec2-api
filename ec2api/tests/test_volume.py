@@ -80,7 +80,7 @@ class VolumeTestCase(base.ApiTestCase):
 
         resp = self.execute(
             'CreateVolume',
-            {'AvailabilityZone': 'fake_zone'})
+            {'AvailabilityZone': fakes.VOLUME_AVAILABILITY_ZONE})
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(fakes.EC2_VOLUME_1, matchers.DictMatches(
             tools.purge_dict(resp, {'http_status_code'})))
@@ -88,3 +88,28 @@ class VolumeTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vol',
             tools.purge_dict(fakes.DB_VOLUME_1, ('id',)))
+
+    def test_format_volume_maps_status(self):
+        fake_volume = fakes.CinderVolume(fakes.OS_VOLUME_1)
+        self.cinder.volumes.list.return_value = [fake_volume]
+        self.db_api.get_items.return_value = [fakes.DB_VOLUME_1]
+
+        fake_volume.status = 'creating'
+        resp = self.execute('DescribeVolumes', {})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertEqual('creating', resp['volumeSet'][0]['status'])
+
+        fake_volume.status = 'attaching'
+        resp = self.execute('DescribeVolumes', {})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertEqual('in-use', resp['volumeSet'][0]['status'])
+
+        fake_volume.status = 'detaching'
+        resp = self.execute('DescribeVolumes', {})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertEqual('in-use', resp['volumeSet'][0]['status'])
+
+        fake_volume.status = 'banana'
+        resp = self.execute('DescribeVolumes', {})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertEqual('banana', resp['volumeSet'][0]['status'])
