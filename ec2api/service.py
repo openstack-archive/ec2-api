@@ -28,22 +28,34 @@ from ec2api import wsgi
 LOG = logging.getLogger(__name__)
 
 service_opts = [
-    cfg.BoolOpt('use_ssl',
-                default=False,
-                help='Enable ssl connections or not'),
     cfg.StrOpt('ec2api_listen',
                default="0.0.0.0",
                help='The IP address on which the EC2 API will listen.'),
     cfg.IntOpt('ec2api_listen_port',
                default=8788,
                help='The port on which the EC2 API will listen.'),
+    cfg.BoolOpt('ec2api_use_ssl',
+                default=False,
+                help='Enable ssl connections or not for EC2 API'),
     cfg.IntOpt('ec2api_workers',
                help='Number of workers for EC2 API service. The default will '
                     'be equal to the number of CPUs available.'),
+    cfg.StrOpt('metadata_listen',
+               default="0.0.0.0",
+               help='The IP address on which the metadata API will listen.'),
+    cfg.IntOpt('metadata_listen_port',
+               default=8789,
+               help='The port on which the metadata API will listen.'),
+    cfg.BoolOpt('metadata_use_ssl',
+                default=False,
+                help='Enable ssl connections or not for EC2 API Metadata'),
+    cfg.IntOpt('metadata_workers',
+               help='Number of workers for metadata service. The default will '
+                    'be the number of CPUs available.'),
     cfg.IntOpt('service_down_time',
                default=60,
                help='Maximum time since last check-in for up service'),
-    ]
+]
 
 CONF = cfg.CONF
 CONF.register_opts(service_opts)
@@ -52,7 +64,7 @@ CONF.register_opts(service_opts)
 class WSGIService(object):
     """Provides ability to launch API from a 'paste' configuration."""
 
-    def __init__(self, name, loader=None, use_ssl=False, max_url_len=None):
+    def __init__(self, name, loader=None, max_url_len=None):
         """Initialize, but do not start the WSGI server.
 
         :param name: The name of the WSGI server given to the loader.
@@ -64,9 +76,10 @@ class WSGIService(object):
         self.manager = self._get_manager()
         self.loader = loader or wsgi.Loader()
         self.app = self.loader.load_app(name)
-        self.host = getattr(CONF, 'ec2api_listen', "0.0.0.0")
-        self.port = getattr(CONF, 'ec2api_listen_port', 0)
-        self.workers = (getattr(CONF, 'ec2api_workers', None) or
+        self.host = getattr(CONF, '%s_listen' % name, "0.0.0.0")
+        self.port = getattr(CONF, '%s_listen_port' % name, 0)
+        self.use_ssl = getattr(CONF, '%s_use_ssl' % name, False)
+        self.workers = (getattr(CONF, '%s_workers' % name, None) or
                         self.cpu_count())
         if self.workers and self.workers < 1:
             worker_name = '%s_workers' % name
@@ -75,7 +88,6 @@ class WSGIService(object):
                    {'worker_name': worker_name,
                     'workers': str(self.workers)})
             raise exception.InvalidInput(msg)
-        self.use_ssl = use_ssl
         self.server = wsgi.Server(name,
                                   self.app,
                                   host=self.host,
