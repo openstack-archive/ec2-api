@@ -89,6 +89,35 @@ class VolumeTestCase(base.ApiTestCase):
             mock.ANY, 'vol',
             tools.purge_dict(fakes.DB_VOLUME_1, ('id',)))
 
+        self.cinder.volumes.create.assert_called_once_with(
+            None, snapshot_id=None, volume_type=None,
+            availability_zone=fakes.VOLUME_AVAILABILITY_ZONE)
+
+    def test_create_volume_from_snapshot(self):
+        self.cinder.volumes.create.return_value = (
+            fakes.CinderVolume(fakes.OS_VOLUME_3))
+        self.db_api.add_item.side_effect = (
+            fakes.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_SNAPSHOT_1: fakes.DB_SNAPSHOT_1}))
+
+        resp = self.execute(
+            'CreateVolume',
+            {'AvailabilityZone': fakes.VOLUME_AVAILABILITY_ZONE,
+             'SnapshotId': fakes.ID_EC2_SNAPSHOT_1})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(fakes.EC2_VOLUME_3, matchers.DictMatches(
+            tools.purge_dict(resp, {'http_status_code'})))
+        self.cinder.volumes.create.assert_called_once(mock.ANY)
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'vol',
+            tools.purge_dict(fakes.DB_VOLUME_3, ('id',)))
+
+        self.cinder.volumes.create.assert_called_once_with(
+            None, snapshot_id=fakes.ID_OS_SNAPSHOT_1, volume_type=None,
+            availability_zone=fakes.VOLUME_AVAILABILITY_ZONE)
+
     def test_format_volume_maps_status(self):
         fake_volume = fakes.CinderVolume(fakes.OS_VOLUME_1)
         self.cinder.volumes.list.return_value = [fake_volume]
