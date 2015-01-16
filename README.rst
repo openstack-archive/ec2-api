@@ -4,12 +4,9 @@ OpenStack EC2 API README
 Support of EC2 API for OpenStack.
 This project provides a standalone EC2 API service which pursues two goals:
 1. Implement VPC API which now absent in nova's EC2 API
-2. Create a standalone service for EC2 API support which later can accommodate
+2. Create a standalone service for EC2 API support accommodates
 not only the VPC API but the rest of the EC2 API currently present in nova as 
 well.
-
-This service implements VPC API related commands only. For the rest of the 
-EC2 API functionality it redirects request to original EC2 API in nova.
 
 It doesn't replace existing nova EC2 API service in deployment it gets 
 installed to a different port (8788 by default).
@@ -19,16 +16,17 @@ Installation
 
 Run install.sh
 
-#TODO: The following should be automated later.
+The EC2 API service gets installed on port 8788 by default. It can be changed
+before the installation in install.sh script.
 
-Change /etc/ec2api/ec2api.conf:
-[database]
-connection_nova = <connection to nova> #should be taken from nova.conf
-[DEFAULT]
-external_network = <public network name> #obtained by neutron net-external-list
+The services afterwards can be started as binaries:
 
-The service gets installed on port 8788 by default. It can be changed before the
-installation in install.sh script.
+::
+
+ /usr/bin/ec2-api
+ /usr/bin/ec2-api-metadata
+
+or set up as services.
 
 Usage
 =====
@@ -36,10 +34,12 @@ Usage
 Download aws cli from Amazon.
 Create configuration file for aws cli in your home directory ~/.aws/config:
 
-[default]
-aws_access_key_id = 1b013f18d5ed47ae8ed0fbb8debc036b
-aws_secret_access_key = 9bbc6f270ffd4dfdbe0e896947f41df3
-region = us-east-1
+::
+
+ [default]
+ aws_access_key_id = 1b013f18d5ed47ae8ed0fbb8debc036b
+ aws_secret_access_key = 9bbc6f270ffd4dfdbe0e896947f41df3
+ region = us-east-1
 
 Change the aws_access_key_id and aws_secret_acces_key above to the values
 appropriate for your cloud (can be obtained by "keystone ec2-credentials-list"
@@ -54,12 +54,12 @@ aws --endpoint-url http://10.0.2.15:8788/services/Cloud ec2 describe-instances
 Limitations
 ===========
 
-VPN-related functionality is not supported yet. 
-Filtering in describe functions is not fully implemented everywhere.
+VPN-related and ACL-related functionality is not supported. 
 Default VPC Security Groups had to be named "Default" instead of Amazon's
 "default" due to conflict with OpenStack's default groups.
+DryRun option is not supported.
 
 Supported Features
 ==================
 
-VPC API except for the Limitations above is supported.
+EC2 API with VPC API except for the limitations above

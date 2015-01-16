@@ -554,33 +554,113 @@ class CloudController(object):
         """
 
     def describe_key_pairs(self, context, key_name=None, filter=None):
+        """Describes one or more of your key pairs.
+
+        Args:
+            context (RequestContext): The request context.
+            key_name (list of str): On or more keypair names.
+            filter (list of filter dict): On or more filters.
+
+        Returns:
+            Specified keypairs.
+        """
         return key_pair.describe_key_pairs(context, key_name, filter)
 
     def create_key_pair(self, context, key_name):
+        """Creates a 2048-bit RSA key pair with the specified name.
+
+        Args:
+            context (RequestContext): The request context.
+            key_name (str): A unique name for the key pair.
+
+        Returns:
+            Created keypair.
+        """
         return key_pair.create_key_pair(context, key_name)
 
     def delete_key_pair(self, context, key_name):
+        """Deletes the specified key pair.
+
+        Args:
+            context (RequestContext): The request context.
+            key_name (str): Name of the keypair.
+
+        Returns:
+            Returns true if the request succeeds.
+        """
         return key_pair.delete_key_pair(context, key_name)
 
     def import_key_pair(self, context, key_name, public_key_material):
+        """Imports the public key from an existing RSA key pair.
+
+        Args:
+            context (RequestContext): The request context.
+            key_name (str): A unique name for the key pair.
+            public_key_material (str): The public key. You must base64 encode
+                the public key material before sending it.
+
+        Returns:
+            Imported keypair.
+        """
         return key_pair.import_key_pair(context, key_name,
                                         public_key_material)
 
     def describe_availability_zones(self, context, zone_name=None,
                                     filter=None):
+        """Describes one or more of the available Availability Zones.
+
+        Args:
+            context (RequestContext): The request context.
+            zone_name (list of str): On or more zone names.
+            filter (list of filter dict): On or more filters.
+
+        Returns:
+            Specified availability zones.
+        """
         return availability_zone.describe_availability_zones(context,
                                                              zone_name,
                                                              filter)
 
     def describe_regions(self, context, region_name=None, filter=None):
+        """Describes one or more regions that are currently available to you.
+
+        Args:
+            context (RequestContext): The request context.
+            region_name (list of str): On or more region names.
+            filter (list of filter dict): On or more filters.
+
+        Returns:
+            Specified regions.
+        """
         return availability_zone.describe_regions(context,
                                                   region_name,
                                                   filter)
 
     def get_password_data(self, context, instance_id):
+        """Retrieves the encrypted administrator password for Windows instance.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (str): ID of the Windows instance
+
+        Returns:
+            The password of the instance, timestamp and instance id.
+
+        The password is encrypted using the key pair that you specified when
+        you launched the instance.
+        """
         return instance.get_password_data(context, instance_id)
 
     def get_console_output(self, context, instance_id):
+        """Gets the console output for the specified instance.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (str): ID of the instance
+
+        Returns:
+            The console output of the instance, timestamp and instance id.
+        """
         return instance.get_console_output(context, instance_id)
 
     def create_volume(self, context, availability_zone=None, size=None,
