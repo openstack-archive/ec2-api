@@ -3,9 +3,9 @@ OpenStack EC2 API README
 
 Support of EC2 API for OpenStack.
 This project provides a standalone EC2 API service which pursues two goals:
-1. Implement VPC API which now absent in nova's EC2 API
-2. Create a standalone service for EC2 API support accommodates
-not only the VPC API but the rest of the EC2 API currently present in nova as 
+ 1. Implement VPC API which now absent in nova's EC2 API
+ 2. Create a standalone service for EC2 API support accommodates
+not only the VPC API but the rest of the EC2 API currently present in nova as
 well.
 
 It doesn't replace existing nova EC2 API service in deployment it gets 
@@ -26,7 +26,32 @@ The services afterwards can be started as binaries:
  /usr/bin/ec2-api
  /usr/bin/ec2-api-metadata
 
-or set up as services.
+or set up as Linux services.
+
+To configure OpenStack for EC2 API metadata service:
+
+for Nova-network
+  add::
+
+    [DEFAULT]
+    metadata_port = 8789
+    [neutron]
+    service_metadata_proxy = True
+
+  to /etc/nova.conf
+
+  then restart nova-metadata (can be run as part of nova-api service) and
+  nova-network services.
+
+for Neutron
+  add::
+
+    [DEFAULT]
+    nova_metadata_port = 8789
+
+  to /etc/neutron/metadata_agent.ini
+
+  then restart neutron-metadata service.
 
 Usage
 =====
