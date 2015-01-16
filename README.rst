@@ -19,6 +19,31 @@ Run install.sh
 The EC2 API service gets installed on port 8788 by default. It can be changed
 before the installation in install.sh script.
 
+To setup OpenStack to use EC2 API metadata server do:
+
+for Nova-network
+  add::
+
+    [DEFAULT]
+    metadata_port = 8789
+    [neutron]
+    service_metadata_proxy = True
+
+  to /etc/nova.conf
+
+  then restart nova-metadata (can be run as part of nova-api service) and
+  nova-network services.
+
+for Neutron
+  add::
+
+    [DEFAULT]
+    nova_metadata_port = 8789
+
+  to /etc/neutron/metadata_agent.ini
+
+  then restart neutron-metadata service.
+
 The services afterwards can be started as binaries:
 
 ::
