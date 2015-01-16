@@ -148,6 +148,9 @@ ID_OS_INSTANCE_2 = random_os_id()
 ID_EC2_RESERVATION_1 = random_ec2_id('r')
 ID_EC2_RESERVATION_2 = random_ec2_id('r')
 
+ROOT_DEVICE_NAME_INSTANCE_1 = '/dev/vda'
+ROOT_DEVICE_NAME_INSTANCE_2 = '/dev/sdb1'
+
 # DHCP options constants
 ID_EC2_DHCP_OPTIONS_1 = random_ec2_id('dopt')
 ID_EC2_DHCP_OPTIONS_2 = random_ec2_id('dopt')
@@ -215,6 +218,10 @@ ID_OS_SNAPSHOT_1 = random_os_id()
 ID_OS_SNAPSHOT_2 = random_os_id()
 
 
+# availability zone constants
+NAME_AVAILABILITY_ZONE = 'nova'
+
+
 # key pair constans
 NAME_KEY_PAIR = 'keyname'
 PRIVATE_KEY_KEY_PAIR = (
@@ -261,7 +268,6 @@ FINGERPRINT_KEY_PAIR = (
 # where
 #    subtype - type of object storage, is not used for DB objects
 #        EC2 - object representation to end user
-#        EC2OS - object received from Nova EC2 API
 #        OS - object is stored in OpenStack
 #    object_name - identifies the object
 
@@ -480,7 +486,7 @@ NOVADB_INSTANCE_1 = {
     'launch_index': 0,
     'kernel_id': ID_OS_IMAGE_AKI_1,
     'ramdisk_id': ID_OS_IMAGE_ARI_1,
-    'root_device_name': '/dev/vda',
+    'root_device_name': ROOT_DEVICE_NAME_INSTANCE_1,
     'hostname': ID_EC2_INSTANCE_1,
     'key_data': PUBLIC_KEY_KEY_PAIR,
 }
@@ -489,28 +495,37 @@ NOVADB_INSTANCE_2 = {
     'launch_index': 0,
     'kernel_id': None,
     'ramdisk_id': None,
-    'root_device_name': '/dev/vda',
+    'root_device_name': ROOT_DEVICE_NAME_INSTANCE_2,
     'hostname': 'Server %s' % ID_OS_INSTANCE_2,
 }
 
-EC2OS_INSTANCE_1 = {
-    'instanceId': ID_EC2_INSTANCE_1,
-    'privateIpAddress': IP_NETWORK_INTERFACE_2,
-    'fakeKey': 'fakeValue',
-}
-EC2OS_INSTANCE_2 = {
-    'instanceId': ID_EC2_INSTANCE_2,
-    'privateIpAddress': None,
-    'fakeKey': 'fakeValue',
-}
-EC2OS_RESERVATION_1 = {
-    'instancesSet': [EC2OS_INSTANCE_1],
-    'fakeKey': 'fakeValue',
-}
-EC2OS_RESERVATION_2 = {
-    'instancesSet': [EC2OS_INSTANCE_2],
-    'fakeKey': 'fakeValue',
-}
+NOVADB_BDM_INSTANCE_1 = []
+NOVADB_BDM_INSTANCE_2 = [
+    {'device_name': ROOT_DEVICE_NAME_INSTANCE_2,
+     'delete_on_termination': False,
+     'snapshot_id': None,
+     'volume_id': ID_OS_VOLUME_2,
+     'no_device': False,
+     'source_type': 'volume',
+    },
+    {'device_name': '/dev/sdc',
+     'snapshot_id': None,
+     'volume_id': None,
+     'virtual_name': 'swap',
+     'no_device': False,
+     'source_type': 'blank',
+     'guest_format': 'swap',
+    },
+    {'device_name': '/dev/sdd',
+     'snapshot_id': None,
+     'volume_id': None,
+     'virtual_name': 'ephemeral3',
+     'no_device': False,
+     'source_type': 'blank',
+     'guest_format': None,
+    },
+]
+
 EC2_INSTANCE_1 = {
     'instanceId': ID_EC2_INSTANCE_1,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
@@ -568,13 +583,13 @@ EC2_INSTANCE_1 = {
     'rootDeviceType': 'instance-store',
     'instanceType': 'fake_flavor',
     'ipAddress': IP_ADDRESS_2,
-    'rootDeviceName': '/dev/vda',
+    'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_1,
 }
 EC2_INSTANCE_2 = {
     'instanceId': ID_EC2_INSTANCE_2,
     'privateIpAddress': None,
     'amiLaunchIndex': 0,
-    'placement': {'availabilityZone': None},
+    'placement': {'availabilityZone': NAME_AVAILABILITY_ZONE},
     'dnsName': None,
     'instanceState': {'code': 0, 'name': 'pending'},
     'imageId': None,
@@ -582,9 +597,15 @@ EC2_INSTANCE_2 = {
     'privateDnsName': 'Server %s' % ID_OS_INSTANCE_2,
     'keyName': None,
     'launchTime': None,
-    'rootDeviceType': 'instance-store',
+    'rootDeviceType': 'ebs',
+    'blockDeviceMapping': [
+            {'deviceName': ROOT_DEVICE_NAME_INSTANCE_2,
+             'ebs': {'status': 'attached',
+                     'deleteOnTermination': False,
+                     'volumeId': ID_EC2_VOLUME_2,
+                     'attachTime': None}}],
     'instanceType': 'fake_flavor',
-    'rootDeviceName': '/dev/vda',
+    'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_2,
 }
 EC2_RESERVATION_1 = {
     'reservationId': ID_EC2_RESERVATION_1,
@@ -597,6 +618,12 @@ EC2_RESERVATION_2 = {
     'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP},
                  {'groupName': NAME_OTHER_OS_SECURITY_GROUP}],
     'instancesSet': [EC2_INSTANCE_2],
+}
+EC2_BDM_METADATA_INSTANCE_1 = {}
+EC2_BDM_METADATA_INSTANCE_2 = {
+    'ebs0': ROOT_DEVICE_NAME_INSTANCE_2,
+    'ephemeral0': '/dev/sdd',
+    'swap': '/dev/sdc',
 }
 
 
@@ -645,7 +672,9 @@ OS_INSTANCE_1 = OSInstance(
 OS_INSTANCE_2 = OSInstance(
     ID_OS_INSTANCE_2, {'id': 'fakeFlavorId'},
     security_groups=[{'name': NAME_DEFAULT_OS_SECURITY_GROUP},
-                     {'name': NAME_OTHER_OS_SECURITY_GROUP}])
+                     {'name': NAME_OTHER_OS_SECURITY_GROUP}],
+    availability_zone=NAME_AVAILABILITY_ZONE)
+
 
 # DHCP options objects
 DB_DHCP_OPTIONS_1 = {'id': ID_EC2_DHCP_OPTIONS_1,
@@ -1253,8 +1282,8 @@ class CinderVolume(object):
         self.created_at = volume['created_at']
         self.display_name = volume['display_name']
         self.display_description = volume['display_description']
-        self.snapshot_id = None
-        self.attachments = [{}]
+        self.snapshot_id = volume['snapshot_id']
+        self.attachments = volume['attachments']
 
     def get(self):
         pass
@@ -1269,12 +1298,11 @@ class CinderVolume(object):
 TIME_CREATE_VOLUME_1 = timeutils.isotime(None, True)
 TIME_CREATE_VOLUME_2 = timeutils.isotime(None, True)
 TIME_CREATE_VOLUME_3 = timeutils.isotime(None, True)
-VOLUME_AVAILABILITY_ZONE = 'fake_zone'
 
 EC2_VOLUME_1 = {
     'volumeId': ID_EC2_VOLUME_1,
     'snapshotId': None,
-    'availabilityZone': VOLUME_AVAILABILITY_ZONE,
+    'availabilityZone': NAME_AVAILABILITY_ZONE,
     'createTime': TIME_CREATE_VOLUME_1,
     'size': 1,
     'status': 'available',
@@ -1283,16 +1311,21 @@ EC2_VOLUME_1 = {
 EC2_VOLUME_2 = {
     'volumeId': ID_EC2_VOLUME_2,
     'snapshotId': None,
-    'availabilityZone': VOLUME_AVAILABILITY_ZONE,
+    'availabilityZone': NAME_AVAILABILITY_ZONE,
     'createTime': TIME_CREATE_VOLUME_2,
     'size': 1,
-    'status': 'available',
-    'attachmentSet': [],
+    'status': 'in-use',
+    'attachmentSet': [{'status': 'attached',
+                       'attachTime': None,
+                       'instanceId': ID_EC2_INSTANCE_2,
+                       'volumeId': ID_EC2_VOLUME_2,
+                       'deleteOnTermination': False,
+                       'device': ROOT_DEVICE_NAME_INSTANCE_2}],
 }
 EC2_VOLUME_3 = {
     'volumeId': ID_EC2_VOLUME_3,
     'snapshotId': ID_EC2_SNAPSHOT_1,
-    'availabilityZone': VOLUME_AVAILABILITY_ZONE,
+    'availabilityZone': NAME_AVAILABILITY_ZONE,
     'createTime': TIME_CREATE_VOLUME_3,
     'size': 1,
     'status': 'available',
@@ -1315,32 +1348,36 @@ DB_VOLUME_3 = {
 OS_VOLUME_1 = {
     'id': ID_OS_VOLUME_1,
     'status': 'available',
-    'availability_zone': VOLUME_AVAILABILITY_ZONE,
+    'availability_zone': NAME_AVAILABILITY_ZONE,
     'size': 1,
     'created_at': TIME_CREATE_VOLUME_1,
     'display_name': 'test-vol-name',
     'display_description': 'test-vol-desc',
-    'snapshot_id': None
+    'snapshot_id': None,
+    'attachments': [],
 }
 OS_VOLUME_2 = {
     'id': ID_OS_VOLUME_2,
-    'status': 'available',
-    'availability_zone': VOLUME_AVAILABILITY_ZONE,
+    'status': 'in-use',
+    'availability_zone': NAME_AVAILABILITY_ZONE,
     'size': 1,
     'created_at': TIME_CREATE_VOLUME_2,
     'display_name': 'test-vol-name',
     'display_description': 'test-vol-desc',
-    'snapshot_id': None
+    'snapshot_id': None,
+    'attachments': [{'device': ROOT_DEVICE_NAME_INSTANCE_2,
+                     'server_id': ID_OS_INSTANCE_2}],
 }
 OS_VOLUME_3 = {
     'id': ID_OS_VOLUME_3,
     'status': 'available',
-    'availability_zone': VOLUME_AVAILABILITY_ZONE,
+    'availability_zone': NAME_AVAILABILITY_ZONE,
     'size': 1,
     'created_at': TIME_CREATE_VOLUME_3,
     'display_name': 'test-vol-name',
     'display_description': 'test-vol-desc',
-    'snapshot_id': ID_OS_SNAPSHOT_1
+    'snapshot_id': ID_OS_SNAPSHOT_1,
+    'attachments': [],
 }
 
 
@@ -1354,7 +1391,7 @@ class NovaAvailabilityZone(object):
             nova_availability_zone_dict['zoneState'] == 'available'}
         self.hosts = nova_availability_zone_dict['hosts']
 
-OS_AVAILABILITY_ZONE = {'zoneName': 'nova',
+OS_AVAILABILITY_ZONE = {'zoneName': NAME_AVAILABILITY_ZONE,
                         'zoneState': 'available',
                         'hosts': {'host1': {'service1': {
                                                 'active': 'True',
@@ -1372,7 +1409,7 @@ OS_AVAILABILITY_ZONE = {'zoneName': 'nova',
 OS_AVAILABILITY_ZONE_INTERNAL = {'zoneName': 'internal',
                                  'zoneState': 'available',
                                  'hosts': {}}
-EC2_AVAILABILITY_ZONE = {'zoneName': 'nova',
+EC2_AVAILABILITY_ZONE = {'zoneName': NAME_AVAILABILITY_ZONE,
                          'zoneState': 'available'}
 
 

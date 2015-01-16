@@ -142,7 +142,7 @@ def _format_volume(context, volume, os_volume, instances={},
     }
     if ec2_volume['status'] == 'in-use':
         ec2_volume['attachmentSet'] = (
-                _format_attachment(context, volume, os_volume, instances))
+                [_format_attachment(context, volume, os_volume, instances)])
     else:
         ec2_volume['attachmentSet'] = {}
     if snapshot_id is None and os_volume.snapshot_id:

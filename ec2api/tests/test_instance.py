@@ -18,8 +18,9 @@ import copy
 import itertools
 
 import mock
+from oslotest import base as test_base
 
-from ec2api.api import instance
+from ec2api.api import instance as instance_api
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
@@ -57,8 +58,8 @@ class InstanceTestCase(base.ApiTestCase):
                 'get_vpc_default_security_group_id')
     def test_run_instances(self, get_vpc_default_security_group_id):
         """Run instance with various network interface settings."""
-        instance.instance_engine = (
-            instance.InstanceEngineNeutron())
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
                 {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
@@ -181,8 +182,8 @@ class InstanceTestCase(base.ApiTestCase):
     def _test_run_instances_multiple_networks(
                 self, get_vpc_default_security_group_id):
         """Run 2 instances at once on 2 subnets in all combinations."""
-        instance.instance_engine = (
-            instance.InstanceEngineNeutron())
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
         self._build_multiple_data_model()
 
         self.db_api.add_item.side_effect = [
@@ -267,8 +268,8 @@ class InstanceTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.network_interface.delete_network_interface')
     def test_run_instances_rollback(self, delete_network_interface):
-        instance.instance_engine = (
-            instance.InstanceEngineNeutron())
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
                 {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
@@ -343,8 +344,8 @@ class InstanceTestCase(base.ApiTestCase):
     def test_terminate_instances(self, detach_network_interface,
                                  dissassociate_address_item):
         """Terminate 2 instances in one request."""
-        instance.instance_engine = (
-            instance.InstanceEngineNeutron())
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
         self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1,
                                                      fakes.DB_INSTANCE_2]
         self.nova_servers.get.side_effect = [fakes.OS_INSTANCE_1,
@@ -490,19 +491,18 @@ class InstanceTestCase(base.ApiTestCase):
                 '_format_security_groups_ids_names')
     def test_describe_instances(self, format_security_groups_ids_names):
         """Describe 2 instances, one of which is vpc instance."""
-        instance.instance_engine = (
-            instance.InstanceEngineNeutron())
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
         self.neutron.list_ports.return_value = {'ports': [fakes.OS_PORT_2]}
         self.db_api.get_items.side_effect = (
-            lambda _, kind: [fakes.DB_NETWORK_INTERFACE_1,
-                             fakes.DB_NETWORK_INTERFACE_2]
-            if kind == 'eni' else
-            [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2]
-            if kind == 'eipalloc' else
-            [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2]
-            if kind == 'i' else
-            [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]
-            if kind == 'ami' else [])
+            fakes.get_db_api_get_items(
+                {'eni': [fakes.DB_NETWORK_INTERFACE_1,
+                         fakes.DB_NETWORK_INTERFACE_2],
+                 'eipalloc': [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2],
+                 'i': [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2],
+                 'ami': [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2],
+                 'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2,
+                         fakes.DB_VOLUME_3]}))
         self.db_api.get_item_ids.side_effect = (
             fakes.get_db_api_get_item_by_id({
                 (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
@@ -523,7 +523,10 @@ class InstanceTestCase(base.ApiTestCase):
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.get.return_value = fake_flavor
         format_security_groups_ids_names.return_value = {}
-        self.novadb.block_device_mapping_get_all_by_instance.return_value = []
+        self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
+            fakes.get_db_api_get_items({
+                fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
+                fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
 
         resp = self.execute('DescribeInstances', {})
 
@@ -548,24 +551,24 @@ class InstanceTestCase(base.ApiTestCase):
                 '_format_security_groups_ids_names')
     def test_describe_instances_ec2_classic(self,
                                             format_security_groups_ids_names):
-        instance.instance_engine = (
-            instance.InstanceEngineNova())
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNova())
         self.db_api.get_items.side_effect = (
-            lambda _, kind:
-            [fakes.DB_INSTANCE_2]
-            if kind == 'i' else
-            [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]
-            if kind == 'ami' else [])
+            fakes.get_db_api_get_items(
+                {'eni': [],
+                 'eipalloc': [],
+                 'i': [fakes.DB_INSTANCE_2],
+                 'ami': [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2],
+                 'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2,
+                         fakes.DB_VOLUME_3]}))
         self.nova_servers.list.return_value = [fakes.OS_INSTANCE_2]
-        instance_get_by_uuid = fakes.get_db_api_get_item_by_id({
-            fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2})
-        self.novadb.instance_get_by_uuid.side_effect = (
-            lambda context, item_id:
-                instance_get_by_uuid(context, None, item_id))
+        self.novadb.instance_get_by_uuid.return_value = (
+            fakes.NOVADB_INSTANCE_2)
         fake_flavor = self.fake_flavor_class('fake_flavor')
         self.nova_flavors.get.return_value = fake_flavor
         format_security_groups_ids_names.return_value = {}
-        self.novadb.block_device_mapping_get_all_by_instance.return_value = []
+        self.novadb.block_device_mapping_get_all_by_instance.return_value = (
+            fakes.NOVADB_BDM_INSTANCE_2)
 
         resp = self.execute('DescribeInstances', {})
 
@@ -578,8 +581,8 @@ class InstanceTestCase(base.ApiTestCase):
     # TODO(ft): restore test after finish extraction of Nova EC2 API
     def _test_describe_instances_mutliple_networks(self):
         """Describe 2 instances with various combinations of network."""
-        instance.instance_engine = (
-            instance.InstanceEngineNeutron())
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
         self._build_multiple_data_model()
         ips_instance = [fakes.IP_FIRST_SUBNET_1, fakes.IP_FIRST_SUBNET_2]
 
@@ -798,3 +801,169 @@ class InstanceTestCase(base.ApiTestCase):
 
 
 # TODO(ft): add tests for get_vpc_default_security_group_id
+
+class InstancePrivateTestCase(test_base.BaseTestCase):
+
+    @mock.patch('cinderclient.v1.client.Client')
+    @mock.patch('ec2api.api.instance.novadb')
+    def test_format_instance_bdm(self, novadb, cinder):
+        cinder.return_value.volumes.get.return_value = (
+            mock.Mock(status='attached', attachments={'device': 'fake'}))
+        id_os_instance_1 = fakes.random_os_id()
+        id_os_instance_2 = fakes.random_os_id()
+        novadb.block_device_mapping_get_all_by_instance.side_effect = (
+            fakes.get_db_api_get_items({
+                id_os_instance_1: [{'device_name': '/dev/sdb1',
+                                    'delete_on_termination': False,
+                                    'snapshot_id': '1',
+                                    'volume_id': '2',
+                                    'no_device': False},
+                                   {'device_name': '/dev/sdb2',
+                                    'delete_on_termination': False,
+                                    'snapshot_id': None,
+                                    'volume_id': '3',
+                                    'volume_size': 1,
+                                    'no_device': False},
+                                   {'device_name': '/dev/sdb3',
+                                    'delete_on_termination': True,
+                                    'snapshot_id': '4',
+                                    'volume_id': '5',
+                                    'no_device': False},
+                                   {'device_name': '/dev/sdb4',
+                                    'delete_on_termination': False,
+                                    'snapshot_id': '6',
+                                    'volume_id': '7',
+                                    'no_device': False},
+                                   {'device_name': '/dev/sdb5',
+                                    'delete_on_termination': False,
+                                    'snapshot_id': '8',
+                                    'volume_id': '9',
+                                    'volume_size': 0,
+                                    'no_device': False},
+                                   {'device_name': '/dev/sdb6',
+                                    'delete_on_termination': False,
+                                    'snapshot_id': '10',
+                                    'volume_id': '11',
+                                    'volume_size': 1,
+                                    'no_device': False},
+                                   {'device_name': '/dev/sdb7',
+                                    'snapshot_id': None,
+                                    'volume_id': None,
+                                    'no_device': True},
+                                   {'device_name': '/dev/sdb8',
+                                    'snapshot_id': None,
+                                    'volume_id': None,
+                                    'virtual_name': 'swap',
+                                    'no_device': False},
+                                   {'device_name': '/dev/sdb9',
+                                    'snapshot_id': None,
+                                    'volume_id': None,
+                                    'virtual_name': 'ephemeral3',
+                                    'no_device': False}],
+                id_os_instance_2: [{'device_name': 'vda',
+                                    'delete_on_termination': False,
+                                    'snapshot_id': '1',
+                                    'volume_id': '21',
+                                    'no_device': False}]
+
+                }))
+
+        db_volumes_1 = {'2': {'id': 'vol-00000002'},
+                        '3': {'id': 'vol-00000003'},
+                        '5': {'id': 'vol-00000005'},
+                        '7': {'id': 'vol-00000007'},
+                        '9': {'id': 'vol-00000009'},
+                        '11': {'id': 'vol-0000000b'}}
+
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+
+        result = {}
+        instance_api._cloud_format_instance_bdm(
+            fake_context, id_os_instance_1, '/dev/sdb1', result, db_volumes_1)
+        self.assertThat(
+            result,
+            matchers.DictMatches({
+                'rootDeviceType': 'ebs',
+                'blockDeviceMapping': [
+                        {'deviceName': '/dev/sdb1',
+                         'ebs': {'status': 'attached',
+                                 'deleteOnTermination': False,
+                                 'volumeId': 'vol-00000002',
+                                 'attachTime': '',
+                                 }},
+                        {'deviceName': '/dev/sdb2',
+                         'ebs': {'status': 'attached',
+                                 'deleteOnTermination': False,
+                                 'volumeId': 'vol-00000003',
+                                 'attachTime': '',
+                                 }},
+                        {'deviceName': '/dev/sdb3',
+                         'ebs': {'status': 'attached',
+                                 'deleteOnTermination': True,
+                                 'volumeId': 'vol-00000005',
+                                 'attachTime': '',
+                                 }},
+                        {'deviceName': '/dev/sdb4',
+                         'ebs': {'status': 'attached',
+                                 'deleteOnTermination': False,
+                                 'volumeId': 'vol-00000007',
+                                 'attachTime': '',
+                                 }},
+                        {'deviceName': '/dev/sdb5',
+                         'ebs': {'status': 'attached',
+                                 'deleteOnTermination': False,
+                                 'volumeId': 'vol-00000009',
+                                 'attachTime': '',
+                                 }},
+                        {'deviceName': '/dev/sdb6',
+                         'ebs': {'status': 'attached',
+                                 'deleteOnTermination': False,
+                                 'volumeId': 'vol-0000000b',
+                                 'attachTime': '', }}]},
+                orderless_lists=True))
+
+        result = {}
+        with mock.patch('ec2api.db.api.IMPL') as db_api:
+            db_api.get_items.return_value = [{'id': 'vol-00000015',
+                                              'os_id': '21'}]
+            instance_api._cloud_format_instance_bdm(
+                fake_context, id_os_instance_2, '/dev/sdc1', result)
+        self.assertThat(
+            result,
+            matchers.DictMatches({
+                'rootDeviceType': 'instance-store',
+                'blockDeviceMapping': [
+                        {'deviceName': 'vda',
+                         'ebs': {'status': 'attached',
+                                 'deleteOnTermination': False,
+                                 'volumeId': 'vol-00000015',
+                                 'attachTime': '', }}]}))
+
+    @mock.patch('cinderclient.v1.client.Client')
+    @mock.patch('ec2api.api.instance.novadb')
+    def test_format_instance_bdm_while_attaching_volume(self, novadb, cinder):
+        cinder.return_value.volumes.get.return_value = (
+            mock.Mock(status='attaching'))
+        id_os_instance = fakes.random_os_id()
+        novadb.block_device_mapping_get_all_by_instance.return_value = (
+            [{'device_name': '/dev/sdb1',
+              'delete_on_termination': False,
+              'snapshot_id': '1',
+              'volume_id': '2',
+              'no_device': False}])
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+
+        result = {}
+        instance_api._cloud_format_instance_bdm(
+            fake_context, id_os_instance, '/dev/vda', result,
+            {'2': {'id': 'vol-00000002'}})
+        self.assertThat(
+            result,
+            matchers.DictMatches({
+                'rootDeviceType': 'instance-store',
+                'blockDeviceMapping': [
+                        {'deviceName': '/dev/sdb1',
+                         'ebs': {'status': 'attaching',
+                                 'deleteOnTermination': False,
+                                 'volumeId': 'vol-00000002',
+                                 'attachTime': '', }}]}))

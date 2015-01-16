@@ -196,8 +196,8 @@ def _build_metadata(context, ec2_instance, ec2_reservation,
 
 
 def _build_block_device_mappings(context, ec2_instance, os_instance_id):
-    mappings = {'ami': ec2_instance['rootDeviceName'],
-                'root': instance_api._block_device_strip_dev(
+    mappings = {'root': ec2_instance['rootDeviceName'],
+                'ami': instance_api._block_device_strip_dev(
                             ec2_instance['rootDeviceName'])}
     if 'blockDeviceMapping' in ec2_instance:
         # NOTE(yamahata): I'm not sure how ebs device should be numbered.
@@ -216,12 +216,12 @@ def _build_block_device_mappings(context, ec2_instance, os_instance_id):
                       for num, eph in enumerate(
                             eph for eph in bdms
                             if (eph['source_type'] == 'blank' and
-                                eph['quest_format'] != 'swap')))
+                                eph['guest_format'] != 'swap')))
     mappings.update(ephemerals)
 
     swap = next((swap['device_name'] for swap in bdms
                  if (swap['source_type'] == 'blank' and
-                     swap['quest_format'] == 'swap')), None)
+                     swap['guest_format'] == 'swap')), None)
     if swap:
         mappings['swap'] = swap
 
