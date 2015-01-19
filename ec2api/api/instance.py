@@ -298,16 +298,20 @@ def describe_instances(context, instance_id=None, filter=None,
 
 def reboot_instances(context, instance_id):
     return _foreach_instance(context, instance_id,
+                             (vm_states_ALLOW_SOFT_REBOOT +
+                              vm_states_ALLOW_HARD_REBOOT),
                              lambda instance: instance.reboot())
 
 
 def stop_instances(context, instance_id, force=False):
     return _foreach_instance(context, instance_id,
+                             [vm_states_ACTIVE, vm_states_RESCUED,
+                              vm_states_ERROR],
                              lambda instance: instance.stop())
 
 
 def start_instances(context, instance_id):
-    return _foreach_instance(context, instance_id,
+    return _foreach_instance(context, instance_id, [vm_states_STOPPED],
                              lambda instance: instance.start())
 
 
@@ -419,14 +423,10 @@ def _get_idempotent_run(context, client_token):
     instances_info = []
     instance_ids = []
     for os_instance in os_instances:
-        instance = instances.pop(os_instance['id'])
+        instance = instances[os_instance.id]
         novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
         instances_info.append((instance, os_instance, novadb_instance,))
         instance_ids.append(instance['id'])
-
-    # NOTE(ft): delete obsolete instances
-    if instances:
-        _remove_instances(context, instances.itervalues())
     if not instances_info:
         return
     ec2_network_interfaces = (
@@ -687,10 +687,15 @@ def _get_ip_info_for_instance(os_instance):
     return fixed_ip, fixed_ip6, floating_ip
 
 
-def _foreach_instance(context, instance_ids, func):
+def _foreach_instance(context, instance_ids, valid_states, func):
     instances = ec2utils.get_db_items(context, 'i', instance_ids)
     os_instances = _get_os_instances_by_instances(context, instances,
                                                   exactly=True)
+    for os_instance in os_instances:
+        if getattr(os_instance, 'OS-EXT-STS:vm_state') not in valid_states:
+            raise exception.IncorrectInstanceState(
+                instance_id=next(inst['id'] for inst in instances
+                                 if inst['os_id'] == os_instance.id))
     for os_instance in os_instances:
         func(os_instance)
     return True
@@ -699,15 +704,17 @@ def _foreach_instance(context, instance_ids, func):
 def _get_os_instances_by_instances(context, instances, exactly=False):
     nova = clients.nova(context)
     os_instances = []
-    found_obsolete_instance = False
+    obsolete_instances = []
     for instance in instances:
         try:
             os_instances.append(nova.servers.get(instance['os_id']))
         except nova_exception.NotFound:
             db_api.delete_item(context, instance['id'])
-            found_obsolete_instance = True
-    if found_obsolete_instance and exactly:
-        raise exception.InvalidInstanceIDNotFound(id=instance['id'])
+            obsolete_instances.append(instance)
+    if obsolete_instances:
+        _remove_instances(context, obsolete_instances)
+        if exactly:
+            raise exception.InvalidInstanceIDNotFound(id=instance['id'])
 
     return os_instances
 
@@ -747,10 +754,6 @@ class InstanceEngineNeutron(object):
                       private_ip_address=None, client_token=None,
                       network_interface=None, iam_instance_profile=None,
                       ebs_optimized=None):
-        # TODO(ft): fix passing complex network parameters to
-        # create_network_interface
-        # TODO(ft): check the compatibility of complex network parameters and
-        # multiple running
         os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
                 context, image_id, kernel_id, ramdisk_id)
 
@@ -906,6 +909,60 @@ class InstanceEngineNeutron(object):
                     eni['attachment']['instanceId']].append(eni)
         return ec2_network_interfaces
 
+    def merge_network_interface_parameters(self,
+                                           security_group_names,
+                                           subnet_id,
+                                           private_ip_address,
+                                           security_group_ids,
+                                           network_interfaces):
+        network_interfaces = network_interfaces or []
+
+        if ((subnet_id or private_ip_address or security_group_ids or
+                security_group_names) and
+                (len(network_interfaces) > 1 or
+                # NOTE(ft): the only case in AWS when simple subnet_id
+                # and/or private_ip_address parameters are compatible with
+                # network_interface parameter is default behavior change of
+                # public IP association for passed subnet_id by specifying
+                # the only element in network_interfaces:
+                # {"device_index": 0,
+                #  "associate_public_ip_address": <boolean>}
+                # Both keys must be in the dict, and no other keys
+                # are allowed
+                # We should support such combination of parameters for
+                # compatibility purposes, even if we ignore device_index
+                # and associate_public_ip_address in all other code
+                len(network_interfaces) == 1 and
+                    (len(network_interfaces[0]) != 2 or
+                     'associate_public_ip_address' not in network_interfaces[0]
+                     or 'device_index' not in network_interfaces[0]))):
+            msg = _(' Network interfaces and an instance-level subnet ID or '
+                    'private IP address or security groups may not be '
+                    'specified on the same request')
+            raise exception.InvalidParameterCombination(msg)
+
+        if subnet_id:
+            if security_group_names:
+                msg = _('The parameter groupName cannot be used with '
+                        'the parameter subnet')
+                raise exception.InvalidParameterCombination(msg)
+            param = {'subnet_id': subnet_id}
+            if private_ip_address:
+                param['private_ip_address'] = private_ip_address
+            if security_group_ids:
+                param['security_group_id'] = security_group_ids
+            return None, [param]
+        elif private_ip_address:
+            msg = _('Specifying an IP address is only valid for VPC instances '
+                    'and thus requires a subnet in which to launch')
+            raise exception.InvalidParameterCombination(msg)
+        elif security_group_ids:
+            msg = _('VPC security groups may not be used for a non-VPC launch')
+            raise exception.InvalidParameterCombination(msg)
+        else:
+            # NOTE(ft): only one of this variables is not empty
+            return security_group_names, network_interfaces
+
     def check_network_interface_parameters(self, params,
                                            min_instance_count,
                                            max_instance_count):
@@ -1051,60 +1108,6 @@ class InstanceEngineNeutron(object):
                     reason=_('There is more than one available network '
                              'for EC2 Classic mode'))
         return ec2_classic_os_networks[0]
-
-    def merge_network_interface_parameters(self,
-                                           security_group_names,
-                                           subnet_id,
-                                           private_ip_address,
-                                           security_group_ids,
-                                           network_interfaces):
-        network_interfaces = network_interfaces or []
-
-        if ((subnet_id or private_ip_address or security_group_ids or
-                security_group_names) and
-                (len(network_interfaces) > 1 or
-                # NOTE(ft): the only case in AWS when simple subnet_id
-                # and/or private_ip_address parameters are compatible with
-                # network_interface parameter is default behavior change of
-                # public IP association for passed subnet_id by specifying
-                # the only element in network_interfaces:
-                # {"device_index": 0,
-                #  "associate_public_ip_address": <boolean>}
-                # Both keys must be in the dict, and no other keys
-                # are allowed
-                # We should support such combination of parameters for
-                # compatibility purposes, even if we ignore device_index
-                # and associate_public_ip_address in all other code
-                len(network_interfaces) == 1 and
-                    (len(network_interfaces[0]) != 2 or
-                     'associate_public_ip_address' not in network_interfaces[0]
-                     or 'device_index' not in network_interfaces[0]))):
-            msg = _(' Network interfaces and an instance-level subnet ID or '
-                    'private IP address or security groups may not be '
-                    'specified on the same request')
-            raise exception.InvalidParameterCombination(msg)
-
-        if subnet_id:
-            if security_group_names:
-                msg = _('The parameter groupName cannot be used with '
-                        'the parameter subnet')
-                raise exception.InvalidParameterCombination(msg)
-            param = {'subnet_id': subnet_id}
-            if private_ip_address:
-                param['private_ip_address'] = private_ip_address
-            if security_group_ids:
-                param['security_group_id'] = security_group_ids
-            return None, [param]
-        elif private_ip_address:
-            msg = _('Specifying an IP address is only valid for VPC instances '
-                    'and thus requires a subnet in which to launch')
-            raise exception.InvalidParameterCombination(msg)
-        elif security_group_ids:
-            msg = _('VPC security groups may not be used for a non-VPC launch')
-            raise exception.InvalidParameterCombination(msg)
-        else:
-            # NOTE(ft): only one of this variables is not empty
-            return security_group_names, network_interfaces
 
     def format_network_interfaces(self, context, instances_network_interfaces):
         neutron = clients.neutron(context)
@@ -1273,6 +1276,7 @@ def _cloud_format_ramdisk_id(context, instance_ref, image_ids=None):
 
 
 def _cloud_format_instance_type(context, os_instance):
+    # TODO(ft): cache flavors
     return clients.nova(context).flavors.get(os_instance.flavor['id']).name
 
 

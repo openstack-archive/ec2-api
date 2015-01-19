@@ -150,6 +150,8 @@ ID_EC2_RESERVATION_2 = random_ec2_id('r')
 
 ROOT_DEVICE_NAME_INSTANCE_1 = '/dev/vda'
 ROOT_DEVICE_NAME_INSTANCE_2 = '/dev/sdb1'
+IPV6_INSTANCE_2 = 'fe80:b33f::a8bb:ccff:fedd:eeff'
+CLIENT_TOKEN_INSTANCE_2 = 'client-token-2'
 
 # DHCP options constants
 ID_EC2_DHCP_OPTIONS_1 = random_ec2_id('dopt')
@@ -479,6 +481,7 @@ DB_INSTANCE_2 = {
     'vpc_id': None,
     'reservation_id': ID_EC2_RESERVATION_2,
     'launch_index': 0,
+    'client_token': CLIENT_TOKEN_INSTANCE_2,
 }
 
 NOVADB_INSTANCE_1 = {
@@ -592,6 +595,7 @@ EC2_INSTANCE_2 = {
     'amiLaunchIndex': 0,
     'placement': {'availabilityZone': NAME_AVAILABILITY_ZONE},
     'dnsName': None,
+    'dnsNameV6': IPV6_INSTANCE_2,
     'instanceState': {'code': 0, 'name': 'pending'},
     'imageId': None,
     'productCodesSet': [],
@@ -607,6 +611,7 @@ EC2_INSTANCE_2 = {
                      'attachTime': None}}],
     'instanceType': 'fake_flavor',
     'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_2,
+    'clientToken': CLIENT_TOKEN_INSTANCE_2,
 }
 EC2_RESERVATION_1 = {
     'reservationId': ID_EC2_RESERVATION_1,
@@ -646,11 +651,25 @@ class OSInstance(object):
         setattr(self, 'OS-EXT-AZ:availability_zone', availability_zone)
 
     def get(self):
-        None
+        pass
 
     def delete(self):
-        None
+        pass
 
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def reboot(self):
+        pass
+
+    def get_password(self):
+        return None
+
+    def get_console_output(self):
+        return None
 
 OS_INSTANCE_1 = OSInstance(
     ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
@@ -674,7 +693,12 @@ OS_INSTANCE_2 = OSInstance(
     ID_OS_INSTANCE_2, {'id': 'fakeFlavorId'},
     security_groups=[{'name': NAME_DEFAULT_OS_SECURITY_GROUP},
                      {'name': NAME_OTHER_OS_SECURITY_GROUP}],
-    availability_zone=NAME_AVAILABILITY_ZONE)
+    availability_zone=NAME_AVAILABILITY_ZONE,
+    addresses={
+        ID_EC2_SUBNET_1: [{'addr': IPV6_INSTANCE_2,
+                           'version': 6,
+                           'OS-EXT-IPS:type': 'fixed'}]},
+    )
 
 
 # DHCP options objects

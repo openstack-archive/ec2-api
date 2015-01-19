@@ -257,6 +257,12 @@ class IncorrectState(EC2Exception):
                 "'%(reason)s'")
 
 
+class IncorrectInstanceState(IncorrectState):
+    ec2_code = 'IncorrectInstanceState'
+    msg_fmt = _("The instance '%(instance_id)s' is not in a state from which "
+                "the requested operation can be performed.")
+
+
 class InvalidVpcRange(Invalid):
     ec2_code = 'InvalidVpc.Range'
     msg_fmt = _("The CIDR '%(cidr_block)s' is invalid.")
