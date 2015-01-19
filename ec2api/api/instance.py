@@ -182,7 +182,9 @@ class InstanceDescriber(common.TaggableItemsDescriber):
                 self.image_ids, self.volumes)
 
         reservation_id = instance['reservation_id']
-        if reservation_id not in self.reservations:
+        if reservation_id in self.reservations:
+            reservation = self.reservations[reservation_id]
+        else:
             reservation = {'id': reservation_id,
                            'owner_id': os_instance.tenant_id}
             self.reservations[reservation_id] = reservation
@@ -220,8 +222,6 @@ class InstanceDescriber(common.TaggableItemsDescriber):
                              'project_id': self.context.project_id})
 
     def auto_update_db(self, instance, os_instance):
-        # TODO(ft): import and use instance_get_all_by_filters to
-        # reduce request DB count
         novadb_instance = novadb.instance_get_by_uuid(self.context,
                                                       os_instance.id)
         self.novadb_instances[os_instance.id] = novadb_instance
@@ -464,81 +464,84 @@ def _format_reservation(context, reservation_id, instances_info,
 
 def _format_instance(context, instance, os_instance, novadb_instance,
                      ec2_network_interfaces, image_ids, volumes=None):
-    ec2_instance = {}
-    ec2_instance['instanceId'] = instance['id']
-    os_image_id = os_instance.image['id'] if os_instance.image else None
-    ec2_instance['imageId'] = ec2utils.os_id_to_ec2_id(
-            context, 'ami', os_image_id, ids_by_os_id=image_ids)
+    ec2_instance = {
+        'amiLaunchIndex': instance['launch_index'],
+        'imageId': (ec2utils.os_id_to_ec2_id(context, 'ami',
+                                             os_instance.image['id'],
+                                             ids_by_os_id=image_ids)
+                    if os_instance.image else None),
+        'instanceId': instance['id'],
+        'instanceType': _cloud_format_instance_type(context, os_instance),
+        'keyName': os_instance.key_name,
+        'launchTime': os_instance.created,
+        'placement': {
+            'availabilityZone': getattr(os_instance,
+                                        'OS-EXT-AZ:availability_zone')},
+        'productCodesSet': None,
+        'instanceState': _cloud_state_description(
+                                getattr(os_instance, 'OS-EXT-STS:vm_state')),
+        'rootDeviceName': _cloud_format_instance_root_device_name(
+                                                            novadb_instance),
+    }
+    _cloud_format_instance_bdm(context, instance['os_id'],
+                               ec2_instance['rootDeviceName'], ec2_instance,
+                               volumes)
     kernel_id = _cloud_format_kernel_id(context, novadb_instance, image_ids)
     if kernel_id:
         ec2_instance['kernelId'] = kernel_id
     ramdisk_id = _cloud_format_ramdisk_id(context, novadb_instance, image_ids)
     if ramdisk_id:
         ec2_instance['ramdiskId'] = ramdisk_id
-    ec2_instance['instanceState'] = _cloud_state_description(
-            getattr(os_instance, 'OS-EXT-STS:vm_state'))
-
-    fixed_ip, fixed_ip6, floating_ip = _get_ip_info_for_instance(os_instance)
-    if fixed_ip6:
-        ec2_instance['dnsNameV6'] = fixed_ip6
-    if CONF.ec2_private_dns_show_ip:
-        ec2_instance['privateDnsName'] = fixed_ip
-    else:
-        ec2_instance['privateDnsName'] = novadb_instance['hostname']
-    ec2_instance['privateIpAddress'] = fixed_ip
-    if floating_ip is not None:
-        ec2_instance['ipAddress'] = floating_ip
-    ec2_instance['dnsName'] = floating_ip
-    ec2_instance['keyName'] = os_instance.key_name
 
     if 'client_token' in instance:
         ec2_instance['clientToken'] = instance['client_token']
 
-    if context.is_admin:
-        ec2_instance['keyName'] = '%s (%s, %s)' % (ec2_instance['keyName'],
-            os_instance.tenant_id,
-            getattr(os_instance, 'OS-EXT-SRV-ATTR:host'))
-    ec2_instance['productCodesSet'] = None
-    ec2_instance['instanceType'] = _cloud_format_instance_type(context,
-                                                               os_instance)
-    ec2_instance['launchTime'] = os_instance.created
-    ec2_instance['amiLaunchIndex'] = instance['launch_index']
-    ec2_instance['rootDeviceName'] = _cloud_format_instance_root_device_name(
-                                                            novadb_instance)
-    _cloud_format_instance_bdm(context, instance['os_id'],
-                               ec2_instance['rootDeviceName'], ec2_instance,
-                               volumes)
-    ec2_instance['placement'] = {
-        'availabilityZone': getattr(os_instance,
-                                    'OS-EXT-AZ:availability_zone')
-    }
     if not ec2_network_interfaces:
+        fixed_ip, fixed_ip6, floating_ip = (
+            _get_ip_info_for_instance(os_instance))
+        if fixed_ip6:
+            ec2_instance['dnsNameV6'] = fixed_ip6
+        dns_name = floating_ip
         # TODO(ft): boto uses 2010-08-31 version of AWS protocol
         # which doesn't contain groupSet element in an instance
         # We should support different versions of output data
         # ec2_instance['groupSet'] = _format_group_set(
         #         context, os_instance.security_groups)
-        return ec2_instance
-    # NOTE(ft): get instance's subnet by instance's privateIpAddress
-    instance_ip = ec2_instance['privateIpAddress']
-    main_ec2_network_interface = None
-    for ec2_network_interface in ec2_network_interfaces:
-        ec2_network_interface['attachment'].pop('instanceId')
-        ec2_network_interface['attachment'].pop('instanceOwnerId')
-        ec2_network_interface.pop('tagSet')
-        if (not main_ec2_network_interface and
-                any(address['privateIpAddress'] == instance_ip
-                    for address in
-                            ec2_network_interface['privateIpAddressesSet'])):
-            main_ec2_network_interface = ec2_network_interface
-    ec2_instance['networkInterfaceSet'] = ec2_network_interfaces
-    if main_ec2_network_interface:
-        ec2_instance['subnetId'] = main_ec2_network_interface['subnetId']
+    else:
+        primary_ec2_network_interface = None
+        for ec2_network_interface in ec2_network_interfaces:
+            ec2_network_interface['attachment'].pop('instanceId')
+            ec2_network_interface['attachment'].pop('instanceOwnerId')
+            ec2_network_interface.pop('tagSet')
+            if not primary_ec2_network_interface:
+                primary_ec2_network_interface = ec2_network_interface
+        ec2_instance['networkInterfaceSet'] = ec2_network_interfaces
+        fixed_ip = primary_ec2_network_interface['privateIpAddress']
+        if 'association' in primary_ec2_network_interface:
+            association = primary_ec2_network_interface['association']
+            floating_ip = association['publicIp']
+            dns_name = association['publicDnsName']
+        else:
+            floating_ip = dns_name = None
+        ec2_instance['vpcId'] = primary_ec2_network_interface['vpcId']
+        ec2_instance['subnetId'] = primary_ec2_network_interface['subnetId']
         # TODO(ft): boto uses 2010-08-31 version of AWS protocol
         # which doesn't contain groupSet element in an instance
         # We should support different versions of output data
-        # ec2_instance['groupSet'] = main_ec2_network_interface['groupSet']
-    ec2_instance['vpcId'] = ec2_network_interface['vpcId']
+        # ec2_instance['groupSet'] = primary_ec2_network_interface['groupSet']
+    ec2_instance.update({
+        'privateIpAddress': fixed_ip,
+        'privateDnsName': (fixed_ip if CONF.ec2_private_dns_show_ip else
+                           novadb_instance['hostname']),
+        'dnsName': dns_name,
+    })
+    if floating_ip is not None:
+        ec2_instance['ipAddress'] = floating_ip
+
+    if context.is_admin:
+        ec2_instance['keyName'] = '%s (%s, %s)' % (ec2_instance['keyName'],
+            os_instance.tenant_id,
+            getattr(os_instance, 'OS-EXT-SRV-ATTR:host'))
     return ec2_instance
 
 
@@ -560,6 +563,8 @@ def _format_state_change(instance, os_instance):
 
 
 def _remove_instances(context, instances, network_interfaces=None):
+    if not instances:
+        return
     if network_interfaces is None:
         # TODO(ft): implement search db items by os_id in DB layer
         network_interfaces = collections.defaultdict(list)

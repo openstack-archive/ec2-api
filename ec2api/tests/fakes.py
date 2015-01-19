@@ -497,6 +497,7 @@ NOVADB_INSTANCE_2 = {
     'ramdisk_id': None,
     'root_device_name': ROOT_DEVICE_NAME_INSTANCE_2,
     'hostname': 'Server %s' % ID_OS_INSTANCE_2,
+    'key_data': None,
 }
 
 NOVADB_BDM_INSTANCE_1 = []
@@ -571,7 +572,7 @@ EC2_INSTANCE_1 = {
     ],
     'amiLaunchIndex': 0,
     'placement': {'availabilityZone': None},
-    'dnsName': IP_ADDRESS_2,
+    'dnsName': None,
     'instanceState': {'code': 0, 'name': 'pending'},
     'imageId': ID_EC2_IMAGE_1,
     'kernelId': ID_EC2_IMAGE_AKI_1,
@@ -1486,6 +1487,7 @@ def gen_ec2_network_interface(ec2_network_interface_id, ec2_subnet, ips,
         'ownerId': ID_OS_PROJECT,
         'requesterManaged': False,
         'groupSet': [],
+        'tagSet': [],
     }
     if not ec2_instance_id:
         ec2_network_interface['status'] = 'available'
@@ -1519,9 +1521,9 @@ def gen_os_port(os_id, ec2_network_interface, os_subnet_id, fixed_ips,
 
 # instance generator functions
 def gen_ec2_instance(ec2_instance_id, private_ip_address='',
-                     ec2_network_interfaces=None, is_private_ip_in_vpc=True,
+                     ec2_network_interfaces=None,
                      floating_ip=None, image_id=None, kernel_id=None,
-                     ramdisk_id=None):
+                     ramdisk_id=None, launch_index=0):
     """Generate EC2 Instance dictionary.
 
     private_ip_address must be specified as IP value or None
@@ -1531,7 +1533,7 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
     """
     ec2_instance = {'instanceId': ec2_instance_id,
                     'privateIpAddress': private_ip_address,
-                    'amiLaunchIndex': 0,
+                    'amiLaunchIndex': launch_index,
                     'placement': {'availabilityZone': None},
                     'dnsName': floating_ip,
                     'instanceState': {'code': 0, 'name': 'pending'},
@@ -1545,12 +1547,19 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
                     'rootDeviceName': '/dev/vda'}
     if floating_ip is not None:
         ec2_instance['ipAddress'] = floating_ip
-    if ec2_network_interfaces is not None:
+    if ec2_network_interfaces:
         ec2_instance['networkInterfaceSet'] = (
-            [ni for ni in ec2_network_interfaces])
+            [tools.patch_dict(ni,
+                              {'attachment': tools.purge_dict(
+                                        ni['attachment'],
+                                        ['instanceId', 'instanceOwnerId'])},
+                              ['tagSet'])
+             for ni in ec2_network_interfaces])
         ec2_instance['vpcId'] = ec2_network_interfaces[0]['vpcId']
-        if private_ip_address and is_private_ip_in_vpc:
-            ec2_instance['subnetId'] = ec2_network_interfaces[0]['subnetId']
+        ec2_instance['subnetId'] = ec2_network_interfaces[0]['subnetId']
+        if private_ip_address == '':
+            ec2_instance['privateIpAddress'] = (
+                            ec2_network_interfaces[0]['privateIpAddress'])
     if kernel_id:
         ec2_instance['kernelId'] = kernel_id
     if ramdisk_id:
