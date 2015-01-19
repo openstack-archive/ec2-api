@@ -42,6 +42,9 @@ class Validator(object):
     def dummy(self, value):
         pass
 
+    def bool(self, value):
+        validator.validate_bool(value, self.param_name)
+
     def str255(self, value):
         validator.validate_str(value, self.param_name, 255)
 
@@ -51,7 +54,13 @@ class Validator(object):
             validation_func(item)
 
     def str255s(self, values):
-        self.multi(values, self.str_255)
+        self.multi(values, self.str255)
+
+    def ip(self, ip):
+        validator.validate_ipv4(ip, self.param_name)
+
+    def ips(self, ips):
+        self.multi(ips, self.ip)
 
     def cidr(self, cidr):
         validator.validate_cidr(cidr, self.param_name)
@@ -112,6 +121,15 @@ class Validator(object):
 
     def vpc_ids(self, ids):
         self.multi(ids, self.vpc_id)
+
+    def eipalloc_id(self, id):
+        self.ec2_id(id, ['eipalloc'])
+
+    def eipalloc_ids(self, ids):
+        self.multi(ids, self.eipalloc_id)
+
+    def eipassoc_id(self, id):
+        self.ec2_id(id, ['eipassoc'])
 
 
 VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb']

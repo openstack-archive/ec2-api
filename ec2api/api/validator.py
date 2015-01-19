@@ -33,6 +33,13 @@ def validate_str(val, parameter_name, max_length=None):
                  "than 255 characters.") % parameter_name)
 
 
+def validate_bool(val, parameter_name):
+    if isinstance(val, bool):
+        return True
+    raise exception.ValidationError(
+        reason=_("Expected a boolean value for parameter %s") % parameter_name)
+
+
 def validate_list(items, parameter_name):
     if not isinstance(items, list):
         raise exception.InvalidParameterValue(
@@ -81,7 +88,7 @@ def validate_cidr_with_ipv6(cidr, parameter_name, **kwargs):
 _cidr_re = re.compile("^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")
 
 
-def validate_cidr(cidr, parameter_name, **kwargs):
+def validate_cidr(cidr, parameter_name):
     invalid_format_exception = exception.InvalidParameterValue(
         value=cidr,
         parameter=parameter_name,
@@ -138,7 +145,7 @@ def validate_ec2_association_id(id, parameter_name, action):
         return validate_ec2_id(['rtbassoc'])(id, parameter_name)
 
 
-def validate_ipv4(address, parameter_name, **kwargs):
+def validate_ipv4(address, parameter_name):
     """Verify that address represents a valid IPv4 address."""
     try:
         if netaddr.valid_ipv4(address):
@@ -148,3 +155,11 @@ def validate_ipv4(address, parameter_name, **kwargs):
     raise exception.InvalidParameterValue(
         value=address, parameter=parameter_name,
         reason=_('Not a valid IP address'))
+
+
+def validate_enum(value, allowed_values, parameter_name, allow_empty=False):
+    if value is None and allow_empty or value in allowed_values:
+        return True
+    raise exception.InvalidParameterValue(
+        value=value, parameter=parameter_name,
+        reason=_('Invalid parameter value specified'))

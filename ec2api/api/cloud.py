@@ -82,6 +82,7 @@ class CloudController(object):
     def __str__(self):
         return 'CloudController'
 
+    @module_and_param_types(address, 'str255')
     def allocate_address(self, context, domain=None):
         """Acquires an Elastic IP address.
 
@@ -98,8 +99,10 @@ class CloudController(object):
         An Elastic IP address is for use either in the EC2-Classic platform
         or in a VPC.
         """
-        return address.allocate_address(context, domain)
 
+    @module_and_param_types(address, 'ip', 'i_id',
+                            'eipalloc_id', 'eni_id',
+                            'ip', 'bool')
     def associate_address(self, context, public_ip=None, instance_id=None,
                           allocation_id=None, network_interface_id=None,
                           private_ip_address=None, allow_reassociation=False):
@@ -137,10 +140,9 @@ class CloudController(object):
         instance and associated with the specified instance.
         This is an idempotent operation.
         """
-        return address.associate_address(
-                context, public_ip, instance_id, allocation_id,
-                network_interface_id, private_ip_address, allow_reassociation)
 
+    @module_and_param_types(address, 'ip',
+                            'eipassoc_id')
     def disassociate_address(self, context, public_ip=None,
                              association_id=None):
         """Disassociates an Elastic IP address.
@@ -159,9 +161,9 @@ class CloudController(object):
         interface it's associated with.
         This is an idempotent action.
         """
-        return address.disassociate_address(context, public_ip,
-                                               association_id)
 
+    @module_and_param_types(address, 'ip',
+                            'eipalloc_id')
     def release_address(self, context, public_ip=None, allocation_id=None):
         """Releases the specified Elastic IP address.
 
@@ -182,8 +184,9 @@ class CloudController(object):
         [Nondefault VPC] You must use DisassociateAddress to disassociate the
         Elastic IP address before you try to release it.
         """
-        return address.release_address(context, public_ip, allocation_id)
 
+    @module_and_param_types(address, 'ips', 'eipalloc_ids',
+                            'dummy')
     def describe_addresses(self, context, public_ip=None, allocation_id=None,
                            filter=None):
         """Describes one or more of your Elastic IP addresses.
@@ -199,8 +202,6 @@ class CloudController(object):
         Returns:
             A list of Elastic IP addresses.
         """
-        return address.describe_addresses(context, public_ip, allocation_id,
-                                             filter)
 
     def describe_security_groups(self, context, group_name=None, group_id=None,
                                  filter=None):

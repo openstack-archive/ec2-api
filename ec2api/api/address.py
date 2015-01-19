@@ -33,6 +33,13 @@ CONF = cfg.CONF
 CONF.import_opt('external_network', 'ec2api.api.internet_gateway')
 
 
+"""Address related API implementation
+"""
+
+
+Validator = common.Validator
+
+
 def get_address_engine():
     if CONF.full_vpc_support:
         return AddressEngineNeutron()
@@ -43,7 +50,7 @@ def get_address_engine():
 # TODO(ft): generate unique association id
 
 def allocate_address(context, domain=None):
-    if domain and domain != 'vpc':
+    if domain and domain not in ['vpc', 'standard']:
         msg = _("Invalid value '%(domain)s' for domain.") % {'domain': domain}
         raise exception.InvalidParameterValue(msg)
 
@@ -202,7 +209,7 @@ def _disassociate_address_item(context, address):
 class AddressEngineNeutron(object):
 
     def allocate_address(self, context, domain=None):
-        if not domain:
+        if not domain or domain == 'standard':
             return AddressEngineNova().allocate_address(context)
         neutron = clients.neutron(context)
         # TODO(ft): check no public network exists
