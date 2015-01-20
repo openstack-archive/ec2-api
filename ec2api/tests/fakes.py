@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import base64
 import copy
 import json
 import random
@@ -60,6 +60,12 @@ def get_neutron_create(kind, os_id, addon={}):
         body[kind]['id'] = os_id
         return body
     return neutron_create
+
+
+def get_by_1st_arg_getter(results_dict_by_id):
+    def getter(obj_id):
+        return copy.deepcopy(results_dict_by_id.get(obj_id))
+    return getter
 
 
 # random identifier generators
@@ -152,6 +158,8 @@ ROOT_DEVICE_NAME_INSTANCE_1 = '/dev/vda'
 ROOT_DEVICE_NAME_INSTANCE_2 = '/dev/sdb1'
 IPV6_INSTANCE_2 = 'fe80:b33f::a8bb:ccff:fedd:eeff'
 CLIENT_TOKEN_INSTANCE_2 = 'client-token-2'
+USER_DATA_INSTANCE_2 = 'fake-user data'
+
 
 # DHCP options constants
 ID_EC2_DHCP_OPTIONS_1 = random_ec2_id('dopt')
@@ -492,6 +500,7 @@ NOVADB_INSTANCE_1 = {
     'root_device_name': ROOT_DEVICE_NAME_INSTANCE_1,
     'hostname': ID_EC2_INSTANCE_1,
     'key_data': PUBLIC_KEY_KEY_PAIR,
+    'user_data': None,
 }
 NOVADB_INSTANCE_2 = {
     'reservation_id': ID_EC2_RESERVATION_2,
@@ -501,6 +510,7 @@ NOVADB_INSTANCE_2 = {
     'root_device_name': ROOT_DEVICE_NAME_INSTANCE_2,
     'hostname': 'Server %s' % ID_OS_INSTANCE_2,
     'key_data': None,
+    'user_data': base64.b64encode(USER_DATA_INSTANCE_2),
 }
 
 NOVADB_BDM_INSTANCE_1 = []

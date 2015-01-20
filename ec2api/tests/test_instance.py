@@ -943,6 +943,63 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidInstanceID.NotFound', resp['Error']['Code'])
 
+    def test_describe_instance_attributes(self):
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1,
+                fakes.ID_EC2_INSTANCE_2: fakes.DB_INSTANCE_2}))
+        self.db_api.get_item_ids.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                (fakes.ID_OS_IMAGE_AKI_1,): [(fakes.ID_EC2_IMAGE_AKI_1,
+                                              fakes.ID_OS_IMAGE_AKI_1)],
+                (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
+                                              fakes.ID_OS_IMAGE_ARI_1)]}))
+        self.nova_servers.get.side_effect = (
+            fakes.get_by_1st_arg_getter({
+                fakes.ID_OS_INSTANCE_1: fakes.OS_INSTANCE_1,
+                fakes.ID_OS_INSTANCE_2: fakes.OS_INSTANCE_2}))
+        self.novadb.instance_get_by_uuid.side_effect = (
+            fakes.get_db_api_get_items({
+                fakes.ID_OS_INSTANCE_1: fakes.NOVADB_INSTANCE_1,
+                fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2}))
+        self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
+            fakes.get_db_api_get_items({
+                fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
+                fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
+        self.cinder.volumes.get.return_value = fakes.CinderVolume(
+                                                            fakes.OS_VOLUME_2)
+        self.db_api.get_items.return_value = [fakes.DB_VOLUME_2]
+
+        def do_check(instance_id, attribute, expected):
+            resp = self.execute('DescribeInstanceAttribute',
+                                {'InstanceId': instance_id,
+                                 'Attribute': attribute})
+            expected.update({'http_status_code': 200,
+                             'instanceId': instance_id})
+            self.assertThat(resp, matchers.DictMatches(expected))
+
+        do_check(fakes.ID_EC2_INSTANCE_2, 'blockDeviceMapping',
+                 {'rootDeviceType': 'ebs',
+                  'blockDeviceMapping': (
+                        fakes.EC2_INSTANCE_2['blockDeviceMapping'])})
+        do_check(fakes.ID_EC2_INSTANCE_2, 'disableApiTermination',
+                 {'disableApiTermination': {'value': False}})
+        do_check(fakes.ID_EC2_INSTANCE_2, 'groupSet',
+                 {'groupSet': fakes.EC2_RESERVATION_2['groupSet']})
+        do_check(fakes.ID_EC2_INSTANCE_2, 'instanceInitiatedShutdownBehavior',
+                 {'instanceInitiatedShutdownBehavior': {'value': 'stop'}})
+        do_check(fakes.ID_EC2_INSTANCE_2, 'instanceType',
+                 {'instanceType': {'value': 'fake_flavor'}})
+        do_check(fakes.ID_EC2_INSTANCE_1, 'kernel',
+                 {'kernel': {'value': fakes.ID_EC2_IMAGE_AKI_1}})
+        do_check(fakes.ID_EC2_INSTANCE_1, 'ramdisk',
+                 {'ramdisk': {'value': fakes.ID_EC2_IMAGE_ARI_1}})
+        do_check(fakes.ID_EC2_INSTANCE_2, 'rootDeviceName',
+                 {'rootDeviceName': {
+                        'value': fakes.ROOT_DEVICE_NAME_INSTANCE_2}})
+        do_check(fakes.ID_EC2_INSTANCE_2, 'userData',
+                 {'userData': {'value': fakes.USER_DATA_INSTANCE_2}})
+
     def _build_multiple_data_model(self):
         # NOTE(ft): generate necessary fake data
         # We need 4 detached ports in 2 subnets.

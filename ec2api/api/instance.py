@@ -342,7 +342,7 @@ def get_console_output(context, instance_id):
 
 
 def describe_instance_attribute(context, instance_id, attribute):
-    instance = db_api.get_item_by_id(context, 'i', instance_id)
+    instance = ec2utils.get_db_item(context, 'i', instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
     novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
@@ -357,14 +357,14 @@ def describe_instance_attribute(context, instance_id, attribute):
 
     def _format_attr_disable_api_termination(result):
         result['disableApiTermination'] = {
-                                'value': novadb_instance['disable_terminate']}
+                    'value': novadb_instance.get('disable_terminate', False)}
 
     def _format_attr_group_set(result):
         result['groupSet'] = _format_group_set(context,
                                                os_instance.security_groups)
 
     def _format_attr_instance_initiated_shutdown_behavior(result):
-        value = ('terminate' if novadb_instance['shutdown_terminate']
+        value = ('terminate' if novadb_instance.get('shutdown_terminate')
                  else 'stop')
         result['instanceInitiatedShutdownBehavior'] = {'value': value}
 
@@ -1259,19 +1259,19 @@ def _cloud_get_image_state(image):
     return image.properties.get('image_state', state)
 
 
-def _cloud_format_kernel_id(context, instance_ref, image_ids=None):
-    kernel_uuid = instance_ref['kernel_id']
-    if kernel_uuid is None or kernel_uuid == '':
+def _cloud_format_kernel_id(context, os_instance, image_ids=None):
+    os_kernel_id = os_instance['kernel_id']
+    if os_kernel_id is None or os_kernel_id == '':
         return
-    return ec2utils.os_id_to_ec2_id(context, 'aki', kernel_uuid,
+    return ec2utils.os_id_to_ec2_id(context, 'aki', os_kernel_id,
                                     ids_by_os_id=image_ids)
 
 
-def _cloud_format_ramdisk_id(context, instance_ref, image_ids=None):
-    ramdisk_uuid = instance_ref['ramdisk_id']
-    if ramdisk_uuid is None or ramdisk_uuid == '':
+def _cloud_format_ramdisk_id(context, os_instance, image_ids=None):
+    os_ramdisk_id = os_instance['ramdisk_id']
+    if os_ramdisk_id is None or os_ramdisk_id == '':
         return
-    return ec2utils.os_id_to_ec2_id(context, 'ari', ramdisk_uuid,
+    return ec2utils.os_id_to_ec2_id(context, 'ari', os_ramdisk_id,
                                     ids_by_os_id=image_ids)
 
 
