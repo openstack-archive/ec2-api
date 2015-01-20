@@ -15,6 +15,7 @@
 import copy
 import datetime
 import itertools
+import random
 
 import mock
 from oslotest import base as test_base
@@ -922,8 +923,6 @@ class InstanceTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.instance._remove_instances')
     def test_describe_instances_auto_remove(self, remove_instances):
-        instance_api.instance_engine = (
-            instance_api.InstanceEngineNova())
         self.db_api.get_items.side_effect = (
             fakes.get_db_api_get_items(
                 {'i': [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2],
@@ -944,6 +943,37 @@ class InstanceTestCase(base.ApiTestCase):
                             orderless_lists=True))
         remove_instances.assert_called_once_with(
             mock.ANY, [fakes.DB_INSTANCE_1])
+
+    @mock.patch('ec2api.api.instance._format_instance')
+    def test_describe_instances_sorting(self, format_instance):
+        db_instances = [
+            {'id': fakes.random_ec2_id('i'),
+             'os_id': fakes.random_os_id(),
+             'vpc_id': None,
+             'launch_index': i,
+             'reservation_id': fakes.ID_EC2_RESERVATION_1}
+            for i in range(5)]
+        random.shuffle(db_instances)
+        self.db_api.get_items.side_effect = (
+            fakes.get_db_api_get_items(
+                {'i': db_instances,
+                 'ami': [],
+                 'vol': []}))
+        os_instances = [
+            fakes.OSInstance(inst['os_id'])
+            for inst in db_instances]
+        self.nova_servers.list.return_value = os_instances
+        format_instance.side_effect = (
+            lambda context, instance, *args: (
+                {'instanceId': instance['id'],
+                 'amiLaunchIndex': instance['launch_index']}))
+
+        resp = self.execute('DescribeInstances', {})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertEqual(
+            [0, 1, 2, 3, 4],
+            [inst['amiLaunchIndex']
+             for inst in resp['reservationSet'][0]['instancesSet']])
 
     def test_describe_instances_invalid_parameters(self):
         resp = self.execute('DescribeInstances', {'InstanceId.1':

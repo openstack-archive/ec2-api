@@ -437,9 +437,11 @@ def _get_idempotent_run(context, client_token):
 
 def _format_reservation_body(context, reservation, formatted_instances,
                              os_groups):
-    formatted_reservation = {'reservationId': reservation['id'],
-                             'ownerId': reservation['owner_id'],
-                             'instancesSet': formatted_instances}
+    formatted_reservation = {
+        'reservationId': reservation['id'],
+        'ownerId': reservation['owner_id'],
+        'instancesSet': sorted(formatted_instances,
+                               key=lambda i: i['amiLaunchIndex'])}
     if os_groups is not None:
         formatted_reservation['groupSet'] = _format_group_set(
                 context, os_groups)
