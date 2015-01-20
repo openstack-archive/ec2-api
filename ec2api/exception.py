@@ -376,6 +376,10 @@ class InvalidPermissionDuplicate(Invalid):
     msg_fmt = _("The specified rule already exists for that security group.")
 
 
+class InvalidFilter(Invalid):
+    msg_fmt = _("The filter is invalid.")
+
+
 class RulesPerSecurityGroupLimitExceeded(Overlimit):
     msg_fmt = _("You've reached the limit on the number of rules that "
                 "you can add to a security group.")

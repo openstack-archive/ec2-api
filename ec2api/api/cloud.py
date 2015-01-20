@@ -19,6 +19,7 @@ dispatched to other nodes via AMQP RPC. State is via distributed
 datastore.
 """
 
+import collections
 import itertools
 
 from oslo.config import cfg
@@ -38,6 +39,7 @@ from ec2api.api import subnet
 from ec2api.api import tag as tag_api
 from ec2api.api import volume
 from ec2api.api import vpc
+from ec2api import exception
 from ec2api.openstack.common import log as logging
 
 CONF = cfg.CONF
@@ -54,13 +56,21 @@ def module_and_param_types(module, *args, **kwargs):
         def func_wrapped(*args, **kwargs):
             impl_func = getattr(module, func.func_name)
             context = args[1]
-            for param_name, param_type in itertools.izip(
-                    func.func_code.co_varnames[2:], param_types):
+            params = collections.OrderedDict(itertools.izip(
+                func.func_code.co_varnames[2:], param_types))
+            param_num = 0
+            mandatory_params_num = (func.func_code.co_argcount - 2 -
+                                    len(func.func_defaults or []))
+            for param_name, param_type in params.items():
                 param_value = kwargs.get(param_name)
-                if param_value:
-                    validator = module.Validator(param_name, func.func_name)
+                if param_value is not None:
+                    validator = module.Validator(param_name, func.func_name,
+                                                 params)
                     validation_func = getattr(validator, param_type)
                     is_valid = validation_func(param_value)
+                    param_num += 1
+                elif param_num < mandatory_params_num:
+                    raise exception.MissingParameter(param=param_name)
             return impl_func(context, **kwargs)
         return func_wrapped
 
@@ -186,7 +196,7 @@ class CloudController(object):
         """
 
     @module_and_param_types(address, 'ips', 'eipalloc_ids',
-                            'dummy')
+                            'filter')
     def describe_addresses(self, context, public_ip=None, allocation_id=None,
                            filter=None):
         """Describes one or more of your Elastic IP addresses.
@@ -203,8 +213,10 @@ class CloudController(object):
             A list of Elastic IP addresses.
         """
 
-    def describe_security_groups(self, context, group_name=None, group_id=None,
-                                 filter=None):
+    @module_and_param_types(security_group, 'security_group_strs',
+                            'sg_ids', 'filter')
+    def describe_security_groups(self, context, group_name=None,
+                                 group_id=None, filter=None):
         """Describes one or more of your security groups.
 
         Args:
@@ -217,11 +229,11 @@ class CloudController(object):
         Returns:
             A list of security groups.
         """
-        return security_group.describe_security_groups(context, group_name,
-                                                       group_id, filter)
 
-    def create_security_group(self, context, group_name=None,
-                              group_description=None, vpc_id=None):
+    @module_and_param_types(security_group, 'security_group_str',
+                            'security_group_str', 'vpc_id')
+    def create_security_group(self, context, group_name,
+                              group_description, vpc_id=None):
         """Creates a security group.
 
         Args:
@@ -249,9 +261,8 @@ class CloudController(object):
         EC2-Classic: ASCII characters,
         EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
         """
-        return security_group.create_security_group(context, group_name,
-                                                    group_description, vpc_id)
 
+    @module_and_param_types(security_group, 'security_group_str', 'sg_id')
     def delete_security_group(self, context, group_name=None, group_id=None):
         """Deletes a security group.
 
@@ -268,9 +279,9 @@ class CloudController(object):
         instance, or is referenced by another security group, the operation
         fails.
         """
-        return security_group.delete_security_group(context, group_name,
-                                                    group_id)
 
+    @module_and_param_types(security_group, 'sg_id',
+                            'security_group_str', 'dummy')
     def authorize_security_group_ingress(self, context, group_id=None,
                                          group_name=None, ip_permissions=None):
         """Adds one or more ingress rules to a security group.
@@ -305,10 +316,9 @@ class CloudController(object):
         Returns:
             true if the requests succeeds.
         """
-        return security_group.authorize_security_group_ingress(
-                                                context, group_id,
-                                                group_name, ip_permissions)
 
+    @module_and_param_types(security_group, 'sg_id',
+                            'security_group_str', 'dummy')
     def revoke_security_group_ingress(self, context, group_id=None,
                                          group_name=None, ip_permissions=None):
         """Removes one or more ingress rules from a security group.
@@ -327,9 +337,42 @@ class CloudController(object):
         The values that you specify in the revoke request (for example, ports)
         must match the existing rule's values for the rule to be removed.
         """
-        return security_group.revoke_security_group_ingress(
-                                                context, group_id,
-                                                group_name, ip_permissions)
+
+    @module_and_param_types(security_group, 'sg_id', 'dummy')
+    def authorize_security_group_egress(self, context, group_id,
+                                        ip_permissions=None):
+        """Adds one or more egress rules to a security group for use with a VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            group_id (str): The ID of the security group.
+            ip_permissions (list of dicts): See
+                authorize_security_group_ingress
+
+        Returns:
+            true if the requests succeeds.
+
+        This action doesn't apply to security groups for use in EC2-Classic.
+        """
+
+    @module_and_param_types(security_group, 'sg_id', 'dummy')
+    def revoke_security_group_egress(self, context, group_id,
+                                        ip_permissions=None):
+        """Removes one or more egress rules from a security group for EC2-VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            group_id (str): The ID of the security group.
+            ip_permissions (list of dicts): See
+                authorize_security_group_ingress
+
+        Returns:
+            true if the requests succeeds.
+
+        The values that you specify in the revoke request (for example, ports)
+        must match the existing rule's values for the rule to be revoked.
+        This action doesn't apply to security groups for use in EC2-Classic.
+        """
 
     @module_and_param_types(instance, 'ami_id', 'dummy', 'dummy',
                             'str255', 'sg_ids',
@@ -470,7 +513,8 @@ class CloudController(object):
         once, each call succeeds.
         """
 
-    @module_and_param_types(instance, 'i_ids', 'dummy', 'dummy', 'dummy')
+    @module_and_param_types(instance, 'i_ids', 'filter',
+                            'dummy', 'dummy')
     def describe_instances(self, context, instance_id=None, filter=None,
                            max_results=None, next_token=None):
         """Describes one or more of your instances.
@@ -535,7 +579,7 @@ class CloudController(object):
             true if the request succeeds.
         """
 
-    @module_and_param_types(instance, 'i_id', 'dummy')
+    @module_and_param_types(instance, 'i_id', 'str255')
     def describe_instance_attribute(self, context, instance_id, attribute):
         """Describes the specified attribute of the specified instance.
 
@@ -1494,46 +1538,6 @@ class VpcCloudController(CloudController):
         """
         return dhcp_options.associate_dhcp_options(context, dhcp_options_id,
                                                    vpc_id)
-
-    def authorize_security_group_egress(self, context, group_id,
-                                        ip_permissions=None):
-        """Adds one or more egress rules to a security group for use with a VPC.
-
-        Args:
-            context (RequestContext): The request context.
-            group_id (str): The ID of the security group.
-            ip_permissions (list of dicts): See
-                authorize_security_group_ingress
-
-        Returns:
-            true if the requests succeeds.
-
-        This action doesn't apply to security groups for use in EC2-Classic.
-        """
-        return security_group.authorize_security_group_egress(
-                                                context, group_id,
-                                                ip_permissions)
-
-    def revoke_security_group_egress(self, context, group_id,
-                                        ip_permissions=None):
-        """Removes one or more egress rules from a security group for EC2-VPC.
-
-        Args:
-            context (RequestContext): The request context.
-            group_id (str): The ID of the security group.
-            ip_permissions (list of dicts): See
-                authorize_security_group_ingress
-
-        Returns:
-            true if the requests succeeds.
-
-        The values that you specify in the revoke request (for example, ports)
-        must match the existing rule's values for the rule to be revoked.
-        This action doesn't apply to security groups for use in EC2-Classic.
-        """
-        return security_group.revoke_security_group_egress(
-                                                context, group_id,
-                                                ip_permissions)
 
     def create_network_interface(self, context, subnet_id,
                                  private_ip_address=None,

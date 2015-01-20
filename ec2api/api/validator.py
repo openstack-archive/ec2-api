@@ -163,3 +163,43 @@ def validate_enum(value, allowed_values, parameter_name, allow_empty=False):
     raise exception.InvalidParameterValue(
         value=value, parameter=parameter_name,
         reason=_('Invalid parameter value specified'))
+
+
+def validate_filter(filters):
+    for filter in filters:
+        if (not filter.get('name') or not filter.get('value') or
+                not isinstance(filter['value'], list)):
+            raise exception.InvalidFilter()
+    return True
+
+
+def validate_security_group_str(value, parameter_name, vpc_id=None):
+    # NOTE(Alex) Amazon accepts any ASCII for EC2 classic;
+    # for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
+    if vpc_id:
+        allowed = '^[a-zA-Z0-9\._\-:/\(\)#,@\[\]\+=&;\{\}!\$\*\ ]+$'
+    else:
+        allowed = r'^[\x20-\x7E]+$'
+    msg = ''
+    try:
+        val = value.strip()
+    except AttributeError:
+        msg = (_("Security group %s is not a string or unicode") %
+               parameter_name)
+    if not val:
+        msg = _("Security group %s cannot be empty.") % parameter_name
+    elif allowed and not re.match(allowed, val):
+        # Some validation to ensure that values match API spec.
+        # - Alphanumeric characters, spaces, dashes, and underscores.
+        # TODO(Daviey): LP: #813685 extend beyond group_name checking, and
+        #  probably create a param validator that can be used elsewhere.
+        msg = (_("Specified value for parameter Group%(property)s is "
+                 "invalid. Content limited to '%(allowed)s'.") %
+               {'allowed': 'allowed',
+                'property': parameter_name})
+    elif len(val) > 255:
+        msg = _("Security group %s should not be greater "
+                "than 255 characters.") % parameter_name
+    if msg:
+        raise exception.ValidationError(reason=msg)
+    return True

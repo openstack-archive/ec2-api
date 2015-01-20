@@ -14,7 +14,6 @@
 
 
 import copy
-import re
 
 try:
     from neutronclient.common import exceptions as neutron_exception
@@ -41,6 +40,9 @@ LOG = logging.getLogger(__name__)
 """Security Groups related API implementation
 """
 
+Validator = common.Validator
+
+
 SECURITY_GROUP_MAP = {'domain-name-servers': 'dns-servers',
                       'domain-name': 'domain-name',
                       'ntp-servers': 'ntp-server',
@@ -57,7 +59,6 @@ def get_security_group_engine():
 
 def create_security_group(context, group_name, group_description,
                           vpc_id=None):
-    _validate_security_group_naming(group_name, group_description, vpc_id)
     nova = clients.nova(context)
     with utils.OnCrashCleaner() as cleaner:
         try:
@@ -76,45 +77,6 @@ def create_security_group(context, group_name, group_description,
             return {'return': 'true',
                     'groupId': security_group['id']}
     return {'return': 'true'}
-
-
-def _validate_security_group_naming(group_name, group_description, vpc_id):
-    if group_name is None:
-        raise exception.MissingParameter(param='group name')
-    if group_description is None:
-        raise exception.MissingParameter(param='group description')
-    # NOTE(Alex) Amazon accepts any ASCII for EC2 classic;
-    # for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
-    if vpc_id:
-        allowed = '^[a-zA-Z0-9\._\-:/\(\)#,@\[\]\+=&;\{\}!\$\*\ ]+$'
-    else:
-        allowed = r'^[\x20-\x7E]+$'
-    _validate_property(group_name, 'name', allowed)
-    _validate_property(group_description, 'description', allowed)
-
-
-def _validate_property(value, property, allowed):
-    msg = ''
-    try:
-        val = value.strip()
-    except AttributeError:
-        msg = _("Security group %s is not a string or unicode") % property
-    if not val:
-        msg = _("Security group %s cannot be empty.") % property
-    elif allowed and not re.match(allowed, val):
-        # Some validation to ensure that values match API spec.
-        # - Alphanumeric characters, spaces, dashes, and underscores.
-        # TODO(Daviey): LP: #813685 extend beyond group_name checking, and
-        #  probably create a param validator that can be used elsewhere.
-        msg = (_("Specified value for parameter Group%(property)s is "
-                 "invalid. Content limited to '%(allowed)s'.") %
-               {'allowed': 'allowed',
-                'property': property})
-    elif len(val) > 255:
-        msg = _("Security group %s should not be greater "
-                        "than 255 characters.") % property
-    if msg:
-        raise exception.ValidationError(reason=msg)
 
 
 def _create_default_security_group(context, vpc):
@@ -156,13 +118,19 @@ def describe_security_groups(context, group_name=None, group_id=None,
     return {'securityGroupInfo': formatted_security_groups}
 
 
-def authorize_security_group_ingress(context, group_id,
-                                     group_name, ip_permissions):
+# TODO(Alex) cidr/ports/protocol/source_group should be possible
+# to pass in root set of parameters, not in ip_permissions as now only
+# supported, for authorize and revoke functions.
+# The new parameters appeared only in the very recent version of AWS doc.
+# API version 2014-06-15 didn't claim support of it.
+
+def authorize_security_group_ingress(context, group_id=None,
+                                     group_name=None, ip_permissions=None):
     return _authorize_security_group(context, group_id, group_name,
                                      ip_permissions, 'ingress')
 
 
-def authorize_security_group_egress(context, group_id, ip_permissions):
+def authorize_security_group_egress(context, group_id, ip_permissions=None):
     return _authorize_security_group(context, group_id, None,
                                      ip_permissions, 'egress')
 
@@ -257,13 +225,13 @@ def _build_rules(context, group_id, group_name, ip_permissions, direction):
     return os_security_group_rule_bodies
 
 
-def revoke_security_group_ingress(context, group_id,
-                                  group_name, ip_permissions):
+def revoke_security_group_ingress(context, group_id=None,
+                                  group_name=None, ip_permissions=None):
     return _revoke_security_group(context, group_id, group_name,
                                   ip_permissions, 'ingress')
 
 
-def revoke_security_group_egress(context, group_id, ip_permissions):
+def revoke_security_group_egress(context, group_id, ip_permissions=None):
     return _revoke_security_group(context, group_id, None,
                                   ip_permissions, 'egress')
 

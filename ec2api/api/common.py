@@ -35,9 +35,10 @@ CONF.register_opts(ec2_opts)
 
 class Validator(object):
 
-    def __init__(self, param_name="", action=""):
+    def __init__(self, param_name="", action="", params=[]):
         self.param_name = param_name
         self.action = action
+        self.params = params
 
     def dummy(self, value):
         pass
@@ -70,6 +71,9 @@ class Validator(object):
 
     def vpc_cidr(self, cidr):
         validator.validate_vpc_cidr(cidr)
+
+    def filter(self, filter):
+        validator.validate_filter(filter)
 
     def ec2_id(self, id, prefices):
         validator.validate_ec2_id(id, self.param_name, prefices)
@@ -130,6 +134,19 @@ class Validator(object):
 
     def eipassoc_id(self, id):
         self.ec2_id(id, ['eipassoc'])
+
+    def sg_id(self, id):
+        self.ec2_id(id, ['sg'])
+
+    def sg_ids(self, ids):
+        self.multi(ids, self.sg_id)
+
+    def security_group_str(self, value):
+        validator.validate_security_group_str(value, self.param_name,
+                                              self.params.get('vpc_id'))
+
+    def security_group_strs(self, values):
+        self.multi(values, self.security_group_str)
 
 
 VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb']
