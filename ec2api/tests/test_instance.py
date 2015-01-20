@@ -1057,7 +1057,7 @@ class InstanceTestCase(base.ApiTestCase):
 
 # TODO(ft): add tests for get_vpc_default_security_group_id,
 # format_network_interfaces, get_os_instances_by_instances, remove_instances,
-# format_reservation
+# format_reservation, _is_ebs_instance
 
 class InstancePrivateTestCase(test_base.BaseTestCase):
 

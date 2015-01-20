@@ -92,6 +92,62 @@ FILE_MANIFEST_XML = """<?xml version="1.0" ?>
 
 class ImageTestCase(base.ApiTestCase):
 
+    @mock.patch('ec2api.api.instance._is_ebs_instance')
+    def _test_create_image(self, instance_status, no_reboot, is_ebs_instance):
+        self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_2
+        os_instance = mock.MagicMock()
+        os_instance.configure_mock(id=fakes.ID_OS_INSTANCE_2,
+                                   status=instance_status)
+        stop_called = iter([False, True])
+        os_instance.stop.side_effect = lambda: next(stop_called)
+        os_instance.get.side_effect = lambda: (setattr(os_instance, 'status',
+                                                       'SHUTOFF')
+                                               if next(stop_called) else None)
+        os_image = mock.MagicMock()
+        os_image.configure_mock(id=fakes.random_os_id())
+        os_instance.create_image.return_value = os_image
+        self.nova_servers.get.return_value = os_instance
+        is_ebs_instance.return_value = True
+        image_id = fakes.random_ec2_id('ami')
+        self.db_api.add_item.side_effect = fakes.get_db_api_add_item(image_id)
+
+        resp = self.execute('CreateImage',
+                            {'InstanceId': fakes.ID_EC2_INSTANCE_2,
+                             'Name': 'fake_name',
+                             'NoReboot': str(no_reboot)})
+        self.assertEqual({'http_status_code': 200,
+                          'imageId': image_id},
+                         resp)
+        self.db_api.get_item_by_id.assert_called_once_with(
+            mock.ANY, 'i', fakes.ID_EC2_INSTANCE_2)
+        self.nova_servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
+        is_ebs_instance.assert_called_once_with(mock.ANY, os_instance)
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'ami', {'os_id': os_image.id,
+                              'is_public': False})
+        if not no_reboot:
+            os_instance.stop.assert_called_once_with()
+            os_instance.get.assert_called_once_with()
+            os_instance.start.assert_called_once_with()
+            os_instance.create_image.assert_called_once_with('fake_name')
+        self.db_api.reset_mock()
+        self.nova_servers.reset_mock()
+
+    def test_create_image(self):
+        self._test_create_image('ACTIVE', False)
+        self._test_create_image('SHUTOFF', True)
+
+    @mock.patch('ec2api.api.instance._is_ebs_instance')
+    def test_create_image_invalid_parameters(self, is_ebs_instance):
+        self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_1
+        is_ebs_instance.return_value = False
+
+        resp = self.execute('CreateImage',
+                            {'InstanceId': fakes.ID_EC2_INSTANCE_1,
+                             'Name': 'fake_name'})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+
     @mock.patch('ec2api.api.image._s3_create')
     def test_register_image(self, s3_create):
         s3_create.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
