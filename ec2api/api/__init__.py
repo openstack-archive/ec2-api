@@ -112,6 +112,12 @@ class RequestLogging(wsgi.Middleware):
             context=ctxt)
 
 
+class InvalidCredentialsException(Exception):
+    def __init__(self, resp):
+        super(Exception, self).__init__()
+        self.resp = resp
+
+
 class EC2KeystoneAuth(wsgi.Middleware):
 
     """Authenticate an EC2 request with keystone and convert to context."""
@@ -120,10 +126,18 @@ class EC2KeystoneAuth(wsgi.Middleware):
     def __call__(self, req):
         request_id = context.generate_request_id()
 
-        if 'Signature' in req.params:
-            cred_dict = self._get_creds(req, request_id)
-        else:
-            cred_dict = self._get_creds_v4(req, request_id)
+        try:
+            if 'Signature' in req.params:
+                cred_dict = self._get_creds(req, request_id)
+            else:
+                cred_dict = self._get_creds_v4(req, request_id)
+        except InvalidCredentialsException as ex:
+            return ex.resp
+        except Exception:
+            msg = _("Invalid authorization parameters")
+            return faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                             status=400)
+
         access = cred_dict['access']
         token_url = CONF.keystone_url + "/ec2tokens"
         if "ec2" in token_url:
@@ -199,13 +213,15 @@ class EC2KeystoneAuth(wsgi.Middleware):
         signature = req.params.get('Signature')
         if not signature:
             msg = _("Signature not provided")
-            return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=400)
+            raise InvalidCredentialsException(
+                faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                          status=400))
         access = req.params.get('AWSAccessKeyId')
         if not access:
             msg = _("Access key not provided")
-            return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=400)
+            raise InvalidCredentialsException(
+                faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                          status=400))
 
         # Make a copy of args for authentication and signature verification.
         auth_params = dict(req.params)
@@ -223,25 +239,35 @@ class EC2KeystoneAuth(wsgi.Middleware):
         return cred_dict
 
     def _get_creds_v4(self, req, request_id):
-        auth = req.environ['HTTP_AUTHORIZATION'].split(',')
+        auth = req.environ.get('HTTP_AUTHORIZATION')
+        if not auth:
+            msg = _("Signature not provided")
+            raise InvalidCredentialsException(
+                faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                          status=400))
+
+        auth = auth.split(',')
         auth = [a.strip() for a in auth]
         if not auth[0].startswith('AWS4-HMAC-SHA256'):
             msg = _("Invalid authorization parameters")
-            return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=400)
+            raise InvalidCredentialsException(
+                faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                          status=400))
         access = auth[0].split('=')[1].split('/')[0]
         if not access:
             msg = _("Access key not provided")
-            return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=400)
+            raise InvalidCredentialsException(
+                faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                          status=400))
 
         for item in auth:
             if item.startswith('Signature'):
                 signature = item.split('=')[1]
         if not signature:
             msg = _("Signature could not be found in request")
-            return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=400)
+            raise InvalidCredentialsException(
+                faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                          status=400))
 
         headers = dict()
         for key in req.headers:
@@ -283,9 +309,6 @@ class EC2KeystoneAuth(wsgi.Middleware):
 
 
 class Requestify(wsgi.Middleware):
-
-    def __init__(self, app):
-        super(Requestify, self).__init__(app)
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
