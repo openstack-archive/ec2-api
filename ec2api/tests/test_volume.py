@@ -149,3 +149,64 @@ class VolumeTestCase(base.ApiTestCase):
         resp = self.execute('DescribeVolumes', {})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('banana', resp['volumeSet'][0]['status'])
+
+    def test_attach_volume(self):
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_INSTANCE_2: fakes.DB_INSTANCE_2,
+                fakes.ID_EC2_VOLUME_3: fakes.DB_VOLUME_3}))
+        os_volume = fakes.CinderVolume(fakes.OS_VOLUME_3)
+        os_volume.attachments.append({'device': '/dev/vdf',
+                                      'server_id': fakes.ID_OS_INSTANCE_2})
+        os_volume.status = 'attaching'
+        self.cinder.volumes.get.return_value = os_volume
+
+        resp = self.execute('AttachVolume',
+                            {'VolumeId': fakes.ID_EC2_VOLUME_3,
+                             'InstanceId': fakes.ID_EC2_INSTANCE_2,
+                             'Device': '/dev/vdf'})
+        self.assertEqual({'http_status_code': 200,
+                          'attachTime': None,
+                          'device': '/dev/vdf',
+                          'instanceId': fakes.ID_EC2_INSTANCE_2,
+                          'status': 'attaching',
+                          'volumeId': fakes.ID_EC2_VOLUME_3},
+                         resp)
+        self.nova_volumes.create_server_volume.assert_called_once_with(
+            fakes.ID_OS_INSTANCE_2, fakes.ID_OS_VOLUME_3, '/dev/vdf')
+
+    @mock.patch.object(fakes.CinderVolume, 'get', autospec=True)
+    def test_detach_volume(self, os_volume_get):
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_INSTANCE_2: fakes.DB_INSTANCE_2,
+                fakes.ID_EC2_VOLUME_2: fakes.DB_VOLUME_2}))
+        self.db_api.get_items.return_value = [fakes.DB_INSTANCE_1,
+                                              fakes.DB_INSTANCE_2]
+        os_volume = fakes.CinderVolume(fakes.OS_VOLUME_2)
+        self.cinder.volumes.get.return_value = os_volume
+        os_volume_get.side_effect = (
+            lambda vol: setattr(vol, 'status', 'detaching'))
+
+        resp = self.execute('DetachVolume',
+                            {'VolumeId': fakes.ID_EC2_VOLUME_2})
+        self.assertEqual({'http_status_code': 200,
+                          'attachTime': None,
+                          'device': os_volume.attachments[0]['device'],
+                          'instanceId': fakes.ID_EC2_INSTANCE_2,
+                          'status': 'detaching',
+                          'volumeId': fakes.ID_EC2_VOLUME_2},
+                         resp)
+        self.nova_volumes.delete_server_volume.assert_called_once_with(
+            fakes.ID_OS_INSTANCE_2, fakes.ID_OS_VOLUME_2)
+        self.cinder.volumes.get.assert_called_once_with(fakes.ID_OS_VOLUME_2)
+
+    def test_detach_volume_invalid_parameters(self):
+        self.db_api.get_item_by_id.return_value = fakes.DB_VOLUME_1
+        self.cinder.volumes.get.return_value = (
+            fakes.CinderVolume(fakes.OS_VOLUME_1))
+
+        resp = self.execute('DetachVolume',
+                            {'VolumeId': fakes.ID_EC2_VOLUME_1})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('IncorrectState', resp['Error']['Code'])

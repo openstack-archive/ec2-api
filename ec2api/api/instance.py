@@ -1240,10 +1240,10 @@ def _cloud_parse_block_device_mapping(context, bdm):
         if ec2_id:
             if ec2_id.startswith('snap-'):
                 snapshot = ec2utils.get_db_item(context, 'snap', ec2_id)
-                bdm['snapshot_id'] = snapshot['id']
+                bdm['snapshot_id'] = snapshot['os_id']
             elif ec2_id.startswith('vol-'):
                 volume = ec2utils.get_db_item(context, 'vol', ec2_id)
-                bdm['volume_id'] = volume['id']
+                bdm['volume_id'] = volume['os_id']
             else:
                 # NOTE(ft): AWS returns undocumented InvalidSnapshotID.NotFound
                 raise exception.InvalidSnapshotIDMalformed(snapshot_id=ec2_id)

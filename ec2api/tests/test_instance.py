@@ -294,31 +294,39 @@ class InstanceTestCase(base.ApiTestCase):
             mock.call(mock.ANY, 'i', tools.purge_dict(db_instance, ['id']))
             for db_instance in self.DB_INSTANCES])
 
+    @mock.patch('ec2api.api.instance._parse_block_device_mapping')
     @mock.patch('ec2api.api.instance._format_reservation')
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
                 'get_ec2_classic_os_network')
     def test_run_instances_other_parameters(self, get_ec2_classic_os_network,
-                                            format_reservation):
+                                            format_reservation,
+                                            parse_block_device_mapping):
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         get_ec2_classic_os_network.return_value = {'id': fakes.random_os_id()}
         format_reservation.return_value = {}
+        parse_block_device_mapping.return_value = 'fake_bdm'
 
         def do_check(engine, extra_kwargs={}, extra_db_instance={}):
             instance_api.instance_engine = engine
 
-            resp = self.execute('RunInstances',
-                                {'ImageId': fakes.ID_EC2_IMAGE_1,
-                                 'InstanceType': 'fake_flavor',
-                                 'MinCount': '1', 'MaxCount': '1',
-                                 'SecurityGroup.1': 'Default',
-                                 'Placement.AvailabilityZone': 'fake_zone',
-                                 'ClientToken': 'fake_client_token'})
+            resp = self.execute(
+                'RunInstances',
+                {'ImageId': fakes.ID_EC2_IMAGE_1,
+                 'InstanceType': 'fake_flavor',
+                 'MinCount': '1', 'MaxCount': '1',
+                 'SecurityGroup.1': 'Default',
+                 'Placement.AvailabilityZone': 'fake_zone',
+                 'ClientToken': 'fake_client_token',
+                 'BlockDeviceMapping.1.DeviceName': '/dev/vdd',
+                 'BlockDeviceMapping.1.Ebs.SnapshotId': (
+                                                    fakes.ID_EC2_SNAPSHOT_1),
+                 'BlockDeviceMapping.1.Ebs.DeleteOnTermination': 'False'})
             self.assertEqual(200, resp['http_status_code'])
 
             self.nova_servers.create.assert_called_once_with(
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
-                userdata=None, block_device_mapping=None,
-                kernel_id=None, ramdisk_id=None, key_name=None,
+                userdata=None, kernel_id=None, ramdisk_id=None, key_name=None,
+                block_device_mapping='fake_bdm',
                 availability_zone='fake_zone', security_groups=['Default'],
                 **extra_kwargs)
             self.nova_servers.reset_mock()
@@ -330,6 +338,13 @@ class InstanceTestCase(base.ApiTestCase):
             self.db_api.add_item.assert_called_once_with(
                 mock.ANY, 'i', db_instance)
             self.db_api.reset_mock()
+            parse_block_device_mapping.assert_called_once_with(
+                mock.ANY,
+                [{'device_name': '/dev/vdd',
+                  'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1,
+                          'delete_on_termination': False}}],
+                self.glance.images.get.return_value)
+            parse_block_device_mapping.reset_mock()
 
         do_check(
             instance_api.InstanceEngineNeutron(),
@@ -1146,6 +1161,61 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         self.assertRaises(exception.ImageNotActive,
                           instance_api._parse_image_parameters,
                           fake_context, image_id, None, None)
+
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_parse_block_device_mapping(self, db_api):
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        os_image = fakes.OSImage(fakes.OS_IMAGE_1)
+
+        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id({
+            fakes.ID_EC2_VOLUME_1: fakes.DB_VOLUME_1,
+            fakes.ID_EC2_VOLUME_2: fakes.DB_VOLUME_2,
+            fakes.ID_EC2_VOLUME_3: fakes.DB_VOLUME_3,
+            fakes.ID_EC2_SNAPSHOT_1: fakes.DB_SNAPSHOT_1,
+            fakes.ID_EC2_SNAPSHOT_2: fakes.DB_SNAPSHOT_2})
+
+        res = instance_api._parse_block_device_mapping(
+            fake_context, [], os_image)
+        self.assertEqual([], res)
+
+        res = instance_api._parse_block_device_mapping(
+            fake_context, [{'device_name': '/dev/vdf',
+                            'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1}},
+                           {'device_name': '/dev/vdg',
+                            'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2,
+                                    'volume_size': 111,
+                                    'delete_on_termination': False}},
+                           {'device_name': '/dev/vdh',
+                            'ebs': {'snapshot_id': fakes.ID_EC2_VOLUME_1}},
+                           {'device_name': '/dev/vdi',
+                            'ebs': {'snapshot_id': fakes.ID_EC2_VOLUME_2,
+                                    'delete_on_termination': True}},
+                           {'device_name': '/dev/sdb1',
+                            'ebs': {'volume_size': 55}}],
+            os_image)
+        self.assertThat(
+            res,
+            matchers.ListMatches([{'device_name': '/dev/vdf',
+                                   'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                                   'delete_on_termination': True},
+                                  {'device_name': '/dev/vdg',
+                                   'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
+                                   'volume_size': 111,
+                                   'delete_on_termination': False},
+                                  {'device_name': '/dev/vdh',
+                                   'volume_id': fakes.ID_OS_VOLUME_1,
+                                   'delete_on_termination': True},
+                                  {'device_name': '/dev/vdi',
+                                   'volume_id': fakes.ID_OS_VOLUME_2,
+                                   'delete_on_termination': True},
+                                  {'device_name': '/dev/sdb1',
+                                   'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                                   'volume_size': 55,
+                                   'volume_id': None,
+                                   'delete_on_termination': None,
+                                   'virtual_name': None,
+                                   'no_device': None}],
+                                 orderless_lists=True))
 
     @mock.patch('ec2api.api.instance.novadb')
     @mock.patch('novaclient.v1_1.client.Client')
