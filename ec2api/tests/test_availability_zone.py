@@ -34,7 +34,7 @@ class AvailabilityZoneCase(base.ApiTestCase):
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE_INTERNAL)]
         resp = self.execute('DescribeAvailabilityZones',
-                            {'zoneName': 'verbose'})
+                            {'zoneName.1': 'verbose'})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(len(resp['availabilityZoneInfo']), 7)
         self.nova_availability_zones.list.assert_called_once()

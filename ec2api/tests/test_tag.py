@@ -189,7 +189,7 @@ class TagTestCase(base.ApiTestCase):
         filter_fields = ['resource-type', 'resource-id', 'key', 'value']
         filter_param = dict(('Filter.%s.Name' % num, field)
                             for num, field in enumerate(filter_fields))
-        filter_param.update(dict(('Filter.%s.Value' % num, 'fake')
+        filter_param.update(dict(('Filter.%s.Value.1' % num, 'fake')
                                  for num, field in enumerate(filter_fields)))
         resp = self.execute('DescribeTags', filter_param)
         self.assertEqual({'http_status_code': 200,

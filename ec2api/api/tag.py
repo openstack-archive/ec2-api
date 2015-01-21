@@ -19,6 +19,13 @@ from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 
 
+"""Tag related API implementation
+"""
+
+
+Validator = common.Validator
+
+
 RESOURCE_TYPES = {
     'dopt': 'dhcp-options',
     'ami': 'image',

@@ -31,6 +31,9 @@ LOG = logging.getLogger(__name__)
 """
 
 
+Validator = common.Validator
+
+
 class KeyPairDescriber(common.UniversalDescriber):
 
     KIND = 'kp'

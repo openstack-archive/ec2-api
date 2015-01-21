@@ -23,6 +23,13 @@ from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 
 
+"""Snapshot related API implementation
+"""
+
+
+Validator = common.Validator
+
+
 def create_snapshot(context, volume_id, description=None):
     volume = ec2utils.get_db_item(context, 'vol', volume_id)
     cinder = clients.cinder(context)

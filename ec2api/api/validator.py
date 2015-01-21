@@ -40,6 +40,14 @@ def validate_bool(val, parameter_name):
         reason=_("Expected a boolean value for parameter %s") % parameter_name)
 
 
+def validate_int(val, parameter_name):
+    if isinstance(val, int):
+        return True
+    raise exception.ValidationError(
+        reason=(_("Expected an integer value for parameter %s") %
+                parameter_name))
+
+
 def validate_list(items, parameter_name):
     if not isinstance(items, list):
         raise exception.InvalidParameterValue(
@@ -129,7 +137,7 @@ def validate_ec2_id(val, parameter_name, prefices):
     try:
         prefix, value = val.rsplit('-', 1)
         int(value, 16)
-        if prefix in prefices:
+        if not prefices or prefix in prefices:
             return True
     except Exception:
         pass

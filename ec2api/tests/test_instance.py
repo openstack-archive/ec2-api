@@ -176,11 +176,9 @@ class InstanceTestCase(base.ApiTestCase):
                     'security_group_id': [fakes.ID_EC2_SECURITY_GROUP_1,
                                           fakes.ID_EC2_SECURITY_GROUP_2]})
         do_check({'SubnetId': fakes.ID_EC2_SUBNET_1,
-                  'PrivateIpAddress.1': fakes.IP_FIRST_SUBNET_1,
-                  'PrivateIpAddress.2': fakes.IP_LAST_SUBNET_1},
+                  'PrivateIpAddress': fakes.IP_FIRST_SUBNET_1},
                  create_network_interface_kwargs={
-                    'private_ip_address': [fakes.IP_FIRST_SUBNET_1,
-                                           fakes.IP_LAST_SUBNET_1]})
+                    'private_ip_address': fakes.IP_FIRST_SUBNET_1})
 
         do_check({'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
                   'NetworkInterface.1.SecurityGroupId.1':

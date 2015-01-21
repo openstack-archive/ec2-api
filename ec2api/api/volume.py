@@ -23,6 +23,13 @@ from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 
 
+"""Volume related API implementation
+"""
+
+
+Validator = common.Validator
+
+
 def create_volume(context, availability_zone=None, size=None,
                   snapshot_id=None, volume_type=None, iops=None,
                   encrypted=None, kms_key_id=None):

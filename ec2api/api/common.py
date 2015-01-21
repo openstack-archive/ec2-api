@@ -40,19 +40,31 @@ class Validator(object):
         self.action = action
         self.params = params
 
+    def multi(self, items, validation_func):
+        validator.validate_list(items, self.param_name)
+        for item in items:
+            validation_func(item)
+
     def dummy(self, value):
         pass
 
     def bool(self, value):
         validator.validate_bool(value, self.param_name)
 
+    def int(self, value):
+        validator.validate_int(value, self.param_name)
+
+    def str(self, value):
+        validator.validate_str(value, self.param_name)
+
+    def strs(self, values):
+        self.multi(values, self.str)
+
+    def str64(self, value):
+        validator.validate_str(value, self.param_name, 64)
+
     def str255(self, value):
         validator.validate_str(value, self.param_name, 255)
-
-    def multi(self, items, validation_func):
-        validator.validate_list(items, self.param_name)
-        for item in items:
-            validation_func(item)
 
     def str255s(self, values):
         self.multi(values, self.str255)
@@ -75,8 +87,11 @@ class Validator(object):
     def filter(self, filter):
         validator.validate_filter(filter)
 
-    def ec2_id(self, id, prefices):
+    def ec2_id(self, id, prefices=[]):
         validator.validate_ec2_id(id, self.param_name, prefices)
+
+    def ec2_ids(self, ids):
+        self.multi(ids, self.ec2_id)
 
     def i_id(self, id):
         self.ec2_id(id, ['i'])
@@ -88,7 +103,7 @@ class Validator(object):
         self.ec2_id(id, ['ami', 'ari', 'aki'])
 
     def ami_ids(self, ids):
-        self.multi(ids, self.aki_id)
+        self.multi(ids, self.ami_id)
 
     def sg_id(self, id):
         self.ec2_id(id, ['sg'])
@@ -140,6 +155,18 @@ class Validator(object):
 
     def sg_ids(self, ids):
         self.multi(ids, self.sg_id)
+
+    def snap_id(self, id):
+        self.ec2_id(id, ['snap'])
+
+    def snap_ids(self, ids):
+        self.multi(ids, self.snap_id)
+
+    def vol_id(self, id):
+        self.ec2_id(id, ['vol'])
+
+    def vol_ids(self, ids):
+        self.multi(ids, self.vol_id)
 
     def security_group_str(self, value):
         validator.validate_security_group_str(value, self.param_name,

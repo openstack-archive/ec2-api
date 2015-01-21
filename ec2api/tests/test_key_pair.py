@@ -41,7 +41,7 @@ class KeyPairCase(base.ApiTestCase):
         self.assertEqual('InvalidKeyPair.Duplicate', resp['Error']['Code'])
         resp = self.execute('CreateKeyPair', {'KeyName': 'k' * 256})
         self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assertEqual('ValidationError', resp['Error']['Code'])
         self.nova_key_pairs.create.side_effect = (
             nova_exception.OverLimit(413))
         resp = self.execute('CreateKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
@@ -95,7 +95,7 @@ class KeyPairCase(base.ApiTestCase):
     def test_describe_key_pairs_invalid(self):
         self.nova_key_pairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
-        resp = self.execute('DescribeKeyPairs', {'KeyName': 'badname'})
+        resp = self.execute('DescribeKeyPairs', {'KeyName.1': 'badname'})
         self.assertEqual(404, resp['http_status_code'])
         self.assertEqual('InvalidKeyPair.NotFound', resp['Error']['Code'])
         self.nova_key_pairs.list.assert_called_once()

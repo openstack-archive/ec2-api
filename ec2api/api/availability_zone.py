@@ -53,6 +53,9 @@ LOG = logging.getLogger(__name__)
 """
 
 
+Validator = common.Validator
+
+
 class AvailabilityZoneDescriber(common.UniversalDescriber):
 
     KIND = 'az'

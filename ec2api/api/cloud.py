@@ -36,7 +36,7 @@ from ec2api.api import route_table
 from ec2api.api import security_group
 from ec2api.api import snapshot
 from ec2api.api import subnet
-from ec2api.api import tag as tag_api
+from ec2api.api import tag
 from ec2api.api import volume
 from ec2api.api import vpc
 from ec2api import exception
@@ -374,16 +374,16 @@ class CloudController(object):
         This action doesn't apply to security groups for use in EC2-Classic.
         """
 
-    @module_and_param_types(instance, 'ami_id', 'dummy', 'dummy',
+    @module_and_param_types(instance, 'ami_id', 'int', 'int',
                             'str255', 'sg_ids',
-                            'str255s', 'dummy', 'dummy',
+                            'security_group_strs', 'str', 'str',
                             'dummy', 'ami_id', 'ami_id',
                             'dummy', 'dummy',
-                            'subnet_id', 'dummy',
-                            'dummy',
+                            'subnet_id', 'bool',
+                            'str',
+                            'ip', 'str64',
                             'dummy', 'dummy',
-                            'dummy', 'dummy',
-                            'dummy')
+                            'bool')
     def run_instances(self, context, image_id, min_count, max_count,
                       key_name=None, security_group_id=None,
                       security_group=None, user_data=None, instance_type=None,
@@ -514,7 +514,7 @@ class CloudController(object):
         """
 
     @module_and_param_types(instance, 'i_ids', 'filter',
-                            'dummy', 'dummy')
+                            'int', 'str')
     def describe_instances(self, context, instance_id=None, filter=None,
                            max_results=None, next_token=None):
         """Describes one or more of your instances.
@@ -551,7 +551,7 @@ class CloudController(object):
             true if the request succeeds.
         """
 
-    @module_and_param_types(instance, 'i_ids', 'dummy')
+    @module_and_param_types(instance, 'i_ids', 'bool')
     def stop_instances(self, context, instance_id, force=False):
         """Stops one or more instances.
 
@@ -598,6 +598,7 @@ class CloudController(object):
             Specified attribute.
         """
 
+    @module_and_param_types(key_pair, 'str255s', 'filter')
     def describe_key_pairs(self, context, key_name=None, filter=None):
         """Describes one or more of your key pairs.
 
@@ -609,8 +610,8 @@ class CloudController(object):
         Returns:
             Specified keypairs.
         """
-        return key_pair.describe_key_pairs(context, key_name, filter)
 
+    @module_and_param_types(key_pair, 'str255')
     def create_key_pair(self, context, key_name):
         """Creates a 2048-bit RSA key pair with the specified name.
 
@@ -621,8 +622,8 @@ class CloudController(object):
         Returns:
             Created keypair.
         """
-        return key_pair.create_key_pair(context, key_name)
 
+    @module_and_param_types(key_pair, 'str255')
     def delete_key_pair(self, context, key_name):
         """Deletes the specified key pair.
 
@@ -633,8 +634,8 @@ class CloudController(object):
         Returns:
             Returns true if the request succeeds.
         """
-        return key_pair.delete_key_pair(context, key_name)
 
+    @module_and_param_types(key_pair, 'str255', 'str')
     def import_key_pair(self, context, key_name, public_key_material):
         """Imports the public key from an existing RSA key pair.
 
@@ -647,9 +648,8 @@ class CloudController(object):
         Returns:
             Imported keypair.
         """
-        return key_pair.import_key_pair(context, key_name,
-                                        public_key_material)
 
+    @module_and_param_types(availability_zone, 'strs', 'filter')
     def describe_availability_zones(self, context, zone_name=None,
                                     filter=None):
         """Describes one or more of the available Availability Zones.
@@ -662,10 +662,8 @@ class CloudController(object):
         Returns:
             Specified availability zones.
         """
-        return availability_zone.describe_availability_zones(context,
-                                                             zone_name,
-                                                             filter)
 
+    @module_and_param_types(availability_zone, 'strs', 'filter')
     def describe_regions(self, context, region_name=None, filter=None):
         """Describes one or more regions that are currently available to you.
 
@@ -677,10 +675,8 @@ class CloudController(object):
         Returns:
             Specified regions.
         """
-        return availability_zone.describe_regions(context,
-                                                  region_name,
-                                                  filter)
 
+    @module_and_param_types(instance, 'i_id')
     def get_password_data(self, context, instance_id):
         """Retrieves the encrypted administrator password for Windows instance.
 
@@ -694,8 +690,8 @@ class CloudController(object):
         The password is encrypted using the key pair that you specified when
         you launched the instance.
         """
-        return instance.get_password_data(context, instance_id)
 
+    @module_and_param_types(instance, 'i_id')
     def get_console_output(self, context, instance_id):
         """Gets the console output for the specified instance.
 
@@ -706,8 +702,10 @@ class CloudController(object):
         Returns:
             The console output of the instance, timestamp and instance id.
         """
-        return instance.get_console_output(context, instance_id)
 
+    @module_and_param_types(volume, 'str', 'int',
+                            'snap_id', 'str', 'int',
+                            'bool', 'str')
     def create_volume(self, context, availability_zone=None, size=None,
                       snapshot_id=None, volume_type=None, iops=None,
                       encrypted=None, kms_key_id=None):
@@ -741,10 +739,8 @@ class CloudController(object):
         You can create a new empty volume or restore a volume from an EBS
         snapshot.
         """
-        return volume.create_volume(context, availability_zone, size,
-                                    snapshot_id, volume_type, iops,
-                                    encrypted, kms_key_id)
 
+    @module_and_param_types(volume, 'vol_id', 'i_id', 'str')
     def attach_volume(self, context, volume_id, instance_id, device):
         """Attaches an EBS volume to a running or stopped instance.
 
@@ -759,8 +755,8 @@ class CloudController(object):
 
         The instance and volume must be in the same Availability Zone.
         """
-        return volume.attach_volume(context, volume_id, instance_id, device)
 
+    @module_and_param_types(volume, 'vol_id', 'i_id', 'str')
     def detach_volume(self, context, volume_id, instance_id=None, device=None,
                       force=None):
         """Detaches an EBS volume from an instance.
@@ -778,9 +774,8 @@ class CloudController(object):
         Returns:
             Information about the detachment.
         """
-        return volume.detach_volume(context, volume_id, instance_id, device,
-                                    force)
 
+    @module_and_param_types(volume, 'vol_id')
     def delete_volume(self, context, volume_id):
         """Deletes the specified EBS volume.
 
@@ -793,8 +788,9 @@ class CloudController(object):
 
         The volume must be in the available state.
         """
-        return volume.delete_volume(context, volume_id)
 
+    @module_and_param_types(volume, 'vol_ids', 'filter',
+                            'int', 'str')
     def describe_volumes(self, context, volume_id=None, filter=None,
                          max_results=None, next_token=None):
         """Describes the specified EBS volumes.
@@ -812,9 +808,8 @@ class CloudController(object):
         Returns:
             A list of volumes.
         """
-        return volume.describe_volumes(context, volume_id, filter,
-                                       max_results, next_token)
 
+    @module_and_param_types(snapshot, 'vol_id', 'str')
     def create_snapshot(self, context, volume_id, description=None):
         """Creates a snapshot of an EBS volume.
 
@@ -826,8 +821,8 @@ class CloudController(object):
         Returns:
             Information about the snapshot.
         """
-        return snapshot.create_snapshot(context, volume_id, description)
 
+    @module_and_param_types(snapshot, 'snap_id')
     def delete_snapshot(self, context, snapshot_id):
         """Deletes the specified snapshot.
 
@@ -838,8 +833,9 @@ class CloudController(object):
         Returns:
             Returns true if the request succeeds.
         """
-        return snapshot.delete_snapshot(context, snapshot_id)
 
+    @module_and_param_types(snapshot, 'snap_ids', 'strs',
+                            'strs', 'filter')
     def describe_snapshots(self, context, snapshot_id=None, owner=None,
                            restorable_by=None, filter=None):
         """Describes one or more of the snapshots available to you.
@@ -859,9 +855,9 @@ class CloudController(object):
         Returns:
             A list of snapshots.
         """
-        return snapshot.describe_snapshots(context, snapshot_id, owner,
-                                           restorable_by, filter)
 
+    @module_and_param_types(image, 'i_id', 'str', 'str',
+                            'bool', 'dummy')
     def create_image(self, context, instance_id, name=None, description=None,
                      no_reboot=False, block_device_mapping=None):
         """Creates an EBS-backed AMI from an EBS-backed instance.
@@ -900,6 +896,11 @@ class CloudController(object):
         return image.create_image(context, instance_id, name, description,
                                   no_reboot, block_device_mapping)
 
+    @module_and_param_types(image, 'str', 'str',
+                            'str', 'str',
+                            'str', 'dummy',
+                            'str', 'ami_id',
+                            'ami_id', 'str')
     def register_image(self, context, name=None, image_location=None,
                        description=None, architecture=None,
                        root_device_name=None, block_device_mapping=None,
@@ -946,12 +947,8 @@ class CloudController(object):
         Returns:
             The ID of the new AMI.
         """
-        return image.register_image(context, name, image_location,
-                                    description, architecture,
-                                    root_device_name, block_device_mapping,
-                                    virtualization_type, kernel_id,
-                                    ramdisk_id, sriov_net_support)
 
+    @module_and_param_types(image, 'ami_id')
     def deregister_image(self, context, image_id):
         """Deregisters the specified AMI.
 
@@ -962,8 +959,9 @@ class CloudController(object):
         Returns:
             true if the request succeeds.
         """
-        return image.deregister_image(context, image_id)
 
+    @module_and_param_types(image, 'strs', 'ami_ids',
+                            'strs', 'filter')
     def describe_images(self, context, executable_by=None, image_id=None,
                         owner=None, filter=None):
         """Describes one or more of the images available to you.
@@ -982,9 +980,8 @@ class CloudController(object):
         Returns:
             A list of images.
         """
-        return image.describe_images(context, executable_by, image_id,
-                                     owner, filter)
 
+    @module_and_param_types(image, 'ami_id', 'str')
     def describe_image_attribute(self, context, image_id, attribute):
         """Describes the specified attribute of the specified AMI.
 
@@ -1001,6 +998,10 @@ class CloudController(object):
         """
         return image.describe_image_attribute(context, image_id, attribute)
 
+    @module_and_param_types(image, 'ami_id', 'str',
+                            'strs', 'str',
+                            'dummy', 'dummy',
+                            'dummy', 'dummy', 'dummy')
     def modify_image_attribute(self, context, image_id, attribute,
                                user_group, operation_type,
                                description=None, launch_permission=None,
@@ -1027,11 +1028,8 @@ class CloudController(object):
         Returns:
             true if the request succeeds.
         """
-        return image.modify_image_attribute(context, image_id, attribute,
-                                            user_group, operation_type,
-                                            description, launch_permission,
-                                            product_code, user_id, value)
 
+    @module_and_param_types(tag, 'ec2_ids', 'dummy')
     def create_tags(self, context, resource_id, tag):
         """Adds or overwrites one or more tags for the specified resources.
 
@@ -1045,8 +1043,8 @@ class CloudController(object):
         Returns:
             true if the request succeeds.
         """
-        return tag_api.create_tags(context, resource_id, tag)
 
+    @module_and_param_types(tag, 'ec2_ids', 'dummy')
     def delete_tags(self, context, resource_id, tag=None):
         """Deletes the specified tags from the specified resources.
 
@@ -1065,8 +1063,9 @@ class CloudController(object):
         its value. If you specify this parameter with an empty string as the
         value, we delete the key only if its value is an empty string.
         """
-        return tag_api.delete_tags(context, resource_id, tag)
 
+    @module_and_param_types(tag, 'filter', 'int',
+                            'str')
     def describe_tags(self, context, filter=None, max_results=None,
                       next_token=None):
         """Describes one or more of the tags for your EC2 resources.
@@ -1083,7 +1082,6 @@ class CloudController(object):
         Returns:
             A list of tags.
         """
-        return tag_api.describe_tags(context, filter, max_results, next_token)
 
 
 class VpcCloudController(CloudController):

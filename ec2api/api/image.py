@@ -74,6 +74,13 @@ rpcapi_opts = [
 CONF.register_opts(rpcapi_opts)
 
 
+"""Volume related API implementation
+"""
+
+
+Validator = common.Validator
+
+
 CONTAINER_TO_KIND = {'aki': 'aki',
                      'ari': 'ari',
                      'ami': 'ami',
