@@ -47,6 +47,9 @@ CONF.register_opts(ec2_opts)
 """
 
 
+Validator = common.Validator
+
+
 def create_internet_gateway(context):
     igw = db_api.add_item(context, 'igw', {})
     return {'internet_gateway': _format_internet_gateway(igw)}

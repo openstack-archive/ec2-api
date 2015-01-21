@@ -87,7 +87,10 @@ class Validator(object):
     def filter(self, filter):
         validator.validate_filter(filter)
 
-    def ec2_id(self, id, prefices=[]):
+    def key_value_dict_list(self, dict_list):
+        validator.validate_key_value_dict_list(dict_list, self.param_name)
+
+    def ec2_id(self, id, prefices=None):
         validator.validate_ec2_id(id, self.param_name, prefices)
 
     def ec2_ids(self, ids):
@@ -150,6 +153,12 @@ class Validator(object):
     def eipassoc_id(self, id):
         self.ec2_id(id, ['eipassoc'])
 
+    def rtbassoc_id(self, id):
+        self.ec2_id(id, ['rtbassoc'])
+
+    def eni_attach_id(self, id):
+        self.ec2_id(id, ['eni-attach'])
+
     def sg_id(self, id):
         self.ec2_id(id, ['sg'])
 
@@ -167,6 +176,12 @@ class Validator(object):
 
     def vol_ids(self, ids):
         self.multi(ids, self.vol_id)
+
+    def dopt_id(self, id):
+        self.ec2_id(id, ['dopt'])
+
+    def dopt_ids(self, ids):
+        self.multi(ids, self.dopt_id)
 
     def security_group_str(self, value):
         validator.validate_security_group_str(value, self.param_name,

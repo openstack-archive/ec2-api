@@ -42,6 +42,15 @@ CONF.register_opts(ec2_opts)
 """DHCP options related API implementation
 """
 
+
+class Validator(common.Validator):
+
+    def dopt_id_or_default(self, id):
+        if id == 'default':
+            return
+        self.ec2_id(id, ['dopt'])
+
+
 DHCP_OPTIONS_MAP = {'domain-name-servers': 'dns-server',
                     'domain-name': 'domain-name',
                     'ntp-servers': 'ntp-server',

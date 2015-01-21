@@ -41,6 +41,9 @@ LOG = logging.getLogger(__name__)
 """
 
 
+Validator = common.Validator
+
+
 def create_network_interface(context, subnet_id,
                              private_ip_address=None,
                              private_ip_addresses=None,

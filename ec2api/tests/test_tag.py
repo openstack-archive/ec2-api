@@ -83,7 +83,7 @@ class TagTestCase(base.ApiTestCase):
                           'return': True},
                          resp)
 
-    def test_create_tags_invlaid_parameters(self):
+    def test_create_tags_invalid_parameters(self):
         # NOTE(ft): check tag validity checks
         resp = self.execute('CreateTags',
                             {'ResourceId.1': fakes.ID_EC2_VPC_1,
@@ -135,7 +135,7 @@ class TagTestCase(base.ApiTestCase):
                 error_code = exc_class.__name__
             self.assertEqual(error_code, resp['Error']['Code'])
 
-    def check_delete_tag(self):
+    def test_delete_tag(self):
         resp = self.execute('DeleteTags',
                             {'ResourceId.1': fakes.ID_EC2_VPC_1,
                              'ResourceId.2': fakes.ID_EC2_SUBNET_1,
@@ -147,7 +147,7 @@ class TagTestCase(base.ApiTestCase):
                           'return': True},
                          resp)
         self.db_api.delete_tags.assert_called_once_with(
-            mock.ANY, [fakes.ID_EC2_VPC_1, fakes.ID_EC2_SUBNET_2],
+            mock.ANY, [fakes.ID_EC2_VPC_1, fakes.ID_EC2_SUBNET_1],
             [{'key': 'key1'},
              {'value': 'value2'},
              {'key': 'key3',

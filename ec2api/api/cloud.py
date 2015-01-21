@@ -1029,7 +1029,7 @@ class CloudController(object):
             true if the request succeeds.
         """
 
-    @module_and_param_types(tag, 'ec2_ids', 'dummy')
+    @module_and_param_types(tag, 'ec2_ids', 'key_value_dict_list')
     def create_tags(self, context, resource_id, tag):
         """Adds or overwrites one or more tags for the specified resources.
 
@@ -1111,6 +1111,7 @@ class VpcCloudController(CloudController):
         and the largest uses a /16 netmask.
         """
 
+    @module_and_param_types(vpc, 'vpc_id')
     def delete_vpc(self, context, vpc_id):
         """Deletes the specified VPC.
 
@@ -1129,6 +1130,7 @@ class VpcCloudController(CloudController):
         """
         return vpc.delete_vpc(context, vpc_id)
 
+    @module_and_param_types(vpc, 'vpc_ids', 'filter')
     def describe_vpcs(self, context, vpc_id=None, filter=None):
         """Describes one or more of your VPCs.
 
@@ -1144,6 +1146,7 @@ class VpcCloudController(CloudController):
         """
         return vpc.describe_vpcs(context, vpc_id, filter)
 
+    @module_and_param_types(internet_gateway)
     def create_internet_gateway(self, context):
         """Creates an Internet gateway for use with a VPC.
 
@@ -1153,8 +1156,8 @@ class VpcCloudController(CloudController):
         Returns:
             Information about the Internet gateway.
         """
-        return internet_gateway.create_internet_gateway(context)
 
+    @module_and_param_types(internet_gateway, 'igw_id', 'vpc_id')
     def attach_internet_gateway(self, context, internet_gateway_id, vpc_id):
         """Attaches an Internet gateway to a VPC.
 
@@ -1169,10 +1172,8 @@ class VpcCloudController(CloudController):
         Attaches an Internet gateway to a VPC, enabling connectivity between
         the Internet and the VPC.
         """
-        return internet_gateway.attach_internet_gateway(context,
-                                                       internet_gateway_id,
-                                                       vpc_id)
 
+    @module_and_param_types(internet_gateway, 'igw_id', 'vpc_id')
     def detach_internet_gateway(self, context, internet_gateway_id, vpc_id):
         """Detaches an Internet gateway from a VPC.
 
@@ -1188,10 +1189,8 @@ class VpcCloudController(CloudController):
         the Internet and the VPC. The VPC must not contain any running
         instances with Elastic IP addresses.
         """
-        return internet_gateway.detach_internet_gateway(context,
-                                                       internet_gateway_id,
-                                                       vpc_id)
 
+    @module_and_param_types(internet_gateway, 'igw_id')
     def delete_internet_gateway(self, context, internet_gateway_id):
         """Deletes the specified Internet gateway.
 
@@ -1205,9 +1204,9 @@ class VpcCloudController(CloudController):
         You must detach the Internet gateway from the VPC before you can
         delete it.
         """
-        return internet_gateway.delete_internet_gateway(context,
-                                                       internet_gateway_id)
 
+    @module_and_param_types(internet_gateway, 'igw_idS',
+                            'filter')
     def describe_internet_gateways(self, context, internet_gateway_id=None,
                                    filter=None):
         """Describes one or more of your Internet gateways.
@@ -1224,11 +1223,9 @@ class VpcCloudController(CloudController):
         Returns:
             A list of Internet gateways.
         """
-        return internet_gateway.describe_internet_gateways(context,
-                                                          internet_gateway_id,
-                                                          filter)
 
-    @module_and_param_types(subnet, 'vpc_id', 'subnet_cidr', 'str255')
+    @module_and_param_types(subnet, 'vpc_id', 'subnet_cidr',
+                            'str255')
     def create_subnet(self, context, vpc_id, cidr_block,
                       availability_zone=None):
         """Creates a subnet in an existing VPC.
@@ -1257,6 +1254,7 @@ class VpcCloudController(CloudController):
         in a star topology with a logical router in the middle.
         """
 
+    @module_and_param_types(subnet, 'subnet_id')
     def delete_subnet(self, context, subnet_id):
         """Deletes the specified subnet.
 
@@ -1270,8 +1268,8 @@ class VpcCloudController(CloudController):
         You must terminate all running instances in the subnet before
         you can delete the subnet.
         """
-        return subnet.delete_subnet(context, subnet_id)
 
+    @module_and_param_types(subnet, 'subnet_ids', 'filter')
     def describe_subnets(self, context, subnet_id=None, filter=None):
         """Describes one or more of your subnets.
 
@@ -1286,8 +1284,8 @@ class VpcCloudController(CloudController):
         Returns:
             A list of subnets.
         """
-        return subnet.describe_subnets(context, subnet_id, filter)
 
+    @module_and_param_types(route_table, 'vpc_id')
     def create_route_table(self, context, vpc_id):
         """Creates a route table for the specified VPC.
 
@@ -1301,10 +1299,11 @@ class VpcCloudController(CloudController):
         After you create a route table, you can add routes and associate the
         table with a subnet.
         """
-        return route_table.create_route_table(context, vpc_id)
 
     @module_and_param_types(route_table, 'rtb_id', 'cidr',
-                            'igw_id', 'i_id', 'eni_id', 'dummy')
+                            'igw_id', 'i_id',
+                            'eni_id',
+                            'dummy')
     def create_route(self, context, route_table_id, destination_cidr_block,
                      gateway_id=None, instance_id=None,
                      network_interface_id=None,
@@ -1334,6 +1333,10 @@ class VpcCloudController(CloudController):
         instance in the VPC.
         """
 
+    @module_and_param_types(route_table, 'rtb_id', 'cidr',
+                            'igw_id', 'i_id',
+                            'eni_id',
+                            'dummy')
     def replace_route(self, context, route_table_id, destination_cidr_block,
                       gateway_id=None, instance_id=None,
                       network_interface_id=None,
@@ -1358,12 +1361,8 @@ class VpcCloudController(CloudController):
         Returns:
             true if the requests succeeds.
         """
-        return route_table.replace_route(context, route_table_id,
-                                         destination_cidr_block,
-                                         gateway_id, instance_id,
-                                         network_interface_id,
-                                         vpc_peering_connection_id)
 
+    @module_and_param_types(route_table, 'rtb_id', 'cidr')
     def delete_route(self, context, route_table_id, destination_cidr_block):
         """Deletes the specified route from the specified route table.
 
@@ -1377,9 +1376,8 @@ class VpcCloudController(CloudController):
         Returns:
             true if the requests succeeds.
         """
-        return route_table.delete_route(context, route_table_id,
-                                        destination_cidr_block)
 
+    @module_and_param_types(route_table, 'rtb_id', 'subnet_id')
     def associate_route_table(self, context, route_table_id, subnet_id):
         """Associates a subnet with a route table.
 
@@ -1397,9 +1395,9 @@ class VpcCloudController(CloudController):
         which you need in order to disassociate the route table from the subnet
         later. A route table can be associated with multiple subnets.
         """
-        return route_table.associate_route_table(context, route_table_id,
-                                                 subnet_id)
 
+    @module_and_param_types(route_table, 'rtbassoc_id',
+                            'rtb_id')
     def replace_route_table_association(self, context, association_id,
                                         route_table_id):
         """Changes the route table associated with a given subnet in a VPC.
@@ -1418,10 +1416,8 @@ class VpcCloudController(CloudController):
         You can also use this action to change which table is the main route
         table in the VPC.
         """
-        return route_table.replace_route_table_association(context,
-                                                           association_id,
-                                                           route_table_id)
 
+    @module_and_param_types(route_table, 'rtbassoc_id')
     def disassociate_route_table(self, context, association_id):
         """Disassociates a subnet from a route table.
 
@@ -1436,8 +1432,8 @@ class VpcCloudController(CloudController):
         the route table. Instead, it uses the routes in the VPC's main route
         table.
         """
-        return route_table.disassociate_route_table(context, association_id)
 
+    @module_and_param_types(route_table, 'rtb_id')
     def delete_route_table(self, context, route_table_id):
         """Deletes the specified route table.
 
@@ -1451,8 +1447,8 @@ class VpcCloudController(CloudController):
         Returns:
             true if the requests succeeds.
         """
-        return route_table.delete_route_table(context, route_table_id)
 
+    @module_and_param_types(route_table, 'rtb_ids', 'filter')
     def describe_route_tables(self, context, route_table_id=None, filter=None):
         """Describes one or more of your route tables.
 
@@ -1465,9 +1461,8 @@ class VpcCloudController(CloudController):
         Returns:
             A list of route tables
         """
-        return route_table.describe_route_tables(context, route_table_id,
-                                                 filter)
 
+    @module_and_param_types(dhcp_options, 'key_value_dict_list')
     def create_dhcp_options(self, context, dhcp_configuration):
         """Creates a set of DHCP options for your VPC.
 
@@ -1487,8 +1482,9 @@ class VpcCloudController(CloudController):
             A set of DHCP options
 
         """
-        return dhcp_options.create_dhcp_options(context, dhcp_configuration)
 
+    @module_and_param_types(dhcp_options, 'dopt_ids',
+                            'filter')
     def describe_dhcp_options(self, context, dhcp_options_id=None,
                               filter=None):
         """Describes the specified DHCP options.
@@ -1496,7 +1492,7 @@ class VpcCloudController(CloudController):
 
         Args:
             context (RequestContext): The request context.
-            dhcp_options_id: DHCP options id.
+            dhcp_options_id (list of str): DHCP options id.
             filter (list of filter dict): You can specify filters so that
                 the response includes information for only certain DHCP
                 options.
@@ -1504,9 +1500,8 @@ class VpcCloudController(CloudController):
         Returns:
             DHCP options.
         """
-        return dhcp_options.describe_dhcp_options(context, dhcp_options_id,
-                                                  filter)
 
+    @module_and_param_types(dhcp_options, 'dopt_id')
     def delete_dhcp_options(self, context, dhcp_options_id):
         """Deletes the specified set of DHCP options
 
@@ -1521,8 +1516,8 @@ class VpcCloudController(CloudController):
         You can disassociate the set of DHCP options by associating either a
         new set of options or the default set of options with the VPC.
         """
-        return dhcp_options.delete_dhcp_options(context, dhcp_options_id)
 
+    @module_and_param_types(dhcp_options, 'dopt_id_or_default', 'vpc_id')
     def associate_dhcp_options(self, context, dhcp_options_id, vpc_id):
         """Associates a set of DHCP options with the specified VPC.
 
@@ -1534,9 +1529,13 @@ class VpcCloudController(CloudController):
         Returns:
             true if the request succeeds
         """
-        return dhcp_options.associate_dhcp_options(context, dhcp_options_id,
-                                                   vpc_id)
 
+    @module_and_param_types(network_interface, 'subnet_id',
+                            'ip',
+                            'dummy',
+                            'int',
+                            'str',
+                            'sg_ids')
     def create_network_interface(self, context, subnet_id,
                                  private_ip_address=None,
                                  private_ip_addresses=None,
@@ -1567,17 +1566,14 @@ class VpcCloudController(CloudController):
                 option and specify more than one private IP address using
                 private_ip_address and/or private_ip_addresses.
             description (str): A description for the network interface.
-            security_group_id (str): The list of security group IDs for the
-                network interface.
+            security_group_id (list of str): The list of security group IDs
+                for the network interface.
 
         Returns:
             The network interface that was created.
         """
-        return network_interface.create_network_interface(context, subnet_id,
-                    private_ip_address, private_ip_addresses,
-                    secondary_private_ip_address_count, description,
-                    security_group_id)
 
+    @module_and_param_types(network_interface, 'eni_id')
     def delete_network_interface(self, context, network_interface_id):
         """Deletes the specified network interface.
 
@@ -1591,9 +1587,9 @@ class VpcCloudController(CloudController):
 
         You must detach the network interface before you can delete it.
         """
-        return network_interface.delete_network_interface(context,
-                                                         network_interface_id)
 
+    @module_and_param_types(network_interface, 'eni_ids',
+                            'filter')
     def describe_network_interfaces(self, context, network_interface_id=None,
                                     filter=None):
         """Describes one or more of your network interfaces.
@@ -1613,6 +1609,8 @@ class VpcCloudController(CloudController):
         return network_interface.describe_network_interfaces(context,
                                                 network_interface_id, filter)
 
+    @module_and_param_types(network_interface, 'eni_id',
+                            'str')
     def describe_network_interface_attribute(self, context,
                                              network_interface_id,
                                              attribute):
@@ -1632,6 +1630,10 @@ class VpcCloudController(CloudController):
         return network_interface.describe_network_interface_attribute(
                 context, network_interface_id, attribute)
 
+    @module_and_param_types(network_interface, 'eni_id',
+                            'str',
+                            'bool',
+                            'sg_ids')
     def modify_network_interface_attribute(self, context,
                                              network_interface_id,
                                              description=None,
@@ -1655,11 +1657,9 @@ class VpcCloudController(CloudController):
 
         You can specify only one attribute at a time.
         """
-        return network_interface.modify_network_interface_attribute(context,
-                                            network_interface_id, description,
-                                            source_dest_check,
-                                            security_group_id)
 
+    @module_and_param_types(network_interface, 'eni_id',
+                            'str')
     def reset_network_interface_attribute(self, context,
                                              network_interface_id,
                                              attribute):
@@ -1675,9 +1675,9 @@ class VpcCloudController(CloudController):
         Returns:
             true if the request succeeds.
         """
-        return network_interface.reset_network_interface_attribute(context,
-                                            network_interface_id, attribute)
 
+    @module_and_param_types(network_interface, 'eni_id',
+                            'i_id', 'int')
     def attach_network_interface(self, context, network_interface_id,
                                  instance_id, device_index):
         """Attach a network interface to an instance.
@@ -1692,11 +1692,9 @@ class VpcCloudController(CloudController):
         Returns:
             Attachment Id
         """
-        return network_interface.attach_network_interface(context,
-                                                          network_interface_id,
-                                                          instance_id,
-                                                          device_index)
 
+    @module_and_param_types(network_interface, 'eni_attach_id',
+                            'bool')
     def detach_network_interface(self, context, attachment_id,
                                  force=None):
         """Detach a network interface from an instance.
@@ -1709,10 +1707,11 @@ class VpcCloudController(CloudController):
         Returns:
             true if the request succeeds.
         """
-        return network_interface.detach_network_interface(context,
-                                                         attachment_id,
-                                                         force)
 
+    @module_and_param_types(network_interface, 'eni_id',
+                            'ips',
+                            'int',
+                            'bool')
     def assign_private_ip_addresses(self, context, network_interface_id,
                                     private_ip_address=None,
                                     secondary_private_ip_address_count=None,
@@ -1729,13 +1728,9 @@ class VpcCloudController(CloudController):
         Returns:
             true if the request succeeds.
         """
-        return network_interface.assign_private_ip_addresses(
-            context,
-            network_interface_id,
-            private_ip_address,
-            secondary_private_ip_address_count,
-            allow_reassignment)
 
+    @module_and_param_types(network_interface, 'eni_id',
+                            'ips')
     def unassign_private_ip_addresses(self, context, network_interface_id,
                                       private_ip_address=None):
         """Unassigns secondary IP addresses from the network interface.
@@ -1748,7 +1743,3 @@ class VpcCloudController(CloudController):
         Returns:
             true if the request succeeds.
         """
-        return network_interface.unassign_private_ip_addresses(
-            context,
-            network_interface_id,
-            private_ip_address)

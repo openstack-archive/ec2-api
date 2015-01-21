@@ -181,6 +181,15 @@ def validate_filter(filters):
     return True
 
 
+def validate_key_value_dict_list(dict_list, parameter_name):
+    for dict in dict_list:
+        if not dict.get('key') or dict.get('value') is None:
+            raise exception.InvalidParameterValue(
+                value=dict, parameter=parameter_name,
+                reason=_('Expected list of key value dictionaries'))
+    return True
+
+
 def validate_security_group_str(value, parameter_name, vpc_id=None):
     # NOTE(Alex) Amazon accepts any ASCII for EC2 classic;
     # for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
