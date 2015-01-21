@@ -1190,6 +1190,12 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                           instance_api._parse_image_parameters,
                           fake_context, image_id, None, None)
 
+        db_api.get_public_items.return_value = []
+        db_api.get_item_by_id.return_value = None
+        self.assertRaises(exception.InvalidAMIIDNotFound,
+                          instance_api._parse_image_parameters,
+                          fake_context, fakes.random_ec2_id('ami'), None, None)
+
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_block_device_mapping(self, db_api):
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])

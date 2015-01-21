@@ -619,7 +619,7 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
             if images:
                 image = images[0]
             else:
-                image = db_api.get_item_by_id(context, kind, ec2_image_id)
+                image = ec2utils.get_db_item(context, kind, ec2_image_id)
             os_image = glance.images.get(image['os_id'])
         except (IndexError, glance_exception.HTTPNotFound):
             raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
