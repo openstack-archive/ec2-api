@@ -17,7 +17,7 @@ class OnCrashCleaner(object):
 
     def __init__(self):
         self._cleanups = []
-        self._first_cleanups = []
+        self._suppress_exception = False
 
     def __enter__(self):
         return self
@@ -25,14 +25,15 @@ class OnCrashCleaner(object):
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
             return
-        self._run_cleanups(self._first_cleanups)
         self._run_cleanups(self._cleanups)
+        return self._suppress_exception
 
     def addCleanup(self, function, *args, **kwargs):
         self._cleanups.append((function, args, kwargs))
 
-    def addFirstCleanup(self, function, *args, **kwargs):
-        self._first_cleanups.append((function, args, kwargs))
+    def approveChanges(self):
+        del self._cleanups[:]
+        self._suppress_exception = True
 
     def _run_cleanups(self, cleanups):
         for function, args, kwargs in reversed(cleanups):

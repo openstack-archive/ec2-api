@@ -515,6 +515,80 @@ class InstanceTestCase(base.ApiTestCase):
                         fakes.ID_EC2_NETWORK_INTERFACE_1},
                  new_port=False)
 
+    @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
+                'format_network_interfaces')
+    @mock.patch('ec2api.api.instance._format_reservation')
+    def test_run_instances_multiply_rollback(self, format_reservation,
+                                             format_network_interfaces):
+        instances = [{'id': fakes.random_ec2_id('i'),
+                      'os_id': fakes.random_os_id()}
+                     for dummy in range(3)]
+        os_instances = [fakes.OSInstance(inst['os_id'])
+                        for inst in instances]
+        network_interfaces = [{'id': fakes.random_ec2_id('eni'),
+                               'os_id': fakes.random_os_id()}
+                              for dummy in range(3)]
+
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id(
+                dict((item['id'], item)
+                     for item in itertools.chain([fakes.DB_SUBNET_1],
+                                                 network_interfaces))))
+        self.db_api.get_item_ids.return_value = [
+                (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
+        self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
+
+        self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
+        format_network_interfaces.return_value = []
+
+        def do_check(engine):
+            instance_api.instance_engine = engine
+
+            self.network_interface_api.create_network_interface.side_effect = [
+                {'networkInterface': {'networkInterfaceId': eni['id']}}
+                for eni in network_interfaces]
+            self.db_api.add_item.side_effect = instances
+            self.nova_servers.create.side_effect = os_instances
+            self.novadb.instance_get_by_uuid.side_effect = [
+                {}, {}, Exception()]
+            format_reservation.side_effect = (
+                lambda _context, r_id, instance_info, *args, **kwargs: (
+                    {'reservationId': r_id,
+                     'instancesSet': [
+                          {'instanceId': inst['id']}
+                          for inst, _os_inst, _novadb_inst in instance_info]}))
+
+            resp = self.execute('RunInstances',
+                                {'ImageId': fakes.ID_EC2_IMAGE_1,
+                                 'InstanceType': 'fake_flavor',
+                                 'MinCount': '2', 'MaxCount': '3',
+                                 'SubnetId': fakes.ID_EC2_SUBNET_1})
+            self.assertEqual(200, resp['http_status_code'])
+            resp.pop('http_status_code')
+            self.assertThat(resp,
+                            matchers.DictMatches(
+                                {'reservationId': fakes.ID_EC2_RESERVATION_1,
+                                 'instancesSet': [
+                                    {'instanceId': inst['id']}
+                                    for inst in instances[:2]]}))
+
+            self.nova_servers.delete.assert_called_once_with(
+                instances[2]['os_id'])
+            self.db_api.delete_item.assert_called_once_with(
+                mock.ANY, instances[2]['id'])
+
+            self.nova_servers.reset_mock()
+            self.db_api.reset_mock()
+
+        do_check(instance_api.InstanceEngineNeutron())
+        (self.network_interface_api._detach_network_interface_item.
+         assert_called_once_with(mock.ANY, network_interfaces[2]))
+        (self.network_interface_api.delete_network_interface.
+         assert_called_once_with(
+            mock.ANY, network_interface_id=network_interfaces[2]['id']))
+
+        do_check(instance_api.InstanceEngineNova())
+
     def test_run_instances_invalid_parameters(self):
         resp = self.execute('RunInstances',
                             {'ImageId': fakes.ID_EC2_IMAGE_1,

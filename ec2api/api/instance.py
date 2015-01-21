@@ -781,7 +781,7 @@ class InstanceEngineNeutron(object):
             vpc_network_parameters, min_count, min_count)
 
         (vpc_id,
-         network_interfaces,
+         existed_network_interfaces,
          create_network_interfaces_args,
          delete_on_termination_flags) = (
             self.parse_network_interface_parameters(
@@ -801,44 +801,30 @@ class InstanceEngineNeutron(object):
         instances_info = []
         ec2_reservation_id = _generate_reservation_id()
 
-        # TODO(ft): Process min and max counts on running errors accordingly to
-        # their meanings. Correct error messages are also critical
         with utils.OnCrashCleaner() as cleaner:
-            # NOTE(ft): create Neutron's ports manually to have a chance to:
+            # NOTE(ft): create Neutron's ports manually and run instances one
+            # by one to have a chance to:
             # process individual network interface options like security_group
             # or private_ip_addresses (Nova's create_instances receives only
             # one fixed_ip for subnet)
             # set dhcp options to port
-            # add network interfaces to our DB
-            # TODO(ft): try to:
-            # extend Nova's create_instances interface to accept additional
-            # network options like for Neutron's create_port
-            # improve Neutron's dhcp extension to have ability to store
-            # dhcp options for subnet and use them when port is being created
+            # add corresponding OS ids of network interfaces to our DB
             # TODO(ft): we should lock created network interfaces to prevent
             # their usage or deleting
+            instance_network_interfaces = []
+
             # TODO(ft): do correct error messages on create failures. For
             # example, overlimit, ip lack, ip overlapping, etc
-            if max_count == 1:
-                for eni in network_interfaces:
-                    cleaner.addFirstCleanup(neutron.update_port,
-                                            eni['os_id'],
-                                            {'port': {'device_id': '',
-                                                      'device_owner': ''}})
-                new_network_interfaces = self.create_network_interfaces(
-                        context, cleaner, create_network_interfaces_args)
-                network_interfaces.extend(new_network_interfaces)
-                instance_network_interfaces = [network_interfaces]
-            else:
-                instance_network_interfaces = []
-                for dummy in range(max_count):
-                    network_interfaces = self.create_network_interfaces(
-                        context, cleaner, create_network_interfaces_args)
-                    instance_network_interfaces.append(network_interfaces)
+            for launch_index in range(max_count):
+                if launch_index >= min_count:
+                    cleaner.approveChanges()
 
-            # NOTE(ft): run instances one by one using created ports
-            for (launch_index,
-                 network_interfaces) in enumerate(instance_network_interfaces):
+                network_interfaces = self.create_network_interfaces(
+                        context, cleaner, create_network_interfaces_args)
+                if max_count == 1:
+                    network_interfaces = (existed_network_interfaces +
+                                          network_interfaces)
+                instance_network_interfaces.append(network_interfaces)
                 nics = ([{'port-id': eni['os_id']} for eni in
                          network_interfaces]
                         if vpc_id else
@@ -855,6 +841,12 @@ class InstanceEngineNeutron(object):
                     nics=nics,
                     key_name=key_name, userdata=user_data)
                 cleaner.addCleanup(nova.servers.delete, os_instance.id)
+                if max_count == 1:
+                    for eni in existed_network_interfaces:
+                        cleaner.addCleanup(neutron.update_port,
+                                           eni['os_id'],
+                                           {'port': {'device_id': '',
+                                                     'device_owner': ''}})
 
                 instance = {'os_id': os_instance.id,
                             'vpc_id': vpc_id,
@@ -1071,8 +1063,8 @@ class InstanceEngineNeutron(object):
                                network_interface_id=ec2_network_interface_id)
             # TODO(ft): receive network_interface from a
             # create_network_interface sub-function
-            network_interface = ec2utils.get_db_item(context, 'eni',
-                                                     ec2_network_interface_id)
+            network_interface = db_api.get_item_by_id(context, 'eni',
+                                                      ec2_network_interface_id)
             network_interfaces.append(network_interface)
 
         return network_interfaces
@@ -1172,10 +1164,13 @@ class InstanceEngineNova(object):
         instances_info = []
         ec2_reservation_id = _generate_reservation_id()
 
-        # TODO(ft): Process min and max counts on running errors accordingly to
-        # their meanings. Correct error messages are also critical
+        # TODO(ft): do correct error messages on create failures. For
+        # example, overlimit, ip lack, ip overlapping, etc
         with utils.OnCrashCleaner() as cleaner:
             for index in range(max_count):
+                if index >= min_count:
+                    cleaner.approveChanges()
+
                 os_instance = nova.servers.create(
                     'EC2 server', os_image.id, os_flavor,
                     min_count=min_count, max_count=max_count,
@@ -1185,7 +1180,7 @@ class InstanceEngineNova(object):
                     block_device_mapping=bdm,
                     security_groups=security_group,
                     key_name=key_name, userdata=user_data)
-                cleaner.addCleanup(nova.servers.delete, os_instance)
+                cleaner.addCleanup(nova.servers.delete, os_instance.id)
 
                 instance = {'os_id': os_instance.id,
                             'reservation_id': ec2_reservation_id,
