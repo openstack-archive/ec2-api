@@ -40,7 +40,8 @@ class EC2UtilsTestCase(testtools.TestCase):
         check_normal_flow('vpc', 'vpc-001234af')
         check_normal_flow('igw', 'igw-00000022')
 
-        def check_not_found(kind, ec2_id, ex_class):
+        def check_not_found(kind, ex_class):
+            ec2_id = fakes.random_ec2_id(kind)
             self.assertRaises(ex_class,
                               ec2utils.get_db_item,
                               'fake_context', kind, ec2_id)
@@ -49,24 +50,18 @@ class EC2UtilsTestCase(testtools.TestCase):
             db_api.reset_mock()
 
         db_api.get_item_by_id.return_value = None
-        check_not_found('vpc', 'vpc-00000022',
-                        exception.InvalidVpcIDNotFound)
-        check_not_found('igw', 'igw-00000022',
-                        exception.InvalidInternetGatewayIDNotFound)
-        check_not_found('subnet', 'subnet-00000022',
-                        exception.InvalidSubnetIDNotFound)
-        check_not_found('eni', 'eni-00000022',
-                        exception.InvalidNetworkInterfaceIDNotFound)
-        check_not_found('dopt', 'dopt-00000022',
-                        exception.InvalidDhcpOptionsIDNotFound)
-        check_not_found('eipalloc', 'eipalloc-00000022',
-                        exception.InvalidAllocationIDNotFound)
-        check_not_found('sg', 'sg-00000022',
-                        exception.InvalidGroupNotFound)
-        check_not_found('rtb', 'rtb--00000022',
-                        exception.InvalidRouteTableIDNotFound)
-        check_not_found('i', 'i-00000022',
-                        exception.InvalidInstanceIDNotFound)
+        check_not_found('vpc', exception.InvalidVpcIDNotFound)
+        check_not_found('igw', exception.InvalidInternetGatewayIDNotFound)
+        check_not_found('subnet', exception.InvalidSubnetIDNotFound)
+        check_not_found('eni', exception.InvalidNetworkInterfaceIDNotFound)
+        check_not_found('dopt', exception.InvalidDhcpOptionsIDNotFound)
+        check_not_found('eipalloc', exception.InvalidAllocationIDNotFound)
+        check_not_found('sg', exception.InvalidGroupNotFound)
+        check_not_found('rtb', exception.InvalidRouteTableIDNotFound)
+        check_not_found('i', exception.InvalidInstanceIDNotFound)
+        check_not_found('vol', exception.InvalidVolumeNotFound)
+        check_not_found('snap', exception.InvalidSnapshotNotFound)
+        check_not_found('ami', exception.InvalidAMIIDNotFound)
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_db_items(self, db_api):
@@ -116,6 +111,9 @@ class EC2UtilsTestCase(testtools.TestCase):
         check_not_found('sg', exception.InvalidGroupNotFound)
         check_not_found('rtb', exception.InvalidRouteTableIDNotFound)
         check_not_found('i', exception.InvalidInstanceIDNotFound)
+        check_not_found('vol', exception.InvalidVolumeNotFound)
+        check_not_found('snap', exception.InvalidSnapshotNotFound)
+        check_not_found('ami', exception.InvalidAMIIDNotFound)
 
     """Unit test api xml conversion."""
     def test_number_conversion(self):

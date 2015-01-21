@@ -20,7 +20,7 @@ from ec2api.openstack.common.gettextutils import _
 
 
 RESOURCE_TYPES = {
-    'dhcp': 'dhcp-options',
+    'dopt': 'dhcp-options',
     'ami': 'image',
     'aki': 'image',
     'ari': 'image',

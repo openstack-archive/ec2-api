@@ -253,7 +253,7 @@ class UniversalDescriber(object):
         # NOTE(Alex): some requested items are not found
         if self.ids or self.names:
             params = {'id': next(iter(self.ids or self.names))}
-            raise ec2utils._NOT_FOUND_EXCEPTION_MAP[self.KIND](**params)
+            raise ec2utils.NOT_FOUND_EXCEPTION_MAP[self.KIND](**params)
         return formatted_items
 
 

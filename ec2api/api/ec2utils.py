@@ -159,7 +159,7 @@ def change_ec2_id_kind(obj_id, new_kind):
     return '%(kind)s-%(id)s' % {'kind': new_kind,
                                 'id': obj_id.split('-')[-1]}
 
-_NOT_FOUND_EXCEPTION_MAP = {
+NOT_FOUND_EXCEPTION_MAP = {
     'vpc': exception.InvalidVpcIDNotFound,
     'igw': exception.InvalidInternetGatewayIDNotFound,
     'subnet': exception.InvalidSubnetIDNotFound,
@@ -181,7 +181,7 @@ def get_db_item(context, kind, ec2_id):
     item = db_api.get_item_by_id(context, kind, ec2_id)
     if item is None:
         params = {'id': ec2_id}
-        raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
+        raise NOT_FOUND_EXCEPTION_MAP[kind](**params)
     return item
 
 
@@ -195,7 +195,7 @@ def get_db_items(context, kind, ec2_ids):
     if len(items) < len(ec2_ids):
         missed_ids = ec2_ids - set((item['id'] for item in items))
         params = {'id': next(iter(missed_ids))}
-        raise _NOT_FOUND_EXCEPTION_MAP[kind](**params)
+        raise NOT_FOUND_EXCEPTION_MAP[kind](**params)
     return items
 
 
