@@ -21,7 +21,6 @@ from novaclient import exceptions as nova_exception
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -67,7 +66,7 @@ def delete_route(context, route_table_id, destination_cidr_block):
         raise exception.InvalidRouteNotFound({
             'route_table_id': route_table_id,
             'destination_cidr_block': destination_cidr_block})
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         db_api.update_item(context, route_table)
         cleaner.addCleanup(db_api.update_item, context,
                            rollback_route_table_state)
@@ -96,7 +95,7 @@ def associate_route_table(context, route_table_id, subnet_id):
     vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
     main_route_table = db_api.get_item_by_id(context, 'rtb',
                                              vpc['route_table_id'])
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         _associate_subnet_item(context, subnet, route_table['id'])
         cleaner.addCleanup(_disassociate_subnet_item, context, subnet)
 
@@ -121,7 +120,7 @@ def replace_route_table_association(context, association_id, route_table_id):
 
         rollabck_route_table_object = db_api.get_item_by_id(
             context, 'rtb', vpc['route_table_id'])
-        with utils.OnCrashCleaner() as cleaner:
+        with common.OnCrashCleaner() as cleaner:
             _associate_vpc_item(context, vpc, route_table['id'])
             cleaner.addCleanup(_associate_vpc_item, context, vpc,
                                rollabck_route_table_object['id'])
@@ -147,7 +146,7 @@ def replace_route_table_association(context, association_id, route_table_id):
 
         rollabck_route_table_object = db_api.get_item_by_id(
             context, 'rtb', subnet['route_table_id'])
-        with utils.OnCrashCleaner() as cleaner:
+        with common.OnCrashCleaner() as cleaner:
             _associate_subnet_item(context, subnet, route_table['id'])
             cleaner.addCleanup(_associate_subnet_item, context, subnet,
                                rollabck_route_table_object['id'])
@@ -182,7 +181,7 @@ def disassociate_route_table(context, association_id):
     vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
     main_route_table = db_api.get_item_by_id(
         context, 'rtb', vpc['route_table_id'])
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         _disassociate_subnet_item(context, subnet)
         cleaner.addCleanup(_associate_subnet_item, context, subnet,
                            rollback_route_table_object['id'])
@@ -375,7 +374,7 @@ def _set_route(context, route_table_id, destination_cidr_block,
     if not idempotent_call:
         route_table['routes'].append(route)
 
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         db_api.update_item(context, route_table)
         cleaner.addCleanup(db_api.update_item, context,
                            rollabck_route_table_state)

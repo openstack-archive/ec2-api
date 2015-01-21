@@ -17,9 +17,9 @@ import copy
 
 import mock
 
+from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import route_table
-from ec2api.api import utils
 from ec2api.tests import base
 from ec2api.tests import fakes
 from ec2api.tests import matchers
@@ -811,10 +811,8 @@ class RouteTableTestCase(base.ApiTestCase):
                             {'destination': '0.0.0.0/0',
                              'nexthop': fakes.IP_GATEWAY_SUBNET_1}]))
 
-    # TODO(Alex) By some reason utils.OnCrashCleaner() doens't work
-    # Need to investigate and revive
     @mock.patch('ec2api.api.route_table._get_subnet_host_routes')
-    def _test_update_subnet_host_routes(self, routes_getter):
+    def test_update_subnet_host_routes(self, routes_getter):
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
         routes_getter.return_value = 'fake_routes'
 
@@ -836,7 +834,7 @@ class RouteTableTestCase(base.ApiTestCase):
         routes_getter.side_effect = ['fake_routes', 'fake_previous_routes']
 
         try:
-            with utils.OnCrashCleaner() as cleaner:
+            with common.OnCrashCleaner() as cleaner:
                 route_table._update_subnet_host_routes(
                     self._create_context(), fakes.DB_SUBNET_1,
                     fakes.DB_ROUTE_TABLE_1, cleaner,

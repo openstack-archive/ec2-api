@@ -24,7 +24,6 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -79,7 +78,7 @@ def attach_internet_gateway(context, internet_gateway_id, vpc_id):
 
     # TODO(ft):
     # set attaching state in db
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         _attach_internet_gateway_item(context, igw, vpc['id'])
         cleaner.addCleanup(_detach_internet_gateway_item, context, igw)
         neutron.add_gateway_router(vpc['os_id'],
@@ -97,7 +96,7 @@ def detach_internet_gateway(context, internet_gateway_id, vpc_id):
     neutron = clients.neutron(context)
     # TODO(ft):
     # set detaching state in db
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         _detach_internet_gateway_item(context, igw)
         cleaner.addCleanup(_attach_internet_gateway_item,
                            context, igw, vpc['id'])

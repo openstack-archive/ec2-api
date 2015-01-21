@@ -23,7 +23,6 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -217,7 +216,7 @@ class AddressEngineNeutron(object):
         os_networks = neutron.list_networks(**search_opts)['networks']
         os_public_network = os_networks[0]
 
-        with utils.OnCrashCleaner() as cleaner:
+        with common.OnCrashCleaner() as cleaner:
             os_floating_ip = {'floating_network_id': os_public_network['id']}
             # TODO(ft): handle error to process floating ip overlimit
             os_floating_ip = neutron.create_floatingip(
@@ -252,7 +251,7 @@ class AddressEngineNeutron(object):
             raise exception.InvalidIPAddressInUse(
                 ip_address=address['public_ip'])
 
-        with utils.OnCrashCleaner() as cleaner:
+        with common.OnCrashCleaner() as cleaner:
             db_api.delete_item(context, address['id'])
             cleaner.addCleanup(db_api.restore_item, context,
                                'eipalloc', address)
@@ -323,7 +322,7 @@ class AddressEngineNeutron(object):
                             address['id'], 'eipassoc')}
             raise exception.ResourceAlreadyAssociated(msg)
         else:
-            with utils.OnCrashCleaner() as cleaner:
+            with common.OnCrashCleaner() as cleaner:
                 _associate_address_item(context, address,
                                         network_interface['id'],
                                         private_ip_address)
@@ -358,7 +357,7 @@ class AddressEngineNeutron(object):
             raise exception.InvalidAssociationIDNotFound(
                     id=association_id)
         if 'network_interface_id' in address:
-            with utils.OnCrashCleaner() as cleaner:
+            with common.OnCrashCleaner() as cleaner:
                 network_interface_id = address['network_interface_id']
                 private_ip_address = address['private_ip_address']
                 _disassociate_address_item(context, address)

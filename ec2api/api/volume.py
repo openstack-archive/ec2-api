@@ -17,7 +17,6 @@ from cinderclient import exceptions as cinder_exception
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -40,7 +39,7 @@ def create_volume(context, availability_zone=None, size=None,
         os_snapshot_id = None
 
     cinder = clients.cinder(context)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         os_volume = cinder.volumes.create(
                 size, snapshot_id=os_snapshot_id, volume_type=volume_type,
                 availability_zone=availability_zone)

@@ -22,7 +22,6 @@ from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import route_table as route_table_api
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -61,7 +60,7 @@ def create_subnet(context, vpc_id, cidr_block,
     host_routes = route_table_api._get_subnet_host_routes(
             context, main_route_table, gateway_ip)
     neutron = clients.neutron(context)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         os_network_body = {'network': {}}
         os_network = neutron.create_network(os_network_body)['network']
         cleaner.addCleanup(neutron.delete_network, os_network['id'])
@@ -105,7 +104,7 @@ def delete_subnet(context, subnet_id):
                 "cannot be deleted.") % {'subnet_id': subnet_id}
         raise exception.DependencyViolation(msg)
     neutron = clients.neutron(context)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         db_api.delete_item(context, subnet['id'])
         cleaner.addCleanup(db_api.restore_item, context, 'subnet', subnet)
         try:

@@ -25,7 +25,6 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
@@ -60,7 +59,7 @@ def get_security_group_engine():
 def create_security_group(context, group_name, group_description,
                           vpc_id=None):
     nova = clients.nova(context)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         try:
             os_security_group = nova.security_groups.create(group_name,
                                                             group_description)

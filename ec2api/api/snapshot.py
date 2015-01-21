@@ -17,7 +17,6 @@ from cinderclient import exceptions as cinder_exception
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -42,7 +41,7 @@ def create_snapshot(context, volume_id, description=None):
         msg = (_("'%s' is not in a state where snapshots are allowed.") %
                volume_id)
         raise exception.IncorrectState(reason=msg)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         os_snapshot = cinder.volume_snapshots.create(
                 os_volume.id, force=True,
                 display_description=description)

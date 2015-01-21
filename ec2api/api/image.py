@@ -34,7 +34,6 @@ from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
-from ec2api.api import utils
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
@@ -139,7 +138,7 @@ def create_image(context, instance_id, name=None, description=None,
     name_map = dict(instance=instance['os_id'], now=timeutils.isotime())
     name = name or _('image of %(instance)s at %(now)s') % name_map
 
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         os_image = os_instance.create_image(name)
         cleaner.addCleanup(os_image.delete)
         image = db_api.add_item(context, _get_os_image_kind(os_image),
@@ -175,7 +174,7 @@ def register_image(context, name=None, image_location=None,
                     for bdm in block_device_mapping]
         properties['block_device_mapping'] = mappings
 
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         os_image = _s3_create(context, metadata)
         cleaner.addCleanup(os_image.delete)
         kind = _get_os_image_kind(os_image)

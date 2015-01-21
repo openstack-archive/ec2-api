@@ -19,7 +19,6 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -142,7 +141,7 @@ def associate_dhcp_options(context, dhcp_options_id, vpc_id):
             db_api.get_item_by_id(context, 'dopt', rollback_dhcp_options_id)
             if dhcp_options_id is not None else
             None)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         _associate_vpc_item(context, vpc, dhcp_options_id)
         cleaner.addCleanup(_associate_vpc_item, context, vpc,
                            rollback_dhcp_options_id)

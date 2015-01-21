@@ -30,7 +30,6 @@ from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import security_group as security_group_api
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api import novadb
@@ -801,7 +800,7 @@ class InstanceEngineNeutron(object):
         instances_info = []
         ec2_reservation_id = _generate_reservation_id()
 
-        with utils.OnCrashCleaner() as cleaner:
+        with common.OnCrashCleaner() as cleaner:
             # NOTE(ft): create Neutron's ports manually and run instances one
             # by one to have a chance to:
             # process individual network interface options like security_group
@@ -1166,7 +1165,7 @@ class InstanceEngineNova(object):
 
         # TODO(ft): do correct error messages on create failures. For
         # example, overlimit, ip lack, ip overlapping, etc
-        with utils.OnCrashCleaner() as cleaner:
+        with common.OnCrashCleaner() as cleaner:
             for index in range(max_count):
                 if index >= min_count:
                     cleaner.approveChanges()

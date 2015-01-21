@@ -25,7 +25,6 @@ from ec2api.api import common
 from ec2api.api import dhcp_options
 from ec2api.api import ec2utils
 from ec2api.api import security_group as security_group_api
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -110,7 +109,7 @@ def create_network_interface(context, subnet_id,
                 'different networks.')
         raise exception.InvalidGroupNotFound(msg)
     os_groups = [security_group['os_id'] for security_group in security_groups]
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         os_port_body = {'port': {'network_id': os_subnet['network_id'],
                                  'security_groups': os_groups}}
         os_port_body['port']['fixed_ips'] = fixed_ips
@@ -169,7 +168,7 @@ def delete_network_interface(context, network_interface_id):
             db_api.update_item(context, address)
 
     neutron = clients.neutron(context)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         db_api.delete_item(context, network_interface['id'])
         cleaner.addCleanup(db_api.restore_item, context, 'eni',
                            network_interface)
@@ -356,7 +355,7 @@ def attach_network_interface(context, network_interface_id,
     # (which means that it doesn't belong to any VPC and can't be attached)
     os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
     nova = clients.nova(context)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         # TODO(Alex) nova inserts compute:%availability_zone into device_owner
         #                              'device_owner': 'compute:None'}})
         _attach_network_interface_item(context, network_interface,
@@ -381,7 +380,7 @@ def detach_network_interface(context, attachment_id, force=None):
     # forbid detaching.
     neutron = clients.neutron(context)
     os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         instance_id = network_interface['instance_id']
         attach_time = network_interface['attach_time']
         delete_on_termination = network_interface['delete_on_termination']

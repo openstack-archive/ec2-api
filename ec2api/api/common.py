@@ -14,6 +14,7 @@
 
 import collections
 import fnmatch
+import inspect
 
 from oslo.config import cfg
 
@@ -21,6 +22,8 @@ from ec2api.api import ec2utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
+from ec2api.openstack.common import gettextutils as textutils
+from ec2api.openstack.common import log as logging
 
 
 ec2_opts = [
@@ -31,6 +34,62 @@ ec2_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
+LOG = logging.getLogger(__name__)
+
+
+class OnCrashCleaner(object):
+
+    def __init__(self):
+        self._cleanups = []
+        self._suppress_exception = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            return
+        self._run_cleanups(self._cleanups)
+        return self._suppress_exception
+
+    def addCleanup(self, function, *args, **kwargs):
+        self._cleanups.append((function, args, kwargs))
+
+    def approveChanges(self):
+        del self._cleanups[:]
+        self._suppress_exception = True
+
+    def _run_cleanups(self, cleanups):
+        for function, args, kwargs in reversed(cleanups):
+            try:
+                function(*args, **kwargs)
+            except Exception:
+                if inspect.ismethod(function):
+                    name = '%s.%s.%s' % (function.im_class.__module__,
+                                         function.im_class.__name__,
+                                         function.__name__)
+                elif inspect.isfunction(function):
+                    name = '%s.%s' % (function.__module__,
+                                      function.__name__)
+                else:
+                    name = '%s.%s' % (function.__class__.__module__,
+                                      function.__class__.__name__)
+                formatted_args = ''
+                args_string = ', '.join([repr(arg) for arg in args])
+                kwargs_string = ', '.join([
+                    '%s=%r' % (key, value) for key, value in kwargs.items()
+                ])
+                if args_string:
+                    formatted_args = args_string
+                if kwargs_string:
+                    if formatted_args:
+                        formatted_args += ', '
+                    formatted_args += kwargs_string
+                LOG.warning(
+                    textutils._LW('Error cleaning up %(name)s(%(args)s)') %
+                    {'name': name, 'args': formatted_args},
+                    exc_info=True)
+                pass
 
 
 class Validator(object):
@@ -158,12 +217,6 @@ class Validator(object):
 
     def eni_attach_id(self, id):
         self.ec2_id(id, ['eni-attach'])
-
-    def sg_id(self, id):
-        self.ec2_id(id, ['sg'])
-
-    def sg_ids(self, ids):
-        self.multi(ids, self.sg_id)
 
     def snap_id(self, id):
         self.ec2_id(id, ['snap'])

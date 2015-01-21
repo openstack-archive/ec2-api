@@ -23,7 +23,6 @@ from ec2api.api import internet_gateway as internet_gateway_api
 from ec2api.api import route_table as route_table_api
 from ec2api.api import security_group as security_group_api
 from ec2api.api import subnet as subnet_api
-from ec2api.api import utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -46,7 +45,7 @@ def create_vpc(context, cidr_block, instance_tenancy='default'):
     # TODO(Alex): Handle errors like overlimit
     # TODO(ft) dhcp_options_id
     # TODO(ft): refactor to prevent update created objects
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         os_router_body = {'router': {}}
         os_router = neutron.create_router(os_router_body)['router']
         cleaner.addCleanup(neutron.delete_router, os_router['id'])
@@ -84,7 +83,7 @@ def delete_vpc(context, vpc_id):
         raise exception.DependencyViolation(msg)
 
     neutron = clients.neutron(context)
-    with utils.OnCrashCleaner() as cleaner:
+    with common.OnCrashCleaner() as cleaner:
         db_api.delete_item(context, vpc['id'])
         cleaner.addCleanup(db_api.restore_item, context, 'vpc', vpc)
         route_table_api._delete_route_table(context, vpc['route_table_id'],
