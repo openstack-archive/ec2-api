@@ -153,6 +153,14 @@ class TagTestCase(base.ApiTestCase):
              {'key': 'key3',
               'value': 'value3'}])
 
+        resp = self.execute('DeleteTags',
+                            {'ResourceId.1': fakes.ID_EC2_VPC_1})
+        self.assertEqual({'http_status_code': 200,
+                          'return': True},
+                         resp)
+        self.db_api.delete_tags.assert_called_with(
+            mock.ANY, [fakes.ID_EC2_VPC_1], None)
+
     def test_describe_tags(self):
         self.db_api.get_tags.return_value = [{'item_id': fakes.ID_EC2_VPC_1,
                                               'key': 'key1',

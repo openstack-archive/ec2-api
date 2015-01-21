@@ -81,7 +81,7 @@ def create_tags(context, resource_id, tag):
     return True
 
 
-def delete_tags(context, resource_id, tag):
+def delete_tags(context, resource_id, tag=None):
     db_api.delete_tags(context, resource_id, tag)
     return True
 
