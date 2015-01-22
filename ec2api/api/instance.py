@@ -794,6 +794,7 @@ class InstanceEngineNeutron(object):
                 {'net-id': self.get_ec2_classic_os_network(context,
                                                            neutron)['id']}]
 
+        instance_ids = []
         instances_info = []
         ec2_reservation_id = _generate_reservation_id()
 
@@ -807,7 +808,6 @@ class InstanceEngineNeutron(object):
             # add corresponding OS ids of network interfaces to our DB
             # TODO(ft): we should lock created network interfaces to prevent
             # their usage or deleting
-            instance_network_interfaces = []
 
             # TODO(ft): do correct error messages on create failures. For
             # example, overlimit, ip lack, ip overlapping, etc
@@ -820,7 +820,6 @@ class InstanceEngineNeutron(object):
                 if max_count == 1:
                     network_interfaces = (existed_network_interfaces +
                                           network_interfaces)
-                instance_network_interfaces.append(network_interfaces)
                 nics = ([{'port-id': eni['os_id']} for eni in
                          network_interfaces]
                         if vpc_id else
@@ -852,6 +851,7 @@ class InstanceEngineNeutron(object):
                     instance['client_token'] = client_token
                 instance = db_api.add_item(context, 'i', instance)
                 cleaner.addCleanup(db_api.delete_item, context, instance['id'])
+                instance_ids.append(instance['id'])
 
                 nova.servers.update(os_instance, name=instance['id'])
 
@@ -872,10 +872,10 @@ class InstanceEngineNeutron(object):
                                                               os_instance.id)
                 instances_info.append((instance, os_instance, novadb_instance))
 
-        # NOTE(ft): we cann't use describe_network_interfaces at this stage
-        # because network interfaces are not attached yet
-        ec2_network_interfaces = self.format_network_interfaces(
-            context, instance_network_interfaces)
+        # NOTE(ft): we don't reuse network interface objects received from
+        # create_network_interfaces because they don't contain attachment info
+        ec2_network_interfaces = (self.get_ec2_network_interfaces(
+                                        context, instance_ids=instance_ids))
         return _format_reservation(context, ec2_reservation_id, instances_info,
                                    ec2_network_interfaces,
                                    image_ids={os_image.id: image_id})
@@ -1098,36 +1098,6 @@ class InstanceEngineNeutron(object):
                     reason=_('There is more than one available network '
                              'for EC2 Classic mode'))
         return ec2_classic_os_networks[0]
-
-    def format_network_interfaces(self, context, instances_network_interfaces):
-        neutron = clients.neutron(context)
-
-        os_ports = neutron.list_ports()['ports']
-        os_ports = dict((p['id'], p) for p in os_ports)
-
-        # TODO(ft): reuse following code from network_interface_api
-        os_floating_ips = neutron.list_floatingips(
-            fields=['id'])['floatingips']
-        os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
-        addresses = collections.defaultdict(list)
-        for address in db_api.get_items(context, 'eipalloc'):
-            if ('network_interface_id' in address and
-                    address['os_id'] in os_floating_ip_ids):
-                addresses[address['network_interface_id']].append(address)
-
-        security_groups = security_group_api._format_security_groups_ids_names(
-                context)
-
-        ec2_network_interfaces = collections.defaultdict(list)
-        for network_interfaces in instances_network_interfaces:
-            for network_interface in network_interfaces:
-                ec2_eni = network_interface_api._format_network_interface(
-                        context, network_interface,
-                        os_ports[network_interface['os_id']],
-                        addresses[network_interface['id']], security_groups)
-                ec2_network_interfaces[
-                        network_interface['instance_id']].append(ec2_eni)
-        return ec2_network_interfaces
 
 
 class InstanceEngineNova(object):

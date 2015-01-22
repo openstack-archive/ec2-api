@@ -63,11 +63,11 @@ class InstanceTestCase(base.ApiTestCase):
         self.nova_flavors.list.return_value = [self.fake_flavor]
 
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
-                'format_network_interfaces')
+                'get_ec2_network_interfaces')
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
                 'get_vpc_default_security_group_id')
     def test_run_instances(self, get_vpc_default_security_group_id,
-                           format_network_interfaces):
+                           get_ec2_network_interfaces):
         """Run instance with various network interface settings."""
         instance_api.instance_engine = (
             instance_api.InstanceEngineNeutron())
@@ -120,7 +120,7 @@ class InstanceTestCase(base.ApiTestCase):
                     image_id=fakes.ID_EC2_IMAGE_1,
                     kernel_id=fakes.ID_EC2_IMAGE_AKI_1,
                     ramdisk_id=fakes.ID_EC2_IMAGE_ARI_1)])
-            format_network_interfaces.return_value = {
+            get_ec2_network_interfaces.return_value = {
                     fakes.ID_EC2_INSTANCE_1: [eni]}
 
             params.update({'ImageId': fakes.ID_EC2_IMAGE_1,
@@ -154,8 +154,8 @@ class InstanceTestCase(base.ApiTestCase):
                 delete_on_termination=delete_port_on_termination))
             self.novadb.instance_get_by_uuid.assert_called_once_with(
                 mock.ANY, fakes.ID_OS_INSTANCE_1)
-            format_network_interfaces.assert_called_once_with(
-                mock.ANY, [[fakes.DB_NETWORK_INTERFACE_1]])
+            get_ec2_network_interfaces.assert_called_once_with(
+                mock.ANY, instance_ids=[fakes.ID_EC2_INSTANCE_1])
             self.assertEqual(2, self.db_api.get_item_ids.call_count)
             self.db_api.get_item_ids.assert_any_call(
                 mock.ANY, 'aki', (fakes.ID_OS_IMAGE_AKI_1,))
@@ -166,7 +166,7 @@ class InstanceTestCase(base.ApiTestCase):
             self.nova_servers.reset_mock()
             self.db_api.reset_mock()
             self.novadb.reset_mock()
-            format_network_interfaces.reset_mock()
+            get_ec2_network_interfaces.reset_mock()
 
         do_check({'SubnetId': fakes.ID_EC2_SUBNET_1},
                  create_network_interface_kwargs={})
@@ -206,12 +206,12 @@ class InstanceTestCase(base.ApiTestCase):
                         fakes.ID_EC2_NETWORK_INTERFACE_1})
 
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
-                'format_network_interfaces')
+                'get_ec2_network_interfaces')
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
                 'get_vpc_default_security_group_id')
     def test_run_instances_multiple_networks(self,
                                              get_vpc_default_security_group_id,
-                                             format_network_interfaces):
+                                             get_ec2_network_interfaces):
         """Run 2 instances at once on 2 subnets in all combinations."""
         instance_api.instance_engine = (
             instance_api.InstanceEngineNeutron())
@@ -220,7 +220,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         get_vpc_default_security_group_id.return_value = None
 
-        format_network_interfaces.return_value = dict(
+        get_ec2_network_interfaces.return_value = dict(
             (ec2_instance_id, list(eni_pair))
             for ec2_instance_id, eni_pair in zip(
                 self.IDS_EC2_INSTANCE,
@@ -541,10 +541,10 @@ class InstanceTestCase(base.ApiTestCase):
                  new_port=False)
 
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
-                'format_network_interfaces')
+                'get_ec2_network_interfaces')
     @mock.patch('ec2api.api.instance._format_reservation')
     def test_run_instances_multiply_rollback(self, format_reservation,
-                                             format_network_interfaces):
+                                             get_ec2_network_interfaces):
         instances = [{'id': fakes.random_ec2_id('i'),
                       'os_id': fakes.random_os_id()}
                      for dummy in range(3)]
@@ -565,7 +565,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
 
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
-        format_network_interfaces.return_value = []
+        get_ec2_network_interfaces.return_value = []
 
         def do_check(engine):
             instance_api.instance_engine = engine
@@ -1256,7 +1256,7 @@ class InstanceTestCase(base.ApiTestCase):
 
 
 # TODO(ft): add tests for get_vpc_default_security_group_id,
-# format_network_interfaces, get_os_instances_by_instances, remove_instances,
+# get_os_instances_by_instances, remove_instances,
 # format_reservation, _is_ebs_instance
 
 class InstancePrivateTestCase(test_base.BaseTestCase):
