@@ -183,8 +183,8 @@ def _format_subnet(context, subnet, os_subnet, os_network, os_ports):
         for fixed_ip in port.get('fixed_ips', []):
             if fixed_ip['subnet_id'] == os_subnet['id']:
                 ip_count -= 1
-            if port['device_owner'] == 'network:dhcp':
-                dhcp_port_accounted = True
+                if port['device_owner'] == 'network:dhcp':
+                    dhcp_port_accounted = True
     if not dhcp_port_accounted:
         ip_count -= 1
     return {
