@@ -148,14 +148,11 @@ class SubnetTestCase(base.ApiTestCase):
         self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                       'CidrBlock': fakes.CIDR_SUBNET_1})
 
-        # TODO(ft): check sequence of calls
-        # remove interface router must be the first
-        self.neutron.remove_interface_router.assert_called_once_with(
-                fakes.ID_OS_ROUTER_1, {'subnet_id': fakes.ID_OS_SUBNET_1})
-        self.neutron.delete_subnet.assert_called_once_with(
-                fakes.ID_OS_SUBNET_1)
-        self.neutron.delete_network.assert_called_once_with(
-                fakes.ID_OS_NETWORK_1)
+        self.neutron.assert_has_calls([
+            mock.call.remove_interface_router(
+                fakes.ID_OS_ROUTER_1, {'subnet_id': fakes.ID_OS_SUBNET_1}),
+            mock.call.delete_subnet(fakes.ID_OS_SUBNET_1),
+            mock.call.delete_network(fakes.ID_OS_NETWORK_1)])
         self.db_api.delete_item.assert_called_once_with(
                 mock.ANY, fakes.ID_EC2_SUBNET_1)
 

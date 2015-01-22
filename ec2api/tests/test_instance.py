@@ -476,25 +476,35 @@ class InstanceTestCase(base.ApiTestCase):
         self.novadb.instance_get_by_uuid.side_effect = Exception()
 
         def do_check(params, new_port=True, delete_on_termination=None):
+            mock_manager = mock.MagicMock()
+            mock_manager.attach_mock(self.network_interface_api,
+                                     'network_interface_api')
+            mock_manager.attach_mock(self.neutron, 'neutron')
+            mock_manager.attach_mock(self.nova_servers, 'nova_servers')
+
             params.update({'ImageId': fakes.ID_EC2_IMAGE_1,
                            'InstanceType': 'fake_flavor',
                            'MinCount': '1', 'MaxCount': '1'})
             self.execute('RunInstances', params)
 
-            # TODO(ft): check sequence of calling
-            # neutron update port must be the first
+            calls = []
+            calls.append(
+                mock.call.network_interface_api._detach_network_interface_item(
+                    mock.ANY, fakes.DB_NETWORK_INTERFACE_1))
+            if not new_port:
+                calls.append(
+                    mock.call.neutron.update_port(
+                        fakes.ID_OS_PORT_1,
+                        {'port': {'device_id': '',
+                                  'device_owner': ''}}))
+            calls.append(
+                mock.call.nova_servers.delete(fakes.ID_OS_INSTANCE_1))
             if new_port:
-                (self.network_interface_api.
-                 delete_network_interface.assert_called_once_with(
-                    mock.ANY,
-                    network_interface_id=fakes.ID_EC2_NETWORK_INTERFACE_1))
-            else:
-                self.neutron.update_port.assert_called_once_with(
-                    fakes.ID_OS_PORT_1,
-                    {'port': {'device_id': '',
-                              'device_owner': ''}})
-            self.nova_servers.delete.assert_called_once_with(
-                fakes.ID_OS_INSTANCE_1)
+                calls.append(
+                    mock.call.network_interface_api.delete_network_interface(
+                        mock.ANY,
+                        network_interface_id=fakes.ID_EC2_NETWORK_INTERFACE_1))
+            mock_manager.assert_has_calls(calls)
             self.db_api.delete_item.assert_called_once_with(
                 mock.ANY, fakes.ID_EC2_INSTANCE_1)
 
