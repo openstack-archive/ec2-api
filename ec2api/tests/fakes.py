@@ -1082,18 +1082,19 @@ class OSImage(object):
 
     def __init__(self, image_dict):
         self.id = image_dict['id']
-        self.owner = image_dict['owner']
-        self.is_public = image_dict['is_public']
-        self.status = image_dict['status']
-        self.container_format = image_dict['container_format']
-        self.name = image_dict['name']
-        self.properties = copy.deepcopy(image_dict['properties'])
-        if 'mappings' in self.properties:
-            self.properties['mappings'] = (
-                json.dumps(self.properties['mappings']))
-        if 'block_device_mapping' in self.properties:
-            self.properties['block_device_mapping'] = (
-                json.dumps(self.properties['block_device_mapping']))
+        self.owner = image_dict.get('owner')
+        self.is_public = image_dict.get('is_public')
+        self.status = image_dict.get('status')
+        self.container_format = image_dict.get('container_format')
+        self.name = image_dict.get('name')
+        self.properties = copy.deepcopy(image_dict.get('properties', {}))
+        for complex_attr in ('mappings', 'block_device_mapping'):
+            if complex_attr in self.properties:
+                self.properties[complex_attr] = (
+                    json.dumps(self.properties[complex_attr]))
+
+    def __eq__(self, other):
+        return type(self) == type(other) and self.__dict__ == other.__dict__
 
     def update(self, **kwargs):
         pass
@@ -1230,6 +1231,12 @@ OS_IMAGE_2 = {
             {'device_name': '/dev/sdb1',
              'snapshot_id': ID_OS_SNAPSHOT_1}],
     }
+}
+OS_IMAGE_AKI_1 = {
+    'id': ID_OS_IMAGE_AKI_1,
+}
+OS_IMAGE_ARI_1 = {
+    'id': ID_OS_IMAGE_ARI_1,
 }
 
 

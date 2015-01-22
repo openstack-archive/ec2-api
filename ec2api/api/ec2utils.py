@@ -174,6 +174,8 @@ NOT_FOUND_EXCEPTION_MAP = {
     'vol': exception.InvalidVolumeNotFound,
     'snap': exception.InvalidSnapshotNotFound,
     'ami': exception.InvalidAMIIDNotFound,
+    'aki': exception.InvalidAMIIDNotFound,
+    'ari': exception.InvalidAMIIDNotFound,
 }
 
 

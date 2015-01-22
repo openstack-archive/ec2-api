@@ -487,12 +487,7 @@ class S3TestCase(base.ApiTestCase):
             s3_untarzip_image.return_value = tempf
             (self.glance.images.create.return_value) = (
                 fakes.OSImage({'id': fakes.random_os_id(),
-                               'owner': fakes.ID_OS_PROJECT,
-                               'is_public': False,
-                               'status': 'queued',
-                               'container_format': 'ami',
-                               'name': 'fake_name',
-                               'properties': {}}))
+                               'status': 'queued'}))
 
             data = [
                 ({'properties': {

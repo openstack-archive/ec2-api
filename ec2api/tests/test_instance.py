@@ -17,6 +17,7 @@ import datetime
 import itertools
 import random
 
+from glanceclient import exc as glance_exception
 import mock
 from oslotest import base as test_base
 
@@ -236,6 +237,7 @@ class InstanceTestCase(base.ApiTestCase):
         fakes_db_items = dict((eni['id'], eni)
                               for eni in self.DB_DETACHED_ENIS)
         fakes_db_items.update({
+            fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
             fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
             fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2})
         self.db_api.get_item_by_id.side_effect = (
@@ -300,7 +302,16 @@ class InstanceTestCase(base.ApiTestCase):
     def test_run_instances_other_parameters(self, get_ec2_classic_os_network,
                                             format_reservation,
                                             parse_block_device_mapping):
-        self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
+                fakes.ID_EC2_IMAGE_AKI_1: fakes.DB_IMAGE_AKI_1,
+                fakes.ID_EC2_IMAGE_ARI_1: fakes.DB_IMAGE_ARI_1}))
+        self.glance.images.get.side_effect = (
+            fakes.get_by_1st_arg_getter({
+                fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
+                fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
+                fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
         get_ec2_classic_os_network.return_value = {'id': fakes.random_os_id()}
         format_reservation.return_value = {}
         parse_block_device_mapping.return_value = 'fake_bdm'
@@ -313,6 +324,8 @@ class InstanceTestCase(base.ApiTestCase):
                 {'ImageId': fakes.ID_EC2_IMAGE_1,
                  'InstanceType': 'fake_flavor',
                  'MinCount': '1', 'MaxCount': '1',
+                 'KernelId': fakes.ID_EC2_IMAGE_AKI_1,
+                 'RamdiskId': fakes.ID_EC2_IMAGE_ARI_1,
                  'SecurityGroup.1': 'Default',
                  'Placement.AvailabilityZone': 'fake_zone',
                  'ClientToken': 'fake_client_token',
@@ -324,7 +337,8 @@ class InstanceTestCase(base.ApiTestCase):
 
             self.nova_servers.create.assert_called_once_with(
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
-                userdata=None, kernel_id=None, ramdisk_id=None, key_name=None,
+                userdata=None, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
+                ramdisk_id=fakes.ID_OS_IMAGE_ARI_1, key_name=None,
                 block_device_mapping='fake_bdm',
                 availability_zone='fake_zone', security_groups=['Default'],
                 **extra_kwargs)
@@ -342,7 +356,7 @@ class InstanceTestCase(base.ApiTestCase):
                 [{'device_name': '/dev/vdd',
                   'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1,
                           'delete_on_termination': False}}],
-                self.glance.images.get.return_value)
+                fakes.OSImage(fakes.OS_IMAGE_1))
             parse_block_device_mapping.reset_mock()
 
         do_check(
@@ -459,7 +473,8 @@ class InstanceTestCase(base.ApiTestCase):
             instance_api.InstanceEngineNeutron())
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
+                {fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
+                 fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
                  fakes.ID_EC2_NETWORK_INTERFACE_1:
                         fakes.DB_NETWORK_INTERFACE_1}))
         self.db_api.get_item_ids.return_value = [
@@ -542,7 +557,8 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
                 dict((item['id'], item)
-                     for item in itertools.chain([fakes.DB_SUBNET_1],
+                     for item in itertools.chain([fakes.DB_IMAGE_1,
+                                                  fakes.DB_SUBNET_1],
                                                  network_interfaces))))
         self.db_api.get_item_ids.return_value = [
                 (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
@@ -1249,36 +1265,92 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_image_parameters(self, db_api, glance):
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
-        image_id = fakes.random_ec2_id('ami')
-        os_image_id = fakes.random_os_id()
-        db_api.get_public_items.return_value = [{'id': image_id,
-                                                 'os_id': os_image_id}]
+
+        # NOTE(ft): check cases of not available image
+        image = {'id': fakes.random_ec2_id('ami'),
+                 'os_id': fakes.random_os_id()}
+        db_api.get_public_items.return_value = [image]
         os_image = fakes.OSImage({
-            'id': fakes.random_os_id(),
-            'owner': fakes.ID_OS_PROJECT,
-            'is_public': True,
+            'id': image['os_id'],
             'status': None,
-            'container_format': 'ami',
-            'name': 'fake_name',
             'properties': {}})
         glance.return_value.images.get.return_value = os_image
 
         self.assertRaises(exception.ImageNotActive,
                           instance_api._parse_image_parameters,
-                          fake_context, image_id, None, None)
+                          fake_context, image['id'], None, None)
 
         os_image.status = 'active'
         os_image.properties['image_state'] = 'decrypting'
 
         self.assertRaises(exception.ImageNotActive,
                           instance_api._parse_image_parameters,
-                          fake_context, image_id, None, None)
+                          fake_context, image['id'], None, None)
 
+        # NOTE(ft): check normal flow for user owned images
         db_api.get_public_items.return_value = []
-        db_api.get_item_by_id.return_value = None
+        db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
+                fakes.ID_EC2_IMAGE_AKI_1: fakes.DB_IMAGE_AKI_1,
+                fakes.ID_EC2_IMAGE_ARI_1: fakes.DB_IMAGE_ARI_1}))
+        glance.return_value.images.get.side_effect = (
+            fakes.get_by_1st_arg_getter({
+                fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
+                fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
+                fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
+
+        self.assertEqual(
+            (fakes.OSImage(fakes.OS_IMAGE_1),
+             fakes.ID_OS_IMAGE_AKI_1, fakes.ID_OS_IMAGE_ARI_1),
+            instance_api._parse_image_parameters(
+                fake_context, fakes.ID_EC2_IMAGE_1,
+                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1))
+
+        # NOTE(ft): check cases of unknown image id
         self.assertRaises(exception.InvalidAMIIDNotFound,
                           instance_api._parse_image_parameters,
-                          fake_context, fakes.random_ec2_id('ami'), None, None)
+                          fake_context, fakes.random_ec2_id('ami'),
+                          fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1)
+        self.assertRaises(exception.InvalidAMIIDNotFound,
+                          instance_api._parse_image_parameters,
+                          fake_context, fakes.ID_EC2_IMAGE_1,
+                          fakes.random_ec2_id('aki'), fakes.ID_EC2_IMAGE_ARI_1)
+        self.assertRaises(exception.InvalidAMIIDNotFound,
+                          instance_api._parse_image_parameters,
+                          fake_context, fakes.ID_EC2_IMAGE_1,
+                          fakes.ID_EC2_IMAGE_AKI_1, fakes.random_ec2_id('ari'))
+
+        # NOTE(ft): check cases of absence of images in OS
+        for n in range(3):
+            glance.return_value.images.get.side_effect = (
+                [fakes.OSImage(fakes.OS_IMAGE_1)] * n +
+                [glance_exception.HTTPNotFound()])
+            self.assertRaises(
+                exception.InvalidAMIIDNotFound,
+                instance_api._parse_image_parameters,
+                fake_context, fakes.ID_EC2_IMAGE_1,
+                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1)
+
+        # NOTE(ft): check normal flow for public images
+        db_api.get_item_by_id.side_effect = None
+        db_api.get_public_items.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                (fakes.ID_EC2_IMAGE_1,): [fakes.DB_IMAGE_1],
+                (fakes.ID_EC2_IMAGE_AKI_1,): [fakes.DB_IMAGE_AKI_1],
+                (fakes.ID_EC2_IMAGE_ARI_1,): [fakes.DB_IMAGE_ARI_1]}))
+        glance.return_value.images.get.side_effect = (
+            fakes.get_by_1st_arg_getter({
+                fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
+                fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
+                fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
+
+        self.assertEqual(
+            (fakes.OSImage(fakes.OS_IMAGE_1),
+             fakes.ID_OS_IMAGE_AKI_1, fakes.ID_OS_IMAGE_ARI_1),
+            instance_api._parse_image_parameters(
+                fake_context, fakes.ID_EC2_IMAGE_1,
+                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1))
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_block_device_mapping(self, db_api):
@@ -1353,27 +1425,30 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                            'ramdisk_id': None,
                            'hostname': instance['id']}
 
-        setattr(os_instance, 'OS-EXT-STS:vm_state',
-                instance_api.vm_states_ACTIVE)
+        # NOTE(ft): check instance state formatting
+        setattr(os_instance, 'OS-EXT-STS:vm_state', 'active')
         formatted_instance = instance_api._format_instance(
             fake_context, instance, os_instance, novadb_instance, [], {})
-        self.assertEqual({'name': instance_api.inst_state_RUNNING,
-                          'code': instance_api.inst_state_RUNNING_CODE},
+        self.assertEqual({'name': 'running', 'code': 16},
                          formatted_instance['instanceState'])
 
-        setattr(os_instance, 'OS-EXT-STS:vm_state',
-                instance_api.vm_states_STOPPED)
+        setattr(os_instance, 'OS-EXT-STS:vm_state', 'stopped')
         formatted_instance = instance_api._format_instance(
             fake_context, instance, os_instance, novadb_instance, [], {})
-        self.assertEqual({'name': instance_api.inst_state_STOPPED,
-                          'code': instance_api.inst_state_STOPPED_CODE},
+        self.assertEqual({'name': 'stopped', 'code': 80},
                          formatted_instance['instanceState'])
 
+        # NOTE(ft): check auto creating of DB item for unknown OS images
         os_instance.image = {'id': fakes.random_os_id()}
+        novadb_instance['kernel_id'] = fakes.random_os_id()
+        novadb_instance['ramdisk_id'] = fakes.random_os_id()
         formatted_instance = instance_api._format_instance(
             fake_context, instance, os_instance, novadb_instance, [], {})
-        db_api.add_item_id.assert_called_once_with(
-            mock.ANY, 'ami', os_instance.image['id'])
+        db_api.add_item_id.assert_has_calls(
+            [mock.call(mock.ANY, 'ami', os_instance.image['id']),
+             mock.call(mock.ANY, 'aki', novadb_instance['kernel_id']),
+             mock.call(mock.ANY, 'ari', novadb_instance['ramdisk_id'])],
+            any_order=True)
 
     @mock.patch('cinderclient.v1.client.Client')
     @mock.patch('ec2api.api.instance.novadb')
