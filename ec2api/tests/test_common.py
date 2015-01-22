@@ -92,6 +92,48 @@ class OnCrashCleanerTestCase(test_base.BaseTestCase):
         self.assertFalse(obj.fake_clean_method.called)
         self.assertFalse(obj.fake_clean_method_25.called)
 
+    def test_filter(self):
+        obj = common.UniversalDescriber()
+        obj.FILTER_MAP = {'prop1': 'prop-1', 'prop2': 'prop-2'}
+
+        res = obj.filtered_out(
+            {'prop-1': 'val-0', 'prop-2': 'val-123'},
+            [{'name': 'prop1', 'value': ['val-0']}])
+        self.assertFalse(res)
+
+        res = obj.filtered_out(
+            {'prop-1': 'val-0', 'prop-2': 'val-123'},
+            [{'name': 'prop1', 'value': ['val-0', '0-val']}])
+        self.assertFalse(res)
+
+        res = obj.filtered_out(
+            {'prop-1': 'val-0', 'prop-2': 'val-123'},
+            [{'name': 'prop1', 'value': ['0-val', 'val-0']}])
+        self.assertFalse(res)
+
+        res = obj.filtered_out(
+            {'prop-1': 'val-0', 'prop-2': 'val-123'},
+            [{'name': 'prop1', 'value': ['0-val']}])
+        self.assertTrue(res)
+
+        res = obj.filtered_out(
+            {'prop-1': 'val-0', 'prop-2': 'val-123'},
+            [{'name': 'prop1', 'value': ['val-0']},
+             {'name': 'prop2', 'value': ['val-123']}])
+        self.assertFalse(res)
+
+        res = obj.filtered_out(
+            {'prop-1': 'val-0', 'prop-2': 'val-123'},
+            [{'name': 'prop1', 'value': ['val-0']},
+             {'name': 'prop2', 'value': ['123-val']}])
+        self.assertTrue(res)
+
+        res = obj.filtered_out(
+            {'prop-1': 'val-0', 'prop-2': 'val-123'},
+            [{'name': 'prop1', 'value': ['0-val']},
+             {'name': 'prop2', 'value': ['val-123']}])
+        self.assertTrue(res)
+
 
 def fake_standalone_crashed_clean_method():
     raise Exception()

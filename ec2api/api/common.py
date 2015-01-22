@@ -303,10 +303,12 @@ class UniversalDescriber(object):
                 return True
             filter_values = filter['value']
             for filter_value in filter_values:
-                for value in values:
-                    if self.is_filtering_value_found(filter_value, value):
-                        return False
-        return True
+                if any(self.is_filtering_value_found(filter_value, value)
+                       for value in values):
+                    break
+            else:
+                return True
+        return False
 
     def describe(self, context, ids=None, names=None, filter=None):
         self.context = context
