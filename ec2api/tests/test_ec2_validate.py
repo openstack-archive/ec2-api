@@ -18,8 +18,8 @@ import datetime
 
 import testtools
 
+from ec2api.api import common
 from ec2api.api import ec2utils
-from ec2api.api import validator
 from ec2api import exception
 from ec2api.openstack.common import timeutils
 
@@ -27,12 +27,16 @@ from ec2api.openstack.common import timeutils
 class EC2ValidationTestCase(testtools.TestCase):
     """Test case for various validations."""
 
-    def test_validate_cidr(self):
-        self.assertEqual(True, validator.validate_cidr('10.10.0.0/24', 'cidr'))
+    def test_validate_net(self):
+        validator = common.Validator()
+        validator.ip('10.10.0.0')
+        validator.cidr('10.10.0.0/24')
+        validator.subnet_cidr('10.10.0.0/24')
+        validator.vpc_cidr('10.10.0.0/24')
 
         def check_raise_invalid_parameter(cidr):
             self.assertRaises(exception.InvalidParameterValue,
-                              validator.validate_cidr, cidr, 'cidr')
+                              validator.cidr, cidr)
 
         check_raise_invalid_parameter('fake')
         check_raise_invalid_parameter('10.10/24')
@@ -46,11 +50,108 @@ class EC2ValidationTestCase(testtools.TestCase):
         check_raise_invalid_parameter('10.10.0.0/33')
         check_raise_invalid_parameter('10.10.0.0/-1')
 
+        self.assertRaises(exception.InvalidParameterValue,
+                          validator.ip, '10.256.0.0')
         self.assertRaises(exception.InvalidSubnetRange,
-                          validator.validate_subnet_cidr, '10.10.0.0/15')
-
+                          validator.subnet_cidr, '10.10.0.0/15')
         self.assertRaises(exception.InvalidVpcRange,
-                          validator.validate_vpc_cidr, '10.10.0.0/29')
+                          validator.vpc_cidr, '10.10.0.0/29')
+
+    def test_validate_id(self):
+        validator = common.Validator()
+        validator.ec2_id('i-00000001')
+        validator.i_id('i-00000001')
+        validator.ami_id('ami-00000001')
+        validator.eni_id('eni-00000001')
+        validator.sg_id('sg-00000001')
+        validator.subnet_id('subnet-00000001')
+        validator.igw_id('igw-00000001')
+        validator.rtb_id('rtb-00000001')
+        validator.vpc_id('vpc-00000001')
+        validator.vol_id('vol-00000001')
+        validator.snap_id('snap-00000001')
+        validator.dopt_id('dopt-00000001')
+        validator.eni_attach_id('eni-attach-00000001')
+        validator.eipalloc_id('eipalloc-00000001')
+        validator.eipassoc_id('eipassoc-00000001')
+        validator.rtbassoc_id('rtbassoc-00000001')
+
+        invalid_ids = ['1234', 'a-1111', '', 'i-1111', 'i-rrr', 'foobar']
+
+        def check_raise_invalid_parameters(func):
+            for id in invalid_ids:
+                self.assertRaises(exception.InvalidParameterValue, func, id)
+
+        check_raise_invalid_parameters(validator.ami_id)
+        check_raise_invalid_parameters(validator.eni_id)
+        check_raise_invalid_parameters(validator.sg_id)
+        check_raise_invalid_parameters(validator.subnet_id)
+        check_raise_invalid_parameters(validator.igw_id)
+        check_raise_invalid_parameters(validator.rtb_id)
+        check_raise_invalid_parameters(validator.vpc_id)
+        check_raise_invalid_parameters(validator.vol_id)
+        check_raise_invalid_parameters(validator.snap_id)
+        check_raise_invalid_parameters(validator.dopt_id)
+        check_raise_invalid_parameters(validator.eni_attach_id)
+        check_raise_invalid_parameters(validator.eipalloc_id)
+        check_raise_invalid_parameters(validator.eipassoc_id)
+        check_raise_invalid_parameters(validator.rtbassoc_id)
+
+        invalid_ids = ['1234', 'a-1111', '', 'vpc-1111', 'vpc-rrr', 'foobar']
+
+        check_raise_invalid_parameters(validator.i_id)
+
+    def test_validate_multi(self):
+        validator = common.Validator()
+        result_sum = {'value': 0}
+        list_to_sum = [1, 2, 3, 4]
+
+        def sum(value):
+            # NOTE(Alex) Because nonlocal is only in python 3.0
+            result_sum['value'] += value
+
+        validator.multi(list_to_sum, sum)
+        self.assertEqual(result_sum['value'], 10)
+
+        self.assertRaises(exception.InvalidParameterValue,
+                          validator.multi, 'not a list', sum)
+
+    def test_validate_primitive(self):
+        validator = common.Validator()
+        validator.int(5)
+        validator.bool(True)
+        validator.str('str')
+        validator.str64('str')
+        validator.str255('str')
+
+        def check_raise_validation_error(value, func):
+            self.assertRaises(exception.ValidationError,
+                              func, value)
+
+        check_raise_validation_error('str', validator.int)
+        check_raise_validation_error('str', validator.bool)
+        check_raise_validation_error(5, validator.str)
+        check_raise_validation_error('x' * 65, validator.str64)
+        check_raise_validation_error('x' * 256, validator.str255)
+
+    def test_validate_security_group(self):
+        validator = common.Validator(params={})
+        validator.security_group_str('name')
+        validator.security_group_str('aa #^% -=99')
+        validator = common.Validator(params={'vpc_id': 'vpc_id'})
+        validator.security_group_str('name')
+
+        def check_raise_validation_error(value):
+            self.assertRaises(exception.ValidationError,
+                              validator.security_group_str, value)
+
+        validator = common.Validator(params={})
+        check_raise_validation_error('aa \t\x01\x02\x7f')
+        check_raise_validation_error('x' * 256)
+
+        validator = common.Validator(params={'vpc_id': 'vpc_id'})
+        check_raise_validation_error('aa #^% -=99')
+        check_raise_validation_error('x' * 256)
 
 
 class EC2TimestampValidationTestCase(testtools.TestCase):
