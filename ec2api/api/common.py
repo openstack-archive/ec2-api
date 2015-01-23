@@ -295,7 +295,11 @@ class UniversalDescriber(object):
                     reason='invalid filter')
             if isinstance(filter_name, list):
                 value_set = item.get(filter_name[0], [])
-                values = [value[filter_name[1]] for value in value_set]
+                values = []
+                for value in value_set:
+                    val = value.get(filter_name[1])
+                    if val is not None:
+                        values.append(val)
             else:
                 value = item.get(filter_name)
                 values = [value] if value else []

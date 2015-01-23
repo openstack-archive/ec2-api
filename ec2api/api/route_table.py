@@ -155,7 +155,7 @@ def replace_route_table_association(context, association_id, route_table_id):
                 context, subnet, route_table, cleaner=cleaner,
                 rollback_route_table_object=rollabck_route_table_object)
 
-    return {'associationId': association_id}
+    return {'newAssociationId': association_id}
 
 
 def disassociate_route_table(context, association_id):

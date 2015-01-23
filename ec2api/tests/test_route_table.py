@@ -446,7 +446,7 @@ class RouteTableTestCase(base.ApiTestCase):
                              'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
-                         resp['associationId'])
+                         resp['newAssociationId'])
         subnet = tools.update_dict(
             subnet,
             {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
@@ -469,7 +469,7 @@ class RouteTableTestCase(base.ApiTestCase):
                              'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
-                         resp['associationId'])
+                         resp['newAssociationId'])
         vpc = tools.update_dict(
             fakes.DB_VPC_1,
             {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
