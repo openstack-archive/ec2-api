@@ -68,17 +68,17 @@ class OnCrashCleanerTestCase(test_base.BaseTestCase):
 
         self.assertEqual(1, cls.call_count)
         self.assertEqual(3, log.warning.call_count)
-        self.assertTrue(log.warning.mock_calls[0][1],
-                        'ec2api.tests.test_common.FakeCrasherClass.'
-                        'fake_crashed_clean_method')
-        self.assertTrue(log.warning.mock_calls[0][1],
-                        "'args', 666, {'key': 'value'},"
-                        "s='args', i=666, d={'key': 'value'}")
-        self.assertTrue(log.warning.mock_calls[1][1],
-                        'ec2api.tests.test_common.FakeCrasherClass')
-        self.assertTrue(log.warning.mock_calls[2][1],
-                        'ec2api.tests.test_common.'
-                        'fake_standalone_crashed_clean_method')
+        self.assertIn('ec2api.tests.test_common.FakeCrasherClass.'
+                      'fake_crashed_clean_method',
+                      log.warning.mock_calls[0][1][0])
+        for arg in ["'args'", "666", "{'key': 'value'}",
+                    "s='args'", "i=666", "d={'key': 'value'}"]:
+            self.assertIn(arg, log.warning.mock_calls[0][1][0])
+        self.assertIn('ec2api.tests.test_common.'
+                      'fake_standalone_crashed_clean_method',
+                      log.warning.mock_calls[1][1][0])
+        self.assertIn('ec2api.tests.test_common.FakeCrasherClass',
+                      log.warning.mock_calls[2][1][0])
         obj.fake_clean_method.assert_called_once_with('params')
         self.assertFalse(obj.fake_clean_method_25.called)
 
