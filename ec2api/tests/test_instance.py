@@ -19,6 +19,7 @@ import random
 
 from glanceclient import exc as glance_exception
 import mock
+from novaclient import exceptions as nova_exception
 from oslotest import base as test_base
 
 from ec2api.api import instance as instance_api
@@ -1256,14 +1257,13 @@ class InstanceTestCase(base.ApiTestCase):
 
 
 # TODO(ft): add tests for get_vpc_default_security_group_id,
-# get_os_instances_by_instances, remove_instances,
-# format_reservation, _is_ebs_instance
 
 class InstancePrivateTestCase(test_base.BaseTestCase):
 
     @mock.patch('glanceclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_image_parameters(self, db_api, glance):
+        glance = glance.return_value
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
 
         # NOTE(ft): check cases of not available image
@@ -1274,7 +1274,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             'id': image['os_id'],
             'status': None,
             'properties': {}})
-        glance.return_value.images.get.return_value = os_image
+        glance.images.get.return_value = os_image
 
         self.assertRaises(exception.ImageNotActive,
                           instance_api._parse_image_parameters,
@@ -1294,7 +1294,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                 fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
                 fakes.ID_EC2_IMAGE_AKI_1: fakes.DB_IMAGE_AKI_1,
                 fakes.ID_EC2_IMAGE_ARI_1: fakes.DB_IMAGE_ARI_1}))
-        glance.return_value.images.get.side_effect = (
+        glance.images.get.side_effect = (
             fakes.get_by_1st_arg_getter({
                 fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
                 fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
@@ -1323,7 +1323,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
 
         # NOTE(ft): check cases of absence of images in OS
         for n in range(3):
-            glance.return_value.images.get.side_effect = (
+            glance.images.get.side_effect = (
                 [fakes.OSImage(fakes.OS_IMAGE_1)] * n +
                 [glance_exception.HTTPNotFound()])
             self.assertRaises(
@@ -1339,7 +1339,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                 (fakes.ID_EC2_IMAGE_1,): [fakes.DB_IMAGE_1],
                 (fakes.ID_EC2_IMAGE_AKI_1,): [fakes.DB_IMAGE_AKI_1],
                 (fakes.ID_EC2_IMAGE_ARI_1,): [fakes.DB_IMAGE_ARI_1]}))
-        glance.return_value.images.get.side_effect = (
+        glance.images.get.side_effect = (
             fakes.get_by_1st_arg_getter({
                 fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
                 fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
@@ -1411,10 +1411,11 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('novaclient.v1_1.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     def test_format_instance(self, db_api, nova, novadb):
+        nova = nova.return_value
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
         fake_flavor = mock.Mock()
         fake_flavor.configure_mock(name='fake_flavor')
-        nova.return_value.flavors.get.return_value = fake_flavor
+        nova.flavors.get.return_value = fake_flavor
 
         instance = {'id': fakes.random_ec2_id('i'),
                     'os_id': fakes.random_os_id(),
@@ -1453,7 +1454,8 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('cinderclient.v1.client.Client')
     @mock.patch('ec2api.api.instance.novadb')
     def test_format_instance_bdm(self, novadb, cinder):
-        cinder.return_value.volumes.get.return_value = (
+        cinder = cinder.return_value
+        cinder.volumes.get.return_value = (
             mock.Mock(status='attached', attachments={'device': 'fake'}))
         id_os_instance_1 = fakes.random_os_id()
         id_os_instance_2 = fakes.random_os_id()
@@ -1588,7 +1590,8 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('cinderclient.v1.client.Client')
     @mock.patch('ec2api.api.instance.novadb')
     def test_format_instance_bdm_while_attaching_volume(self, novadb, cinder):
-        cinder.return_value.volumes.get.return_value = (
+        cinder = cinder.return_value
+        cinder.volumes.get.return_value = (
             mock.Mock(status='attaching'))
         id_os_instance = fakes.random_os_id()
         novadb.block_device_mapping_get_all_by_instance.return_value = (
@@ -1613,6 +1616,150 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000002',
                                  'attachTime': '', }}]}))
+
+    @mock.patch('ec2api.api.instance._remove_instances')
+    @mock.patch('novaclient.v1_1.client.Client')
+    def test_get_os_instances_by_instances(self, nova, remove_instances):
+        nova = nova.return_value
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+
+        def do_check(exactly_flag):
+            nova.servers.get.side_effect = [fakes.OS_INSTANCE_1,
+                                            nova_exception.NotFound(404),
+                                            fakes.OS_INSTANCE_2]
+            absent_instance = {'id': fakes.random_ec2_id('i'),
+                               'os_id': fakes.random_os_id()}
+
+            params = (fake_context, [fakes.DB_INSTANCE_1, absent_instance,
+                                     fakes.DB_INSTANCE_2],
+                      exactly_flag)
+            if exactly_flag:
+                self.assertRaises(exception.InvalidInstanceIDNotFound,
+                                  instance_api._get_os_instances_by_instances,
+                                  *params)
+            else:
+                res = instance_api._get_os_instances_by_instances(*params)
+                self.assertEqual([fakes.OS_INSTANCE_1, fakes.OS_INSTANCE_2],
+                                 res)
+            remove_instances.assert_called_once_with(fake_context,
+                                                     [absent_instance])
+            remove_instances.reset_mock()
+
+        do_check(True)
+        do_check(False)
+
+    @mock.patch('ec2api.api.network_interface._detach_network_interface_item')
+    @mock.patch('ec2api.api.address._disassociate_address_item')
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_remove_instances(self, db_api, disassociate_address_item,
+                              detach_network_interface_item):
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+
+        instances = [{'id': fakes.random_ec2_id('i')}
+                     for dummy in range(4)]
+        network_interfaces = [
+            {'id': fakes.random_ec2_id('eni'),
+             'instance_id': inst['id'],
+             'delete_on_termination': num in (0, 1, 4, 6)}
+            for num, inst in enumerate(itertools.chain(
+                  *(zip(instances[:3], instances[:3]) +
+                    [[{'id': fakes.random_ec2_id('i')}] * 2])))]
+        network_interfaces.extend({'id': fakes.random_ec2_id('eni')}
+                                  for dummy in range(2))
+        addresses = [{'id': fakes.random_ec2_id('eipalloc'),
+                      'network_interface_id': eni['id']}
+                     for eni in network_interfaces[::2]]
+        addresses.extend({'id': fakes.random_ec2_id('eipalloc')}
+                         for dummy in range(2))
+
+        instances_to_remove = instances[:2] + [instances[3]]
+        network_interfaces_of_removed_instances = {
+            instances[0]['id']: network_interfaces[0:2],
+            instances[1]['id']: network_interfaces[2:4],
+            instances[3]['id']: []}
+        network_interfaces_to_delete = [network_interfaces[0],
+                                        network_interfaces[1]]
+        network_interfaces_to_detach = [network_interfaces[2],
+                                        network_interfaces[3]]
+        addresses_to_dissassociate = [addresses[0]]
+
+        db_api.get_items.side_effect = fakes.get_db_api_get_items({
+            'eni': network_interfaces,
+            'eipalloc': addresses})
+
+        def check_calls():
+            for eni in network_interfaces_to_detach:
+                detach_network_interface_item.assert_any_call(fake_context,
+                                                              eni)
+            for eni in network_interfaces_to_delete:
+                db_api.delete_item.assert_any_call(fake_context, eni['id'])
+            for addr in addresses_to_dissassociate:
+                disassociate_address_item.assert_any_call(fake_context, addr)
+            detach_network_interface_item.reset_mock()
+            db_api.reset_mock()
+            disassociate_address_item.reset_mock()
+
+        instance_api._remove_instances(fake_context, instances_to_remove)
+        check_calls()
+
+        instance_api._remove_instances(fake_context, instances_to_remove,
+                                       network_interfaces_of_removed_instances)
+        check_calls()
+
+    @mock.patch('ec2api.api.instance.novadb')
+    def test_is_ebs_instance(self, novadb):
+        context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        os_instance = fakes.OSInstance(fakes.random_os_id())
+
+        novadb.instance_get_by_uuid.return_value = {}
+        novadb.block_device_mapping_get_all_by_instance.return_value = []
+        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+
+        novadb.instance_get_by_uuid.return_value = {
+            'root_device_name': '/dev/vda'}
+        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+
+        novadb.block_device_mapping_get_all_by_instance.return_value = [
+            {'device_name': '/dev/vda',
+             'volume_id': None,
+             'snapshot_id': None,
+             'no_device': True}]
+        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+
+        novadb.block_device_mapping_get_all_by_instance.return_value = [
+            {'device_name': '/dev/vda',
+             'volume_id': fakes.random_ec2_id('vol'),
+             'snapshot_id': None,
+             'no_device': True}]
+        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+
+        novadb.block_device_mapping_get_all_by_instance.return_value = [
+            {'device_name': '/dev/vda',
+             'volume_id': '',
+             'snapshot_id': '',
+             'no_device': False}]
+        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+
+        novadb.block_device_mapping_get_all_by_instance.return_value = [
+            {'device_name': '/dev/vdb',
+             'volume_id': fakes.random_ec2_id('vol'),
+             'snapshot_id': '',
+             'no_device': False}]
+        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+
+        novadb.block_device_mapping_get_all_by_instance.return_value = [
+            {'device_name': '/dev/vda',
+             'volume_id': fakes.random_ec2_id('vol'),
+             'snapshot_id': '',
+             'no_device': False}]
+        self.assertTrue(instance_api._is_ebs_instance(context, os_instance))
+
+        novadb.block_device_mapping_get_all_by_instance.return_value = [
+            {'device_name': 'vda',
+             'volume_id': fakes.random_ec2_id('vol'),
+             'snapshot_id': '',
+             'no_device': False}]
+        self.assertTrue(instance_api._is_ebs_instance(context, os_instance))
 
     def test_block_device_strip_dev(self):
         self.assertEqual(

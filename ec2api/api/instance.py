@@ -707,12 +707,12 @@ def _get_os_instances_by_instances(context, instances, exactly=False):
         try:
             os_instances.append(nova.servers.get(instance['os_id']))
         except nova_exception.NotFound:
-            db_api.delete_item(context, instance['id'])
             obsolete_instances.append(instance)
     if obsolete_instances:
         _remove_instances(context, obsolete_instances)
         if exactly:
-            raise exception.InvalidInstanceIDNotFound(id=instance['id'])
+            raise exception.InvalidInstanceIDNotFound(
+                                id=obsolete_instances[0]['id'])
 
     return os_instances
 

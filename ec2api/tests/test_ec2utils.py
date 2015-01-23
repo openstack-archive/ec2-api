@@ -62,6 +62,8 @@ class EC2UtilsTestCase(testtools.TestCase):
         check_not_found('vol', exception.InvalidVolumeNotFound)
         check_not_found('snap', exception.InvalidSnapshotNotFound)
         check_not_found('ami', exception.InvalidAMIIDNotFound)
+        check_not_found('ari', exception.InvalidAMIIDNotFound)
+        check_not_found('aki', exception.InvalidAMIIDNotFound)
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_db_items(self, db_api):
@@ -114,6 +116,8 @@ class EC2UtilsTestCase(testtools.TestCase):
         check_not_found('vol', exception.InvalidVolumeNotFound)
         check_not_found('snap', exception.InvalidSnapshotNotFound)
         check_not_found('ami', exception.InvalidAMIIDNotFound)
+        check_not_found('aki', exception.InvalidAMIIDNotFound)
+        check_not_found('ari', exception.InvalidAMIIDNotFound)
 
     """Unit test api xml conversion."""
     def test_number_conversion(self):
