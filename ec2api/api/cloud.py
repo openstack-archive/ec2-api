@@ -1205,7 +1205,7 @@ class VpcCloudController(CloudController):
         delete it.
         """
 
-    @module_and_param_types(internet_gateway, 'igw_idS',
+    @module_and_param_types(internet_gateway, 'igw_ids',
                             'filter')
     def describe_internet_gateways(self, context, internet_gateway_id=None,
                                    filter=None):
