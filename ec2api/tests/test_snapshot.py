@@ -57,6 +57,22 @@ class SnapshotTestCase(base.ApiTestCase):
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, 'snap', set([fakes.ID_EC2_SNAPSHOT_1]))
 
+        self.check_filtering(
+            'DescribeSnapshots', 'snapshotSet',
+            [
+             # NOTE(ft): declare a constant for the description in fakes
+             ('description', 'fake description'),
+             ('owner-id', fakes.ID_OS_PROJECT),
+             ('progress', '100%'),
+             ('snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
+             ('start-time', fakes.TIME_CREATE_SNAPSHOT_2),
+             ('status', 'completed'),
+             ('volume-id', fakes.ID_EC2_VOLUME_2),
+             # TODO(ft): support filtering by a number value
+             # NOTE(ft): declare a constant for the volume size in fakes
+#              ('volume-size', 1)
+             ])
+
     def test_describe_snapshots_invalid_parameters(self):
         self.cinder.volume_snapshots.list.return_value = [
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1),

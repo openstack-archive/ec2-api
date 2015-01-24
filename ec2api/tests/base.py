@@ -116,3 +116,18 @@ class ApiTestCase(test_base.BaseTestCase):
             if matchers.ListMatches(call_args, args, orderless_lists=True):
                 return
         self.assertEqual(False, True)
+
+    def check_filtering(self, operation, resultset_key, filters):
+        for name, value in filters:
+            resp = self.execute(operation,
+                                {'Filter.1.Name': name,
+                                 'Filter.1.Value.1': str(value)})
+            self.assertEqual(200, resp['http_status_code'])
+            self.assertTrue(len(resp[resultset_key]) > 0)
+
+            resp = self.execute(operation,
+                                {'Filter.1.Name': name,
+                                 'Filter.1.Value.1': 'dummy filter value'})
+            self.assertEqual(200, resp['http_status_code'])
+            self.assertTrue(resp[resultset_key] is None or
+                            len(resp[resultset_key]) == 0)

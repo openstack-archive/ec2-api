@@ -274,6 +274,12 @@ class IgwTestCase(base.ApiTestCase):
                         matchers.ListMatches([fakes.EC2_IGW_1,
                                                   fakes.EC2_IGW_2]))
 
+        self.check_filtering(
+            'DescribeInternetGateways', 'internetGatewaySet',
+            [('internet-gateway-id', fakes.ID_EC2_IGW_2),
+             ('attachment.state', 'available'),
+             ('attachment.vpc-id', fakes.ID_EC2_VPC_1)])
+
     @base.skip_not_implemented
     def test_describe_igw_no_vpc(self):
         pass

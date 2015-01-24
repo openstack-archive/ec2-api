@@ -253,6 +253,19 @@ class SubnetTestCase(base.ApiTestCase):
                         matchers.ListMatches([fakes.EC2_SUBNET_1,
                                                   fakes.EC2_SUBNET_2]))
 
+        self.check_filtering(
+            'DescribeSubnets', 'subnetSet',
+            [
+             # TODO(ft): support filtering by a number value
+             # NOTE(ft): declare a constant for the count in fakes
+#              ('available-ip-address-count', 253),
+             ('cidr', fakes.CIDR_SUBNET_2),
+             ('cidrBlock', fakes.CIDR_SUBNET_2),
+             ('cidr-block', fakes.CIDR_SUBNET_2),
+             ('subnet-id', fakes.ID_EC2_SUBNET_2),
+             ('state', 'available'),
+             ('vpc-id', fakes.ID_EC2_VPC_1)])
+
     @base.skip_not_implemented
     def test_describe_subnets_no_vpc(self):
         pass

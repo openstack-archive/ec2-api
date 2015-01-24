@@ -617,6 +617,17 @@ class AddressTestCase(base.ApiTestCase):
                         matchers.ListMatches([fakes.EC2_ADDRESS_1,
                                                   fakes.EC2_ADDRESS_2]))
 
+        self.check_filtering(
+             'DescribeAddresses', 'addressesSet',
+             [('allocation-id', fakes.ID_EC2_ADDRESS_1),
+              ('association-id', fakes.ID_EC2_ASSOCIATION_2),
+              ('domain', 'vpc'),
+              ('instance-id', fakes.ID_EC2_INSTANCE_1),
+              ('network-interface-id', fakes.ID_EC2_NETWORK_INTERFACE_2),
+              ('network-interface-owner-id', fakes.ID_OS_PROJECT),
+              ('privateIpAddress', fakes.IP_NETWORK_INTERFACE_2),
+              ('public-ip', fakes.IP_ADDRESS_2)])
+
     def test_describe_addresses_ec2_classic(self):
         address.address_engine = (
             address.AddressEngineNova())

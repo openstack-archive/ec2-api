@@ -231,6 +231,15 @@ class VpcTestCase(base.ApiTestCase):
                                                   fakes.EC2_VPC_2]))
         self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')
 
+        self.check_filtering(
+            'DescribeVpcs', 'vpcSet',
+            [('cidr', fakes.CIDR_VPC_1),
+             ('dhcp-options-id', 'default'),
+             # TODO(ft): support filtering by a boolean value
+#              ('is-default', False),
+             ('state', 'available'),
+             ('vpc-id', fakes.ID_EC2_VPC_1)])
+
     def test_describe_vpcs_no_router(self):
         self.neutron.list_routers.return_value = {'routers': []}
         self.db_api.get_items.return_value = [fakes.DB_VPC_1]

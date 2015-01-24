@@ -231,6 +231,21 @@ class ImageTestCase(base.ApiTestCase):
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, 'ami', set([fakes.ID_EC2_IMAGE_1]))
 
+        self.check_filtering(
+            'DescribeImages', 'imagesSet',
+            [('architecture', 'x86_64'),
+             # TODO(ft): store a description in DB
+#              ('description', ''),
+             ('image-id', fakes.ID_EC2_IMAGE_1),
+             ('image-type', 'machine'),
+             # TODO(ft): support filtering by a boolean value
+#              ('is-public', True),
+             ('kernel_id', fakes.ID_EC2_IMAGE_AKI_1,),
+             ('name', 'fake_name'),
+             ('owner-id', fakes.ID_OS_PROJECT),
+             ('ramdisk-id', fakes.ID_EC2_IMAGE_ARI_1),
+             ('state', 'available')])
+
     def test_describe_images_invalid_parameters(self):
         self._setup_model()
 

@@ -365,6 +365,29 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                             [fakes.EC2_NETWORK_INTERFACE_1,
                              fakes.EC2_NETWORK_INTERFACE_2]))
 
+        self.check_filtering(
+            'DescribeNetworkInterfaces', 'networkInterfaceSet',
+            [('addresses.private-ip-address',
+              fakes.IP_NETWORK_INTERFACE_2_EXT_1,),
+             # TODO(ft): support filtering by a boolean value
+#              ('addresses.primary', False),
+             ('description', fakes.DESCRIPTION_NETWORK_INTERFACE_1),
+             # TODO(ft): add security groups to fake data
+#              ('group-id', ),
+#              ('group-name'),
+             # TODO(ft): declare a constant for the mac in fakes
+             ('mac-address', 'fb:10:2e:b2:ba:b7'),
+             ('network-interface-id', fakes.ID_EC2_NETWORK_INTERFACE_1),
+             ('owner-id', fakes.ID_OS_PROJECT),
+             ('private-ip-address', fakes.IP_NETWORK_INTERFACE_1),
+             # TODO(ft): support filtering by a boolean value
+#              ('requester-managed', False),
+             # TODO(ft): support filtering by a boolean value
+#              ('source-dest-check', True),
+             ('status', 'available'),
+             ('vpc-id', fakes.ID_EC2_VPC_1),
+             ('subnet-id', fakes.ID_EC2_SUBNET_2)])
+
     def test_describe_network_interface_attribute(self):
         self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1
 

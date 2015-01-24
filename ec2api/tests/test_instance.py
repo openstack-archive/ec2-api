@@ -898,16 +898,6 @@ class InstanceTestCase(base.ApiTestCase):
                                 fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
 
-        resp = self.execute('DescribeInstances',
-                            {'Filter.1.Name': 'key-name',
-                             'Filter.1.Value.1': 'a',
-                             'Filter.1.Value.2': 'b',
-                             'Filter.2.Name': 'client-token',
-                             'Filter.2.Value.1': 'a string'})
-        self.assertEqual({'http_status_code': 200,
-                          'reservationSet': []},
-                         resp)
-
         self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_2]
         resp = self.execute('DescribeInstances', {'InstanceId.1':
                                                   fakes.ID_EC2_INSTANCE_2})
@@ -917,6 +907,46 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertThat(resp, matchers.DictMatches(
             {'reservationSet': [fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
+
+        self.check_filtering(
+            'DescribeInstances', 'reservationSet',
+            [('block-device-mapping.device-name',
+              fakes.ROOT_DEVICE_NAME_INSTANCE_2),
+             ('client-token', fakes.CLIENT_TOKEN_INSTANCE_2),
+             # TODO(ft): support filtering by none/empty value
+#              ('dns-name', ''),
+             ('image-id', fakes.ID_EC2_IMAGE_1),
+             ('instance-id', fakes.ID_EC2_INSTANCE_2),
+             ('instance-type', 'fake_flavor'),
+             ('ip-address', fakes.IP_ADDRESS_2),
+             ('kernel-id', fakes.ID_EC2_IMAGE_AKI_1),
+             ('key-name', fakes.NAME_KEY_PAIR),
+             # TODO(ft): support filtering by a none/empty value
+#              ('launch-index', 0),
+             # TODO(ft): fill the field in fakes with correct value
+#              ('launch-time', ),
+             ('private-dns-name', fakes.ID_EC2_INSTANCE_1),
+             ('private-ip-address', fakes.IP_NETWORK_INTERFACE_2),
+             ('ramdisk-id', fakes.ID_EC2_IMAGE_ARI_1),
+             ('root-device-name', fakes.ROOT_DEVICE_NAME_INSTANCE_1),
+             ('root-device-type', 'ebs'),
+             ('subnet-id', fakes.ID_EC2_SUBNET_2),
+             ('vpc-id', fakes.ID_EC2_VPC_1),
+             ('network-interface.description',
+              fakes.DESCRIPTION_NETWORK_INTERFACE_2),
+             ('network-interface.subnet-id', fakes.ID_EC2_SUBNET_2),
+             ('network-interface.vpc-id', fakes.ID_EC2_VPC_1),
+             ('network-interface.network-interface.id',
+              fakes.ID_EC2_NETWORK_INTERFACE_2),
+             ('network-interface.owner-id', fakes.ID_OS_PROJECT),
+             # TODO(ft): support filtering by a boolean value
+#              ('network-interface.requester-managed', False),
+             ('network-interface.status', 'in-use'),
+             # TODO(ft): declare a constant for the mac in fakes
+             ('network-interface.mac-address', 'fb:10:2e:b2:ba:b7'),
+             # TODO(ft): support filtering by a boolean value
+#              ('network-interface.source-destination-check', True),
+             ])
 
     def test_describe_instances_ec2_classic(self):
         instance_api.instance_engine = (

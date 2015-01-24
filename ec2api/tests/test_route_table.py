@@ -696,6 +696,24 @@ class RouteTableTestCase(base.ApiTestCase):
                         matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1,
                                                   fakes.EC2_ROUTE_TABLE_2]))
 
+        self.check_filtering(
+            'DescribeRouteTables', 'routeTableSet',
+            [('association.route-table-association-id',
+              fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1),
+             ('association.route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
+             # TODO(ft): add fake data for this case
+#              ('association.subnet-id', ),
+             # TODO(ft): support filtering by a boolean value
+#              ('association.main', True),
+             ('route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
+             ('route.destination-cidr-block', fakes.CIDR_EXTERNAL_NETWORK),
+             ('route.gateway-id', 'local'),
+             ('route.instance-id', fakes.ID_EC2_INSTANCE_1),
+             ('route.origin', 'CreateRouteTable'),
+             ('route.state', 'active'),
+             ('vpc-id', fakes.ID_EC2_VPC_1)
+            ])
+
     def test_describe_route_tables_variations(self):
         igw_1 = tools.purge_dict(fakes.DB_IGW_1, ('vpc_id',))
         igw_2 = tools.update_dict(fakes.DB_IGW_2,

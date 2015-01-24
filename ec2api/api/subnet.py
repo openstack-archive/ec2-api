@@ -137,7 +137,7 @@ class SubnetDescriber(common.TaggableItemsDescriber):
                   'cidr': 'cidrBlock',
                   'cidrBlock': 'cidrBlock',
                   'cidr-block': 'cidrBlock',
-                  'subnet-id': 'id',
+                  'subnet-id': 'subnetId',
                   'state': 'state',
                   'vpc-id': 'vpcId'}
 

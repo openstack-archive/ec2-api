@@ -62,6 +62,17 @@ class VolumeTestCase(base.ApiTestCase):
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, 'vol', set([fakes.ID_EC2_VOLUME_1]))
 
+        self.check_filtering(
+            'DescribeVolumes', 'volumeSet',
+            [('availability-zone', fakes.NAME_AVAILABILITY_ZONE),
+             ('create-time', fakes.TIME_CREATE_VOLUME_2),
+             # TODO(ft): support filtering by a number value
+             # NOTE(ft): declare a constant for the volume size in fakes
+#              ('size', 1),
+             ('snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
+             ('status', 'available'),
+             ('volume-id', fakes.ID_EC2_VOLUME_1)])
+
     def test_describe_volumes_invalid_parameters(self):
         self.cinder.volumes.list.return_value = [
             fakes.CinderVolume(fakes.OS_VOLUME_1),

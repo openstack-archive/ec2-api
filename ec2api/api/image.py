@@ -207,9 +207,9 @@ class ImageDescriber(common.TaggableItemsDescriber):
                   'is-public': 'isPublic',
                   'kernel_id': 'kernelId',
                   'name': 'name',
-                  'owner-id': 'ownerId',
+                  'owner-id': 'imageOwnerId',
                   'ramdisk-id': 'ramdiskId',
-                  'state': 'state',
+                  'state': 'imageState',
                   }
 
     def format(self, image, os_image):

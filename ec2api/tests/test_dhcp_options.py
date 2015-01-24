@@ -102,6 +102,11 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                                               fakes.EC2_DHCP_OPTIONS_2],
                                              orderless_lists=True))
 
+        self.check_filtering(
+            'DescribeDhcpOptions', 'dhcpOptionsSet',
+            [('dhcp_options_id', fakes.ID_EC2_DHCP_OPTIONS_1),
+             ('key', 'netbios-node-type')])
+
     def test_associate_dhcp_options(self):
         self.db_api.get_item_by_id.side_effect = (
                 fakes.get_db_api_get_item_by_id(

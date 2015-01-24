@@ -124,7 +124,7 @@ class InternetGatewayDescriber(common.TaggableItemsDescriber,
                                common.NonOpenstackItemsDescriber):
 
     KIND = 'igw'
-    FILTER_MAP = {'internet-gateway-id': 'id',
+    FILTER_MAP = {'internet-gateway-id': 'internetGatewayId',
                   'attachment.state': ['attachmentSet', 'state'],
                   'attachment.vpc-id': ['attachmentSet', 'vpcId']}
 

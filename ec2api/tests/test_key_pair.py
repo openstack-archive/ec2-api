@@ -92,6 +92,11 @@ class KeyPairCase(base.ApiTestCase):
                                              {'keyMaterial'})]))
         self.nova_key_pairs.list.assert_called_once()
 
+        self.check_filtering(
+            'DescribeKeyPairs', 'keySet',
+            [('fingerprint', fakes.FINGERPRINT_KEY_PAIR),
+             ('key-name', fakes.NAME_KEY_PAIR)])
+
     def test_describe_key_pairs_invalid(self):
         self.nova_key_pairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]

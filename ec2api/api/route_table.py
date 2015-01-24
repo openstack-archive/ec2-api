@@ -209,14 +209,14 @@ class RouteTableDescriber(common.TaggableItemsDescriber,
                   'association.route-table-id': ['associationSet',
                                                  'routeTableId'],
                   'association.subnet-id': ['associationSet', 'subnetId'],
-                  'association.main': ['association', 'main'],
+                  'association.main': ['associationSet', 'main'],
                   'route-table-id': 'routeTableId',
                   'route.destination-cidr-block': ['routeSet',
                                                    'destinationCidrBlock'],
                   'route.gateway-id': ['routeSet', 'gatewayId'],
                   'route.instance-id': ['routeSet', 'instanceId'],
-                  'route.origin': ['route', 'origin'],
-                  'route.state': ['route', 'state'],
+                  'route.origin': ['routeSet', 'origin'],
+                  'route.state': ['routeSet', 'state'],
                   'vpc-id': 'vpcId'}
 
     def format(self, route_table):

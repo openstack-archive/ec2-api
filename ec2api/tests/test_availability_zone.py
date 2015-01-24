@@ -29,6 +29,11 @@ class AvailabilityZoneCase(base.ApiTestCase):
                         matchers.ListMatches([fakes.EC2_AVAILABILITY_ZONE]))
         self.nova_availability_zones.list.assert_called_once()
 
+        self.check_filtering(
+            'DescribeAvailabilityZones', 'availabilityZoneInfo',
+            [('state', 'available'),
+             ('zone-name', fakes.NAME_AVAILABILITY_ZONE)])
+
     def test_describe_availability_zones_verbose(self):
         self.nova_availability_zones.list.return_value = [
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),

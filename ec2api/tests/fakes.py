@@ -176,6 +176,7 @@ ID_OS_FLOATING_IP_2 = random_os_id()
 
 IP_ADDRESS_1 = '192.168.1.100'
 IP_ADDRESS_2 = '192.168.1.200'
+IP_ADDRESS_NOVA_1 = '192.168.2.100'
 
 
 # security group constants
@@ -604,7 +605,7 @@ EC2_INSTANCE_2 = {
     'privateIpAddress': None,
     'amiLaunchIndex': 0,
     'placement': {'availabilityZone': NAME_AVAILABILITY_ZONE},
-    'dnsName': None,
+    'dnsName': IP_ADDRESS_NOVA_1,
     'dnsNameV6': IPV6_INSTANCE_2,
     'instanceState': {'code': 0, 'name': 'pending'},
     'imageId': None,
@@ -620,6 +621,7 @@ EC2_INSTANCE_2 = {
                      'volumeId': ID_EC2_VOLUME_2,
                      'attachTime': None}}],
     'instanceType': 'fake_flavor',
+    'ipAddress': IP_ADDRESS_NOVA_1,
     'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_2,
     'clientToken': CLIENT_TOKEN_INSTANCE_2,
 }
@@ -707,7 +709,10 @@ OS_INSTANCE_2 = OSInstance(
     addresses={
         ID_EC2_SUBNET_1: [{'addr': IPV6_INSTANCE_2,
                            'version': 6,
-                           'OS-EXT-IPS:type': 'fixed'}]},
+                           'OS-EXT-IPS:type': 'fixed'},
+                          {'addr': IP_ADDRESS_NOVA_1,
+                           'version': 4,
+                           'OS-EXT-IPS:type': 'floating'}]},
     )
 
 
@@ -1147,6 +1152,7 @@ EC2_IMAGE_2 = {
     'architecture': None,
     'rootDeviceType': 'ebs',
     'rootDeviceName': ROOT_DEVICE_NAME_IMAGE_2,
+    'architecture': 'x86_64',
     'blockDeviceMapping': [
         {'deviceName': '/dev/sdb1',
          'ebs': {'snapshotId': ID_EC2_SNAPSHOT_1}}],
@@ -1225,6 +1231,7 @@ OS_IMAGE_2 = {
     'properties': {
         'type': 'machine',
         'root_device_name': '/dev/sdb1',
+        'architecture': 'x86_64',
         'mappings': [{'device': '/dev/sda1',
                       'virtual': 'root'}],
         'block_device_mapping': [

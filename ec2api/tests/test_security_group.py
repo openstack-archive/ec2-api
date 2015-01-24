@@ -281,6 +281,13 @@ class SecurityGroupTestCase(base.ApiTestCase):
                             [fakes.EC2_SECURITY_GROUP_2],
                             orderless_lists=True))
 
+        self.check_filtering(
+            'DescribeSecurityGroups', 'securityGroupInfo',
+            [('vpc-id', fakes.ID_EC2_VPC_1),
+             # TODO(ft): declare a constant for the group name in fakes
+             ('group-name', 'groupname'),
+             ('group-id', fakes.ID_EC2_SECURITY_GROUP_1)])
+
     def test_describe_security_groups_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
