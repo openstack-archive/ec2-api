@@ -336,6 +336,12 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidRoute.NotFound', resp['Error']['Code'])
 
+        resp = self.execute('DeleteRoute',
+                            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                             'DestinationCidrBlock': fakes.CIDR_VPC_1})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
     def test_delete_route_rollback(self, routes_updater):
         self.db_api.get_item_by_id.return_value = (

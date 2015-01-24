@@ -55,17 +55,23 @@ def replace_route(context, route_table_id, destination_cidr_block,
 
 
 def delete_route(context, route_table_id, destination_cidr_block):
-    # TODO(ft): check cidr block is valid
     route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
-    rollback_route_table_state = copy.deepcopy(route_table)
-    route_count = len(route_table['routes'])
-    route_table['routes'] = [
-        r for r in route_table['routes']
-        if r['destination_cidr_block'] != destination_cidr_block]
-    if route_count == len(route_table['routes']):
+    for route_index, route in enumerate(route_table['routes']):
+        if route['destination_cidr_block'] != destination_cidr_block:
+            continue
+        if route.get('gateway_id', 0) is None:
+            msg = _('cannot remove local route %(destination_cidr_block)s '
+                    'in route table %(route_table_id)s')
+            msg = msg % {'route_table_id': route_table_id,
+                         'destination_cidr_block': destination_cidr_block}
+            raise exception.InvalidParameterValue(msg)
+        break
+    else:
         raise exception.InvalidRouteNotFound({
             'route_table_id': route_table_id,
             'destination_cidr_block': destination_cidr_block})
+    rollback_route_table_state = copy.deepcopy(route_table)
+    del route_table['routes'][route_index]
     with common.OnCrashCleaner() as cleaner:
         db_api.update_item(context, route_table)
         cleaner.addCleanup(db_api.update_item, context,
