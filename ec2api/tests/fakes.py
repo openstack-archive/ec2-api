@@ -192,8 +192,11 @@ NAME_OTHER_OS_SECURITY_GROUP = 'other'
 # route table constants
 ID_EC2_ROUTE_TABLE_1 = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_2 = random_ec2_id('rtb')
+ID_EC2_ROUTE_TABLE_3 = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_ASSOCIATION_1 = ID_EC2_VPC_1.replace('vpc', 'rtbassoc')
 ID_EC2_ROUTE_TABLE_ASSOCIATION_2 = ID_EC2_SUBNET_2.replace('subnet',
+                                                           'rtbassoc')
+ID_EC2_ROUTE_TABLE_ASSOCIATION_3 = ID_EC2_SUBNET_2.replace('subnet',
                                                            'rtbassoc')
 
 CIDR_EXTERNAL_NETWORK = '192.168.50.0/24'
@@ -334,7 +337,8 @@ DB_SUBNET_1 = {'id': ID_EC2_SUBNET_1,
                'vpc_id': ID_EC2_VPC_1}
 DB_SUBNET_2 = {'id': ID_EC2_SUBNET_2,
                'os_id': ID_OS_SUBNET_2,
-               'vpc_id': ID_EC2_VPC_1}
+               'vpc_id': ID_EC2_VPC_1,
+               'route_table_id': ID_EC2_ROUTE_TABLE_3}
 
 EC2_SUBNET_1 = {'subnetId': ID_EC2_SUBNET_1,
                 'state': 'available',
@@ -1046,6 +1050,12 @@ DB_ROUTE_TABLE_2 = {
                {'destination_cidr_block': '0.0.0.0/0',
                 'gateway_id': ID_EC2_IGW_1}],
 }
+DB_ROUTE_TABLE_3 = {
+    'id': ID_EC2_ROUTE_TABLE_3,
+    'vpc_id': ID_EC2_VPC_1,
+    'routes': [{'destination_cidr_block': CIDR_VPC_1,
+                'gateway_id': None}],
+}
 EC2_ROUTE_TABLE_1 = {
     'routeTableId': ID_EC2_ROUTE_TABLE_1,
     'vpcId': ID_EC2_VPC_1,
@@ -1078,6 +1088,21 @@ EC2_ROUTE_TABLE_2 = {
          'gatewayId': ID_EC2_IGW_1,
          'state': 'active',
          'origin': 'CreateRoute'}],
+    'tagSet': [],
+}
+EC2_ROUTE_TABLE_3 = {
+    'routeTableId': ID_EC2_ROUTE_TABLE_3,
+    'vpcId': ID_EC2_VPC_1,
+    'routeSet': [
+        {'destinationCidrBlock': CIDR_VPC_1,
+         'gatewayId': 'local',
+         'state': 'active',
+         'origin': 'CreateRouteTable'}],
+    'associationSet': [
+        {'routeTableAssociationId': ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
+         'routeTableId': ID_EC2_ROUTE_TABLE_3,
+         'subnetId': ID_EC2_SUBNET_2,
+         'main': False}],
     'tagSet': [],
 }
 

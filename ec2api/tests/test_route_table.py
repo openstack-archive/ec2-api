@@ -438,29 +438,26 @@ class RouteTableTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
     def test_replace_route_table_association(self, routes_updater):
-        subnet = tools.update_dict(
-            fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
                 fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_EC2_SUBNET_2: subnet}))
-        resp = self.execute('ReplaceRouteTableAssociation',
-                            {'AssociationId':
-                             fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
-                             'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
+                fakes.ID_EC2_ROUTE_TABLE_3: fakes.DB_ROUTE_TABLE_3,
+                fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2}))
+        resp = self.execute(
+            'ReplaceRouteTableAssociation',
+            {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
+             'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
                          resp['newAssociationId'])
         subnet = tools.update_dict(
-            subnet,
+            fakes.DB_SUBNET_2,
             {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.update_item.assert_called_once_with(
             mock.ANY, subnet)
         routes_updater.assert_called_once_with(
             mock.ANY, subnet, fakes.DB_ROUTE_TABLE_2, cleaner=mock.ANY,
-            rollback_route_table_object=fakes.DB_ROUTE_TABLE_1)
+            rollback_route_table_object=fakes.DB_ROUTE_TABLE_3)
 
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
     def test_replace_route_table_association_main(self, routes_updater):
@@ -508,20 +505,21 @@ class RouteTableTestCase(base.ApiTestCase):
         # NOTE(ft): association with subnet is obsolete (no subnet)
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
+                {fakes.ID_EC2_ROUTE_TABLE_3: fakes.DB_ROUTE_TABLE_3,
                  fakes.ID_EC2_SUBNET_2: None}))
-        do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
-                  'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2},
+        do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
+                  'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_3},
                  'InvalidAssociationID.NotFound')
 
         # NOTE(ft): association with subnet is obsolete (subnet is
         # disassociated)
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                 fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2}))
-        do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
-                  'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2},
+                {fakes.ID_EC2_ROUTE_TABLE_3: fakes.DB_ROUTE_TABLE_3,
+                 fakes.ID_EC2_SUBNET_2: tools.purge_dict(fakes.DB_SUBNET_2,
+                                                         ['route_table_id'])}))
+        do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
+                  'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_3},
                  'InvalidAssociationID.NotFound')
 
         # NOTE(ft): association belongs to different vpc
@@ -543,14 +541,12 @@ class RouteTableTestCase(base.ApiTestCase):
     @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
     def test_replace_route_table_association_rollback(self, routes_updater,
                                                       multiply_routes_updater):
-        subnet = tools.update_dict(
-            fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
                 fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
                 fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_EC2_SUBNET_2: subnet,
+                fakes.ID_EC2_ROUTE_TABLE_3: fakes.DB_ROUTE_TABLE_3,
+                fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2,
                 fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         multiply_routes_updater.side_effect = Exception()
 
@@ -564,34 +560,32 @@ class RouteTableTestCase(base.ApiTestCase):
         routes_updater.side_effect = Exception()
 
         self.execute('ReplaceRouteTableAssociation',
-                     {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
+                     {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
                       'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
 
         self.db_api.update_item.assert_any_call(
-            mock.ANY, subnet)
+            mock.ANY, fakes.DB_SUBNET_2)
 
     @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
     def test_disassociate_route_table(self, routes_updater):
-        subnet = tools.update_dict(
-            fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
                 fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_EC2_SUBNET_2: subnet,
+                fakes.ID_EC2_ROUTE_TABLE_3: fakes.DB_ROUTE_TABLE_3,
+                fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2,
                 fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         resp = self.execute(
             'DisassociateRouteTable',
-            {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2})
+            {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
+        subnet = tools.purge_dict(fakes.DB_SUBNET_2, ('route_table_id',))
         self.db_api.update_item.assert_called_once_with(
-            mock.ANY, fakes.DB_SUBNET_2)
+            mock.ANY, subnet)
         routes_updater.assert_called_once_with(
-            mock.ANY, fakes.DB_SUBNET_2, fakes.DB_ROUTE_TABLE_1,
+            mock.ANY, subnet, fakes.DB_ROUTE_TABLE_1,
             cleaner=mock.ANY,
-            rollback_route_table_object=fakes.DB_ROUTE_TABLE_2)
+            rollback_route_table_object=fakes.DB_ROUTE_TABLE_3)
 
     def test_disassociate_route_table_invalid_parameter(self):
         def do_check(params, error_code):
@@ -603,38 +597,33 @@ class RouteTableTestCase(base.ApiTestCase):
         do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1},
                  'InvalidAssociationID.NotFound')
 
-        self.db_api.get_item_by_id.side_effect = (
-            lambda _, kind, item_id:
-            None
-            if kind == 'subnet' else
-            fakes.DB_VPC_1
-            if kind == 'vpc' and item_id == fakes.ID_EC2_VPC_1
-            else None)
-        do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1},
-                 'InvalidParameterValue')
-
-        self.db_api.get_item_by_id.return_value = fakes.DB_SUBNET_2
+        self.db_api.get_item_by_id.return_value = tools.purge_dict(
+            fakes.DB_SUBNET_1, ['route_table_id'])
         do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2},
                  'InvalidAssociationID.NotFound')
 
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id(
+                {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
+        do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1},
+                 'InvalidParameterValue')
+
     @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
     def test_disassociate_route_table_rollback(self, routes_updater):
-        subnet = tools.update_dict(
-            fakes.DB_SUBNET_2,
-            {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
                 fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1,
-                fakes.ID_EC2_ROUTE_TABLE_2: fakes.DB_ROUTE_TABLE_2,
-                fakes.ID_EC2_SUBNET_2: subnet,
+                fakes.ID_EC2_ROUTE_TABLE_3: fakes.DB_ROUTE_TABLE_3,
+                fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2,
                 fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
         routes_updater.side_effect = Exception()
 
-        self.execute('DisassociateRouteTable',
-                     {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2})
+        self.execute(
+             'DisassociateRouteTable',
+             {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3})
 
         self.db_api.update_item.assert_any_call(
-            mock.ANY, subnet)
+            mock.ANY, fakes.DB_SUBNET_2)
 
     def test_delete_route_table(self):
         self.db_api.get_item_by_id.side_effect = (
@@ -682,33 +671,29 @@ class RouteTableTestCase(base.ApiTestCase):
 
     def test_describe_route_tables(self):
         self.db_api.get_items.side_effect = (
-            lambda _, kind:
-            [fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2]
-            if kind == 'rtb' else
-            [fakes.DB_VPC_1, fakes.DB_VPC_2]
-            if kind == 'vpc' else
-            [fakes.DB_IGW_1, fakes.DB_IGW_2]
-            if kind == 'igw' else
-            [fakes.DB_SUBNET_1, fakes.DB_SUBNET_2]
-            if kind == 'subnet' else
-            [fakes.DB_NETWORK_INTERFACE_1,
-             fakes.DB_NETWORK_INTERFACE_2]
-            if kind == 'eni' else [])
+            fakes.get_db_api_get_items({
+                'rtb': [fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
+                        fakes.DB_ROUTE_TABLE_3],
+                'vpc': [fakes.DB_VPC_1, fakes.DB_VPC_2],
+                'igw': [fakes.DB_IGW_1, fakes.DB_IGW_2],
+                'subnet': [fakes.DB_SUBNET_1, fakes.DB_SUBNET_2],
+                'eni': [fakes.DB_NETWORK_INTERFACE_1,
+                        fakes.DB_NETWORK_INTERFACE_2]}))
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
         self.nova_servers.get.return_value = fake_server_class('ACTIVE')
         resp = self.execute('DescribeRouteTables', {})
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['routeTableSet'],
                         matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1,
-                                                  fakes.EC2_ROUTE_TABLE_2]))
+                                              fakes.EC2_ROUTE_TABLE_2,
+                                              fakes.EC2_ROUTE_TABLE_3]))
 
         self.check_filtering(
             'DescribeRouteTables', 'routeTableSet',
             [('association.route-table-association-id',
               fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1),
              ('association.route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
-             # TODO(ft): add fake data for this case
-#              ('association.subnet-id', ),
+             ('association.subnet-id', fakes.ID_EC2_SUBNET_2),
              # TODO(ft): support filtering by a boolean value
 #              ('association.main', True),
              ('route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
@@ -746,18 +731,13 @@ class RouteTableTestCase(base.ApiTestCase):
             {'destination_cidr_block': '192.168.88.0/24',
              'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_2})
         self.db_api.get_items.side_effect = (
-            lambda _, kind:
-            [route_table_1, route_table_2]
-            if kind == 'rtb' else
-            [fakes.DB_VPC_1, fakes.DB_VPC_2]
-            if kind == 'vpc' else
-            [igw_1, igw_2]
-            if kind == 'igw' else
-            [subnet_1, subnet_2]
-            if kind == 'subnet' else
-            [fakes.DB_NETWORK_INTERFACE_1,
-             fakes.DB_NETWORK_INTERFACE_2]
-            if kind == 'eni' else [])
+            fakes.get_db_api_get_items({
+                'rtb': [route_table_1, route_table_2],
+                'vpc': [fakes.DB_VPC_1, fakes.DB_VPC_2],
+                'igw': [igw_1, igw_2],
+                'subnet': [subnet_1, subnet_2],
+                'eni': [fakes.DB_NETWORK_INTERFACE_1,
+                        fakes.DB_NETWORK_INTERFACE_2]}))
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
         self.nova_servers.get.return_value = fake_server_class('DOWN')
         resp = self.execute('DescribeRouteTables', {})
