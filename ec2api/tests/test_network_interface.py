@@ -366,6 +366,18 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                             [fakes.EC2_NETWORK_INTERFACE_1,
                              fakes.EC2_NETWORK_INTERFACE_2]))
 
+        self.db_api.get_items_by_ids = tools.CopyingMock(
+            return_value=[fakes.DB_NETWORK_INTERFACE_1])
+        resp = self.execute(
+            'DescribeNetworkInterfaces',
+            {'NetworkInterfaceId.1': fakes.ID_EC2_NETWORK_INTERFACE_1})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['networkInterfaceSet'],
+                        matchers.ListMatches(
+                            [fakes.EC2_NETWORK_INTERFACE_1]))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'eni', set([fakes.ID_EC2_NETWORK_INTERFACE_1]))
+
         self.check_filtering(
             'DescribeNetworkInterfaces', 'networkInterfaceSet',
             [('addresses.private-ip-address',
@@ -388,6 +400,9 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              ('status', 'available'),
              ('vpc-id', fakes.ID_EC2_VPC_1),
              ('subnet-id', fakes.ID_EC2_SUBNET_2)])
+        self.check_tag_support(
+            'DescribeNetworkInterfaces', 'networkInterfaceSet',
+            fakes.ID_EC2_NETWORK_INTERFACE_1, 'networkInterfaceId')
 
     def test_describe_network_interface_attribute(self):
         self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1

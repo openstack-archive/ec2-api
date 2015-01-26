@@ -251,7 +251,17 @@ class SubnetTestCase(base.ApiTestCase):
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['subnetSet'],
                         matchers.ListMatches([fakes.EC2_SUBNET_1,
-                                                  fakes.EC2_SUBNET_2]))
+                                              fakes.EC2_SUBNET_2]))
+
+        self.db_api.get_items_by_ids = tools.CopyingMock(
+            return_value=[fakes.DB_SUBNET_2])
+        resp = self.execute('DescribeSubnets',
+                            {'SubnetId.1': fakes.ID_EC2_SUBNET_2})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['subnetSet'],
+                        matchers.ListMatches([fakes.EC2_SUBNET_2]))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'subnet', set([fakes.ID_EC2_SUBNET_2]))
 
         self.check_filtering(
             'DescribeSubnets', 'subnetSet',
@@ -265,6 +275,9 @@ class SubnetTestCase(base.ApiTestCase):
              ('subnet-id', fakes.ID_EC2_SUBNET_2),
              ('state', 'available'),
              ('vpc-id', fakes.ID_EC2_VPC_1)])
+        self.check_tag_support(
+            'DescribeSubnets', 'subnetSet',
+            fakes.ID_EC2_SUBNET_2, 'subnetId')
 
     @base.skip_not_implemented
     def test_describe_subnets_no_vpc(self):

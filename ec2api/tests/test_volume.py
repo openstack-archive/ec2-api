@@ -46,11 +46,8 @@ class VolumeTestCase(base.ApiTestCase):
 
         self.db_api.get_items.assert_any_call(mock.ANY, 'vol')
 
-        self.db_api.get_items_by_ids.side_effect = (
-            lambda context, kind, ids: [fakes.DB_VOLUME_1])
         self.db_api.get_items_by_ids = tools.CopyingMock(
-            side_effect=self.db_api.get_items_by_ids.side_effect)
-
+            return_value=[fakes.DB_VOLUME_1])
         resp = self.execute('DescribeVolumes',
                             {'VolumeId.1': fakes.ID_EC2_VOLUME_1})
         self.assertEqual(200, resp['http_status_code'])
@@ -58,7 +55,6 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertThat(resp, matchers.DictMatches(
             {'volumeSet': [fakes.EC2_VOLUME_1]},
             orderless_lists=True))
-
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, 'vol', set([fakes.ID_EC2_VOLUME_1]))
 
@@ -72,6 +68,9 @@ class VolumeTestCase(base.ApiTestCase):
              ('snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
              ('status', 'available'),
              ('volume-id', fakes.ID_EC2_VOLUME_1)])
+        self.check_tag_support(
+            'DescribeVolumes', 'volumeSet',
+            fakes.ID_EC2_VOLUME_1, 'volumeId')
 
     def test_describe_volumes_invalid_parameters(self):
         self.cinder.volumes.list.return_value = [

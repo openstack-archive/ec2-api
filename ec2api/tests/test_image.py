@@ -227,7 +227,6 @@ class ImageTestCase(base.ApiTestCase):
         self.assertThat(resp, matchers.DictMatches(
             {'imagesSet': [fakes.EC2_IMAGE_1]},
             orderless_lists=True))
-
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, 'ami', set([fakes.ID_EC2_IMAGE_1]))
 
@@ -245,6 +244,10 @@ class ImageTestCase(base.ApiTestCase):
              ('owner-id', fakes.ID_OS_PROJECT),
              ('ramdisk-id', fakes.ID_EC2_IMAGE_ARI_1),
              ('state', 'available')])
+        self.check_tag_support(
+            'DescribeImages', 'imagesSet',
+            fakes.ID_EC2_IMAGE_1, 'imageId',
+            ('ami', 'ari', 'aki'))
 
     def test_describe_images_invalid_parameters(self):
         self._setup_model()

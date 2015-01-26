@@ -681,12 +681,22 @@ class RouteTableTestCase(base.ApiTestCase):
                         fakes.DB_NETWORK_INTERFACE_2]}))
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
         self.nova_servers.get.return_value = fake_server_class('ACTIVE')
+
         resp = self.execute('DescribeRouteTables', {})
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['routeTableSet'],
                         matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1,
                                               fakes.EC2_ROUTE_TABLE_2,
                                               fakes.EC2_ROUTE_TABLE_3]))
+
+        self.db_api.get_items_by_ids.return_value = [fakes.DB_ROUTE_TABLE_1]
+        resp = self.execute('DescribeRouteTables',
+                            {'RouteTableId.1': fakes.ID_EC2_ROUTE_TABLE_1})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['routeTableSet'],
+                        matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1]))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'rtb', set([fakes.ID_EC2_ROUTE_TABLE_1]))
 
         self.check_filtering(
             'DescribeRouteTables', 'routeTableSet',
@@ -704,6 +714,9 @@ class RouteTableTestCase(base.ApiTestCase):
              ('route.state', 'active'),
              ('vpc-id', fakes.ID_EC2_VPC_1)
             ])
+        self.check_tag_support(
+            'DescribeRouteTables', 'routeTableSet',
+            fakes.ID_EC2_ROUTE_TABLE_1, 'routeTableId')
 
     def test_describe_route_tables_variations(self):
         igw_1 = tools.purge_dict(fakes.DB_IGW_1, ('vpc_id',))

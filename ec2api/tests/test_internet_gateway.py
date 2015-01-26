@@ -268,17 +268,28 @@ class IgwTestCase(base.ApiTestCase):
                                               fakes.DB_IGW_2]
 
         resp = self.execute('DescribeInternetGateways', {})
-
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['internetGatewaySet'],
                         matchers.ListMatches([fakes.EC2_IGW_1,
-                                                  fakes.EC2_IGW_2]))
+                                              fakes.EC2_IGW_2]))
+
+        self.db_api.get_items_by_ids.return_value = [fakes.DB_IGW_2]
+        resp = self.execute('DescribeInternetGateways',
+                            {'InternetGatewayId.1': fakes.ID_EC2_IGW_2})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['internetGatewaySet'],
+                        matchers.ListMatches([fakes.EC2_IGW_2]))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'igw', set([fakes.ID_EC2_IGW_2]))
 
         self.check_filtering(
             'DescribeInternetGateways', 'internetGatewaySet',
             [('internet-gateway-id', fakes.ID_EC2_IGW_2),
              ('attachment.state', 'available'),
              ('attachment.vpc-id', fakes.ID_EC2_VPC_1)])
+        self.check_tag_support(
+            'DescribeInternetGateways', 'internetGatewaySet',
+            fakes.ID_EC2_IGW_2, 'internetGatewayId')
 
     @base.skip_not_implemented
     def test_describe_igw_no_vpc(self):

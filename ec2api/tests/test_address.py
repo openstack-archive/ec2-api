@@ -615,7 +615,17 @@ class AddressTestCase(base.ApiTestCase):
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['addressesSet'],
                         matchers.ListMatches([fakes.EC2_ADDRESS_1,
-                                                  fakes.EC2_ADDRESS_2]))
+                                              fakes.EC2_ADDRESS_2]))
+
+        self.db_api.get_items_by_ids = tools.CopyingMock(
+            return_value=[fakes.DB_ADDRESS_1])
+        resp = self.execute('DescribeAddresses',
+                            {'AllocationId.1': fakes.ID_EC2_ADDRESS_1})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['addressesSet'],
+                        matchers.ListMatches([fakes.EC2_ADDRESS_1]))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'eipalloc', set([fakes.ID_EC2_ADDRESS_1]))
 
         self.check_filtering(
              'DescribeAddresses', 'addressesSet',

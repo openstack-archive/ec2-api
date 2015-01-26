@@ -98,6 +98,7 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
                   'group-id': 'groupId'}
 
     def __init__(self):
+        super(SecurityGroupDescriber, self).__init__()
         self.all_db_items = None
 
     def format(self, item=None, os_item=None):

@@ -224,12 +224,20 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.get_items.return_value = [fakes.DB_VPC_1, fakes.DB_VPC_2]
 
         resp = self.execute('DescribeVpcs', {})
-
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['vpcSet'],
                         matchers.ListMatches([fakes.EC2_VPC_1,
-                                                  fakes.EC2_VPC_2]))
+                                              fakes.EC2_VPC_2]))
         self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')
+
+        self.db_api.get_items_by_ids.return_value = [fakes.DB_VPC_1]
+        resp = self.execute('DescribeVpcs',
+                            {'VpcId.1': fakes.ID_EC2_VPC_1})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['vpcSet'],
+                        matchers.ListMatches([fakes.EC2_VPC_1]))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'vpc', set([fakes.ID_EC2_VPC_1]))
 
         self.check_filtering(
             'DescribeVpcs', 'vpcSet',
@@ -239,6 +247,9 @@ class VpcTestCase(base.ApiTestCase):
 #              ('is-default', False),
              ('state', 'available'),
              ('vpc-id', fakes.ID_EC2_VPC_1)])
+        self.check_tag_support(
+            'DescribeVpcs', 'vpcSet',
+            fakes.ID_EC2_VPC_1, 'vpcId')
 
     def test_describe_vpcs_no_router(self):
         self.neutron.list_routers.return_value = {'routers': []}

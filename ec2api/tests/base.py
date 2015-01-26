@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 
 import mock
 from oslotest import base as test_base
 
 import ec2api.api.apirequest
+from ec2api.api import ec2utils
 from ec2api.tests import fakes
 from ec2api.tests import matchers
 from ec2api.tests import tools
@@ -131,3 +133,54 @@ class ApiTestCase(test_base.BaseTestCase):
             self.assertEqual(200, resp['http_status_code'])
             self.assertTrue(resp[resultset_key] is None or
                             len(resp[resultset_key]) == 0)
+
+    def check_tag_support(self, operation, resultset_key, sample_item_id,
+                          id_key, item_kinds=[]):
+        self.db_api.get_tags = tools.CopyingMock(
+            return_value=[{'item_id': sample_item_id,
+                           'key': 'fake_key',
+                           'value': 'fake_value'}])
+        ec2_tags = [{'key': 'fake_key',
+                     'value': 'fake_value'}]
+
+        resp = self.execute(operation, {})
+        self.assertEqual(200, resp['http_status_code'])
+        tag_found = False
+        if type(resultset_key) is list:
+            resp_items = itertools.chain(*(r[resultset_key[1]]
+                                           for r in resp[resultset_key[0]]))
+        else:
+            resp_items = resp[resultset_key]
+            resultset_key = [resultset_key]
+        for resp_item in resp_items:
+            if resp_item[id_key] == sample_item_id:
+                self.assertIn('tagSet', resp_item)
+                self.assertThat(resp_item['tagSet'],
+                                matchers.ListMatches(ec2_tags))
+                tag_found = True
+            else:
+                self.assertTrue('tagSet' not in resp_item or
+                                resp_item['tagSet'] == [])
+        self.assertTrue(tag_found)
+        if not item_kinds:
+            item_kinds = (ec2utils.get_ec2_id_kind(sample_item_id),)
+        self.assertTrue(self.db_api.get_tags.call_count == 1 and
+                        (self.db_api.get_tags.mock_calls[0] in
+                         (mock.call(mock.ANY, item_kinds, set()),
+                          mock.call(mock.ANY, item_kinds, None))))
+        self.db_api.reset_mock()
+
+        id_param = '%s%s.1' % (id_key[0].capitalize(), id_key[1:])
+        resp = self.execute(operation, {id_param: sample_item_id})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertTrue(
+            self.db_api.get_tags.call_count == 1 and
+            (self.db_api.get_tags.mock_calls[0] in
+             (mock.call(mock.ANY, item_kinds, set([sample_item_id])),
+              mock.call(mock.ANY, item_kinds, [sample_item_id]))))
+
+        self.check_filtering(
+             operation, resultset_key[0],
+             [('tag-key', 'fake_key'),
+              ('tag-value', 'fake_value'),
+              ('tag:fake_key', 'fake_value')])

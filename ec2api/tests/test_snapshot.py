@@ -41,11 +41,8 @@ class SnapshotTestCase(base.ApiTestCase):
 
         self.db_api.get_items.assert_any_call(mock.ANY, 'vol')
 
-        self.db_api.get_items_by_ids.side_effect = (
-            lambda context, kind, ids: [fakes.DB_SNAPSHOT_1])
         self.db_api.get_items_by_ids = tools.CopyingMock(
-            side_effect=self.db_api.get_items_by_ids.side_effect)
-
+            return_value=[fakes.DB_SNAPSHOT_1])
         resp = self.execute('DescribeSnapshots',
                             {'SnapshotId.1': fakes.ID_EC2_SNAPSHOT_1})
         self.assertEqual(200, resp['http_status_code'])
@@ -53,8 +50,7 @@ class SnapshotTestCase(base.ApiTestCase):
         self.assertThat(resp, matchers.DictMatches(
             {'snapshotSet': [fakes.EC2_SNAPSHOT_1]},
             orderless_lists=True))
-
-        self.db_api.get_items_by_ids.assert_any_call(
+        self.db_api.get_items_by_ids.assert_called_once_with(
             mock.ANY, 'snap', set([fakes.ID_EC2_SNAPSHOT_1]))
 
         self.check_filtering(
@@ -72,6 +68,9 @@ class SnapshotTestCase(base.ApiTestCase):
              # NOTE(ft): declare a constant for the volume size in fakes
 #              ('volume-size', 1)
              ])
+        self.check_tag_support(
+            'DescribeSnapshots', 'snapshotSet',
+            fakes.ID_EC2_SNAPSHOT_1, 'snapshotId')
 
     def test_describe_snapshots_invalid_parameters(self):
         self.cinder.volume_snapshots.list.return_value = [

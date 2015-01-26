@@ -265,6 +265,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
                             [fakes.EC2_SECURITY_GROUP_1,
                              fakes.EC2_SECURITY_GROUP_2],
                             orderless_lists=True))
+
         resp = self.execute('DescribeSecurityGroups',
                             {'GroupName.1': 'groupname2'})
         self.assertEqual(200, resp['http_status_code'])
@@ -272,7 +273,9 @@ class SecurityGroupTestCase(base.ApiTestCase):
                         matchers.ListMatches(
                             [fakes.EC2_SECURITY_GROUP_2],
                             orderless_lists=True))
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_SECURITY_GROUP_2]
+
+        self.db_api.get_items_by_ids = tools.CopyingMock(
+            return_value=[fakes.DB_SECURITY_GROUP_2])
         resp = self.execute('DescribeSecurityGroups',
                             {'GroupId.1': fakes.ID_EC2_SECURITY_GROUP_2})
         self.assertEqual(200, resp['http_status_code'])
@@ -280,6 +283,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
                         matchers.ListMatches(
                             [fakes.EC2_SECURITY_GROUP_2],
                             orderless_lists=True))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'sg', set([fakes.ID_EC2_SECURITY_GROUP_2]))
 
         self.check_filtering(
             'DescribeSecurityGroups', 'securityGroupInfo',
@@ -287,6 +292,9 @@ class SecurityGroupTestCase(base.ApiTestCase):
              # TODO(ft): declare a constant for the group name in fakes
              ('group-name', 'groupname'),
              ('group-id', fakes.ID_EC2_SECURITY_GROUP_1)])
+        self.check_tag_support(
+            'DescribeSecurityGroups', 'securityGroupInfo',
+            fakes.ID_EC2_SECURITY_GROUP_2, 'groupId')
 
     def test_describe_security_groups_nova(self):
         security_group.security_group_engine = (

@@ -909,16 +909,17 @@ class InstanceTestCase(base.ApiTestCase):
                                 fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
 
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1]
-        resp = self.execute('DescribeInstances', {'InstanceId.1':
-                                                  fakes.ID_EC2_INSTANCE_1})
-
+        self.db_api.get_items_by_ids = tools.CopyingMock(
+            return_value=[fakes.DB_INSTANCE_1])
+        resp = self.execute('DescribeInstances',
+                            {'InstanceId.1': fakes.ID_EC2_INSTANCE_1})
         self.assertEqual(200, resp['http_status_code'])
         resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'reservationSet': [fakes.EC2_RESERVATION_1]},
             orderless_lists=True))
-
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, 'i', set([fakes.ID_EC2_INSTANCE_1]))
         (self.network_interface_api.describe_network_interfaces.
          assert_called_with(
             mock.ANY, network_interface_id=[fakes.ID_EC2_NETWORK_INTERFACE_2]))
@@ -961,7 +962,11 @@ class InstanceTestCase(base.ApiTestCase):
              ('network-interface.mac-address', 'fb:10:2e:b2:ba:b7'),
              # TODO(ft): support filtering by a boolean value
 #              ('network-interface.source-destination-check', True),
-             ])
+            ('reservation-id', fakes.ID_EC2_RESERVATION_1),
+            ('owner-id', fakes.ID_OS_PROJECT)])
+        self.check_tag_support(
+            'DescribeInstances', ['reservationSet', 'instancesSet'],
+            fakes.ID_EC2_INSTANCE_1, 'instanceId')
 
     def test_describe_instances_ec2_classic(self):
         instance_api.instance_engine = (

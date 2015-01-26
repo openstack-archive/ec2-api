@@ -95,6 +95,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
     def test_describe_dhcp_options(self):
         self.db_api.get_items.return_value = (
                 [fakes.DB_DHCP_OPTIONS_1, fakes.DB_DHCP_OPTIONS_2])
+
         resp = self.execute('DescribeDhcpOptions', {})
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['dhcpOptionsSet'],
@@ -102,10 +103,24 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                                               fakes.EC2_DHCP_OPTIONS_2],
                                              orderless_lists=True))
 
+        self.db_api.get_items_by_ids.return_value = (
+                [fakes.DB_DHCP_OPTIONS_1])
+        resp = self.execute('DescribeDhcpOptions',
+                            {'DhcpOptionsId.1': fakes.ID_EC2_DHCP_OPTIONS_1})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['dhcpOptionsSet'],
+                        matchers.ListMatches([fakes.EC2_DHCP_OPTIONS_1],
+                                             orderless_lists=True))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+                mock.ANY, 'dopt', set([fakes.ID_EC2_DHCP_OPTIONS_1]))
+
         self.check_filtering(
             'DescribeDhcpOptions', 'dhcpOptionsSet',
             [('dhcp_options_id', fakes.ID_EC2_DHCP_OPTIONS_1),
              ('key', 'netbios-node-type')])
+        self.check_tag_support(
+            'DescribeDhcpOptions', 'dhcpOptionsSet',
+            fakes.ID_EC2_DHCP_OPTIONS_1, 'dhcpOptionsId')
 
     def test_associate_dhcp_options(self):
         self.db_api.get_item_by_id.side_effect = (
