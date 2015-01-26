@@ -111,6 +111,7 @@ class InstanceTestCase(base.ApiTestCase):
                 [fakes.IP_NETWORK_INTERFACE_1],
                 description=fakes.DESCRIPTION_NETWORK_INTERFACE_1,
                 ec2_instance_id=fakes.ID_EC2_INSTANCE_1,
+                device_index=0,
                 delete_on_termination=delete_port_on_termination)
             expected_reservation = fakes.gen_ec2_reservation(
                 fakes.ID_EC2_RESERVATION_1,
@@ -151,7 +152,7 @@ class InstanceTestCase(base.ApiTestCase):
             (self.network_interface_api.
              _attach_network_interface_item.assert_called_once_with(
                 mock.ANY, fakes.DB_NETWORK_INTERFACE_1,
-                fakes.ID_EC2_INSTANCE_1,
+                fakes.ID_EC2_INSTANCE_1, 0,
                 delete_on_termination=delete_port_on_termination))
             self.novadb.instance_get_by_uuid.assert_called_once_with(
                 mock.ANY, fakes.ID_OS_INSTANCE_1)
@@ -182,7 +183,8 @@ class InstanceTestCase(base.ApiTestCase):
                  create_network_interface_kwargs={
                     'private_ip_address': fakes.IP_FIRST_SUBNET_1})
 
-        do_check({'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
+        do_check({'NetworkInterface.1.DeviceIndex': '0',
+                  'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
                   'NetworkInterface.1.SecurityGroupId.1':
                         fakes.ID_EC2_SECURITY_GROUP_1,
                   'NetworkInterface.1.PrivateIpAddress.1':
@@ -191,11 +193,13 @@ class InstanceTestCase(base.ApiTestCase):
                     'security_group_id': [fakes.ID_EC2_SECURITY_GROUP_1],
                     'private_ip_address': [fakes.IP_FIRST_SUBNET_1]})
 
-        do_check({'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
+        do_check({'NetworkInterface.1.DeviceIndex': '0',
+                  'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
                   'NetworkInterface.1.DeleteOnTermination': 'False'},
                  create_network_interface_kwargs={},
                  delete_on_termination=False)
-        do_check({'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
+        do_check({'NetworkInterface.1.DeviceIndex': '0',
+                  'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
                   'NetworkInterface.1.SecurityGroupId.1':
                         fakes.ID_EC2_SECURITY_GROUP_1,
                   'NetworkInterface.1.DeleteOnTermination': 'False'},
@@ -203,7 +207,8 @@ class InstanceTestCase(base.ApiTestCase):
                     'security_group_id': [fakes.ID_EC2_SECURITY_GROUP_1]},
                  delete_on_termination=False)
 
-        do_check({'NetworkInterface.1.NetworkInterfaceId':
+        do_check({'NetworkInterface.1.DeviceIndex': '0',
+                  'NetworkInterface.1.NetworkInterfaceId':
                         fakes.ID_EC2_NETWORK_INTERFACE_1})
 
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
@@ -259,7 +264,9 @@ class InstanceTestCase(base.ApiTestCase):
              'InstanceType': 'fake_flavor',
              'MinCount': '2',
              'MaxCount': '2',
+             'NetworkInterface.1.DeviceIndex': '0',
              'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
+             'NetworkInterface.2.DeviceIndex': '1',
              'NetworkInterface.2.SubnetId': fakes.ID_EC2_SUBNET_2,
              'NetworkInterface.2.DeleteOnTermination': 'False'})
 
@@ -285,12 +292,13 @@ class InstanceTestCase(base.ApiTestCase):
             for port_ids in zip(*[iter(self.IDS_OS_PORT)] * 2)])
         (self.network_interface_api.
          _attach_network_interface_item.assert_has_calls([
-            mock.call(mock.ANY, eni, ec2_instance_id,
+            mock.call(mock.ANY, eni, ec2_instance_id, dev_ind,
                       delete_on_termination=dot)
-            for eni, ec2_instance_id, dot in zip(
+            for eni, ec2_instance_id, dev_ind, dot in zip(
                 self.DB_DETACHED_ENIS,
                 itertools.chain(*map(lambda i: [i] * 2,
                                      self.IDS_EC2_INSTANCE)),
+                [0, 1] * 2,
                 [True, False, True, False])]))
         self.db_api.add_item.assert_has_calls([
             mock.call(mock.ANY, 'i', tools.purge_dict(db_instance, ['id']))
@@ -531,13 +539,16 @@ class InstanceTestCase(base.ApiTestCase):
 
         do_check({'SubnetId': fakes.ID_EC2_SUBNET_1})
 
-        do_check({'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1})
+        do_check({'NetworkInterface.1.DeviceIndex': '0',
+                  'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1})
 
-        do_check({'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
+        do_check({'NetworkInterface.1.DeviceIndex': '0',
+                  'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
                   'NetworkInterface.1.DeleteOnTermination': 'False'},
                  delete_on_termination=False)
 
-        do_check({'NetworkInterface.1.NetworkInterfaceId':
+        do_check({'NetworkInterface.1.DeviceIndex': '0',
+                  'NetworkInterface.1.NetworkInterfaceId':
                         fakes.ID_EC2_NETWORK_INTERFACE_1},
                  new_port=False)
 
@@ -898,15 +909,19 @@ class InstanceTestCase(base.ApiTestCase):
                                 fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
 
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_2]
+        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1]
         resp = self.execute('DescribeInstances', {'InstanceId.1':
-                                                  fakes.ID_EC2_INSTANCE_2})
+                                                  fakes.ID_EC2_INSTANCE_1})
 
         self.assertEqual(200, resp['http_status_code'])
         resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
-            {'reservationSet': [fakes.EC2_RESERVATION_2]},
+            {'reservationSet': [fakes.EC2_RESERVATION_1]},
             orderless_lists=True))
+
+        (self.network_interface_api.describe_network_interfaces.
+         assert_called_with(
+            mock.ANY, network_interface_id=[fakes.ID_EC2_NETWORK_INTERFACE_2]))
 
         self.check_filtering(
             'DescribeInstances', 'reservationSet',
@@ -1048,7 +1063,7 @@ class InstanceTestCase(base.ApiTestCase):
         do_check(
             ips_by_instance=[[ip_info(0), ip_info(1)], [ip_info(3)]],
             ec2_enis_by_instance=[[self.EC2_ATTACHED_ENIS[1]], []],
-            ec2_instance_ips=[fakes.IP_FIRST_SUBNET_2, fakes.IP_LAST_SUBNET_2])
+            ec2_instance_ips=[None, fakes.IP_LAST_SUBNET_2])
 
     @mock.patch('ec2api.api.instance._remove_instances')
     def test_describe_instances_auto_remove(self, remove_instances):
@@ -1204,13 +1219,16 @@ class InstanceTestCase(base.ApiTestCase):
                 ec2_id, os_id, fakes.ID_EC2_VPC_1,
                 subnet_ec2_id, ip,
                 instance_id=instance_ec2_id,
+                device_index=dev_ind,
                 delete_on_termination=dot)
-            for ec2_id, os_id, subnet_ec2_id, ip, instance_ec2_id, dot in zip(
+            for (ec2_id, os_id, subnet_ec2_id, ip, instance_ec2_id, dev_ind,
+                 dot) in zip(
                 ids_ec2_eni,
                 ids_os_port,
                 ids_ec2_subnet_by_port,
                 ips,
                 ids_ec2_instance_by_port,
+                range(subnets_count) * instances_count,
                 dots_by_port)]
         db_detached_enis = [
             fakes.gen_db_network_interface(
@@ -1227,14 +1245,16 @@ class InstanceTestCase(base.ApiTestCase):
                 None,  # ec2_subnet
                 [db_eni['private_ip_address']],
                 ec2_instance_id=ec2_instance_id,
+                device_index=dev_ind,
                 delete_on_termination=dot,
                 ec2_subnet_id=ec2_subnet_id,
                 ec2_vpc_id=fakes.ID_EC2_VPC_1)
-            for db_eni, dot, ec2_subnet_id, ec2_instance_id in zip(
+            for db_eni, dot, ec2_subnet_id, ec2_instance_id, dev_ind in zip(
                 db_attached_enis,
                 dots_by_port,
                 ids_ec2_subnet_by_port,
-                ids_ec2_instance_by_port)]
+                ids_ec2_instance_by_port,
+                range(subnets_count) * instances_count)]
         ec2_detached_enis = [
             fakes.gen_ec2_network_interface(
                 db_eni['id'],

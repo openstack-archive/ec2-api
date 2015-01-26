@@ -392,6 +392,7 @@ DB_NETWORK_INTERFACE_2 = {'id': ID_EC2_NETWORK_INTERFACE_2,
                           'description': DESCRIPTION_NETWORK_INTERFACE_2,
                           'private_ip_address': IP_NETWORK_INTERFACE_2,
                           'instance_id': ID_EC2_INSTANCE_1,
+                          'device_index': 0,
                           'delete_on_termination': False,
                           'attach_time': TIME_ATTACH_NETWORK_INTERFACE}
 
@@ -449,6 +450,7 @@ EC2_NETWORK_INTERFACE_2 = {
         'attachmentId': ID_EC2_NETWORK_INTERFACE_2_ATTACH,
         'instanceId': ID_EC2_INSTANCE_1,
         'instanceOwnerId': ID_OS_PROJECT,
+        'deviceIndex': 0,
     },
     'groupSet': [],
     'tagSet': [],
@@ -579,6 +581,7 @@ EC2_INSTANCE_1 = {
          ],
          'attachment': {
              'status': 'attached',
+             'deviceIndex': 0,
              'attachTime': TIME_ATTACH_NETWORK_INTERFACE,
              'deleteOnTermination': False,
              'attachmentId': ID_EC2_NETWORK_INTERFACE_2_ATTACH,
@@ -1522,7 +1525,8 @@ def gen_db_igw(ec2_id, ec2_vpc_id=None):
 # network interface generator functions
 def gen_db_network_interface(ec2_id, os_id, vpc_ec2_id, subnet_ec2_id,
                              private_ip_address, description=None,
-                             instance_id=None, delete_on_termination=False):
+                             instance_id=None, device_index=None,
+                             delete_on_termination=False):
     eni = {'id': ec2_id,
            'os_id': os_id,
            'vpc_id': vpc_ec2_id,
@@ -1531,6 +1535,7 @@ def gen_db_network_interface(ec2_id, os_id, vpc_ec2_id, subnet_ec2_id,
            'private_ip_address': private_ip_address}
     if instance_id:
         eni['instance_id'] = instance_id
+        eni['device_index'] = device_index
         eni['delete_on_termination'] = delete_on_termination
         eni['attach_time'] = TIME_ATTACH_NETWORK_INTERFACE
     return eni
@@ -1538,6 +1543,7 @@ def gen_db_network_interface(ec2_id, os_id, vpc_ec2_id, subnet_ec2_id,
 
 def gen_ec2_network_interface(ec2_network_interface_id, ec2_subnet, ips,
                               description=None, ec2_instance_id=None,
+                              device_index=None,
                               delete_on_termination=False,
                               for_instance_output=False,
                               ec2_subnet_id=None,
@@ -1569,6 +1575,7 @@ def gen_ec2_network_interface(ec2_network_interface_id, ec2_subnet, ips,
     else:
         attachment_id = ec2_network_interface_id.replace('eni', 'eni-attach')
         attachment = {'status': 'attached',
+                      'deviceIndex': device_index,
                       'attachTime': TIME_ATTACH_NETWORK_INTERFACE,
                       'deleteOnTermination': delete_on_termination,
                       'attachmentId': attachment_id}
@@ -1631,10 +1638,13 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
                               ['tagSet'])
              for ni in ec2_network_interfaces])
         ec2_instance['vpcId'] = ec2_network_interfaces[0]['vpcId']
-        ec2_instance['subnetId'] = ec2_network_interfaces[0]['subnetId']
-        if private_ip_address == '':
-            ec2_instance['privateIpAddress'] = (
-                            ec2_network_interfaces[0]['privateIpAddress'])
+        primary_eni = next((eni for eni in ec2_network_interfaces
+                            if eni['attachment']['deviceIndex'] == 0), None)
+        if primary_eni:
+            ec2_instance['subnetId'] = primary_eni['subnetId']
+            if private_ip_address == '':
+                ec2_instance['privateIpAddress'] = (
+                                    primary_eni['privateIpAddress'])
     if kernel_id:
         ec2_instance['kernelId'] = kernel_id
     if ramdisk_id:

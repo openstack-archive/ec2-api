@@ -353,13 +353,15 @@ def attach_network_interface(context, network_interface_id,
     # TODO(Alex) Check that the instance is not yet attached to another VPC
     # TODO(Alex) Check that the instance is "our", not created via nova
     # (which means that it doesn't belong to any VPC and can't be attached)
+    # TODO(ft): Check that the instance doesn't have a network interface
+    # which is attached at device_index
     os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
     nova = clients.nova(context)
     with common.OnCrashCleaner() as cleaner:
         # TODO(Alex) nova inserts compute:%availability_zone into device_owner
         #                              'device_owner': 'compute:None'}})
         _attach_network_interface_item(context, network_interface,
-                                       instance_id)
+                                       instance_id, device_index)
         cleaner.addCleanup(_detach_network_interface_item, context,
                            network_interface)
         try:
@@ -382,12 +384,13 @@ def detach_network_interface(context, attachment_id, force=None):
     os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
     with common.OnCrashCleaner() as cleaner:
         instance_id = network_interface['instance_id']
+        device_index = network_interface['device_index']
         attach_time = network_interface['attach_time']
         delete_on_termination = network_interface['delete_on_termination']
         _detach_network_interface_item(context, network_interface)
         cleaner.addCleanup(_attach_network_interface_item,
                            context, network_interface, instance_id,
-                           attach_time, delete_on_termination)
+                           device_index, attach_time, delete_on_termination)
         neutron.update_port(os_port['id'],
                             {'port': {'device_id': '',
                                       'device_owner': ''}})
@@ -419,6 +422,7 @@ def _format_network_interface(context, network_interface, os_port,
             'attachmentId': ec2utils.change_ec2_id_kind(
                     network_interface['id'], 'eni-attach'),
             'instanceId': network_interface['instance_id'],
+            'deviceIndex': network_interface['device_index'],
             'status': 'attached',
             'deleteOnTermination': network_interface['delete_on_termination'],
             'attachTime': network_interface['attach_time'],
@@ -463,12 +467,13 @@ def _format_network_interface(context, network_interface, os_port,
 
 
 def _attach_network_interface_item(context, network_interface, instance_id,
-                                   attach_time=None,
+                                   device_index, attach_time=None,
                                    delete_on_termination=False):
     if not attach_time:
         attach_time = timeutils.isotime(None, True)
     network_interface.update({
         'instance_id': instance_id,
+        'device_index': device_index,
         'attach_time': attach_time,
         'delete_on_termination': delete_on_termination})
     db_api.update_item(context, network_interface)
@@ -476,6 +481,7 @@ def _attach_network_interface_item(context, network_interface, instance_id,
 
 def _detach_network_interface_item(context, network_interface):
     network_interface.pop('instance_id', None)
+    network_interface.pop('device_index', None)
     network_interface.pop('attach_time', None)
     network_interface.pop('delete_on_termination', None)
     db_api.update_item(context, network_interface)

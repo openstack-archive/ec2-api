@@ -291,6 +291,10 @@ class InvalidParameterCombination(Invalid):
     pass
 
 
+class UnsupportedOperation(Invalid):
+    pass
+
+
 class ResourceAlreadyAssociated(Invalid):
     ec2_code = 'Resource.AlreadyAssociated'
 

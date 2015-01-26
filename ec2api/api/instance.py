@@ -61,9 +61,6 @@ def get_instance_engine():
         return InstanceEngineNova()
 
 
-# TODO(ft): implement DeviceIndex
-
-
 def run_instances(context, image_id, min_count, max_count,
                   key_name=None, security_group_id=None,
                   security_group=None, user_data=None, instance_type=None,
@@ -514,18 +511,19 @@ def _format_instance(context, instance, os_instance, novadb_instance,
             ec2_network_interface['attachment'].pop('instanceId')
             ec2_network_interface['attachment'].pop('instanceOwnerId')
             ec2_network_interface.pop('tagSet')
-            if not primary_ec2_network_interface:
+            if ec2_network_interface['attachment']['deviceIndex'] == 0:
                 primary_ec2_network_interface = ec2_network_interface
-        ec2_instance['networkInterfaceSet'] = ec2_network_interfaces
-        fixed_ip = primary_ec2_network_interface['privateIpAddress']
-        if 'association' in primary_ec2_network_interface:
-            association = primary_ec2_network_interface['association']
-            floating_ip = association['publicIp']
-            dns_name = association['publicDnsName']
-        else:
-            floating_ip = dns_name = None
-        ec2_instance['vpcId'] = primary_ec2_network_interface['vpcId']
-        ec2_instance['subnetId'] = primary_ec2_network_interface['subnetId']
+        ec2_instance.update({'vpcId': ec2_network_interface['vpcId'],
+                             'networkInterfaceSet': ec2_network_interfaces})
+        fixed_ip = floating_ip = dns_name = None
+        if primary_ec2_network_interface:
+            ec2_instance['subnetId'] = (
+                primary_ec2_network_interface['subnetId'])
+            fixed_ip = primary_ec2_network_interface['privateIpAddress']
+            if 'association' in primary_ec2_network_interface:
+                association = primary_ec2_network_interface['association']
+                floating_ip = association['publicIp']
+                dns_name = association['publicDnsName']
         # TODO(ft): boto uses 2010-08-31 version of AWS protocol
         # which doesn't contain groupSet element in an instance
         # We should support different versions of output data
@@ -773,15 +771,11 @@ class InstanceEngineNeutron(object):
             subnet_id, private_ip_address, security_group_id,
             network_interface)
 
-        self.check_network_interface_parameters(
-            vpc_network_parameters, min_count, min_count)
+        self.check_network_interface_parameters(vpc_network_parameters,
+                                                max_count > 1)
 
-        (vpc_id,
-         existed_network_interfaces,
-         create_network_interfaces_args,
-         delete_on_termination_flags) = (
-            self.parse_network_interface_parameters(
-                context, vpc_network_parameters))
+        (vpc_id, network_data) = self.parse_network_interface_parameters(
+                context, vpc_network_parameters)
 
         # NOTE(ft): workaround for Launchpad Bug #1384347 in Icehouse
         if not security_groups_names and vpc_network_parameters:
@@ -815,13 +809,9 @@ class InstanceEngineNeutron(object):
                 if launch_index >= min_count:
                     cleaner.approveChanges()
 
-                network_interfaces = self.create_network_interfaces(
-                        context, cleaner, create_network_interfaces_args)
-                if max_count == 1:
-                    network_interfaces = (existed_network_interfaces +
-                                          network_interfaces)
-                nics = ([{'port-id': eni['os_id']} for eni in
-                         network_interfaces]
+                self.create_network_interfaces(context, cleaner, network_data)
+                nics = ([{'port-id': data['network_interface']['os_id']}
+                         for data in network_data]
                         if vpc_id else
                         ec2_classic_nics)
 
@@ -836,10 +826,11 @@ class InstanceEngineNeutron(object):
                     nics=nics,
                     key_name=key_name, userdata=user_data)
                 cleaner.addCleanup(nova.servers.delete, os_instance.id)
-                if max_count == 1:
-                    for eni in existed_network_interfaces:
+
+                for data in network_data:
+                    if data.get('detach_on_crash'):
                         cleaner.addCleanup(neutron.update_port,
-                                           eni['os_id'],
+                                           data['network_interface']['os_id'],
                                            {'port': {'device_id': '',
                                                      'device_owner': ''}})
 
@@ -855,18 +846,18 @@ class InstanceEngineNeutron(object):
 
                 nova.servers.update(os_instance, name=instance['id'])
 
-                delete_on_termination = iter(delete_on_termination_flags)
-                for network_interface in network_interfaces:
+                for data in network_data:
                     # TODO(ft): implement update items in DB layer to prevent
                     # record by record modification
                     # Alternatively a create_network_interface sub-function can
                     # set attach_time  at once
                     network_interface_api._attach_network_interface_item(
-                        context, network_interface, instance['id'],
-                        delete_on_termination=delete_on_termination.next())
+                        context, data['network_interface'], instance['id'],
+                        data['device_index'],
+                        delete_on_termination=data['delete_on_termination'])
                     cleaner.addCleanup(
                         network_interface_api._detach_network_interface_item,
-                        context, network_interface)
+                        context, data['network_interface'])
 
                 novadb_instance = novadb.instance_get_by_uuid(context,
                                                               os_instance.id)
@@ -920,12 +911,12 @@ class InstanceEngineNeutron(object):
                 # Both keys must be in the dict, and no other keys
                 # are allowed
                 # We should support such combination of parameters for
-                # compatibility purposes, even if we ignore device_index
-                # and associate_public_ip_address in all other code
+                # compatibility purposes, even if we ignore
+                # associate_public_ip_address in all other code
                 len(network_interfaces) == 1 and
                     (len(network_interfaces[0]) != 2 or
                      'associate_public_ip_address' not in network_interfaces[0]
-                     or 'device_index' not in network_interfaces[0]))):
+                     or network_interfaces[0].get('device_index') != 0))):
             msg = _(' Network interfaces and an instance-level subnet ID or '
                     'private IP address or security groups may not be '
                     'specified on the same request')
@@ -936,7 +927,8 @@ class InstanceEngineNeutron(object):
                 msg = _('The parameter groupName cannot be used with '
                         'the parameter subnet')
                 raise exception.InvalidParameterCombination(msg)
-            param = {'subnet_id': subnet_id}
+            param = {'device_index': 0,
+                     'subnet_id': subnet_id}
             if private_ip_address:
                 param['private_ip_address'] = private_ip_address
             if security_group_ids:
@@ -953,12 +945,18 @@ class InstanceEngineNeutron(object):
             # NOTE(ft): only one of this variables is not empty
             return security_group_names, network_interfaces
 
-    def check_network_interface_parameters(self, params,
-                                           min_instance_count,
-                                           max_instance_count):
-        # NOTE(ft): we ignore device_index and associate_public_ip_address:
-        # OpenStack doesn't support them
+    def check_network_interface_parameters(self, params, multiple_instances):
+        # NOTE(ft): we ignore associate_public_ip_address
+        device_indexes = set()
         for param in params:
+            if 'device_index' not in param:
+                msg = _('Each network interface requires a device index.')
+                raise exception.InvalidParameterValue(msg)
+            elif param['device_index'] in device_indexes:
+                msg = _('Each network interface requires a unique '
+                        'device index.')
+                raise exception.InvalidParameterValue(msg)
+            device_indexes.add(param['device_index'])
             ni_exists = 'network_interface_id' in param
             subnet_exists = 'subnet_id' in param
             ip_exists = 'private_ip_address' in param
@@ -976,26 +974,28 @@ class InstanceEngineNeutron(object):
                 msg = _('A network interface may not specify a network '
                         'interface ID and delete on termination as true')
                 raise exception.InvalidParameterCombination(msg)
-            if max_instance_count > 1 and (ni_exists or ip_exists):
+            if multiple_instances and (ni_exists or ip_exists):
                 msg = _('Multiple instances creation is not compatible with '
                         'private IP address or network interface ID '
                         'parameters.')
                 raise exception.InvalidParameterCombination(msg)
+        if params and 0 not in device_indexes:
+            msg = _('When specifying network interfaces, you must include '
+                    'a device at index 0.')
+            raise exception.UnsupportedOperation(msg)
 
     def parse_network_interface_parameters(self, context, params):
-        network_interfaces = []
-        network_interface_id_set = set()
-        create_network_interfaces_args = []
-        subnets = []
-        delete_on_termination_flags = []
+        vpc_ids = set()
+        network_interface_ids = set()
         busy_network_interfaces = []
+        network_data = []
         for param in params:
             # TODO(ft): OpenStack doesn't support more than one port in a
             # subnet for an instance, but AWS does it.
             # We should check this before creating any object in OpenStack
             if 'network_interface_id' in param:
                 ec2_eni_id = param['network_interface_id']
-                if ec2_eni_id in network_interface_id_set:
+                if ec2_eni_id in network_interface_ids:
                     msg = _("Network interface ID '%(network_interface_id)s' "
                             "may not be specified on multiple interfaces.")
                     msg = msg % {'network_interface_id': ec2_eni_id}
@@ -1008,28 +1008,28 @@ class InstanceEngineNeutron(object):
                                                          ec2_eni_id)
                 if 'instance_id' in network_interface:
                     busy_network_interfaces.append(ec2_eni_id)
-                network_interfaces.append(network_interface)
-                network_interface_id_set.add(ec2_eni_id)
+                vpc_ids.add(network_interface['vpc_id'])
+                network_interface_ids.add(ec2_eni_id)
+                network_data.append({'device_index': param['device_index'],
+                                     'network_interface': network_interface,
+                                     'detach_on_crash': True,
+                                     'delete_on_termination': False})
             else:
                 subnet = ec2utils.get_db_item(context, 'subnet',
                                               param['subnet_id'])
-                subnets.append(subnet)
+                vpc_ids.add(subnet['vpc_id'])
                 args = copy.deepcopy(param)
-                args.pop('device_index', None)
+                delete_on_termination = args.pop('delete_on_termination', True)
                 args.pop('associate_public_ip_address', None)
-                delete_on_termination_flags.append(
-                        args.pop('delete_on_termination', True))
-                subnet_id = args.pop('subnet_id')
-                create_network_interfaces_args.append((subnet_id, args,))
+                network_data.append(
+                    {'device_index': args.pop('device_index'),
+                     'create_args': (args.pop('subnet_id'), args),
+                     'delete_on_termination': delete_on_termination})
 
         if busy_network_interfaces:
             raise exception.InvalidNetworkInterfaceInUse(
                     interface_ids=busy_network_interfaces)
 
-        subnet_vpcs = set(s['vpc_id'] for s in subnets)
-        network_interface_vpcs = set(eni['vpc_id']
-                                     for eni in network_interfaces)
-        vpc_ids = subnet_vpcs | network_interface_vpcs
         if len(vpc_ids) > 1:
             msg = _('Network interface attachments may not cross '
                     'VPC boundaries.')
@@ -1039,16 +1039,14 @@ class InstanceEngineNeutron(object):
         # interface for an instance in parallel run_instances, or even
         # deleting a network interface. We should lock such operations
 
-        delete_on_termination_flags = ([False] * len(network_interfaces) +
-                                       delete_on_termination_flags)
-        return (next(iter(vpc_ids), None),
-                network_interfaces,
-                create_network_interfaces_args,
-                delete_on_termination_flags)
+        network_data.sort(key=lambda data: data['device_index'])
+        return (next(iter(vpc_ids), None), network_data)
 
-    def create_network_interfaces(self, context, cleaner, params):
-        network_interfaces = []
-        for subnet_id, args in params:
+    def create_network_interfaces(self, context, cleaner, network_data):
+        for data in network_data:
+            if 'create_args' not in data:
+                continue
+            (subnet_id, args) = data['create_args']
             ec2_network_interface = (
                 network_interface_api.create_network_interface(
                     context, subnet_id, **args)['networkInterface'])
@@ -1061,9 +1059,7 @@ class InstanceEngineNeutron(object):
             # create_network_interface sub-function
             network_interface = db_api.get_item_by_id(context, 'eni',
                                                       ec2_network_interface_id)
-            network_interfaces.append(network_interface)
-
-        return network_interfaces
+            data['network_interface'] = network_interface
 
     def get_vpc_default_security_group_id(self, context, vpc_id):
         default_groups = security_group_api.describe_security_groups(

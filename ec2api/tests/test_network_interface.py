@@ -119,6 +119,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                 mock.ANY, 'eni',
                 tools.purge_dict(fakes.DB_NETWORK_INTERFACE_2,
                                  ('id',
+                                  'device_index',
                                   'instance_id',
                                   'delete_on_termination',
                                   'attach_time')))
@@ -456,7 +457,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_called_once_with(
             mock.ANY,
             tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
-                              {'instance_id': fakes.ID_EC2_INSTANCE_1,
+                              {'device_index': 1,
+                               'instance_id': fakes.ID_EC2_INSTANCE_1,
                                'delete_on_termination': False}))
 
     def test_attach_network_interface_rollback(self):
@@ -493,7 +495,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_called_once_with(
             mock.ANY,
             tools.purge_dict(fakes.DB_NETWORK_INTERFACE_2,
-                             {'instance_id',
+                             {'device_index',
+                              'instance_id',
                               'delete_on_termination',
                               'attach_time'}))
 
