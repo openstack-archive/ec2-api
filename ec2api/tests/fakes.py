@@ -14,7 +14,6 @@
 
 import base64
 import copy
-import json
 import random
 import uuid
 
@@ -1124,7 +1123,7 @@ class OSImage(object):
         for complex_attr in ('mappings', 'block_device_mapping'):
             if complex_attr in self.properties:
                 self.properties[complex_attr] = (
-                    json.dumps(self.properties[complex_attr]))
+                    str(self.properties[complex_attr]))
 
     def __eq__(self, other):
         return type(self) == type(other) and self.__dict__ == other.__dict__

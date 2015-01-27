@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ast
 import base64
 import binascii
 import itertools
-import json
 import os
 import re
 import shutil
@@ -156,26 +156,51 @@ def register_image(context, name=None, image_location=None,
                    root_device_name=None, block_device_mapping=None,
                    virtualization_type=None, kernel_id=None,
                    ramdisk_id=None, sriov_net_support=None):
-    if image_location is None and name:
+    if not image_location and not root_device_name:
+        # NOTE(ft): for backward compatibility with a hypothetical code
+        # which uses name as image_location
         image_location = name
-    if image_location is None:
-        raise exception.MissingParameter(param='ImageLocation')
+    if not image_location and not root_device_name:
+        msg = _("Either imageLocation or rootDeviceName must be set.")
+        raise exception.InvalidParameterCombination(msg)
+    if not image_location and not name:
+        msg = _('The request must contain the parameter name')
+        raise exception.MissingParameter(msg)
 
-    properties = {'image_location': image_location}
-    metadata = {'properties': properties,
-                'name': name if name else image_location}
-
+    # TODO(ft): check parameters
+    properties = {}
+    metadata = {'properties': properties}
+    if name:
+        # TODO(ft): check the name is unique (at least for EBS image case)
+        metadata['name'] = name
+    if image_location:
+        properties['image_location'] = image_location
+        if 'name' not in metadata:
+            # NOTE(ft): it's needed for backward compatibility
+            metadata['name'] = image_location
     if root_device_name:
         properties['root_device_name'] = root_device_name
-
     if block_device_mapping:
         mappings = [instance_api._cloud_parse_block_device_mapping(context,
                                                                    bdm)
                     for bdm in block_device_mapping]
         properties['block_device_mapping'] = mappings
+    if architecture is not None:
+        properties['architecture'] = architecture
+    if kernel_id:
+        properties['kernel_id'] = kernel_id
+    if ramdisk_id:
+        properties['ramdisk_id'] = ramdisk_id
 
     with common.OnCrashCleaner() as cleaner:
-        os_image = _s3_create(context, metadata)
+        if 'image_location' in properties:
+            os_image = _s3_create(context, metadata)
+        else:
+            metadata.update({'size': 0,
+                             'is_public': False})
+            # TODO(ft): set default values of image properties
+            glance = clients.glance(context)
+            os_image = glance.images.create(**metadata)
         cleaner.addCleanup(os_image.delete)
         kind = _get_os_image_kind(os_image)
         image = db_api.add_item(context, kind, {'os_id': os_image.id,
@@ -431,7 +456,7 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
 def _prepare_mappings(os_image):
     def prepare_property(property_name):
         if property_name in os_image.properties:
-            os_image.properties[property_name] = json.loads(
+            os_image.properties[property_name] = ast.literal_eval(
                     os_image.properties[property_name])
     prepare_property('mappings')
     prepare_property('block_device_mapping')

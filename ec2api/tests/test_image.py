@@ -149,7 +149,7 @@ class ImageTestCase(base.ApiTestCase):
         self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
 
     @mock.patch('ec2api.api.image._s3_create')
-    def test_register_image(self, s3_create):
+    def test_register_image_by_s3(self, s3_create):
         s3_create.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         self.db_api.add_item.side_effect = (
             fakes.get_db_api_add_item(fakes.ID_EC2_IMAGE_1))
@@ -180,10 +180,39 @@ class ImageTestCase(base.ApiTestCase):
             {'name': 'an image name',
              'properties': {'image_location': fakes.LOCATION_IMAGE_1}})
 
+    def test_register_image_by_bdm(self):
+        self.glance.images.create.return_value = (
+            fakes.OSImage(fakes.OS_IMAGE_2))
+        self.db_api.add_item.side_effect = (
+            fakes.get_db_api_add_item(fakes.ID_EC2_IMAGE_2))
+        self.db_api.get_item_by_id.return_value = fakes.DB_SNAPSHOT_1
+
+        resp = self.execute(
+            'RegisterImage',
+            {'RootDeviceName': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+             'Name': 'fake_name',
+             'BlockDeviceMapping.1.DeviceName': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+             'BlockDeviceMapping.1.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1})
+        self.assertThat(resp, matchers.DictMatches(
+            {'http_status_code': 200,
+            'imageId': fakes.ID_EC2_IMAGE_2}))
+        self.db_api.get_item_by_id.assert_called_once_with(
+            mock.ANY, 'snap', fakes.ID_EC2_SNAPSHOT_1)
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'ami', {'os_id': fakes.ID_OS_IMAGE_2,
+                              'is_public': False})
+        self.glance.images.create.assert_called_once_with(
+            is_public=False, size=0, name='fake_name',
+            properties={'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+                        'block_device_mapping': [
+                            {'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                             'delete_on_termination': True,
+                             'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2}]})
+
     def test_register_image_invalid_parameters(self):
         resp = self.execute('RegisterImage', {})
         self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('MissingParameter', resp['Error']['Code'])
+        self.assertEqual('InvalidParameterCombination', resp['Error']['Code'])
 
     def test_deregister_image(self):
         self._setup_model()

@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ast
 import base64
 import collections
 import copy
 import itertools
-import json
 import random
 import re
 
@@ -642,7 +642,7 @@ def _parse_block_device_mapping(context, block_device_mapping, os_image):
         (_block_device_strip_dev(bd.get('device_name') or
                                 image_root_device_name),
          bd)
-        for bd in json.loads(
+        for bd in ast.literal_eval(
                 os_image.properties.get('block_device_mapping', '[]'))
         if bd.get('device_name') or bd.get('boot_index') == 0)
 
