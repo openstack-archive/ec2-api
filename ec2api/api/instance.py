@@ -545,15 +545,17 @@ def _format_instance(context, instance, os_instance, novadb_instance,
 
 
 def _format_state_change(instance, os_instance):
-    prev_state = (_cloud_state_description(getattr(os_instance,
-                                                   'OS-EXT-STS:vm_state'))
-                  if os_instance else vm_states_DELETED)
-    try:
-        os_instance.get()
-        curr_state = _cloud_state_description(getattr(os_instance,
+    if os_instance:
+        prev_state = _cloud_state_description(getattr(os_instance,
                                                       'OS-EXT-STS:vm_state'))
-    except nova_exception.NotFound:
-        curr_state = _cloud_state_description(vm_states_DELETED)
+        try:
+            os_instance.get()
+            curr_state = _cloud_state_description(
+                getattr(os_instance, 'OS-EXT-STS:vm_state'))
+        except nova_exception.NotFound:
+            curr_state = _cloud_state_description(vm_states_DELETED)
+    else:
+        prev_state = curr_state = _cloud_state_description(vm_states_DELETED)
     return {
         'instanceId': instance['id'],
         'previousState': prev_state,
@@ -1281,7 +1283,6 @@ def _cloud_format_instance_bdm(context, instance_uuid, root_device_name,
         # TODO(yamahata): volume attach time
         ebs = {'volumeId': volume['id'],
                'deleteOnTermination': bdm['delete_on_termination'],
-               'attachTime': '',
                'status': _cloud_get_volume_attach_status(vol), }
         res = {'deviceName': bdm['device_name'],
                'ebs': ebs, }

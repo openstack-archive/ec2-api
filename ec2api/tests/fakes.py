@@ -624,8 +624,7 @@ EC2_INSTANCE_2 = {
             {'deviceName': ROOT_DEVICE_NAME_INSTANCE_2,
              'ebs': {'status': 'attached',
                      'deleteOnTermination': False,
-                     'volumeId': ID_EC2_VOLUME_2,
-                     'attachTime': None}}],
+                     'volumeId': ID_EC2_VOLUME_2}}],
     'instanceType': 'fake_flavor',
     'ipAddress': IP_ADDRESS_NOVA_1,
     'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_2,
@@ -1362,6 +1361,8 @@ class CinderVolume(object):
         self.display_description = volume['display_description']
         self.snapshot_id = volume['snapshot_id']
         self.attachments = volume['attachments']
+        self.volume_type = None
+        self.encrypted = False
 
     def get(self):
         pass
@@ -1385,6 +1386,8 @@ EC2_VOLUME_1 = {
     'size': 1,
     'status': 'available',
     'attachmentSet': [],
+    'encrypted': False,
+    'volumeType': None,
 }
 EC2_VOLUME_2 = {
     'volumeId': ID_EC2_VOLUME_2,
@@ -1394,11 +1397,12 @@ EC2_VOLUME_2 = {
     'size': 1,
     'status': 'in-use',
     'attachmentSet': [{'status': 'attached',
-                       'attachTime': None,
                        'instanceId': ID_EC2_INSTANCE_2,
                        'volumeId': ID_EC2_VOLUME_2,
                        'deleteOnTermination': False,
                        'device': ROOT_DEVICE_NAME_INSTANCE_2}],
+    'encrypted': False,
+    'volumeType': None,
 }
 EC2_VOLUME_3 = {
     'volumeId': ID_EC2_VOLUME_3,
@@ -1408,6 +1412,8 @@ EC2_VOLUME_3 = {
     'size': 1,
     'status': 'available',
     'attachmentSet': [],
+    'encrypted': False,
+    'volumeType': None,
 }
 
 DB_VOLUME_1 = {

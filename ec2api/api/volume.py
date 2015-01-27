@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from cinderclient import exceptions as cinder_exception
+from novaclient import exceptions as nova_exception
 
 from ec2api.api import clients
 from ec2api.api import common
@@ -57,8 +58,11 @@ def attach_volume(context, volume_id, instance_id, device):
     instance = ec2utils.get_db_item(context, 'i', instance_id)
 
     nova = clients.nova(context)
-    nova.volumes.create_server_volume(instance['os_id'], volume['os_id'],
-                                      device)
+    try:
+        nova.volumes.create_server_volume(instance['os_id'], volume['os_id'],
+                                          device)
+    except (nova_exception.Conflict, nova_exception.BadRequest):
+        raise exception.UnsupportedOperation()
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
     return _format_attachment(context, volume, os_volume,
@@ -91,6 +95,8 @@ def delete_volume(context, volume_id):
     cinder = clients.cinder(context)
     try:
         cinder.volumes.delete(volume['os_id'])
+    except cinder_exception.BadRequest:
+        raise exception.UnsupportedOperation()
     except cinder_exception.NotFound:
         pass
     db_api.delete_item(context, volume['id'])
@@ -145,6 +151,8 @@ def _format_volume(context, volume, os_volume, instances={},
             'size': os_volume.size,
             'availabilityZone': os_volume.availability_zone,
             'createTime': os_volume.created_at,
+            'volumeType': os_volume.volume_type,
+            'encrypted': os_volume.encrypted,
     }
     if ec2_volume['status'] == 'in-use':
         ec2_volume['attachmentSet'] = (
@@ -169,7 +177,6 @@ def _format_attachment(context, volume, os_volume, instances={},
                 context, 'i', os_instance_id, instances)
         instance_id = instance['id']
     ec2_attachment = {
-            'attachTime': '',
             'device': os_attachment.get('device'),
             'instanceId': instance_id,
             'status': (os_volume.status

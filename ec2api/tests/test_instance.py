@@ -1592,37 +1592,32 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000002',
-                                 'attachTime': '',
                                  }},
                         {'deviceName': '/dev/sdb2',
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000003',
-                                 'attachTime': '',
                                  }},
                         {'deviceName': '/dev/sdb3',
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': True,
                                  'volumeId': 'vol-00000005',
-                                 'attachTime': '',
                                  }},
                         {'deviceName': '/dev/sdb4',
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000007',
-                                 'attachTime': '',
                                  }},
                         {'deviceName': '/dev/sdb5',
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000009',
-                                 'attachTime': '',
                                  }},
                         {'deviceName': '/dev/sdb6',
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-0000000b',
-                                 'attachTime': '', }}]},
+                                 }}]},
                 orderless_lists=True))
 
         result = {}
@@ -1640,7 +1635,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000015',
-                                 'attachTime': '', }}]}))
+                                 }}]}))
 
     @mock.patch('cinderclient.v1.client.Client')
     @mock.patch('ec2api.api.instance.novadb')
@@ -1670,7 +1665,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                          'ebs': {'status': 'attaching',
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000002',
-                                 'attachTime': '', }}]}))
+                                 }}]}))
 
     @mock.patch('ec2api.api.instance._remove_instances')
     @mock.patch('novaclient.v1_1.client.Client')

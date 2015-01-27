@@ -176,7 +176,6 @@ class VolumeTestCase(base.ApiTestCase):
                              'InstanceId': fakes.ID_EC2_INSTANCE_2,
                              'Device': '/dev/vdf'})
         self.assertEqual({'http_status_code': 200,
-                          'attachTime': None,
                           'device': '/dev/vdf',
                           'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'status': 'attaching',
@@ -201,7 +200,6 @@ class VolumeTestCase(base.ApiTestCase):
         resp = self.execute('DetachVolume',
                             {'VolumeId': fakes.ID_EC2_VOLUME_2})
         self.assertEqual({'http_status_code': 200,
-                          'attachTime': None,
                           'device': os_volume.attachments[0]['device'],
                           'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'status': 'detaching',
