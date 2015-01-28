@@ -61,7 +61,8 @@ def delete_snapshot(context, snapshot_id):
         cinder.volume_snapshots.delete(snapshot['os_id'])
     except cinder_exception.NotFound:
         pass
-    db_api.delete_item(context, snapshot['id'])
+    # NOTE(andrey-mp) Don't delete item from DB until it disappears from Cloud
+    # It will be deleted by describer in the future
     return True
 
 
@@ -122,11 +123,18 @@ def _format_snapshot(context, snapshot, os_snapshot, volumes={},
                 context, 'vol', os_snapshot.volume_id, volumes)
         volume_id = volume['id']
 
+    # NOTE(andrey-mp): ownerId and progress are empty in just created snapshot
+    ownerId = os_snapshot.project_id
+    if not ownerId:
+        ownerId = context.project_id
+    progress = os_snapshot.progress
+    if not progress:
+        progress = '0%'
     return {'snapshotId': snapshot['id'],
             'volumeId': volume_id,
             'status': mapped_status,
             'startTime': os_snapshot.created_at,
-            'progress': os_snapshot.progress,
-            'ownerId': os_snapshot.project_id,
+            'progress': progress,
+            'ownerId': ownerId,
             'volumeSize': os_snapshot.size,
             'description': os_snapshot.display_description}
