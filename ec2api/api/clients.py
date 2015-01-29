@@ -128,13 +128,6 @@ def nova_cert(context):
     return _cert_api
 
 
-def rpc_init(conf):
-    global _rpc_TRANSPORT
-    # NOTE(ft): set control_exchange parameter to use Nova cert topic
-    messaging.set_transport_defaults('nova')
-    _rpc_TRANSPORT = messaging.get_transport(conf)
-
-
 def _url_for(context, **kwargs):
     service_catalog = context.service_catalog
     if not service_catalog:
@@ -174,7 +167,16 @@ class _rpcapi_CertAPI(object):
 _rpc_TRANSPORT = None
 
 
+def _rpc_init(conf):
+    global _rpc_TRANSPORT
+    # NOTE(ft): set control_exchange parameter to use Nova cert topic
+    messaging.set_transport_defaults('nova')
+    _rpc_TRANSPORT = messaging.get_transport(conf)
+
+
 def _rpc_get_client(target):
+    if not _rpc_TRANSPORT:
+        _rpc_init(CONF)
     assert _rpc_TRANSPORT is not None
     serializer = _rpc_RequestContextSerializer()
     return messaging.RPCClient(_rpc_TRANSPORT,
