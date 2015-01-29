@@ -121,7 +121,8 @@ class InstanceTestCase(base.ApiTestCase):
                     ec2_network_interfaces=[eni],
                     image_id=fakes.ID_EC2_IMAGE_1,
                     kernel_id=fakes.ID_EC2_IMAGE_AKI_1,
-                    ramdisk_id=fakes.ID_EC2_IMAGE_ARI_1)])
+                    ramdisk_id=fakes.ID_EC2_IMAGE_ARI_1,
+                    reservation_id=fakes.ID_EC2_RESERVATION_1)])
             get_ec2_network_interfaces.return_value = {
                     fakes.ID_EC2_INSTANCE_1: [eni]}
 
@@ -139,7 +140,8 @@ class InstanceTestCase(base.ApiTestCase):
                     mock.ANY, fakes.ID_EC2_SUBNET_1,
                     **create_network_interface_kwargs))
             self.nova_servers.create.assert_called_once_with(
-                'EC2 server', fakes.ID_OS_IMAGE_1, self.fake_flavor,
+                '%s-%s' % (fakes.ID_EC2_RESERVATION_1, 0),
+                fakes.ID_OS_IMAGE_1, self.fake_flavor,
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
@@ -233,7 +235,8 @@ class InstanceTestCase(base.ApiTestCase):
                 zip(*[iter(self.EC2_ATTACHED_ENIS)] * 2)))
         ec2_instances = [
             fakes.gen_ec2_instance(ec2_instance_id, launch_index=l_i,
-                                   ec2_network_interfaces=eni_pair)
+                                   ec2_network_interfaces=eni_pair,
+                                   reservation_id=fakes.ID_EC2_RESERVATION_1)
             for l_i, (ec2_instance_id, eni_pair) in enumerate(zip(
                 self.IDS_EC2_INSTANCE,
                 zip(*[iter(self.EC2_ATTACHED_ENIS)] * 2)))]
@@ -280,7 +283,8 @@ class InstanceTestCase(base.ApiTestCase):
             for ec2_subnet_id in self.IDS_EC2_SUBNET_BY_PORT])
         self.nova_servers.create.assert_has_calls([
             mock.call(
-                'EC2 server', fakes.ID_OS_IMAGE_1, self.fake_flavor,
+                '%s-%s' % (fakes.ID_EC2_RESERVATION_1, launch_index),
+                fakes.ID_OS_IMAGE_1, self.fake_flavor,
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
@@ -289,7 +293,8 @@ class InstanceTestCase(base.ApiTestCase):
                 nics=[{'port-id': port_id}
                       for port_id in port_ids],
                 key_name=None, userdata=None)
-            for port_ids in zip(*[iter(self.IDS_OS_PORT)] * 2)])
+            for launch_index, port_ids in enumerate(
+                                        zip(*[iter(self.IDS_OS_PORT)] * 2))])
         (self.network_interface_api.
          _attach_network_interface_item.assert_has_calls([
             mock.call(mock.ANY, eni, ec2_instance_id, dev_ind,
@@ -941,7 +946,7 @@ class InstanceTestCase(base.ApiTestCase):
 #              ('launch-index', 0),
              # TODO(ft): fill the field in fakes with correct value
 #              ('launch-time', ),
-             ('private-dns-name', fakes.ID_EC2_INSTANCE_1),
+             ('private-dns-name', '%s-%s' % (fakes.ID_EC2_RESERVATION_1, 0)),
              ('private-ip-address', fakes.IP_NETWORK_INTERFACE_2),
              ('ramdisk-id', fakes.ID_EC2_IMAGE_ARI_1),
              ('root-device-name', fakes.ROOT_DEVICE_NAME_INSTANCE_1),
@@ -1035,7 +1040,8 @@ class InstanceTestCase(base.ApiTestCase):
 
             instances = [fakes.gen_ec2_instance(
                             inst_id, launch_index=l_i, private_ip_address=ip,
-                            ec2_network_interfaces=enis)
+                            ec2_network_interfaces=enis,
+                            reservation_id=fakes.ID_EC2_RESERVATION_1)
                          for l_i, (inst_id, ip, enis) in enumerate(zip(
                             self.IDS_EC2_INSTANCE,
                             ec2_instance_ips,
@@ -1283,8 +1289,8 @@ class InstanceTestCase(base.ApiTestCase):
             {'kernel_id': None,
              'ramdisk_id': None,
              'root_device_name': '/dev/vda',
-             'hostname': ec2_id}
-            for ec2_id in ids_ec2_instance]
+             'hostname': '%s-%s' % (fakes.ID_EC2_RESERVATION_1, l_i)}
+            for l_i, ec2_id in enumerate(ids_ec2_instance)]
 
         self.IDS_EC2_SUBNET = ids_ec2_subnet
         self.IDS_OS_PORT = ids_os_port

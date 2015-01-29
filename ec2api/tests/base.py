@@ -125,7 +125,8 @@ class ApiTestCase(test_base.BaseTestCase):
                                 {'Filter.1.Name': name,
                                  'Filter.1.Value.1': str(value)})
             self.assertEqual(200, resp['http_status_code'])
-            self.assertTrue(len(resp[resultset_key]) > 0)
+            self.assertTrue(len(resp[resultset_key]) > 0,
+                            'Filter by %s does not work' % name)
 
             resp = self.execute(operation,
                                 {'Filter.1.Name': name,
