@@ -818,7 +818,8 @@ class InstanceEngineNeutron(object):
                         ec2_classic_nics)
 
                 os_instance = nova.servers.create(
-                    'EC2 server', os_image.id, os_flavor,
+                    '%s-%s' % (ec2_reservation_id, launch_index),
+                    os_image.id, os_flavor,
                     min_count=1, max_count=1,
                     kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
                     availability_zone=(
@@ -1136,7 +1137,8 @@ class InstanceEngineNova(object):
                     cleaner.approveChanges()
 
                 os_instance = nova.servers.create(
-                    'EC2 server', os_image.id, os_flavor,
+                    '%s-%s' % (ec2_reservation_id, index),
+                    os_image.id, os_flavor,
                     min_count=min_count, max_count=max_count,
                     kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
                     availability_zone=(

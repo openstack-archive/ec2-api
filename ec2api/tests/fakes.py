@@ -504,7 +504,7 @@ NOVADB_INSTANCE_1 = {
     'kernel_id': ID_OS_IMAGE_AKI_1,
     'ramdisk_id': ID_OS_IMAGE_ARI_1,
     'root_device_name': ROOT_DEVICE_NAME_INSTANCE_1,
-    'hostname': ID_EC2_INSTANCE_1,
+    'hostname': '%s-%s' % (ID_EC2_RESERVATION_1, 0),
     'key_data': PUBLIC_KEY_KEY_PAIR,
     'user_data': None,
 }
@@ -598,7 +598,7 @@ EC2_INSTANCE_1 = {
     'kernelId': ID_EC2_IMAGE_AKI_1,
     'ramdiskId': ID_EC2_IMAGE_ARI_1,
     'productCodesSet': [],
-    'privateDnsName': ID_EC2_INSTANCE_1,
+    'privateDnsName': '%s-%s' % (ID_EC2_RESERVATION_1, 0),
     'keyName': NAME_KEY_PAIR,
     'launchTime': None,
     'rootDeviceType': 'instance-store',
@@ -1610,7 +1610,7 @@ def gen_os_port(os_id, ec2_network_interface, os_subnet_id, fixed_ips,
 def gen_ec2_instance(ec2_instance_id, private_ip_address='',
                      ec2_network_interfaces=None,
                      floating_ip=None, image_id=None, kernel_id=None,
-                     ramdisk_id=None, launch_index=0):
+                     ramdisk_id=None, launch_index=0, reservation_id=None):
     """Generate EC2 Instance dictionary.
 
     private_ip_address must be specified as IP value or None
@@ -1626,7 +1626,7 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
                     'instanceState': {'code': 0, 'name': 'pending'},
                     'imageId': image_id,
                     'productCodesSet': [],
-                    'privateDnsName': ec2_instance_id,
+                    'privateDnsName': '%s-%s' % (reservation_id, launch_index),
                     'keyName': None,
                     'launchTime': None,
                     'rootDeviceType': 'instance-store',
