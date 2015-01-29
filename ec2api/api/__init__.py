@@ -382,7 +382,9 @@ def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
     if not code:
         code = exception_to_ec2code(ex)
     status = getattr(ex, 'code', None)
-    if not status:
+    if not isinstance(status, int):
+        status = getattr(ex, 'status', None)
+    if not status or not isinstance(status, int):
         status = 500
 
     if unexpected:
@@ -409,7 +411,7 @@ def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
     log_fun(log_msg % log_msg_args, context=context, exc_info=exc_info)
 
     if ex.args and not message and (not unexpected or status < 500):
-        message = unicode(ex.args[0])
+        message = " ".join(map(unicode, ex.args))
     if unexpected:
         # Log filtered environment for unexpected errors.
         env = req.environ.copy()
