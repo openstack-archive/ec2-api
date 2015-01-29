@@ -83,8 +83,23 @@ VPN-related and ACL-related functionality is not supported.
 Default VPC Security Groups had to be named "Default" instead of Amazon's
 "default" due to conflict with OpenStack's default groups.
 DryRun option is not supported.
+Some exceptions are not exactly the same as reported by AWS.
 
 Supported Features
 ==================
 
 EC2 API with VPC API except for the limitations above
+
+Additions to the legacy nova's EC2 API include:
+1. VPC API
+2. Filtering
+3. Tags
+
+References
+==========
+
+Blueprint:
+https://blueprints.launchpad.net/nova/+spec/ec2-api
+
+Spec:
+https://review.openstack.org/#/c/147882/
