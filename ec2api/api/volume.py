@@ -62,6 +62,7 @@ def attach_volume(context, volume_id, instance_id, device):
         nova.volumes.create_server_volume(instance['os_id'], volume['os_id'],
                                           device)
     except (nova_exception.Conflict, nova_exception.BadRequest):
+        # TODO(andrey-mp): raise correct errors for different cases
         raise exception.UnsupportedOperation()
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
@@ -96,6 +97,7 @@ def delete_volume(context, volume_id):
     try:
         cinder.volumes.delete(volume['os_id'])
     except cinder_exception.BadRequest:
+        # TODO(andrey-mp): raise correct errors for different cases
         raise exception.UnsupportedOperation()
     except cinder_exception.NotFound:
         pass

@@ -72,6 +72,26 @@ class SnapshotTestCase(base.ApiTestCase):
             'DescribeSnapshots', 'snapshotSet',
             fakes.ID_EC2_SNAPSHOT_1, 'snapshotId')
 
+    def test_describe_snapshots_auto_remove(self):
+        self.cinder.volume_snapshots.list.return_value = []
+
+        self.db_api.get_items.side_effect = (
+            fakes.get_db_api_get_items({
+                'snap': [fakes.DB_SNAPSHOT_1],
+                'vol': [fakes.DB_VOLUME_2]}))
+
+        resp = self.execute('DescribeSnapshots', {})
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
+        self.assertThat(resp, matchers.DictMatches(
+            {'snapshotSet': []},
+            orderless_lists=True))
+
+        self.db_api.get_items.assert_any_call(mock.ANY, 'vol')
+        self.db_api.get_items.assert_any_call(mock.ANY, 'snap')
+        self.db_api.delete_item.assert_any_call(mock.ANY,
+                                                fakes.ID_EC2_SNAPSHOT_1)
+
     def test_describe_snapshots_invalid_parameters(self):
         self.cinder.volume_snapshots.list.return_value = [
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1),
