@@ -101,6 +101,6 @@ class KeyPairCase(base.ApiTestCase):
         self.nova_key_pairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
         resp = self.execute('DescribeKeyPairs', {'KeyName.1': 'badname'})
-        self.assertEqual(404, resp['http_status_code'])
+        self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidKeyPair.NotFound', resp['Error']['Code'])
         self.nova_key_pairs.list.assert_called_once()

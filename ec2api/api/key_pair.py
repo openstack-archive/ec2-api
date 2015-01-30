@@ -20,6 +20,7 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api import exception
+from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
 
 
@@ -96,6 +97,9 @@ def create_key_pair(context, key_name):
 
 def import_key_pair(context, key_name, public_key_material):
     _validate_name(key_name)
+    if not public_key_material:
+        raise exception.MissingParameter(
+            _('The request must contain the parameter PublicKeyMaterial'))
     nova = clients.nova(context)
     public_key = base64.b64decode(public_key_material)
     try:

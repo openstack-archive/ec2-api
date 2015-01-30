@@ -148,17 +148,13 @@ class AuthFailure(Invalid):
     pass
 
 
-class NotFound(EC2Exception):
-    msg_fmt = _("Resource could not be found.")
-    code = 404
-
-
 class ValidationError(Invalid):
     msg_fmt = _("The input fails to satisfy the constraints "
                 "specified by an AWS service: '%(reason)s'")
 
 
-class EC2NotFound(NotFound):
+class EC2NotFound(EC2Exception):
+    msg_fmt = _("Resource could not be found.")
     code = 400
 
 
@@ -248,6 +244,16 @@ class InvalidSnapshotNotFound(EC2NotFound):
 class InvalidAMIIDNotFound(EC2NotFound):
     ec2_code = 'InvalidAMIID.NotFound'
     msg_fmt = _("The image id '[%(id)s]' does not exist")
+
+
+class InvalidKeypairNotFound(EC2NotFound):
+    ec2_code = 'InvalidKeyPair.NotFound'
+    msg_fmt = _("Keypair %(id)s is not found")
+
+
+class InvalidAvailabilityZoneNotFound(EC2NotFound):
+    ec2_code = 'InvalidAvailabilityZone.NotFound'
+    msg_fmt = _("Availability zone %(id)s not found")
 
 
 class IncorrectState(EC2Exception):
@@ -358,16 +364,6 @@ class InvalidSnapshotIDMalformed(Invalid):
     ec2_code = 'InvalidSnapshotID.Malformed'
     # TODO(ft): Change the message with the real AWS message
     msg_fmg = _('The snapshot %(id)s ID is not valid')
-
-
-class InvalidKeypairNotFound(NotFound):
-    ec2_code = 'InvalidKeyPair.NotFound'
-    msg_fmt = _("Keypair %(id)s is not found")
-
-
-class InvalidAvailabilityZoneNotFound(NotFound):
-    ec2_code = 'InvalidAvailabilityZone.NotFound'
-    msg_fmt = _("Availability zone %(id)s not found")
 
 
 class InvalidKeyPairDuplicate(Invalid):
