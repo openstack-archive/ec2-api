@@ -145,7 +145,7 @@ class InstanceTestCase(base.ApiTestCase):
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
-                block_device_mapping=None,
+                block_device_mapping={},
                 security_groups=None,
                 nics=[{'port-id': fakes.ID_OS_PORT_1}],
                 key_name=None, userdata=None)
@@ -288,7 +288,7 @@ class InstanceTestCase(base.ApiTestCase):
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
-                block_device_mapping=None,
+                block_device_mapping={},
                 security_groups=None,
                 nics=[{'port-id': port_id}
                       for port_id in port_ids],
@@ -1427,7 +1427,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
 
         res = instance_api._parse_block_device_mapping(
             fake_context, [], os_image)
-        self.assertEqual([], res)
+        self.assertEqual({}, res)
 
         res = instance_api._parse_block_device_mapping(
             fake_context, [{'device_name': '/dev/vdf',
@@ -1446,27 +1446,13 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             os_image)
         self.assertThat(
             res,
-            matchers.ListMatches([{'device_name': '/dev/vdf',
-                                   'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
-                                   'delete_on_termination': True},
-                                  {'device_name': '/dev/vdg',
-                                   'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
-                                   'volume_size': 111,
-                                   'delete_on_termination': False},
-                                  {'device_name': '/dev/vdh',
-                                   'volume_id': fakes.ID_OS_VOLUME_1,
-                                   'delete_on_termination': True},
-                                  {'device_name': '/dev/vdi',
-                                   'volume_id': fakes.ID_OS_VOLUME_2,
-                                   'delete_on_termination': True},
-                                  {'device_name': '/dev/sdb1',
-                                   'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
-                                   'volume_size': 55,
-                                   'volume_id': None,
-                                   'delete_on_termination': None,
-                                   'virtual_name': None,
-                                   'no_device': None}],
-                                 orderless_lists=True))
+            matchers.DictMatches(
+                {'/dev/vdf': fakes.ID_OS_SNAPSHOT_1 + ':snap::True',
+                 '/dev/vdg': fakes.ID_OS_SNAPSHOT_2 + ':snap:111:False',
+                 '/dev/vdh': fakes.ID_OS_VOLUME_1 + ':vol::True',
+                 '/dev/vdi': fakes.ID_OS_VOLUME_2 + ':vol::True',
+                 '/dev/sdb1': '::55:'},
+                orderless_lists=True))
 
     @mock.patch('ec2api.api.instance.novadb')
     @mock.patch('novaclient.v1_1.client.Client')

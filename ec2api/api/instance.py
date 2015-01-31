@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
 import base64
 import collections
 import copy
@@ -636,31 +635,17 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
 
 
 def _parse_block_device_mapping(context, block_device_mapping, os_image):
-    # NOTE(ft): The following code allows reconfiguration of devices
-    # according to list of new parameters supplied in EC2 call.
-    # This code merges these parameters with information taken from image.
-    image_root_device_name = os_image.properties.get('root_device_name')
-    image_bdm = dict(
-        (_block_device_strip_dev(bd.get('device_name') or
-                                image_root_device_name),
-         bd)
-        for bd in ast.literal_eval(
-                os_image.properties.get('block_device_mapping', '[]'))
-        if bd.get('device_name') or bd.get('boot_index') == 0)
-
+    # TODO(ft): check block_device_mapping structure
+    bdm = {}
     for args_bd in (block_device_mapping or []):
         _cloud_parse_block_device_mapping(context, args_bd)
-        dev_name = _block_device_strip_dev(args_bd.get('device_name'))
-        if (not dev_name or dev_name not in image_bdm or
-                'snapshot_id' in args_bd or 'volume_id' in args_bd):
-            continue
-        image_bd = image_bdm[dev_name]
-        for key in ('device_name', 'delete_on_termination', 'virtual_name',
-                    'snapshot_id', 'volume_id', 'volume_size',
-                    'no_device'):
-            args_bd[key] = args_bd.get(key, image_bd.get(key))
-
-    return block_device_mapping
+        bdm[args_bd['device_name']] = ':'.join(
+            [args_bd.get('snapshot_id', args_bd.get('volume_id', '')),
+             ('snap' if 'snapshot_id' in args_bd else
+              'vol' if 'volume_id' in args_bd else ''),
+             str(args_bd.get('volume_size', '')),
+             str(args_bd.get('delete_on_termination', ''))])
+    return bdm
 
 
 def _format_group_set(context, os_security_groups):
