@@ -39,7 +39,7 @@ class RequestContext(object):
 
     """
 
-    def __init__(self, user_id, project_id, access_key, secret_key,
+    def __init__(self, user_id, project_id,
                  is_admin=None, roles=None, remote_address=None,
                  auth_token=None, user_name=None, project_name=None,
                  overwrite=True, service_catalog=None, api_version=None,
@@ -59,8 +59,7 @@ class RequestContext(object):
 
         self.user_id = user_id
         self.project_id = project_id
-        self.access_key = access_key
-        self.secret_key = secret_key
+        self.cached_secret_key = None
         self.roles = roles or []
         self.remote_address = remote_address
         timestamp = timeutils.utcnow()
@@ -126,7 +125,6 @@ def get_admin_context(project_id=None, read_deleted="no"):
     return RequestContext(user_id=None,
                           project_id=project_id,
                           access_key=None,
-                          secret_key=None,
                           is_admin=True,
                           read_deleted=read_deleted,
                           overwrite=False)

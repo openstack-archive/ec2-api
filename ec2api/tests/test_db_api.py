@@ -69,10 +69,9 @@ class DbApiTestCase(test_base.BaseTestCase):
         conn = engine.connect()
         conn.connection.executescript(self.DB_SCHEMA)
         self.context = ec2_context.RequestContext(fakes.ID_OS_USER,
-                                                  fakes.ID_OS_PROJECT,
-                                                  None, None)
+                                                  fakes.ID_OS_PROJECT)
         self.other_context = ec2_context.RequestContext(
-            fakes.random_os_id(), fakes.random_os_id(), None, None)
+            fakes.random_os_id(), fakes.random_os_id())
 
     def test_add_item(self):
         new_item = {'os_id': fakes.random_os_id(),

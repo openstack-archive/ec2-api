@@ -193,7 +193,6 @@ class MetadataRequestHandler(wsgi.Application):
         return ec2context.RequestContext(
                 keystone.auth_user_id,
                 keystone.auth_tenant_id,
-                None, None,
                 auth_token=keystone.auth_token,
                 service_catalog=service_catalog,
                 is_admin=True,

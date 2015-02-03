@@ -47,7 +47,7 @@ class Ec2ErrorResponseTestCase(test_base.BaseTestCase):
     def setUp(self):
         super(Ec2ErrorResponseTestCase, self).setUp()
         self.context = context.RequestContext('test_user_id',
-                'test_project_id', None, None)
+                'test_project_id')
         self.req = wsgi.Request.blank('/test')
         self.req.environ['ec2api.context'] = self.context
 

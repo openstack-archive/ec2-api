@@ -85,7 +85,6 @@ class ApiTestCase(test_base.BaseTestCase):
     def _create_context(self):
         return ec2api.context.RequestContext(
             fakes.ID_OS_USER, fakes.ID_OS_PROJECT,
-            'fake_access_key', 'fake_secret_key',
             service_catalog=[{'type': 'network',
                               'endpoints': [{'publicUrl': 'fake_url'}]}])
 

@@ -758,10 +758,11 @@ def _s3_test_for_malicious_tarball(path, filename):
 def _s3_conn(context):
     # NOTE(vish): access and secret keys for s3 server are not
     #             checked in nova-objectstore
-    access = context.access_key
+    ec2_creds = clients.keystone(context).ec2.list(context.user_id)
+    access = ec2_creds[0].access
     if CONF.s3_affix_tenant:
         access = '%s:%s' % (access, context.project_id)
-    secret = context.secret_key
+    secret = ec2_creds[0].secret
     calling = boto.s3.connection.OrdinaryCallingFormat()
     return boto.s3.connection.S3Connection(aws_access_key_id=access,
                                            aws_secret_access_key=secret,

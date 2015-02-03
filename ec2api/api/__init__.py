@@ -15,7 +15,6 @@
 """
 Starting point for routing EC2 requests.
 """
-import functools
 import hashlib
 import sys
 
@@ -43,6 +42,9 @@ LOG = logging.getLogger(__name__)
 ec2_opts = [
     cfg.StrOpt('keystone_url',
                default='http://localhost:5000/v2.0',
+               help='URL to get token from ec2 request.'),
+    cfg.StrOpt('keystone_ec2_tokens_url',
+               default='$keystone_url/ec2tokens',
                help='URL to get token from ec2 request.'),
     cfg.IntOpt('ec2_timestamp_expiry',
                default=300,
@@ -113,33 +115,102 @@ class RequestLogging(wsgi.Middleware):
 
 
 class InvalidCredentialsException(Exception):
-    def __init__(self, resp):
+    def __init__(self, msg):
         super(Exception, self).__init__()
-        self.resp = resp
+        self.msg = msg
 
 
 class EC2KeystoneAuth(wsgi.Middleware):
 
     """Authenticate an EC2 request with keystone and convert to context."""
 
+    def _get_signature(self, req):
+        """Extract the signature from the request.
+
+        This can be a get/post variable or for version 4 also in a header
+        called 'Authorization'.
+        - params['Signature'] == version 0,1,2,3
+        - params['X-Amz-Signature'] == version 4
+        - header 'Authorization' == version 4
+        """
+        sig = req.params.get('Signature') or req.params.get('X-Amz-Signature')
+        if sig is not None:
+            return sig
+
+        if 'Authorization' not in req.headers:
+            return None
+
+        auth_str = req.headers['Authorization']
+        if not auth_str.startswith('AWS4-HMAC-SHA256'):
+            return None
+
+        return auth_str.partition("Signature=")[2].split(',')[0]
+
+    def _get_access(self, req):
+        """Extract the access key identifier.
+
+        For version 0/1/2/3 this is passed as the AccessKeyId parameter, for
+        version 4 it is either an X-Amz-Credential parameter or a Credential=
+        field in the 'Authorization' header string.
+        """
+        access = req.params.get('AWSAccessKeyId')
+        if access is not None:
+            return access
+
+        cred_param = req.params.get('X-Amz-Credential')
+        if cred_param:
+            access = cred_param.split("/")[0]
+            if access is not None:
+                return access
+
+        if 'Authorization' not in req.headers:
+            return None
+        auth_str = req.headers['Authorization']
+        if not auth_str.startswith('AWS4-HMAC-SHA256'):
+            return None
+        cred_str = auth_str.partition("Credential=")[2].split(',')[0]
+        return cred_str.split("/")[0]
+
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
         request_id = context.generate_request_id()
 
-        try:
-            if 'Signature' in req.params:
-                cred_dict = self._get_creds(req, request_id)
-            else:
-                cred_dict = self._get_creds_v4(req, request_id)
-        except InvalidCredentialsException as ex:
-            return ex.resp
-        except Exception:
-            msg = _("Invalid authorization parameters")
+        # NOTE(alevine) We need to calculate the hash here because
+        # subsequent access to request modifies the req.body so the hash
+        # calculation will yield invalid results.
+        body_hash = hashlib.sha256(req.body).hexdigest()
+
+        signature = self._get_signature(req)
+        if not signature:
+            msg = _("Signature not provided")
+            return faults.ec2_error_response(request_id, "AuthFailure", msg,
+                                             status=400)
+        access = self._get_access(req)
+        if not access:
+            msg = _("Access key not provided")
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=400)
 
-        access = cred_dict['access']
-        token_url = CONF.keystone_url + "/ec2tokens"
+        if 'X-Amz-Signature' in req.params or 'Authorization' in req.headers:
+            params = {}
+        else:
+            # Make a copy of args for authentication and signature verification
+            params = dict(req.params)
+            # Not part of authentication args
+            params.pop('Signature', None)
+
+        cred_dict = {
+            'access': access,
+            'signature': signature,
+            'host': req.host,
+            'verb': req.method,
+            'path': req.path,
+            'params': params,
+            'headers': req.headers,
+            'body_hash': body_hash
+        }
+
+        token_url = CONF.keystone_ec2_tokens_url
         if "ec2" in token_url:
             creds = {'ec2Credentials': cred_dict}
         else:
@@ -151,10 +222,7 @@ class EC2KeystoneAuth(wsgi.Middleware):
                                     data=creds_json, headers=headers)
         status_code = response.status_code
         if status_code != 200:
-            if status_code == 401:
-                msg = response.reason
-            else:
-                msg = _("Failure communicating with keystone")
+            msg = response.reason
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=status_code)
         result = response.json()
@@ -178,25 +246,8 @@ class EC2KeystoneAuth(wsgi.Middleware):
             remote_address = req.headers.get('X-Forwarded-For',
                                              remote_address)
 
-        headers["X-Auth-Token"] = token_id
-        url = CONF.keystone_url + ("/users/%s/credentials/OS-EC2/%s"
-            % (user_id, access))
-        response = requests.request('GET', url, headers=headers)
-        status_code = response.status_code
-        if status_code != 200:
-            if status_code == 401:
-                msg = response.reason
-            else:
-                msg = _("Failure communicating with keystone")
-            return faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                             status=status_code)
-        ec2_creds = response.json()
-
         catalog = result['access']['serviceCatalog']
-        ctxt = context.RequestContext(user_id,
-                                      project_id,
-                                      ec2_creds["credential"]["access"],
-                                      ec2_creds["credential"]["secret"],
+        ctxt = context.RequestContext(user_id, project_id,
                                       user_name=user_name,
                                       project_name=project_name,
                                       roles=roles,
@@ -208,104 +259,6 @@ class EC2KeystoneAuth(wsgi.Middleware):
         req.environ['ec2api.context'] = ctxt
 
         return self.application
-
-    def _get_creds(self, req, request_id):
-        signature = req.params.get('Signature')
-        if not signature:
-            msg = _("Signature not provided")
-            raise InvalidCredentialsException(
-                faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                          status=400))
-        access = req.params.get('AWSAccessKeyId')
-        if not access:
-            msg = _("Access key not provided")
-            raise InvalidCredentialsException(
-                faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                          status=400))
-
-        # Make a copy of args for authentication and signature verification.
-        auth_params = dict(req.params)
-        # Not part of authentication args
-        auth_params.pop('Signature')
-
-        cred_dict = {
-            'access': access,
-            'signature': signature,
-            'host': req.host,
-            'verb': req.method,
-            'path': req.path,
-            'params': auth_params,
-        }
-        return cred_dict
-
-    def _get_creds_v4(self, req, request_id):
-        auth = req.environ.get('HTTP_AUTHORIZATION')
-        if not auth:
-            msg = _("Signature not provided")
-            raise InvalidCredentialsException(
-                faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                          status=400))
-
-        auth = auth.split(',')
-        auth = [a.strip() for a in auth]
-        if not auth[0].startswith('AWS4-HMAC-SHA256'):
-            msg = _("Invalid authorization parameters")
-            raise InvalidCredentialsException(
-                faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                          status=400))
-        access = auth[0].split('=')[1].split('/')[0]
-        if not access:
-            msg = _("Access key not provided")
-            raise InvalidCredentialsException(
-                faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                          status=400))
-
-        for item in auth:
-            if item.startswith('Signature'):
-                signature = item.split('=')[1]
-        if not signature:
-            msg = _("Signature could not be found in request")
-            raise InvalidCredentialsException(
-                faults.ec2_error_response(request_id, "AuthFailure", msg,
-                                          status=400))
-
-        headers = dict()
-        for key in req.headers:
-            headers[key] = req.headers.get(key)
-
-        if 'X-Amz-Content-SHA256' in req.headers:
-            body_hash = req.headers['X-Amz-Content-SHA256']
-        else:
-            body_hash = self._payload(req)
-
-        cred_dict = {
-            'access': access,
-            'signature': signature,
-            'host': req.host,
-            'verb': req.method,
-            'path': req.path,
-            # most clients do not use req.params(that stores body for now)
-            'params': dict(),
-            'headers': headers,
-            'body_hash': body_hash
-        }
-        return cred_dict
-
-    def _payload(self, request):
-        if request.body and hasattr(request.body, 'seek'):
-            position = request.body.tell()
-            read_chunksize = functools.partial(request.body.read,
-                                               PAYLOAD_BUFFER)
-            checksum = hashlib.sha256()
-            for chunk in iter(read_chunksize, b''):
-                checksum.update(chunk)
-            hex_checksum = checksum.hexdigest()
-            request.body.seek(position)
-            return hex_checksum
-        elif request.body:
-            return hashlib.sha256(request.body.encode('utf-8')).hexdigest()
-        else:
-            return EMPTY_SHA256_HASH
 
 
 class Requestify(wsgi.Middleware):
