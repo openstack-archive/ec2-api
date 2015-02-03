@@ -3,12 +3,12 @@ OpenStack EC2 API README
 
 Support of EC2 API for OpenStack.
 This project provides a standalone EC2 API service which pursues two goals:
- 1. Implement VPC API which now absent in nova's EC2 API
- 2. Create a standalone service for EC2 API support accommodates
+ 1. Implement VPC API which is now absent in nova's EC2 API
+ 2. Create a standalone service for EC2 API support which accommodates
 not only the VPC API but the rest of the EC2 API currently present in nova as
 well.
 
-It doesn't replace existing nova EC2 API service in deployment it gets 
+It doesn't replace existing nova EC2 API service in deployment, it gets
 installed to a different port (8788 by default).
 
 Installation
@@ -73,13 +73,13 @@ command).
 Run aws cli commands using new EC2 API endpoint URL (can be obtained from
 keystone with the new port 8788) like this:
 
-aws --endpoint-url http://10.0.2.15:8788/services/Cloud ec2 describe-instances 
+aws --endpoint-url http://10.0.2.15:8788/services/Cloud ec2 describe-instances
 
 
 Limitations
 ===========
 
-VPN-related and ACL-related functionality is not supported. 
+VPN-related and ACL-related functionality is not supported.
 Default VPC Security Groups had to be named "Default" instead of Amazon's
 "default" due to conflict with OpenStack's default groups.
 DryRun option is not supported.
@@ -88,7 +88,7 @@ Some exceptions are not exactly the same as reported by AWS.
 Supported Features
 ==================
 
-EC2 API with VPC API except for the limitations above
+EC2 API with VPC API except for the limitations above.
 
 Additions to the legacy nova's EC2 API include:
 1. VPC API
