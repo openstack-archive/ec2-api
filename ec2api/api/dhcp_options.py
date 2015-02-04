@@ -28,10 +28,10 @@ from ec2api.openstack.common import log as logging
 LOG = logging.getLogger(__name__)
 
 ec2_opts = [
-    cfg.StrOpt('network_device_mtu',
+    cfg.IntOpt('network_device_mtu',
                default=1500,
                help='MTU size to set by DHCP for instances. Corresponds '
-                    'with the network_device_mtu in nova.conf.')
+                    'with the network_device_mtu in ec2api.conf.')
 ]
 
 CONF = cfg.CONF

@@ -324,4 +324,4 @@ sudo rm -rf build ec2_api.egg-info
 
 #recreate database
 echo Setuping database
-sudo bin/ec2api-db-setup deb
+sudo tools/db/ec2api-db-setup deb

@@ -4,19 +4,15 @@
 # Options defined in oslo.messaging
 #
 
-# Use durable queues in amqp. (boolean value)
+# Use durable queues in AMQP. (boolean value)
 # Deprecated group/name - [DEFAULT]/rabbit_durable_queues
 #amqp_durable_queues=false
 
-# Auto-delete queues in amqp. (boolean value)
+# Auto-delete queues in AMQP. (boolean value)
 #amqp_auto_delete=false
 
 # Size of RPC connection pool. (integer value)
 #rpc_conn_pool_size=30
-
-# Modules of exceptions that are permitted to be recreated
-# upon receiving exception data from an rpc call. (list value)
-#allowed_rpc_exception_modules=oslo.messaging.exceptions,nova.exception,cinder.exception,exceptions
 
 # Qpid broker hostname. (string value)
 #qpid_hostname=nova
@@ -47,6 +43,10 @@
 # Whether to disable the Nagle algorithm. (boolean value)
 #qpid_tcp_nodelay=true
 
+# The number of prefetched messages held by receiver. (integer
+# value)
+#qpid_receiver_capacity=1
+
 # The qpid topology version to use.  Version 1 is what was
 # originally used by impl_qpid.  Version 2 includes some
 # backwards-incompatible changes that allow broker federation
@@ -56,8 +56,8 @@
 #qpid_topology_version=1
 
 # SSL version to use (valid only if SSL enabled). valid values
-# are TLSv1, SSLv23 and SSLv3. SSLv2 may be available on some
-# distributions. (string value)
+# are TLSv1 and SSLv23. SSLv2 and SSLv3 may be available on
+# some distributions. (string value)
 #kombu_ssl_version=
 
 # SSL key file (valid only if SSL enabled). (string value)
@@ -94,7 +94,7 @@
 # The RabbitMQ password. (string value)
 #rabbit_password=guest
 
-# the RabbitMQ login method (string value)
+# The RabbitMQ login method. (string value)
 #rabbit_login_method=AMQPLAIN
 
 # The RabbitMQ virtual host. (string value)
@@ -117,7 +117,8 @@
 # value)
 #rabbit_ha_queues=false
 
-# If passed, use a fake RabbitMQ provider. (boolean value)
+# Deprecated, use rpc_backend=kombu+memory or rpc_backend=fake
+# (boolean value)
 #fake_rabbit=false
 
 # ZeroMQ bind address. Should be a wildcard (*), an ethernet
@@ -155,15 +156,6 @@
 
 # Heartbeat time-to-live. (integer value)
 #matchmaker_heartbeat_ttl=600
-
-# Host to locate redis. (string value)
-#host=127.0.0.1
-
-# Use this port to connect to redis host. (integer value)
-#port=6379
-
-# Password for Redis server (optional). (string value)
-#password=<None>
 
 # Size of RPC greenthread pool. (integer value)
 #rpc_thread_pool_size=64
@@ -208,7 +200,7 @@
 
 # Directory where the ec2api python module is installed
 # (string value)
-#pybasedir=/home/apavlov/progmatic/ec2-api
+#pybasedir=/home/apavlov/stackforge/ec2-api
 
 # Directory where ec2api binaries are installed (string value)
 #bindir=/usr/local/bin
@@ -222,9 +214,6 @@
 # Options defined in ec2api.service
 #
 
-# Enable ssl connections or not (boolean value)
-#use_ssl=false
-
 # The IP address on which the EC2 API will listen. (string
 # value)
 #ec2api_listen=0.0.0.0
@@ -232,9 +221,28 @@
 # The port on which the EC2 API will listen. (integer value)
 #ec2api_listen_port=8788
 
+# Enable ssl connections or not for EC2 API (boolean value)
+#ec2api_use_ssl=false
+
 # Number of workers for EC2 API service. The default will be
 # equal to the number of CPUs available. (integer value)
 #ec2api_workers=<None>
+
+# The IP address on which the metadata API will listen.
+# (string value)
+#metadata_listen=0.0.0.0
+
+# The port on which the metadata API will listen. (integer
+# value)
+#metadata_listen_port=8789
+
+# Enable ssl connections or not for EC2 API Metadata (boolean
+# value)
+#metadata_use_ssl=false
+
+# Number of workers for metadata service. The default will be
+# the number of CPUs available. (integer value)
+#metadata_workers=<None>
 
 # Maximum time since last check-in for up service (integer
 # value)
@@ -293,22 +301,11 @@
 # Options defined in ec2api.api
 #
 
-# The IP address of the EC2 API server (string value)
-#base_ec2_host=nova
-
-# The port of the EC2 API server (integer value)
-#base_ec2_port=8773
-
-# The protocol to use when connecting to the EC2 API server
-# (http, https) (string value)
-#base_ec2_scheme=http
-
-# The path prefix used to call the ec2 API server (string
-# value)
-#base_ec2_path=/services/Cloud
-
 # URL to get token from ec2 request. (string value)
 #keystone_url=http://localhost:5000/v2.0
+
+# URL to get token from ec2 request. (string value)
+#keystone_ec2_tokens_url=$keystone_url/ec2tokens
 
 # Time in seconds before ec2 timestamp expires (integer value)
 #ec2_timestamp_expiry=300
@@ -325,6 +322,97 @@
 # Treat X-Forwarded-For as the canonical remote address. Only
 # enable this if you have a sanitizing proxy. (boolean value)
 #use_forwarded_for=false
+
+
+#
+# Options defined in ec2api.api.availability_zone
+#
+
+# The availability_zone to show internal services under
+# (string value)
+#internal_service_availability_zone=internal
+
+# IP address of this host (string value)
+#my_ip=10.0.0.1
+
+# The IP address of the EC2 API server (string value)
+#ec2_host=$my_ip
+
+# The port of the EC2 API server (integer value)
+#ec2_port=8788
+
+# The protocol to use when connecting to the EC2 API server
+# (http, https) (string value)
+#ec2_scheme=http
+
+# The path prefix used to call the ec2 API server (string
+# value)
+#ec2_path=/
+
+# List of region=fqdn pairs separated by commas (list value)
+#region_list=
+
+
+#
+# Options defined in ec2api.api.common
+#
+
+# True if server supports Neutron for full VPC access (boolean
+# value)
+#full_vpc_support=true
+
+
+#
+# Options defined in ec2api.api.dhcp_options
+#
+
+# MTU size to set by DHCP for instances. Corresponds with the
+# network_device_mtu in ec2api.conf. (integer value)
+#network_device_mtu=1500
+
+
+#
+# Options defined in ec2api.api.image
+#
+
+# The topic cert nodes listen on (string value)
+#cert_topic=cert
+
+# Parent directory for tempdir used for image decryption
+# (string value)
+#image_decryption_dir=/tmp
+
+# Hostname or IP for OpenStack to use when accessing the S3
+# api (string value)
+#s3_host=$my_ip
+
+# Port used when accessing the S3 api (integer value)
+#s3_port=3333
+
+# Whether to use SSL when talking to S3 (boolean value)
+#s3_use_ssl=false
+
+# Whether to affix the tenant id to the access key when
+# downloading from S3 (boolean value)
+#s3_affix_tenant=false
+
+
+#
+# Options defined in ec2api.api.instance
+#
+
+# Return the IP address as private dns hostname in describe
+# instances (boolean value)
+#ec2_private_dns_show_ip=false
+
+
+#
+# Options defined in ec2api.api.internet_gateway
+#
+
+# Name of the external network, which is used to connectVPCs
+# to Internet and to allocate Elastic IPs (string value)
+#external_network=<None>
 
 
 #
@@ -374,7 +462,7 @@
 #logging_exception_prefix=%(asctime)s.%(msecs)03d %(process)d TRACE %(name)s %(instance)s
 
 # List of logger=LEVEL pairs. (list value)
-#default_log_levels=amqp=WARN,amqplib=WARN,boto=WARN,qpid=WARN,sqlalchemy=WARN,suds=INFO,oslo.messaging=INFO,iso8601=WARN,requests.packages.urllib3.connectionpool=WARN
+#default_log_levels=amqp=WARN,amqplib=WARN,boto=WARN,qpid=WARN,sqlalchemy=WARN,suds=INFO,oslo.messaging=INFO,iso8601=WARN,requests.packages.urllib3.connectionpool=WARN,urllib3.connectionpool=WARN,websocket=WARN
 
 # Enables or disables publication of error events. (boolean
 # value)
@@ -385,11 +473,11 @@
 #fatal_deprecations=false
 
 # The format for an instance that is passed with the log
-# message.  (string value)
+# message. (string value)
 #instance_format="[instance: %(uuid)s] "
 
 # The format for an instance UUID that is passed with the log
-# message.  (string value)
+# message. (string value)
 #instance_uuid_format="[instance: %(uuid)s] "
 
 # The name of a logging configuration file. This file is
@@ -421,7 +509,7 @@
 #log_dir=<None>
 
 # Use syslog for logging. Existing syslog format is DEPRECATED
-# during I, and will chang in J to honor RFC5424. (boolean
+# during I, and will change in J to honor RFC5424. (boolean
 # value)
 #use_syslog=false
 
@@ -703,6 +791,34 @@
 # Keystone server. (boolean value)
 #check_revocations_for_cached=false
 
+# Hash algorithms to use for hashing PKI tokens. This may be a
+# single algorithm or multiple. The algorithms are those
+# supported by Python standard hashlib.new(). The hashes will
+# be tried in the order given, so put the preferred one first
+# for performance. The result of the first hash will be stored
+# in the cache. This will typically be set to multiple values
+# only while migrating from a less secure algorithm to a more
+# secure one. Once all the old tokens are expired this option
+# should be set to a single value for better performance.
+# (list value)
+#hash_algorithms=md5
+
+
+[matchmaker_redis]
+
+#
+# Options defined in oslo.messaging
+#
+
+# Host to locate redis. (string value)
+#host=127.0.0.1
+
+# Use this port to connect to redis host. (integer value)
+#port=6379
+
+# Password for Redis server (optional). (string value)
+#password=<None>
+
 
 [matchmaker_ring]
 
@@ -713,5 +829,97 @@
 # Matchmaker ring file (JSON). (string value)
 # Deprecated group/name - [DEFAULT]/matchmaker_ringfile
 #ringfile=/etc/oslo/matchmaker_ring.json
+
+
+[metadata]
+
+#
+# Options defined in ec2api.metadata
+#
+
+# IP address used by Nova metadata server. (string value)
+#nova_metadata_ip=127.0.0.1
+
+# TCP Port used by Nova metadata server. (integer value)
+#nova_metadata_port=8775
+
+# Protocol to access nova metadata, http or https (string
+# value)
+#nova_metadata_protocol=http
+
+# Allow to perform insecure SSL (https) requests to nova
+# metadata (boolean value)
+#nova_metadata_insecure=false
+
+# Certificate Authority public key (CA cert) file for ssl
+# (string value)
+#auth_ca_cert=<None>
+
+# Client certificate for nova metadata api server. (string
+# value)
+#nova_client_cert=
+
+# Private key of client certificate. (string value)
+#nova_client_priv_key=
+
+# Admin user (string value)
+#admin_user=<None>
+
+# Admin password (string value)
+#admin_password=<None>
+
+# Admin tenant name (string value)
+#admin_tenant_name=<None>
+
+# Shared secret to sign instance-id request (string value)
+#metadata_proxy_shared_secret=
+
+
+[oslo_messaging_amqp]
+
+#
+# Options defined in oslo.messaging
+#
+
+# address prefix used when sending to a specific server
+# (string value)
+#server_request_prefix=exclusive
+
+# address prefix used when broadcasting to all servers (string
+# value)
+#broadcast_prefix=broadcast
+
+# address prefix when sending to any server in group (string
+# value)
+#group_request_prefix=unicast
+
+# Name for the AMQP container (string value)
+#container_name=<None>
+
+# Timeout for inactive connections (in seconds) (integer
+# value)
+#idle_timeout=0
+
+# Debug: dump AMQP frames to stdout (boolean value)
+#trace=false
+
+# CA certificate PEM file for verifing server certificate
+# (string value)
+#ssl_ca_file=
+
+# Identifying certificate PEM file to present to clients
+# (string value)
+#ssl_cert_file=
+
+# Private key PEM file used to sign cert_file certificate
+# (string value)
+#ssl_key_file=
+
+# Password for decrypting ssl_key_file (if encrypted) (string
+# value)
+#ssl_key_password=<None>
+
+# Accept clients using either SSL or plain TCP (boolean value)
+#allow_insecure_clients=false
 
 
