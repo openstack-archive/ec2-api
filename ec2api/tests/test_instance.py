@@ -701,9 +701,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.nova_servers.get.assert_any_call(fakes.ID_OS_INSTANCE_2)
         self.assertEqual(
             0, self.address_api.dissassociate_address_item.call_count)
-        self.assertEqual(2, self.db_api.delete_item.call_count)
-        for inst_id in (fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2):
-            self.db_api.delete_item.assert_any_call(mock.ANY, inst_id)
+        self.assertFalse(self.db_api.delete_item.called)
         self.assertEqual(2, os_instance_delete.call_count)
         self.assertEqual(2, os_instance_get.call_count)
         for call_num, inst_id in enumerate([fakes.OS_INSTANCE_1,
@@ -752,12 +750,7 @@ class InstanceTestCase(base.ApiTestCase):
                 detach_network_interface.assert_any_call(
                     mock.ANY,
                     ('eni-attach-%s' % ec2_eni['id'].split('-')[-1]))
-            self.assertEqual(len(deleted_enis) + 2,
-                             self.db_api.delete_item.call_count)
-            for eni in deleted_enis:
-                self.db_api.delete_item.assert_any_call(mock.ANY, eni['id'])
-            for inst_id in (fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2):
-                self.db_api.delete_item.assert_any_call(mock.ANY, inst_id)
+            self.assertFalse(self.db_api.delete_item.called)
 
             detach_network_interface.reset_mock()
             self.db_api.delete_item.reset_mock()
@@ -1097,7 +1090,7 @@ class InstanceTestCase(base.ApiTestCase):
                              'reservationSet': [fakes.EC2_RESERVATION_2]},
                             orderless_lists=True))
         remove_instances.assert_called_once_with(
-            mock.ANY, [fakes.DB_INSTANCE_1])
+            mock.ANY, [fakes.DB_INSTANCE_1], purge_linked_items=False)
 
     @mock.patch('ec2api.api.instance._format_instance')
     def test_describe_instances_sorting(self, format_instance):

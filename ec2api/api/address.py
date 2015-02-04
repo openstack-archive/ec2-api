@@ -115,7 +115,7 @@ class AddressDescriber(common.UniversalDescriber):
                   'instance-id': 'instanceId',
                   'network-interface-id': 'networkInterfaceId',
                   'network-interface-owner-id': 'networkInterfaceOwnerId',
-                  'privateIpAddress': 'privateIpAddress',
+                  'private-ip-address': 'privateIpAddress',
                   'public-ip': 'publicIp'}
 
     def __init__(self, os_ports):
@@ -126,6 +126,14 @@ class AddressDescriber(common.UniversalDescriber):
 
     def get_os_items(self):
         return address_engine.get_os_floating_ips(self.context)
+
+    def auto_update_db(self, item, os_item):
+        item = super(AddressDescriber, self).auto_update_db(item, os_item)
+        if (item and 'network_interface_id' in item and
+                (not os_item.get('port_id') or
+                 os_item['fixed_ip_address'] != item['private_ip_address'])):
+            _disassociate_address_item(self.context, item)
+        return item
 
     def get_name(self, os_item):
         return os_item['floating_ip_address']

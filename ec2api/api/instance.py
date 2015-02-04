@@ -118,8 +118,8 @@ def terminate_instances(context, instance_id):
         state_change = _format_state_change(instance, os_instance)
         state_changes.append(state_change)
 
-    _remove_instances(context, instances, network_interfaces)
-
+    # NOTE(ft): don't delete items from DB until they disappear from OS.
+    # They will be auto deleted by a describe operation
     return {'instancesSet': state_changes}
 
 
@@ -272,7 +272,11 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
         formatted_instances = instance_describer.describe(
                 context, ids=ids, filter=instance_filters)
 
-        _remove_instances(context, instance_describer.obsolete_instances)
+        # NOTE(ft): remove obsolete instances' DB items only, because
+        # network interfaces and addresses are cleaned during appropriate
+        # describe operations called inside current operation
+        _remove_instances(context, instance_describer.obsolete_instances,
+                          purge_linked_items=False)
 
         self.reservations = instance_describer.reservations.values()
         self.instances = instance_describer.reservation_instances
@@ -562,19 +566,18 @@ def _format_state_change(instance, os_instance):
     }
 
 
-def _remove_instances(context, instances, network_interfaces=None):
+def _remove_instances(context, instances, purge_linked_items=True):
     if not instances:
         return
-    if network_interfaces is None:
+    network_interfaces = collections.defaultdict(list)
+    if purge_linked_items:
         # TODO(ft): implement search db items by os_id in DB layer
-        network_interfaces = collections.defaultdict(list)
         for eni in db_api.get_items(context, 'eni'):
             if 'instance_id' in eni:
                 network_interfaces[eni['instance_id']].append(eni)
-
-    addresses = db_api.get_items(context, 'eipalloc')
-    addresses = dict((a['network_interface_id'], a) for a in addresses
-                     if 'network_interface_id' in a)
+        addresses = db_api.get_items(context, 'eipalloc')
+        addresses = dict((a['network_interface_id'], a) for a in addresses
+                         if 'network_interface_id' in a)
     for instance in instances:
         for eni in network_interfaces[instance['id']]:
             if eni['delete_on_termination']:

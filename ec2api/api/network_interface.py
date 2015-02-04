@@ -20,6 +20,7 @@ from neutronclient.common import exceptions as neutron_exception
 from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
+from ec2api.api import address as address_api
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import dhcp_options
@@ -163,9 +164,7 @@ def delete_network_interface(context, network_interface_id):
 
     for address in db_api.get_items(context, 'eipalloc'):
         if address.get('network_interface_id') == network_interface['id']:
-            address.pop('network_interface_id')
-            address.pop('private_ip_address')
-            db_api.update_item(context, address)
+            address_api._disassociate_address_item(context, address)
 
     neutron = clients.neutron(context)
     with common.OnCrashCleaner() as cleaner:
@@ -207,20 +206,19 @@ class NetworkInterfaceDescriber(common.TaggableItemsDescriber):
             return None
         return _format_network_interface(
                 self.context, network_interface, os_port,
-                self.addresses[network_interface['id']], self.security_groups)
+                self.ec2_addresses[network_interface['id']],
+                self.security_groups)
 
     def get_os_items(self):
-        neutron = clients.neutron(self.context)
-        os_floating_ips = neutron.list_floatingips()['floatingips']
-        os_floating_ip_ids = set(ip['id'] for ip in os_floating_ips)
-        addresses = collections.defaultdict(list)
-        for address in db_api.get_items(self.context, 'eipalloc'):
-            if ('network_interface_id' in address and
-                    address['os_id'] in os_floating_ip_ids):
-                addresses[address['network_interface_id']].append(address)
-        self.addresses = addresses
+        addresses = address_api.describe_addresses(self.context)
+        self.ec2_addresses = collections.defaultdict(list)
+        for address in addresses['addressesSet']:
+            if 'networkInterfaceId' in address:
+                self.ec2_addresses[
+                        address['networkInterfaceId']].append(address)
         self.security_groups = (
             security_group_api._format_security_groups_ids_names(self.context))
+        neutron = clients.neutron(self.context)
         return neutron.list_ports()['ports']
 
     def get_name(self, os_item):
@@ -398,7 +396,7 @@ def detach_network_interface(context, attachment_id, force=None):
 
 
 def _format_network_interface(context, network_interface, os_port,
-                              associated_addresses=[], security_groups={}):
+                              associated_ec2_addresses=[], security_groups={}):
     ec2_network_interface = {}
     ec2_network_interface['networkInterfaceId'] = network_interface['id']
     ec2_network_interface['subnetId'] = network_interface['subnet_id']
@@ -439,16 +437,17 @@ def _format_network_interface(context, network_interface, os_port,
                 ip['ip_address'])
             item = {'privateIpAddress': ip['ip_address'],
                     'primary': primary}
-            address = next((addr for addr in associated_addresses
-                            if addr['private_ip_address'] == ip['ip_address']),
-                           None)
-            if address:
+            ec2_address = next(
+                (addr for addr in associated_ec2_addresses
+                 if addr['privateIpAddress'] == ip['ip_address']),
+                None)
+            if ec2_address:
                 item['association'] = {
-                    'associationId': ec2utils.change_ec2_id_kind(address['id'],
-                                                                 'eipassoc'),
+                    'associationId': ec2utils.change_ec2_id_kind(
+                                    ec2_address['allocationId'], 'eipassoc'),
                     'ipOwnerId': context.project_id,
                     'publicDnsName': None,
-                    'publicIp': address['public_ip'],
+                    'publicIp': ec2_address['publicIp'],
                 }
             if primary:
                 ipsSet.insert(0, item)

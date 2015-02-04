@@ -72,6 +72,24 @@ class VolumeTestCase(base.ApiTestCase):
             'DescribeVolumes', 'volumeSet',
             fakes.ID_EC2_VOLUME_1, 'volumeId')
 
+    def test_describe_volumes_auto_remove(self):
+        self.cinder.volumes.list.return_value = []
+        self.db_api.get_items.side_effect = (
+            fakes.get_db_api_get_items({
+                'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2],
+                'i': [],
+                'snap': []}))
+        resp = self.execute('DescribeVolumes', {})
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
+        self.assertThat(resp, matchers.DictMatches(
+            {'volumeSet': []}))
+
+        self.db_api.delete_item.assert_any_call(
+            mock.ANY, fakes.ID_EC2_VOLUME_1)
+        self.db_api.delete_item.assert_any_call(
+            mock.ANY, fakes.ID_EC2_VOLUME_2)
+
     def test_describe_volumes_invalid_parameters(self):
         self.cinder.volumes.list.return_value = [
             fakes.CinderVolume(fakes.OS_VOLUME_1),
@@ -134,6 +152,17 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.create.assert_called_once_with(
             None, snapshot_id=fakes.ID_OS_SNAPSHOT_1, volume_type=None,
             availability_zone=fakes.NAME_AVAILABILITY_ZONE)
+
+    def test_delete_volume(self):
+        self.db_api.get_item_by_id.return_value = fakes.DB_VOLUME_1
+        resp = self.execute('DeleteVolume',
+                            {'VolumeId': fakes.ID_EC2_VOLUME_1})
+        self.assertEqual(200, resp['http_status_code'])
+        resp.pop('http_status_code')
+        self.assertEqual({'return': True}, resp)
+        self.cinder.volumes.delete.assert_called_once_with(
+            fakes.ID_OS_VOLUME_1)
+        self.assertFalse(self.db_api.delete_item.called)
 
     def test_format_volume_maps_status(self):
         fake_volume = fakes.CinderVolume(fakes.OS_VOLUME_1)

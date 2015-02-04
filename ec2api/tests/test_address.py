@@ -635,7 +635,7 @@ class AddressTestCase(base.ApiTestCase):
               ('instance-id', fakes.ID_EC2_INSTANCE_1),
               ('network-interface-id', fakes.ID_EC2_NETWORK_INTERFACE_2),
               ('network-interface-owner-id', fakes.ID_OS_PROJECT),
-              ('privateIpAddress', fakes.IP_NETWORK_INTERFACE_2),
+              ('private-ip-address', fakes.IP_NETWORK_INTERFACE_2),
               ('public-ip', fakes.IP_ADDRESS_2)])
 
     def test_describe_addresses_ec2_classic(self):

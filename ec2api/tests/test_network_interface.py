@@ -348,11 +348,11 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
     def test_describe_network_interfaces(self):
         self.db_api.get_items.side_effect = (
-            lambda _, kind: [fakes.DB_NETWORK_INTERFACE_1,
-                             fakes.DB_NETWORK_INTERFACE_2]
-            if kind == 'eni' else
-            [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2]
-            if kind == 'eipalloc' else [])
+            fakes.get_db_api_get_items({
+                'eni': [fakes.DB_NETWORK_INTERFACE_1,
+                        fakes.DB_NETWORK_INTERFACE_2],
+                'eipalloc': [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2],
+                'i': [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2]}))
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.neutron.list_floatingips.return_value = (

@@ -101,7 +101,8 @@ def delete_volume(context, volume_id):
         raise exception.UnsupportedOperation()
     except cinder_exception.NotFound:
         pass
-    db_api.delete_item(context, volume['id'])
+    # NOTE(andrey-mp) Don't delete item from DB until it disappears from Cloud
+    # It will be deleted by describer in the future
     return True
 
 
