@@ -1,0 +1,4 @@
+# Devstack settings
+
+# we have to add ec2-api to enabled services for screen_it to work
+enable_service ec2-api

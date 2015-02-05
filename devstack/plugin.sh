@@ -20,10 +20,6 @@ set -o xtrace
 # Defaults
 # --------
 
-# Set up default repos
-EC2API_REPO=${EC2API_REPO:-${GIT_BASE}/stackforge/ec2-api.git}
-EC2API_BRANCH=${EC2API_BRANCH:-master}
-
 # Set up default directories
 EC2API_DIR=$DEST/ec2-api
 EC2API_CONF_DIR=${EC2API_CONF_DIR:-/etc/ec2api}
@@ -211,8 +207,6 @@ function init_ec2api() {
 
 # install_ec2api() - Collect source and prepare
 function install_ec2api() {
-    git_clone $EC2API_REPO $EC2API_DIR $EC2API_BRANCH
-
     # TODO(ruhe): use setup_develop once ec2api requirements match with global-requirement.txt
     # both functions (setup_develop and setup_package) are defined at:
     # http://git.openstack.org/cgit/openstack-dev/devstack/tree/functions-common
@@ -237,6 +231,25 @@ function cleanup_ec2api() {
     # Cleanup keystone signing dir
     sudo rm -rf $EC2API_KEYSTONE_SIGNING_DIR
 }
+
+# main dispatcher
+if [[ "$1" == "stack" && "$2" == "install" ]]; then
+    echo_summary "Installing ec2-api"
+    install_ec2api
+elif [[ "$1" == "stack" && "$2" == "post-config" ]]; then
+    echo_summary "Configuring ec2-api"
+    configure_ec2api
+    create_ec2api_accounts
+elif [[ "$1" == "stack" && "$2" == "extra" ]]; then
+    echo_summary "Initializing ec2-api"
+    init_ec2api
+    start_ec2api
+fi
+
+if [[ "$1" == "unstack" ]]; then
+    stop_ec2api
+    cleanup_ec2api
+fi
 
 # Restore xtrace
 $XTRACE
