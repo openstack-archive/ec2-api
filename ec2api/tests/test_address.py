@@ -152,8 +152,10 @@ class AddressTestCase(base.ApiTestCase):
             self.neutron.update_floatingip.reset_mock()
             self.db_api.update_item.reset_mock()
 
-        self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
-                                              fakes.DB_NETWORK_INTERFACE_2]
+        self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
+            {'eni': [fakes.DB_NETWORK_INTERFACE_1,
+                     fakes.DB_NETWORK_INTERFACE_2],
+             'igw': [fakes.DB_IGW_1, fakes.DB_IGW_2]})
 
         self.db_api.get_item_by_id.return_value = (
             copy.deepcopy(fakes.DB_ADDRESS_1))
@@ -165,8 +167,7 @@ class AddressTestCase(base.ApiTestCase):
 
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_ADDRESS_1:
-                    copy.deepcopy(fakes.DB_ADDRESS_1),
+                fakes.ID_EC2_ADDRESS_1: fakes.DB_ADDRESS_1,
                 fakes.ID_EC2_NETWORK_INTERFACE_2:
                     fakes.DB_NETWORK_INTERFACE_2}))
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
@@ -209,8 +210,7 @@ class AddressTestCase(base.ApiTestCase):
                                               fakes.DB_NETWORK_INTERFACE_2]
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_ADDRESS_2:
-                 copy.deepcopy(fakes.DB_ADDRESS_2),
+                {fakes.ID_EC2_ADDRESS_2: fakes.DB_ADDRESS_2,
                  fakes.ID_EC2_NETWORK_INTERFACE_2:
                     fakes.DB_NETWORK_INTERFACE_2}))
         self.neutron.show_floatingip.return_value = (
@@ -280,13 +280,18 @@ class AddressTestCase(base.ApiTestCase):
             self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error, resp['Error']['Code'])
 
+        # NOTE(ft): not registered instance id vs vpc address
+        self.db_api.get_items.return_value = []
+        self.db_api.get_item_by_id.return_value = None
+        do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
+                  'InstanceId': fakes.ID_EC2_INSTANCE_1},
+                 'InvalidInstanceID.NotFound')
+
         # NOTE(ft): vpc instance vs public ip parmeter
         self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_2]
         do_check({'PublicIp': '0.0.0.0',
                   'InstanceId': fakes.ID_EC2_INSTANCE_1},
                  'InvalidParameterCombination')
-
-        self.db_api.get_item_by_id.return_value = None
 
         # NOTE(ft): vpc instance vs not registered vpc address
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
@@ -310,7 +315,8 @@ class AddressTestCase(base.ApiTestCase):
         # NOTE(ft): already associated address vs network interface
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_ADDRESS_2: fakes.DB_ADDRESS_2,
+                {fakes.ID_EC2_ADDRESS_1: fakes.DB_ADDRESS_1,
+                 fakes.ID_EC2_ADDRESS_2: fakes.DB_ADDRESS_2,
                  fakes.ID_EC2_NETWORK_INTERFACE_1:
                     fakes.DB_NETWORK_INTERFACE_1}))
         self.neutron.show_floatingip.return_value = (
@@ -338,6 +344,14 @@ class AddressTestCase(base.ApiTestCase):
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
                   'InstanceId': fakes.ID_EC2_INSTANCE_1},
                  'InvalidInstanceID')
+
+        # NOTE(ft): internet gateway isn't attached to the vpc
+        self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
+            {'eni': [fakes.DB_NETWORK_INTERFACE_2],
+             'igw': []})
+        do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
+                  'InstanceId': fakes.ID_EC2_INSTANCE_1},
+                 'Gateway.NotAttached')
 
     def test_associate_address_ec2_classic_broken_vpc(self):
         address.address_engine = (

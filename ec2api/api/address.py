@@ -23,6 +23,7 @@ from oslo.config import cfg
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
+from ec2api.api import internet_gateway as internet_gateway_api
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -274,7 +275,6 @@ class AddressEngineNeutron(object):
                           private_ip_address=None, allow_reassociation=False):
         instance_network_interfaces = []
         if instance_id:
-            # TODO(ft): check instance exists
             # TODO(ft): implement search in DB layer
             for eni in db_api.get_items(context, 'eni'):
                 if instance_id and eni.get('instance_id') == instance_id:
@@ -303,6 +303,8 @@ class AddressEngineNeutron(object):
 
         if instance_id:
             if not instance_network_interfaces:
+                # NOTE(ft): check the instance exists
+                ec2utils.get_db_item(context, 'i', instance_id)
                 msg = _('You must specify an IP address when mapping '
                         'to a non-VPC instance')
                 raise exception.InvalidParameterCombination(msg)
@@ -319,6 +321,7 @@ class AddressEngineNeutron(object):
         if not _is_address_valid(context, neutron, address):
             raise exception.InvalidAllocationIDNotFound(
                 id=allocation_id)
+
         if address.get('network_interface_id') == network_interface['id']:
             # NOTE(ft): idempotent call
             pass
@@ -330,6 +333,17 @@ class AddressEngineNeutron(object):
                             address['id'], 'eipassoc')}
             raise exception.ResourceAlreadyAssociated(msg)
         else:
+            internet_gateways = (
+                internet_gateway_api.describe_internet_gateways(
+                    context,
+                    filter=[{'name': 'attachment.vpc-id',
+                             'value': [network_interface['vpc_id']]}])
+                ['internetGatewaySet'])
+            if len(internet_gateways) == 0:
+                msg = _('Network %(vpc_id)s is not attached to any internet '
+                        'gateway') % {'vpc_id': network_interface['vpc_id']}
+                raise exception.GatewayNotAttached(msg)
+
             with common.OnCrashCleaner() as cleaner:
                 _associate_address_item(context, address,
                                         network_interface['id'],
