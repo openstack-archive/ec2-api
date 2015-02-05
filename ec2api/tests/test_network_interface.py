@@ -364,7 +364,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertThat(resp['networkInterfaceSet'],
                         matchers.ListMatches(
                             [fakes.EC2_NETWORK_INTERFACE_1,
-                             fakes.EC2_NETWORK_INTERFACE_2]))
+                             fakes.EC2_NETWORK_INTERFACE_2],
+                            orderless_lists=True))
 
         self.db_api.get_items_by_ids = tools.CopyingMock(
             return_value=[fakes.DB_NETWORK_INTERFACE_1])
