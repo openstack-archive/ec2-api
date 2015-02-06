@@ -18,8 +18,8 @@ import testtools
 
 from ec2api.api import ec2utils
 from ec2api import exception
-from ec2api.tests import fakes
-from ec2api.tests import matchers
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
 
 
 class EC2UtilsTestCase(testtools.TestCase):

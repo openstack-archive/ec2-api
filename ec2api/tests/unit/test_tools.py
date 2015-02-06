@@ -15,7 +15,7 @@
 
 import testtools
 
-from ec2api.tests import tools
+from ec2api.tests.unit import tools
 
 
 class TestToolsTestCase(testtools.TestCase):

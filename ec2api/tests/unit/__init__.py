@@ -13,10 +13,10 @@
 # limitations under the License.
 
 """
-:mod:`ec2api.tests.unit` -- EC2api Unittests
+:mod:`ec2api.tests.unit.unit` -- EC2api Unittests
 =====================================================
 
-.. automodule:: ec2api.tests.unit
+.. automodule:: ec2api.tests.unit.unit
    :platform: Unix
 """
 

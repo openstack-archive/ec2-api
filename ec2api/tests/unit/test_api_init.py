@@ -21,8 +21,8 @@ from oslotest import base as test_base
 from ec2api import api
 from ec2api.api import apirequest
 from ec2api import exception
-from ec2api.tests import fakes_request_response as fakes
-from ec2api.tests import matchers
+from ec2api.tests.unit import fakes_request_response as fakes
+from ec2api.tests.unit import matchers
 from ec2api import wsgi
 
 

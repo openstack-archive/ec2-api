@@ -19,9 +19,9 @@ from oslotest import base as test_base
 
 import ec2api.api.apirequest
 from ec2api.api import ec2utils
-from ec2api.tests import fakes
-from ec2api.tests import matchers
-from ec2api.tests import tools
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
+from ec2api.tests.unit import tools
 import ec2api.wsgi
 
 

@@ -17,9 +17,9 @@ from novaclient import exceptions as nova_exception
 
 from ec2api import exception
 from ec2api.metadata import api
-from ec2api.tests import base
-from ec2api.tests import fakes
-from ec2api.tests import matchers
+from ec2api.tests.unit import base
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
 
 
 class MetadataApiTestCase(base.ApiTestCase):

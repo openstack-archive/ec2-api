@@ -16,9 +16,9 @@ import mock
 
 from ec2api.api import ec2utils
 from ec2api.api import tag as tag_api
-from ec2api.tests import base
-from ec2api.tests import fakes
-from ec2api.tests import matchers
+from ec2api.tests.unit import base
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
 
 
 class TagTestCase(base.ApiTestCase):

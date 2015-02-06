@@ -22,8 +22,8 @@ from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api.db import migration
 from ec2api.db.sqlalchemy import api as session
-from ec2api.tests import fakes
-from ec2api.tests import matchers
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
 
 
 class DbApiTestCase(test_base.BaseTestCase):

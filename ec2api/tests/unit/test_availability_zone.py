@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ec2api.tests import base
-from ec2api.tests import fakes
-from ec2api.tests import matchers
+from ec2api.tests.unit import base
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
 
 
 class AvailabilityZoneCase(base.ApiTestCase):

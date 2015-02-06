@@ -21,9 +21,9 @@ from oslo.utils import timeutils
 from oslotest import base as test_base
 
 from ec2api.api import apirequest
-from ec2api.tests import fakes_request_response as fakes
-from ec2api.tests import matchers
-from ec2api.tests import tools
+from ec2api.tests.unit import fakes_request_response as fakes
+from ec2api.tests.unit import matchers
+from ec2api.tests.unit import tools
 
 
 class EC2RequesterTestCase(test_base.BaseTestCase):

@@ -18,7 +18,7 @@ import random
 import uuid
 
 from ec2api.openstack.common import timeutils
-from ec2api.tests import tools
+from ec2api.tests.unit import tools
 
 
 # Helper functions section

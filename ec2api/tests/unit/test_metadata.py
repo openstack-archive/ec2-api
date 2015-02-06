@@ -20,8 +20,8 @@ import webob
 
 from ec2api import exception
 from ec2api import metadata
-from ec2api.tests import fakes
-from ec2api.tests import matchers
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
 
 
 class ProxyTestCase(test_base.BaseTestCase):

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from ec2api.tests import tools
+from ec2api.tests.unit import tools
 
 XML_RESULT_TEMPLATE = '''
 <%(action)sResponse

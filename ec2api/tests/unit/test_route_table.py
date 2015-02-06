@@ -20,10 +20,10 @@ import mock
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import route_table
-from ec2api.tests import base
-from ec2api.tests import fakes
-from ec2api.tests import matchers
-from ec2api.tests import tools
+from ec2api.tests.unit import base
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
+from ec2api.tests.unit import tools
 
 
 class RouteTableTestCase(base.ApiTestCase):

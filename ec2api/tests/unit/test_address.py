@@ -20,10 +20,10 @@ from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import address
-from ec2api.tests import base
-from ec2api.tests import fakes
-from ec2api.tests import matchers
-from ec2api.tests import tools
+from ec2api.tests.unit import base
+from ec2api.tests.unit import fakes
+from ec2api.tests.unit import matchers
+from ec2api.tests.unit import tools
 
 
 class AddressTestCase(base.ApiTestCase):
