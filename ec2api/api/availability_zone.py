@@ -103,6 +103,8 @@ def describe_regions(context, region_name=None, filter=None):
         regions = []
         for region in CONF.region_list:
             name, _sep, host = region.partition('=')
+            if not host:
+                host = CONF.ec2_host
             endpoint = '%s://%s:%s%s' % (CONF.ec2_scheme,
                                          host,
                                          CONF.ec2_port,
