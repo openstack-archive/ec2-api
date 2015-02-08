@@ -76,8 +76,7 @@ def attach_internet_gateway(context, internet_gateway_id, vpc_id):
     os_networks = neutron.list_networks(**search_opts)['networks']
     os_public_network = os_networks[0]
 
-    # TODO(ft):
-    # set attaching state in db
+    # TODO(ft): set attaching state into db
     with common.OnCrashCleaner() as cleaner:
         _attach_internet_gateway_item(context, igw, vpc['id'])
         cleaner.addCleanup(_detach_internet_gateway_item, context, igw)
@@ -94,8 +93,7 @@ def detach_internet_gateway(context, internet_gateway_id, vpc_id):
                                            vpc_id=vpc['id'])
 
     neutron = clients.neutron(context)
-    # TODO(ft):
-    # set detaching state in db
+    # TODO(ft): set detaching state into db
     with common.OnCrashCleaner() as cleaner:
         _detach_internet_gateway_item(context, igw)
         cleaner.addCleanup(_attach_internet_gateway_item,
@@ -103,9 +101,6 @@ def detach_internet_gateway(context, internet_gateway_id, vpc_id):
         try:
             neutron.remove_gateway_router(vpc["os_id"])
         except neutron_exception.NotFound:
-            # TODO(ft): do log error
-            # TODO(ft): adjust catched exception classes to catch:
-            # the router doesn't exist
             pass
     return True
 
@@ -143,8 +138,11 @@ def _format_internet_gateway(igw):
     ec2_igw = {'internetGatewayId': igw['id'],
                'attachmentSet': []}
     if igw.get('vpc_id'):
+        # NOTE(ft): AWS actually returns 'available' state rather than
+        # documented 'attached' one
+        attachment_state = 'available'
         attachment = {'vpcId': igw['vpc_id'],
-                      'state': 'available'}
+                      'state': attachment_state}
         ec2_igw['attachmentSet'].append(attachment)
     return ec2_igw
 
