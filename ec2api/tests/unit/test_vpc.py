@@ -88,9 +88,9 @@ class VpcTestCase(base.ApiTestCase):
         resp = self.execute('CreateVpc', {'CidrBlock': '10.0.0.0/8'})
         check_response(resp, 'InvalidVpc.Range')
 
-    @base.skip_not_implemented
     def test_create_vpc_overlimit(self):
-        self.neutron.create_router.side_effect = neutron_exception.Conflict
+        self.neutron.create_router.side_effect = (
+            neutron_exception.OverQuotaClient)
         self.db_api.add_item.side_effect = fakes.get_db_api_add_item(
             fakes.ID_EC2_VPC_1)
 
