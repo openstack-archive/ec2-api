@@ -98,7 +98,7 @@ def create_network_interface(context, subnet_id,
         default_groups = security_group_api.describe_security_groups(
             context,
             filter=[{'name': 'vpc-id', 'value': [vpc_id]},
-                    {'name': 'group-name', 'value': ['Default']}]
+                    {'name': 'group-name', 'value': ['default']}]
             )['securityGroupInfo']
         security_group_id = [default_group['groupId']
                              for default_group in default_groups]

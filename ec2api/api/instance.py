@@ -1056,7 +1056,7 @@ class InstanceEngineNeutron(object):
         default_groups = security_group_api.describe_security_groups(
             context,
             filter=[{'name': 'vpc-id', 'value': [vpc_id]},
-                    {'name': 'group-name', 'value': ['Default']}]
+                    {'name': 'group-name', 'value': ['default']}]
             )['securityGroupInfo']
         security_groups = [ec2utils.get_db_item(context, 'sg',
                                                 default_group['groupId'])

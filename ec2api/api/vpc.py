@@ -89,6 +89,8 @@ def delete_vpc(context, vpc_id):
         cleaner.addCleanup(db_api.restore_item, context, 'vpc', vpc)
         route_table_api._delete_route_table(context, vpc['route_table_id'],
                                             cleaner=cleaner)
+        # TODO(Alex): Check that only the default security group is left
+        # in this VPC, otherwise DependencyViolation.
         security_groups = security_group_api.describe_security_groups(
             context,
             filter=[{'name': 'vpc-id',

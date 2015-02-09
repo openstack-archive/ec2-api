@@ -61,6 +61,8 @@ def create_security_group(context, group_name, group_description,
     nova = clients.nova(context)
     with common.OnCrashCleaner() as cleaner:
         try:
+            # TODO(Alex): Shouldn't allow creation of groups with existing
+            # name if in the same VPC or in EC2-Classic.
             os_security_group = nova.security_groups.create(group_name,
                                                             group_description)
         except nova_exception.OverLimit:
@@ -80,8 +82,8 @@ def create_security_group(context, group_name, group_description,
 
 def _create_default_security_group(context, vpc):
     # NOTE(Alex): OpenStack doesn't allow creation of another group
-    # named 'default' hence 'Default' is used.
-    return create_security_group(context, 'Default',
+    # named 'default' hence vpc-id is used.
+    return create_security_group(context, vpc['id'],
                                  'Default VPC security group', vpc['id'])
 
 
@@ -104,13 +106,19 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
         self.all_db_items = None
 
     def format(self, item=None, os_item=None):
-        if self.all_db_items is None:
-            self.all_db_items = ec2utils.get_db_items(self.context, 'sg', None)
         return _format_security_group(item, os_item,
                                       self.all_db_items, self.os_items)
 
     def get_os_items(self):
-        return security_group_engine.get_os_groups(self.context)
+        if self.all_db_items == None:
+            self.all_db_items = ec2utils.get_db_items(self.context, 'sg', None)
+            self.os_ids_in_db = set(g['os_id'] for g in self.all_db_items)
+        os_groups = security_group_engine.get_os_groups(self.context)
+        for os_group in os_groups:
+            if (os_group['name'].startswith('vpc-') and
+                    os_group['id'] in self.os_ids_in_db):
+                os_group['name'] = 'default'
+        return os_groups
 
 
 def describe_security_groups(context, group_name=None, group_id=None,

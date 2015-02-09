@@ -340,7 +340,7 @@ class InstanceTestCase(base.ApiTestCase):
                  'MinCount': '1', 'MaxCount': '1',
                  'KernelId': fakes.ID_EC2_IMAGE_AKI_1,
                  'RamdiskId': fakes.ID_EC2_IMAGE_ARI_1,
-                 'SecurityGroup.1': 'Default',
+                 'SecurityGroup.1': 'default',
                  'Placement.AvailabilityZone': 'fake_zone',
                  'ClientToken': 'fake_client_token',
                  'BlockDeviceMapping.1.DeviceName': '/dev/vdd',
@@ -354,7 +354,7 @@ class InstanceTestCase(base.ApiTestCase):
                 userdata=None, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
                 ramdisk_id=fakes.ID_OS_IMAGE_ARI_1, key_name=None,
                 block_device_mapping='fake_bdm',
-                availability_zone='fake_zone', security_groups=['Default'],
+                availability_zone='fake_zone', security_groups=['default'],
                 **extra_kwargs)
             self.nova_servers.reset_mock()
             db_instance = {'os_id': mock.ANY,
