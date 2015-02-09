@@ -79,6 +79,8 @@ def create_security_group(context, group_name, group_description,
 
 
 def _create_default_security_group(context, vpc):
+    # NOTE(Alex): OpenStack doesn't allow creation of another group
+    # named 'default' hence 'Default' is used.
     return create_security_group(context, 'Default',
                                  'Default VPC security group', vpc['id'])
 

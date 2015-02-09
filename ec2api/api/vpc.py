@@ -35,6 +35,8 @@ LOG = logging.getLogger(__name__)
 
 """VPC-object related API implementation
 """
+# TODO(ft): implement DescribeVpcAttribute, ModifyVpcAttribute API methods
+# TODO(ft): implement 'instanceTenancy' VPC property
 
 
 Validator = common.Validator
@@ -42,12 +44,12 @@ Validator = common.Validator
 
 def create_vpc(context, cidr_block, instance_tenancy='default'):
     neutron = clients.neutron(context)
-    # TODO(Alex): Handle errors like overlimit
-    # TODO(ft) dhcp_options_id
-    # TODO(ft): refactor to prevent update created objects
     with common.OnCrashCleaner() as cleaner:
         os_router_body = {'router': {}}
-        os_router = neutron.create_router(os_router_body)['router']
+        try:
+            os_router = neutron.create_router(os_router_body)['router']
+        except neutron_exception.OverQuotaClient:
+            raise exception.VpcLimitExceeded()
         cleaner.addCleanup(neutron.delete_router, os_router['id'])
         vpc = db_api.add_item(context, 'vpc',
                               {'os_id': os_router['id'],
@@ -59,22 +61,21 @@ def create_vpc(context, cidr_block, instance_tenancy='default'):
         vpc['route_table_id'] = route_table['id']
         db_api.update_item(context, vpc)
         neutron.update_router(os_router['id'], {'router': {'name': vpc['id']}})
-        # NOTE(Alex): OpenStack doesn't allow creation of another group
-        # named 'default' hence 'Default' is used.
-        security_group = security_group_api._create_default_security_group(
-            context, vpc)
+        security_group_api._create_default_security_group(context, vpc)
     return {'vpc': _format_vpc(vpc)}
 
 
 def delete_vpc(context, vpc_id):
     vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
-    subnets = subnet_api.describe_subnets(context,
+    subnets = subnet_api.describe_subnets(
+        context,
         filter=[{'name': 'vpc-id', 'value': [vpc_id]}])['subnetSet']
     internet_gateways = internet_gateway_api.describe_internet_gateways(
         context,
         filter=[{'name': 'attachment.vpc-id',
                  'value': [vpc['id']]}])['internetGatewaySet']
-    route_tables = route_table_api.describe_route_tables(context,
+    route_tables = route_table_api.describe_route_tables(
+        context,
         filter=[{'name': 'vpc-id', 'value': [vpc['id']]}])['routeTableSet']
     if subnets or internet_gateways or len(route_tables) > 1:
         msg = _("The vpc '%(vpc_id)s' has dependencies and "
@@ -97,11 +98,13 @@ def delete_vpc(context, vpc_id):
                 context, group_id=security_group['groupId'])
         try:
             neutron.delete_router(vpc['os_id'])
-        except neutron_exception.NeutronClientException as ex:
-            # TODO(ft): do log error
-            # TODO(ft): adjust catched exception classes to catch:
-            # the router doesn't exist
-            # somewhat plugged to the router
+        except neutron_exception.Conflict as ex:
+            LOG.warning(_('Failed to delete router %(os_id)s during deleting '
+                          'VPC %(id)s. Reason: %(reason)s'),
+                        {'id': vpc['id'],
+                         'os_id': vpc['os_id'],
+                         'reason': ex.message})
+        except neutron_exception.NotFound:
             pass
 
     return True
