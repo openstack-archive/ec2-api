@@ -248,7 +248,7 @@ def assign_private_ip_addresses(context, network_interface_id,
     fixed_ips = os_port['fixed_ips'] or []
     if private_ip_address is not None:
         for ip_address in private_ip_address:
-            if ip_address not in subnet_ipnet:
+            if netaddr.IPAddress(ip_address) not in subnet_ipnet:
                 raise exception.InvalidParameterValue(
                     value=str(ip_address),
                     parameter='private_ip_address',

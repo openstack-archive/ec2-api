@@ -14,6 +14,7 @@
 #    under the License.
 
 import logging
+import random
 import sys
 import time
 import traceback
@@ -34,6 +35,15 @@ logging.getLogger('botocore').setLevel(logging.INFO)
 logging.getLogger(
     'botocore.vendored.requests.packages.urllib3.connectionpool'
 ).setLevel(logging.WARNING)
+
+
+# TODO(andrey-mp): remove it when new tempest_lib with this will be
+def rand_name(name=''):
+    randbits = str(random.randint(1, 0x7fffffff))
+    if name:
+        return name + '-' + randbits
+    else:
+        return randbits
 
 
 def safe_setup(f):
@@ -456,3 +466,9 @@ class EC2TestCase(base.BaseTestCase):
     @classmethod
     def get_snapshot_waiter(cls):
         return EC2Waiter(cls._snapshot_get_state)
+
+    def assertEmpty(self, list_obj, msg=None):
+        self.assertTrue(len(list_obj) == 0, msg)
+
+    def assertNotEmpty(self, list_obj, msg=None):
+        self.assertTrue(len(list_obj) > 0, msg)
