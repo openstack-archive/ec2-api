@@ -34,6 +34,8 @@ LOG = logging.getLogger(__name__)
 
 """Subnet related API implementation
 """
+# TODO(ft): implement ModifySubnetAttribute method
+# TODO(ft): implement 'availabilityZone' property
 
 
 Validator = common.Validator
@@ -47,14 +49,7 @@ def create_subnet(context, vpc_id, cidr_block,
     if subnet_ipnet not in vpc_ipnet:
         raise exception.InvalidSubnetRange(cidr_block=cidr_block)
 
-    # TODO(ft):
-    # check availability zone
-    # choose default availability zone
     gateway_ip = str(netaddr.IPAddress(subnet_ipnet.first + 1))
-    # NOTE(Alex): AWS takes 4 first addresses (.1 - .4) but for
-    # OpenStack we decided not to support this as compatibility.
-    # start_ip = str(netaddr.IPAddress(subnet_ipnet.first + 4))
-    # end_ip = str(netaddr.IPAddress(subnet_ipnet.last - 1))
     main_route_table = db_api.get_item_by_id(context, 'rtb',
                                              vpc['route_table_id'])
     host_routes = route_table_api._get_subnet_host_routes(
@@ -62,23 +57,26 @@ def create_subnet(context, vpc_id, cidr_block,
     neutron = clients.neutron(context)
     with common.OnCrashCleaner() as cleaner:
         os_network_body = {'network': {}}
-        os_network = neutron.create_network(os_network_body)['network']
-        cleaner.addCleanup(neutron.delete_network, os_network['id'])
-        os_subnet_body = {'subnet': {'network_id': os_network['id'],
-                                     'ip_version': '4',
-                                     'cidr': cidr_block,
-                                     # 'allocation_pools': [{'start': start_ip,
-                                     #                       'end': end_ip}],
-                                     'host_routes': host_routes}}
-        os_subnet = neutron.create_subnet(os_subnet_body)['subnet']
-        cleaner.addCleanup(neutron.delete_subnet, os_subnet['id'])
-        neutron.add_interface_router(vpc['os_id'],
-                                     {'subnet_id': os_subnet['id']})
+        try:
+            os_network = neutron.create_network(os_network_body)['network']
+            cleaner.addCleanup(neutron.delete_network, os_network['id'])
+            # NOTE(Alex): AWS takes 4 first addresses (.1 - .4) but for
+            # OpenStack we decided not to support this as compatibility.
+            os_subnet_body = {'subnet': {'network_id': os_network['id'],
+                                         'ip_version': '4',
+                                         'cidr': cidr_block,
+                                         'host_routes': host_routes}}
+            os_subnet = neutron.create_subnet(os_subnet_body)['subnet']
+            cleaner.addCleanup(neutron.delete_subnet, os_subnet['id'])
+        except neutron_exception.OverQuotaClient:
+            raise exception.SubnetLimitExceeded()
+        try:
+            neutron.add_interface_router(vpc['os_id'],
+                                         {'subnet_id': os_subnet['id']})
+        except neutron_exception.BadRequest:
+            raise exception.InvalidSubnetConflict(cidr_block=cidr_block)
         cleaner.addCleanup(neutron.remove_interface_router,
                            vpc['os_id'], {'subnet_id': os_subnet['id']})
-        # TODO(Alex): Handle errors like cidr conflict or overlimit
-        # TODO(ft):
-        # store availability_zone
         subnet = db_api.add_item(context, 'subnet',
                                  {'os_id': os_subnet['id'],
                                   'vpc_id': vpc['id']})
@@ -89,7 +87,7 @@ def create_subnet(context, vpc_id, cidr_block,
                               {'subnet': {'name': subnet['id']}})
     os_ports = neutron.list_ports()['ports']
     return {'subnet': _format_subnet(context, subnet, os_subnet,
-                                          os_network, os_ports)}
+                                     os_network, os_ports)}
 
 
 def delete_subnet(context, subnet_id):
@@ -108,24 +106,26 @@ def delete_subnet(context, subnet_id):
         db_api.delete_item(context, subnet['id'])
         cleaner.addCleanup(db_api.restore_item, context, 'subnet', subnet)
         try:
-            if vpc is not None:
-                neutron.remove_interface_router(vpc['os_id'],
-                                                {'subnet_id': subnet['os_id']})
-                cleaner.addCleanup(neutron.add_interface_router,
-                                   vpc['os_id'],
-                                   {'subnet_id': subnet['os_id']})
-            os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
-            neutron.delete_subnet(os_subnet['id'])
-            neutron.delete_network(os_subnet['network_id'])
-        except neutron_exception.NeutronClientException:
-            # TODO(ft): do log error
-            # TODO(ft): adjust catched exception classes to catch:
-            # the subnet is already unplugged from the router
-            # no such router
-            # the subnet doesn't exist
-            # some ports exist in the subnet
-            # the network has other not empty subnets
+            neutron.remove_interface_router(vpc['os_id'],
+                                            {'subnet_id': subnet['os_id']})
+        except neutron_exception.NotFound:
             pass
+        cleaner.addCleanup(neutron.add_interface_router,
+                           vpc['os_id'],
+                           {'subnet_id': subnet['os_id']})
+        try:
+            os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
+        except neutron_exception.NotFound:
+            pass
+        else:
+            try:
+                neutron.delete_network(os_subnet['network_id'])
+            except neutron_exception.NetworkInUseClient as ex:
+                LOG.warning(_('Failed to delete network %(os_id)s during '
+                              'deleting Subnet %(id)s. Reason: %(reason)s'),
+                            {'id': subnet['id'],
+                             'os_id': os_subnet['network_id'],
+                             'reason': ex.message})
 
     return True
 
@@ -174,9 +174,9 @@ def _format_subnet(context, subnet, os_subnet, os_network, os_ports):
                   'BUILD': 'pending',
                   'DOWN': 'available',
                   'ERROR': 'available'}
-    range = int(os_subnet['cidr'].split('/')[1])
+    cidr_range = int(os_subnet['cidr'].split('/')[1])
     # NOTE(Alex) First and last IP addresses are system ones.
-    ip_count = pow(2, 32 - range) - 2
+    ip_count = pow(2, 32 - cidr_range) - 2
     # TODO(Alex): Probably performance-killer. Will have to optimize.
     dhcp_port_accounted = False
     for port in os_ports:

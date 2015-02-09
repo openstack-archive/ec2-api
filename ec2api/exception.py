@@ -342,7 +342,12 @@ class RouteAlreadyExists(Invalid):
 
 
 class VpcLimitExceeded(Overlimit):
-    msg_fmt = _("The maximum number of VPCs has been reached.")
+    msg_fmt = _('The maximum number of VPCs has been reached.')
+
+
+class SubnetLimitExceeded(Overlimit):
+    msg_fmt = _('You have reached the limit on the number of subnets that you '
+                'can create')
 
 
 class NetworkInterfaceLimitExceeded(Overlimit):
