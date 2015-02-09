@@ -887,7 +887,7 @@ OS_SECURITY_GROUP_RULE_2 = {
 }
 OS_SECURITY_GROUP_1 = {
     'id': ID_OS_SECURITY_GROUP_1,
-    'name': 'groupname',
+    'name': ID_EC2_VPC_1,
     'security_group_rules':
     [{'remote_group_id': None,
       'direction': 'egress',
@@ -966,7 +966,7 @@ EC2_SECURITY_GROUP_1 = {
     'vpcId': ID_EC2_VPC_1,
     'groupDescription': 'Group description',
     'ipPermissions': None,
-    'groupName': 'groupname',
+    'groupName': 'default',
     'ipPermissionsEgress':
     [{'toPort': -1,
       'ipProtocol': -1,
@@ -991,7 +991,7 @@ EC2_SECURITY_GROUP_2 = {
       'fromPort': 10,
       'groups':
       [{'groupId': ID_EC2_SECURITY_GROUP_1,
-        'groupName': 'groupname',
+        'groupName': 'default',
         'userId': ID_OS_PROJECT}]
       }],
     'ownerId': ID_OS_PROJECT,

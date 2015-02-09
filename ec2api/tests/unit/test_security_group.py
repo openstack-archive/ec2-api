@@ -185,11 +185,11 @@ class SecurityGroupTestCase(base.ApiTestCase):
         resp = self.execute(
             'DeleteSecurityGroup',
             {'GroupName':
-             fakes.EC2_SECURITY_GROUP_1['groupName']})
+             fakes.EC2_SECURITY_GROUP_2['groupName']})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.nova_security_groups.delete.assert_called_once_with(
-            fakes.ID_OS_SECURITY_GROUP_1)
+            fakes.ID_OS_SECURITY_GROUP_2)
 
     # NOTE(Alex) This test is disabled because it checks using non-AWS id.
     @base.skip_not_implemented
@@ -290,7 +290,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
             'DescribeSecurityGroups', 'securityGroupInfo',
             [('vpc-id', fakes.ID_EC2_VPC_1),
              # TODO(ft): declare a constant for the group name in fakes
-             ('group-name', 'groupname'),
+             ('group-name', 'default'),
              ('group-id', fakes.ID_EC2_SECURITY_GROUP_1)])
         self.check_tag_support(
             'DescribeSecurityGroups', 'securityGroupInfo',
@@ -299,6 +299,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_describe_security_groups_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
+        self.db_api.get_items.return_value = []
         self.nova_security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
