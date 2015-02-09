@@ -42,10 +42,6 @@ class IgwTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_with(
                 mock.ANY, 'igw', {})
 
-    @base.skip_not_implemented
-    def test_create_igw_overlimit(self):
-        pass
-
     def test_attach_igw(self):
         conf = cfg.CONF
         self.addCleanup(conf.reset)
@@ -247,8 +243,8 @@ class IgwTestCase(base.ApiTestCase):
         def do_check(error_code):
             resp = self.execute(
                     'DeleteInternetGateway',
-                    {'InternetGatewayId':
-                            fakes.EC2_IGW_1['internetGatewayId']})
+                    {'InternetGatewayId': (
+                            fakes.EC2_IGW_1['internetGatewayId'])})
 
             self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
@@ -290,11 +286,3 @@ class IgwTestCase(base.ApiTestCase):
         self.check_tag_support(
             'DescribeInternetGateways', 'internetGatewaySet',
             fakes.ID_EC2_IGW_2, 'internetGatewayId')
-
-    @base.skip_not_implemented
-    def test_describe_igw_no_vpc(self):
-        pass
-
-    @base.skip_not_implemented
-    def test_describe_igw_is_attached_to_broken_vpc(self):
-        pass
