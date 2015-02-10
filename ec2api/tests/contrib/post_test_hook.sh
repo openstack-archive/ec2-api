@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -14,24 +14,30 @@
 
 # This script is executed inside post_test_hook function in devstack gate.
 
-CONFIG_DIR="."
-export TEST_CONFIG_DIR=$(readlink -f $CONFIG_DIR)
+# Sleep some time until all services are started
+sleep 5
+
+export TEST_CONFIG_DIR=$(readlink -f .)
 export TEST_CONFIG="functional_tests.conf"
 
-if [[ ! -f $CONFIG_DIR/$TEST_CONFIG ]]; then
+if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
-IMAGE_ID=$(euca-describe-images | grep "ami-" | head -n 1 | awk '{print $2}')
+IMAGE_ID=$(euca-describe-images | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
 
-  cat > $CONFIG_DIR/$TEST_CONFIG <<EOF
+  sudo bash -c "cat > $TEST_CONFIG_DIR/$TEST_CONFIG <<EOF
 [aws]
 ec2_url = $EC2_URL
 aws_access = $EC2_ACCESS_KEY
 aws_secret = $EC2_SECRET_KEY
 image_id = $IMAGE_ID
-EOF
+EOF"
 fi
 
-python -m testtools.run discover -v -t ./ ec2api/tests/functional
+sudo pip install -r test-requirements.txt
+# botocore not in openstack requirements now, so install it manually
+sudo pip install botocore==0.85
+sudo OS_STDOUT_CAPTURE=-1 OS_STDERR_CAPTURE=-1 OS_TEST_TIMEOUT=500 OS_TEST_LOCK_PATH=${TMPDIR:-'/tmp'} \
+  python -m subunit.run discover -t ./ ./ec2api/tests/functional | subunit-2to1 | tools/colorizer.py
 RETVAL=$?
 
 # Here can be some commands for log archiving, etc...
