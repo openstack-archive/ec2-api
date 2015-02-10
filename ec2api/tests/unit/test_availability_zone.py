@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import mock
+
+from ec2api.api import availability_zone
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -50,3 +53,62 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.assertEqual(resp['regionInfo'][0]['regionName'], 'nova')
         self.assertTrue(resp['regionInfo'][0].get('regionEndpoint')
                         is not None)
+
+    def test_describe_account_attributes(self):
+        self.nova_quotas.get.return_value = mock.Mock(instances=77)
+
+        availability_zone.account_attribute_engine = (
+            availability_zone.AccountAttributeEngineNeutron())
+        resp = self.execute('DescribeAccountAttributes', {})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['accountAttributeSet'],
+                        matchers.ListMatches(
+                            [{'attributeName': 'supported-platforms',
+                              'attributeValueSet': [
+                                  {'attributeValue': 'EC2'},
+                                  {'attributeValue': 'VPC'}]},
+                             {'attributeName': 'default-vpc',
+                              'attributeValueSet': [
+                                  {'attributeValue': 'none'}]},
+                             {'attributeName': 'max-instances',
+                              'attributeValueSet': [
+                                  {'attributeValue': 77}]}],
+                            orderless_lists=True))
+        self.nova_quotas.get.assert_called_once_with(
+            fakes.ID_OS_PROJECT, fakes.ID_OS_USER)
+
+        availability_zone.account_attribute_engine = (
+            availability_zone.AccountAttributeEngineNova())
+        resp = self.execute('DescribeAccountAttributes', {})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['accountAttributeSet'],
+                        matchers.ListMatches(
+                            [{'attributeName': 'supported-platforms',
+                              'attributeValueSet': [
+                                  {'attributeValue': 'EC2'}]},
+                             {'attributeName': 'default-vpc',
+                              'attributeValueSet': [
+                                  {'attributeValue': 'none'}]},
+                             {'attributeName': 'max-instances',
+                              'attributeValueSet': [
+                                  {'attributeValue': 77}]}],
+                            orderless_lists=True))
+
+        resp = self.execute('DescribeAccountAttributes',
+                            {'AttributeName.1': 'default-vpc',
+                             'AttributeName.2': 'max-instances'})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertThat(resp['accountAttributeSet'],
+                        matchers.ListMatches(
+                            [{'attributeName': 'default-vpc',
+                              'attributeValueSet': [
+                                  {'attributeValue': 'none'}]},
+                             {'attributeName': 'max-instances',
+                              'attributeValueSet': [
+                                  {'attributeValue': 77}]}],
+                            orderless_lists=True))
+
+        resp = self.execute('DescribeAccountAttributes',
+                            {'AttributeName.1': 'fake'})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('InvalidParameter', resp['Error']['Code'])

@@ -16,6 +16,7 @@ from oslo.config import cfg
 
 from ec2api.api import clients
 from ec2api.api import common
+from ec2api import exception
 from ec2api.openstack.common import log as logging
 from ec2api import utils
 
@@ -49,11 +50,21 @@ CONF = cfg.CONF
 CONF.register_opts(availability_zone_opts)
 LOG = logging.getLogger(__name__)
 
-"""Availability zones and regions related API implementation
+"""Availability zones, regions, account attributes related API implementation
 """
+# TODO(ft): implement messages, regionName AvailabilityZone properties
+# TODO(ft): implement vpc-max-security-groups-per-interface, max-elastic-ips,
+# vpc-max-elastic-ips Account Attributes
 
 
 Validator = common.Validator
+
+
+def get_account_attribute_engine():
+    if CONF.full_vpc_support:
+        return AccountAttributeEngineNeutron()
+    else:
+        return AccountAttributeEngineNova()
 
 
 class AvailabilityZoneDescriber(common.UniversalDescriber):
@@ -120,12 +131,42 @@ def describe_regions(context, region_name=None, filter=None):
     return {'regionInfo': regions}
 
 
+def describe_account_attributes(context, attribute_name=None):
+    def get_max_instances():
+        nova = clients.nova(context)
+        quotas = nova.quotas.get(context.project_id, context.user_id)
+        return quotas.instances
+
+    attribute_getters = {
+        'supported-platforms': (
+            account_attribute_engine.get_supported_platforms),
+        'default-vpc': account_attribute_engine.get_default_vpc,
+        'max-instances': get_max_instances,
+    }
+
+    formatted_attributes = []
+    for attribute in (attribute_name or attribute_getters):
+        if attribute not in attribute_getters:
+            raise exception.InvalidParameter(name=attribute)
+        formatted_attributes.append(
+            _format_account_attribute(attribute,
+                                      attribute_getters[attribute]()))
+    return {'accountAttributeSet': formatted_attributes}
+
+
 def _format_availability_zone(zone):
     return {'zoneName': zone.zoneName,
             'zoneState': ('available'
                           if zone.zoneState.get('available')
                           else 'unavailable')
             }
+
+
+def _format_account_attribute(attribute, value):
+    if not isinstance(value, list):
+        value = [value]
+    return {'attributeName': attribute,
+            'attributeValueSet': [{'attributeValue': val} for val in value]}
 
 
 # NOTE(Alex): Openstack extension, AWS-incompability
@@ -152,3 +193,24 @@ def _describe_verbose(context):
                                                  values['updated_at']))})
 
     return {'availabilityZoneInfo': formatted_availability_zones}
+
+
+class AccountAttributeEngineNeutron(object):
+
+    def get_supported_platforms(self):
+        return ['EC2', 'VPC']
+
+    def get_default_vpc(self):
+        return 'none'
+
+
+class AccountAttributeEngineNova(object):
+
+    def get_supported_platforms(self):
+        return ['EC2']
+
+    def get_default_vpc(self):
+        return 'none'
+
+
+account_attribute_engine = get_account_attribute_engine()

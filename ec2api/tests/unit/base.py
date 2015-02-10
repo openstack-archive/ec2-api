@@ -53,6 +53,7 @@ class ApiTestCase(test_base.BaseTestCase):
         self.nova_security_group_rules = (
             nova_mock.return_value.security_group_rules)
         self.nova_volumes = nova_mock.return_value.volumes
+        self.nova_quotas = nova_mock.return_value.quotas
         self.addCleanup(nova_patcher.stop)
 
         glance_patcher = mock.patch('glanceclient.client.Client')

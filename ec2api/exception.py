@@ -288,6 +288,10 @@ class MissingParameter(Invalid):
     msg_fmt = _("The required parameter '%(param)s' is missing")
 
 
+class InvalidParameter(Invalid):
+    msg_fmt = _("The property '%(name)s' is not valid")
+
+
 class InvalidParameterValue(Invalid):
     msg_fmt = _("Value (%(value)s) for parameter %(parameter)s is invalid. "
                 "%(reason)s")

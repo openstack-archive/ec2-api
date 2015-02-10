@@ -320,7 +320,7 @@ class CloudController(object):
     @module_and_param_types(security_group, 'sg_id',
                             'security_group_str', 'dummy')
     def revoke_security_group_ingress(self, context, group_id=None,
-                                         group_name=None, ip_permissions=None):
+                                      group_name=None, ip_permissions=None):
         """Removes one or more ingress rules from a security group.
 
         Args:
@@ -357,7 +357,7 @@ class CloudController(object):
 
     @module_and_param_types(security_group, 'sg_id', 'dummy')
     def revoke_security_group_egress(self, context, group_id,
-                                        ip_permissions=None):
+                                     ip_permissions=None):
         """Removes one or more egress rules from a security group for EC2-VPC.
 
         Args:
@@ -674,6 +674,23 @@ class CloudController(object):
 
         Returns:
             Specified regions.
+        """
+
+    @module_and_param_types(availability_zone, 'strs')
+    def describe_account_attributes(self, context, attribute_name=None):
+        """Describes attributes of your EC2 account.
+
+        Args:
+            context (RequestContext): The request context.
+            attribute_name (list of str): One or more account attribute names.
+                The following are the supported account attributes:
+                    supported-platforms | default-vpc | max-instances |
+                    vpc-max-security-groups-per-interface (unsupported now) |
+                    max-elastic-ips (unsupported now) |
+                    vpc-max-elastic-ips (unsupported now)
+
+        Returns:
+            Information about one or more account attributes.
         """
 
     @module_and_param_types(instance, 'i_id')
@@ -1606,8 +1623,8 @@ class VpcCloudController(CloudController):
         Returns:
             A list of network interfaces.
         """
-        return network_interface.describe_network_interfaces(context,
-                                                network_interface_id, filter)
+        return network_interface.describe_network_interfaces(
+                                    context, network_interface_id, filter)
 
     @module_and_param_types(network_interface, 'eni_id',
                             'str')
@@ -1635,10 +1652,10 @@ class VpcCloudController(CloudController):
                             'bool',
                             'sg_ids')
     def modify_network_interface_attribute(self, context,
-                                             network_interface_id,
-                                             description=None,
-                                             source_dest_check=None,
-                                             security_group_id=None):
+                                           network_interface_id,
+                                           description=None,
+                                           source_dest_check=None,
+                                           security_group_id=None):
         """Modifies the specified attribute of the specified network interface.
 
 
@@ -1661,8 +1678,8 @@ class VpcCloudController(CloudController):
     @module_and_param_types(network_interface, 'eni_id',
                             'str')
     def reset_network_interface_attribute(self, context,
-                                             network_interface_id,
-                                             attribute):
+                                          network_interface_id,
+                                          attribute):
         """Resets the specified attribute of the specified network interface.
 
 
