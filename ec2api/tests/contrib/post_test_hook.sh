@@ -23,6 +23,10 @@ export TEST_CONFIG="functional_tests.conf"
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
 IMAGE_ID=$(euca-describe-images | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
+VPC_ENABLED="False"
+if [[ $DEVSTACK_GATE_NEUTRON -eq "1" ]]; then
+  VPC_ENABLED="True"
+fi
 
   sudo bash -c "cat > $TEST_CONFIG_DIR/$TEST_CONFIG <<EOF
 [aws]
@@ -30,6 +34,7 @@ ec2_url = $EC2_URL
 aws_access = $EC2_ACCESS_KEY
 aws_secret = $EC2_SECRET_KEY
 image_id = $IMAGE_ID
+vpc_enabled = $VPC_ENABLED
 EOF"
 fi
 

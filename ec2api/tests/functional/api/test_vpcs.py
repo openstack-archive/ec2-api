@@ -23,6 +23,13 @@ CONF = config.CONF
 
 class VPCTest(base.EC2TestCase):
 
+    @classmethod
+    @base.safe_setup
+    def setUpClass(cls):
+        super(VPCTest, cls).setUpClass()
+        if not CONF.aws.vpc_enabled:
+            raise cls.skipException('VPC is disabled')
+
     def test_create_delete_vpc(self):
         cidr = '10.1.0.0/16'
         resp, data = self.client.CreateVpc(CidrBlock=cidr)

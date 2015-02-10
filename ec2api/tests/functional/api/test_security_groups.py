@@ -35,6 +35,9 @@ class SecurityGroupTest(base.EC2TestCase):
     @base.safe_setup
     def setUpClass(cls):
         super(SecurityGroupTest, cls).setUpClass()
+        if not CONF.aws.vpc_enabled:
+            raise cls.skipException('VPC is disabled')
+
         resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)
         if resp.status_code != 200:
             LOG.error(base.EC2ErrorConverter(data))

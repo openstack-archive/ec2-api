@@ -18,14 +18,20 @@ import time
 from tempest_lib.openstack.common import log
 
 from ec2api.tests.functional import base
+from ec2api.tests.functional import config
 
+CONF = config.CONF
 LOG = log.getLogger(__name__)
 
 
 class DhcpOptionsTest(base.EC2TestCase):
 
-    VPC_CIDR = '10.12.0.0/24'
-    vpc_id = None
+    @classmethod
+    @base.safe_setup
+    def setUpClass(cls):
+        super(DhcpOptionsTest, cls).setUpClass()
+        if not CONF.aws.vpc_enabled:
+            raise cls.skipException('VPC is disabled')
 
     def test_create_delete_dhcp_options(self):
         kwargs = {
