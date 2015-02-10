@@ -112,12 +112,11 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
     def get_os_items(self):
         if self.all_db_items == None:
             self.all_db_items = ec2utils.get_db_items(self.context, 'sg', None)
-            self.os_ids_in_db = set(g['os_id'] for g in self.all_db_items)
         os_groups = security_group_engine.get_os_groups(self.context)
         for os_group in os_groups:
-            if (os_group['name'].startswith('vpc-') and
-                    os_group['id'] in self.os_ids_in_db):
-                os_group['name'] = 'default'
+            os_group['name'] = _translate_group_name(self.context,
+                                                     os_group,
+                                                     self.all_db_items)
         return os_groups
 
 
@@ -284,6 +283,19 @@ def _revoke_security_group(context, group_id, group_name, ip_permissions,
     return True
 
 
+def _translate_group_name(context, os_group, db_groups):
+    # NOTE(Alex): This function translates VPC default group names
+    # from vpc id 'vpc-xxxxxxxx' format to 'default'. It's supposed
+    # to be called right after getting security groups from OpenStack
+    # in order to avoid problems with incoming 'default' name value
+    # in all of the subsequent handling (filtering, using in parameters...)
+    if (os_group['name'].startswith('vpc-') and db_groups and
+            next((g for g in db_groups
+                  if g['os_id'] == os_group['id']))):
+        return 'default'
+    return os_group['name']
+
+
 def _format_security_groups_ids_names(context):
     neutron = clients.neutron(context)
     os_security_groups = neutron.list_security_groups()['security_groups']
@@ -296,7 +308,9 @@ def _format_security_groups_ids_names(context):
             continue
         ec2_security_groups[os_security_group['id']] = (
             {'groupId': security_group['id'],
-             'groupName': os_security_group['name']})
+             'groupName': _translate_group_name(context,
+                                                os_security_group,
+                                                security_groups)})
     return ec2_security_groups
 
 
