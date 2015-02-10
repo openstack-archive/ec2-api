@@ -919,8 +919,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.get_items_by_ids.assert_called_once_with(
             mock.ANY, 'i', set([fakes.ID_EC2_INSTANCE_1]))
         (self.network_interface_api.describe_network_interfaces.
-         assert_called_with(
-            mock.ANY, network_interface_id=[fakes.ID_EC2_NETWORK_INTERFACE_2]))
+         assert_called_with(mock.ANY))
 
         self.check_filtering(
             'DescribeInstances', 'reservationSet',

@@ -863,20 +863,23 @@ class InstanceEngineNeutron(object):
                                    image_ids={os_image.id: image_id})
 
     def get_ec2_network_interfaces(self, context, instance_ids=None):
-        ec2_network_interfaces = collections.defaultdict(list)
-        if not instance_ids:
-            network_interface_ids = None
-        else:
-            # TODO(ft): implement search db items in DB layer
-            network_interface_ids = [
-                    eni['id'] for eni in db_api.get_items(context, 'eni')
-                    if eni.get('instance_id') in instance_ids]
+        # NOTE(ft): we would be glad to use filters with this describe
+        # operation, but:
+        # 1. A selective filter by network interface IDs is improper because
+        # it leads to rising NotFound exception if at least one of specified
+        # network interfaces is obsolete. This is the legal case of describing
+        # an instance after its terminating.
+        # 2. A general filter by instance ID is unsupported now.
+        # 3. A general filter by network interface IDs leads to additional
+        # call of DB here to get corresponding network interfaces, but doesn't
+        # lead to decrease DB and OS throughtput in called describe operation.
         enis = network_interface_api.describe_network_interfaces(
-                context,
-                network_interface_id=network_interface_ids
-                )['networkInterfaceSet']
+                context)['networkInterfaceSet']
+        ec2_network_interfaces = collections.defaultdict(list)
         for eni in enis:
-            if eni['status'] == 'in-use':
+            if (eni['status'] == 'in-use' and
+                    (not instance_ids or
+                     eni['attachment']['instanceId'] in instance_ids)):
                 ec2_network_interfaces[
                     eni['attachment']['instanceId']].append(eni)
         return ec2_network_interfaces
