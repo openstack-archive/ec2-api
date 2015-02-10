@@ -363,6 +363,10 @@ class SecurityGroupLimitExceeded(Overlimit):
     msg_fmt = _('You have reached the limit of security groups')
 
 
+class AddressLimitExceeded(Overlimit):
+    msg_fmt = _('The maximum number of addresses has been reached.')
+
+
 class ImageNotActive(Invalid):
     ec2_code = 'InvalidAMIID.Unavailable'
     # TODO(ft): Change the message with the real AWS message
