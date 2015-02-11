@@ -397,7 +397,6 @@ def _format_route_table(context, route_table, is_main=False,
     vpc_id = route_table['vpc_id']
     ec2_route_table = {'routeTableId': route_table['id'],
                        'vpcId': vpc_id,
-                       # TODO(ft): propagationVgwSet
                        'routeSet': [],
                        # NOTE(ft): AWS returns empty tag set for a route table
                        # if no tag exists

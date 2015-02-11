@@ -87,8 +87,7 @@ def create_dhcp_options(context, dhcp_configuration):
             dhcp_options[key] = values
     dhcp_options = db_api.add_item(context, 'dopt',
                                    {'dhcp_configuration': dhcp_options})
-    return {'dhcpOptions':
-                _format_dhcp_options(context, dhcp_options)}
+    return {'dhcpOptions': _format_dhcp_options(context, dhcp_options)}
 
 
 def delete_dhcp_options(context, dhcp_options_id):
