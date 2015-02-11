@@ -30,7 +30,7 @@ class DhcpOptionsTest(base.EC2TestCase):
     @base.safe_setup
     def setUpClass(cls):
         super(DhcpOptionsTest, cls).setUpClass()
-        if not CONF.aws.vpc_enabled:
+        if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
     def test_create_delete_dhcp_options(self):

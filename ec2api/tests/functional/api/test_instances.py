@@ -36,7 +36,7 @@ class InstanceTest(base.EC2TestCase):
     @base.safe_setup
     def setUpClass(cls):
         super(InstanceTest, cls).setUpClass()
-        if not CONF.aws.vpc_enabled:
+        if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
         if not CONF.aws.image_id:
             raise cls.skipException('aws image_id does not provided')

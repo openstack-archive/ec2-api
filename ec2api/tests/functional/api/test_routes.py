@@ -32,7 +32,7 @@ class RouteTest(base.EC2TestCase):
     @base.safe_setup
     def setUpClass(cls):
         super(RouteTest, cls).setUpClass()
-        if not CONF.aws.vpc_enabled:
+        if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
         resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)

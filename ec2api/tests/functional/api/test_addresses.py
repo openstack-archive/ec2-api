@@ -16,7 +16,6 @@
 import time
 
 from tempest_lib.openstack.common import log
-import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -27,7 +26,7 @@ LOG = log.getLogger(__name__)
 
 class AddressTest(base.EC2TestCase):
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests, "VPC is disabled")
+    @base.skip_without_vpc()
     def test_create_delete_vpc_address(self):
         kwargs = {
             'Domain': 'vpc',
@@ -54,7 +53,7 @@ class AddressTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests, "VPC is disabled")
+    @base.skip_without_vpc()
     def test_invalid_delete_vpc_address(self):
         kwargs = {
             'Domain': 'vpc',
@@ -106,12 +105,18 @@ class AddressTest(base.EC2TestCase):
         }
         resp, data = self.client.AllocateAddress(*[], **kwargs)
         if resp.status_code == 200:
-            self.addResourceCleanUp(self.client.ReleaseAddress,
-                                    AllocationId=data['AllocationId'])
+            allocation_id = data.get('AllocationId')
+            if allocation_id:
+                self.addResourceCleanUp(self.client.ReleaseAddress,
+                                        AllocationId=allocation_id)
+            else:
+                public_ip = data.get('PublicIp')
+                self.addResourceCleanUp(self.client.ReleaseAddress,
+                                        PublicIp=public_ip)
         self.assertEqual(400, resp.status_code)
         self.assertEqual('InvalidParameterValue', data['Error']['Code'])
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests, "VPC is disabled")
+    @base.skip_without_vpc()
     def test_describe_vpc_addresses(self):
         resp, data = self.client.DescribeAddresses(*[], **{})
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -239,7 +244,7 @@ class AddressTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests, "VPC is disabled")
+    @base.skip_without_vpc()
     def test_associate_disassociate_vpc_addresses(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id

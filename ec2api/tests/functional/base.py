@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import functools
 import logging
 import random
 import sys
@@ -46,27 +47,6 @@ def rand_name(name=''):
         return randbits
 
 
-def safe_setup(f):
-    """A decorator used to wrap the setUpClass for safe setup."""
-
-    def decorator(cls):
-            try:
-                f(cls)
-            except Exception as se:
-                etype, value, trace = sys.exc_info()
-                LOG.exception("setUpClass failed: %s" % se)
-                try:
-                    cls.tearDownClass()
-                except Exception as te:
-                    LOG.exception("tearDownClass failed: %s" % te)
-                try:
-                    raise etype(value), None, trace
-                finally:
-                    del trace  # for avoiding circular refs
-
-    return decorator
-
-
 class EC2ErrorConverter(object):
 
     _data = ''
@@ -91,6 +71,9 @@ class EC2ResponceException(Exception):
     def __init__(self, resp, data):
         self.resp = resp
         self.data = data
+
+    def __str__(self):
+        return str(self.data)
 
 
 class EC2Waiter(object):
@@ -185,6 +168,69 @@ class EC2Waiter(object):
             interval += self.default_check_interval
 
 
+def safe_setup(f):
+    """A decorator used to wrap the setUpClass for safe setup."""
+
+    def decorator(cls):
+            try:
+                f(cls)
+            except Exception as se:
+                etype, value, trace = sys.exc_info()
+                LOG.exception("setUpClass failed: %s" % se)
+                try:
+                    cls.tearDownClass()
+                except Exception as te:
+                    LOG.exception("tearDownClass failed: %s" % te)
+                try:
+                    raise etype(value), None, trace
+                finally:
+                    del trace  # for avoiding circular refs
+
+    return decorator
+
+
+class TesterStateHolder(object):
+
+    ec2_client = None
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(TesterStateHolder, cls).__new__(
+                cls, *args, **kwargs)
+        return cls._instance
+
+    _vpc_enabled = None
+
+    def get_vpc_enabled(self):
+        if self._vpc_enabled:
+            return self._vpc_enabled
+
+        self._vpc_enabled = False
+        resp, data = self.ec2_client.DescribeAccountAttributes()
+        if resp.status_code == 200:
+            for item in data.get('AccountAttributes', []):
+                if item['AttributeName'] == 'supported-platforms':
+                    for value in item['AttributeValues']:
+                        if value['AttributeValue'] == 'VPC':
+                            self._vpc_enabled = True
+
+        return self._vpc_enabled
+
+
+def skip_without_vpc(*args, **kwargs):
+    """A decorator useful to skip tests if VPC is not supported."""
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *func_args, **func_kwargs):
+            if not TesterStateHolder().get_vpc_enabled():
+                msg = "Skipped because VPC is disabled"
+                raise testtools.TestCase.skipException(msg)
+            return f(self, *func_args, **func_kwargs)
+        return wrapper
+    return decorator
+
+
 class EC2TestCase(base.BaseTestCase):
     """Recommended to use as base class for boto related test."""
 
@@ -198,6 +244,7 @@ class EC2TestCase(base.BaseTestCase):
     def setUpClass(cls):
         super(EC2TestCase, cls).setUpClass()
         cls.client = botocoreclient.APIClientEC2()
+        TesterStateHolder().ec2_client = cls.client
 
     @classmethod
     def addResourceCleanUpStatic(cls, function, *args, **kwargs):
