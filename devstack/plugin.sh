@@ -193,6 +193,16 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE database connection_nova `database_connection_url nova`
 
     configure_ec2api_networking
+
+    # metadata configuring
+    if [[ ,${ENABLED_SERVICES} =~ ,"q-" ]]; then
+        # with neutron
+        iniset $Q_META_CONF_FILE DEFAULT nova_metadata_port 8789
+    else
+        # with nova-network
+        iniset $NOVA_CONF DEFAULT metadata_port 8789
+        iniset $NOVA_CONF neutron service_metadata_proxy True
+    fi
 }
 
 
@@ -217,6 +227,7 @@ function install_ec2api() {
 # start_ec2api() - Start running processes, including screen
 function start_ec2api() {
     screen_it ec2-api "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api --config-file $EC2API_CONF_DIR/ec2api.conf"
+    screen_it ec2-api-metadata "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api-metadata --config-file $EC2API_CONF_DIR/ec2api.conf"
 }
 
 
@@ -224,6 +235,7 @@ function start_ec2api() {
 function stop_ec2api() {
     # Kill the ec2api screen windows
     screen -S $SCREEN_NAME -p ec2-api -X kill
+    screen -S $SCREEN_NAME -p ec2-api-metadata -X kill
 }
 
 function cleanup_ec2api() {
