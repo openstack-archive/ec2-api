@@ -79,11 +79,103 @@ aws --endpoint-url http://10.0.2.15:8788/services/Cloud ec2 describe-instances
 Limitations
 ===========
 
-VPN-related and ACL-related functionality is not supported.
-Default VPC Security Groups had to be named "Default" instead of Amazon's
-"default" due to conflict with OpenStack's default groups.
-DryRun option is not supported.
-Some exceptions are not exactly the same as reported by AWS.
+General:
+- DryRun option is not supported.
+- Some exceptions are not exactly the same as reported by AWS.
+
+Not supported functionality features:
+- VPN
+- Network ACL
+- VPC Peering connection
+- Classic Link
+- Reserved Instances
+- Spot Instances
+- Placement Groups
+- Monitoring Instances and Volumes
+- Instances Tasks - Bundle, Export, Import
+
+Availability zone related:
+- messages AvailabilityZone property
+- regionName AvailabilityZone property
+
+Image related:
+- CopyImage
+- ResetImageAttribute
+- creationDate  Image property
+- platform Image property
+- productCodes Image property
+- description Image property
+- hypervisor Image property
+- imageOwnerAlias Image property
+- sriovNetSupport Image property
+- stateReason Image property
+- virtualizationType Image property
+- encrypted EbsBlockDevice property
+- iops EbsBlockDevice property
+- volumeType EbsBlockDevice property
+- selective filtering by Image Owner
+
+Instance related:
+- DescribeInstanceStatus
+- ReportInstanceStatus
+- ModifyInstanceAttribute
+- ResetInstanceAttribute
+- productCodes Instance property
+- sourceDestCheck Instance property
+- ebsOptimized Instance property
+- sriovNetSupport Instance property
+- monitoring Instance property
+- placement Instance property
+- platform Instance property
+- publicDnsName Instance property
+- stateTransitionReason Instance property
+- architecture Instance property
+- ebsOptimized Instance property
+- hypervisor Instance property
+- iamInstanceProfile Instance property
+- instanceLifecycle Instance property
+- spotInstanceRequestId Instance property
+- stateReason Instance property
+- virtualizationType Instance property
+- attachTime EbsInstanceBlockDevice property
+
+Network interface related:
+- availabilityZone NetworkInterface property
+- deleteOnTermination (modification is not supported)
+
+Snapshot related:
+- CopySnapshot
+- ModifySnapshotAttribute
+- ResetSnapshotAttribute
+- encryption Snapshot property
+- kmsKeyId Snapshot property
+- ownerAlias Snapshot property
+- selective filtering by Snapshot Owner, RestorableBy
+
+Subnet related:
+- ModifySubnetAttribute
+- availabilityZone Subnet property
+- defaultForAz Subnet property
+- mapPublicIpOnLaunch Subnet property
+
+Volume related:
+- DescribeVolumeAttribute
+- DescribeVolumeStatus
+- ModifyVolumeAttribute
+- kmsKeyId Volume property
+- iops Volume property
+- deleteOnTermination property (supported for describing instances only)
+- volumeType (current implementation isn't AWS compatible) Volume property
+
+VPC related:
+- describeVpcAttribute
+- modifyVpcAttribute
+- instanceTenancy VPC property
+
+DescribeAccountAttributes result properties:
+- pc-max-security-groups-per-interface AccountAttribute property
+- max-elastic-ips AccountAttribute property
+- vpc-max-elastic-ips AccountAttribute property
 
 Supported Features
 ==================
