@@ -35,8 +35,6 @@ LOG = logging.getLogger(__name__)
 
 """VPC-object related API implementation
 """
-# TODO(ft): implement DescribeVpcAttribute, ModifyVpcAttribute API methods
-# TODO(ft): implement 'instanceTenancy' VPC property
 
 
 Validator = common.Validator
@@ -138,5 +136,4 @@ def _format_vpc(vpc):
             'cidrBlock': vpc['cidr_block'],
             'isDefault': 'false',
             'dhcpOptionsId': vpc.get('dhcp_options_id', 'default'),
-            # 'instanceTenancy': 'default', #TODO(Alex) implement
             }

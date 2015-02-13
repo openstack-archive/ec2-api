@@ -400,7 +400,7 @@ def describe_instance_attribute(context, instance_id, attribute):
         'ramdisk': _format_attr_ramdisk,
         'rootDeviceName': _format_attr_root_device_name,
         'userData': _format_attr_user_data,
-        }
+    }
 
     fn = attribute_formatter.get(attribute)
     if fn is None:
@@ -541,7 +541,8 @@ def _format_instance(context, instance, os_instance, novadb_instance,
         ec2_instance['ipAddress'] = floating_ip
 
     if context.is_admin:
-        ec2_instance['keyName'] = '%s (%s, %s)' % (ec2_instance['keyName'],
+        ec2_instance['keyName'] = '%s (%s, %s)' % (
+            ec2_instance['keyName'],
             os_instance.tenant_id,
             getattr(os_instance, 'OS-EXT-SRV-ATTR:host'))
     return ec2_instance
@@ -663,11 +664,11 @@ def _format_group_set(context, os_security_groups):
 def _get_ip_info_for_instance(os_instance):
     addresses = list(itertools.chain(*os_instance.addresses.itervalues()))
     fixed_ip = next((addr['addr'] for addr in addresses
-                     if addr['version'] == 4 and
-                            addr['OS-EXT-IPS:type'] == 'fixed'), None)
+                     if (addr['version'] == 4 and
+                         addr['OS-EXT-IPS:type'] == 'fixed')), None)
     fixed_ip6 = next((addr['addr'] for addr in addresses
-                      if addr['version'] == 6 and
-                            addr['OS-EXT-IPS:type'] == 'fixed'), None)
+                      if (addr['version'] == 6 and
+                          addr['OS-EXT-IPS:type'] == 'fixed')), None)
     floating_ip = next((addr['addr'] for addr in addresses
                         if addr['OS-EXT-IPS:type'] == 'floating'), None)
     return fixed_ip, fixed_ip6, floating_ip
@@ -895,20 +896,20 @@ class InstanceEngineNeutron(object):
         if ((subnet_id or private_ip_address or security_group_ids or
                 security_group_names) and
                 (len(network_interfaces) > 1 or
-                # NOTE(ft): the only case in AWS when simple subnet_id
-                # and/or private_ip_address parameters are compatible with
-                # network_interface parameter is default behavior change of
-                # public IP association for passed subnet_id by specifying
-                # the only element in network_interfaces:
-                # {"device_index": 0,
-                #  "associate_public_ip_address": <boolean>}
-                # Both keys must be in the dict, and no other keys
-                # are allowed
-                # We should support such combination of parameters for
-                # compatibility purposes, even if we ignore
-                # associate_public_ip_address in all other code
-                len(network_interfaces) == 1 and
-                    (len(network_interfaces[0]) != 2 or
+                 # NOTE(ft): the only case in AWS when simple subnet_id
+                 # and/or private_ip_address parameters are compatible with
+                 # network_interface parameter is default behavior change of
+                 # public IP association for passed subnet_id by specifying
+                 # the only element in network_interfaces:
+                 # {"device_index": 0,
+                 #  "associate_public_ip_address": <boolean>}
+                 # Both keys must be in the dict, and no other keys
+                 # are allowed
+                 # We should support such combination of parameters for
+                 # compatibility purposes, even if we ignore
+                 # associate_public_ip_address in all other code
+                 len(network_interfaces) == 1 and
+                 (len(network_interfaces[0]) != 2 or
                      'associate_public_ip_address' not in network_interfaces[0]
                      or network_interfaces[0].get('device_index') != 0))):
             msg = _(' Network interfaces and an instance-level subnet ID or '
@@ -1060,7 +1061,7 @@ class InstanceEngineNeutron(object):
             context,
             filter=[{'name': 'vpc-id', 'value': [vpc_id]},
                     {'name': 'group-name', 'value': ['default']}]
-            )['securityGroupInfo']
+        )['securityGroupInfo']
         security_groups = [ec2utils.get_db_item(context, 'sg',
                                                 default_group['groupId'])
                            for default_group in default_groups]

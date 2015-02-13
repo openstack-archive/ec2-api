@@ -34,8 +34,6 @@ LOG = logging.getLogger(__name__)
 
 """Subnet related API implementation
 """
-# TODO(ft): implement ModifySubnetAttribute method
-# TODO(ft): implement 'availabilityZone' property
 
 
 Validator = common.Validator
@@ -194,6 +192,5 @@ def _format_subnet(context, subnet, os_subnet, os_network, os_ports):
         'cidrBlock': os_subnet['cidr'],
         'defaultForAz': 'false',
         'mapPublicIpOnLaunch': 'false',
-        # 'availabilityZone' = 'nova' # TODO(Alex) implement
         'availableIpAddressCount': ip_count
     }

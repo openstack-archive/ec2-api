@@ -52,9 +52,6 @@ LOG = logging.getLogger(__name__)
 
 """Availability zones, regions, account attributes related API implementation
 """
-# TODO(ft): implement messages, regionName AvailabilityZone properties
-# TODO(ft): implement vpc-max-security-groups-per-interface, max-elastic-ips,
-# vpc-max-elastic-ips Account Attributes
 
 
 Validator = common.Validator

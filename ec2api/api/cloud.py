@@ -67,7 +67,7 @@ def module_and_param_types(module, *args, **kwargs):
                     validator = module.Validator(param_name, func.func_name,
                                                  params)
                     validation_func = getattr(validator, param_type)
-                    is_valid = validation_func(param_value)
+                    validation_func(param_value)
                     param_num += 1
                 elif param_num < mandatory_params_num:
                     raise exception.MissingParameter(param=param_name)

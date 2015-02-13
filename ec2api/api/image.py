@@ -53,13 +53,13 @@ s3_opts = [
                default=3333,
                help='Port used when accessing the S3 api'),
     cfg.BoolOpt('s3_use_ssl',
-               default=False,
-               help='Whether to use SSL when talking to S3'),
+                default=False,
+                help='Whether to use SSL when talking to S3'),
     cfg.BoolOpt('s3_affix_tenant',
-               default=False,
-               help='Whether to affix the tenant id to the access key '
-                    'when downloading from S3'),
-    ]
+                default=False,
+                help='Whether to affix the tenant id to the access key '
+                     'when downloading from S3'),
+]
 
 CONF = cfg.CONF
 CONF.register_opts(s3_opts)
@@ -254,8 +254,9 @@ class ImageDescriber(common.TaggableItemsDescriber):
                                              for i in images)
             raise exception.InvalidAMIIDNotFound(id=next(iter(missed_ids)))
         self.images = images
-        self.snapshot_ids = dict((s['os_id'], s['id'])
-                              for s in db_api.get_items(self.context, 'snap'))
+        self.snapshot_ids = dict(
+            (s['os_id'], s['id'])
+            for s in db_api.get_items(self.context, 'snap'))
         self.local_images_os_ids = set(i['os_id']
                                        for i in itertools.chain(*local_images))
         self.ids_dict = {}
@@ -335,7 +336,7 @@ def describe_image_attribute(context, image_id, attribute):
         'ramdisk': _ramdisk_attribute,
         # NOTE(ft): Openstack extension, AWS-incompability
         'rootDeviceName': _root_device_name_attribute,
-        }
+    }
 
     # TODO(ft): AWS returns AuthFailure for not own public images,
     # but we return NotFound for this case because we search for local images

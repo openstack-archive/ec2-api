@@ -187,6 +187,5 @@ def _format_attachment(context, volume, os_volume, instances={},
                        'attached' if os_attachment else 'detached'),
             'volumeId': volume['id']}
     if not short:
-        # TODO(ft): receive delete_on_termination from instance BDM
         ec2_attachment['deleteOnTermination'] = False
     return ec2_attachment

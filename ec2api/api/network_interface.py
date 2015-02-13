@@ -99,7 +99,7 @@ def create_network_interface(context, subnet_id,
             context,
             filter=[{'name': 'vpc-id', 'value': [vpc_id]},
                     {'name': 'group-name', 'value': ['default']}]
-            )['securityGroupInfo']
+        )['securityGroupInfo']
         security_group_id = [default_group['groupId']
                              for default_group in default_groups]
     security_groups = [ec2utils.get_db_item(context, 'sg', ec2_id)
@@ -298,7 +298,8 @@ def modify_network_interface_attribute(context, network_interface_id,
                                        source_dest_check=None,
                                        security_group_id=None):
     # NOTE(Alex) Later more parameters will appear
-    params_count = (int(description is not None) +
+    params_count = (
+        int(description is not None) +
         int(source_dest_check is not None) +
         int(security_group_id is not None))
     if params_count != 1:
@@ -402,8 +403,6 @@ def _format_network_interface(context, network_interface, os_port,
     ec2_network_interface['subnetId'] = network_interface['subnet_id']
     ec2_network_interface['vpcId'] = network_interface['vpc_id']
     ec2_network_interface['description'] = network_interface['description']
-    # TODO(Alex) Implement
-    # ec2_network_interface['availabilityZone'] = ''
     ec2_network_interface['sourceDestCheck'] = (
         network_interface.get('source_dest_check', True))
     ec2_network_interface['requesterManaged'] = (
