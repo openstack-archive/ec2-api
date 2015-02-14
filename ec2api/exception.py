@@ -305,6 +305,10 @@ class UnsupportedOperation(Invalid):
     pass
 
 
+class OperationNotPermitted(Invalid):
+    pass
+
+
 class ResourceAlreadyAssociated(Invalid):
     ec2_code = 'Resource.AlreadyAssociated'
 

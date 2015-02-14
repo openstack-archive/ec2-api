@@ -17,7 +17,6 @@ import collections
 
 import netaddr
 from neutronclient.common import exceptions as neutron_exception
-from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
 from ec2api.api import address as address_api
@@ -73,13 +72,13 @@ def create_network_interface(context, subnet_id,
         if ip_address not in subnet_ipnet:
             raise exception.InvalidParameterValue(
                 value=str(ip_address),
-                parameter='private_ip_addresses',
+                parameter='PrivateIpAddresses',
                 reason='IP address is out of the subnet range')
         if ip.get('primary', False):
             if primary_ip is not None:
                 raise exception.InvalidParameterValue(
                     value=str(ip_address),
-                    parameter='private_ip_addresses',
+                    parameter='PrivateIpAddresses',
                     reason='More than one primary ip is supplied')
             else:
                 primary_ip = str(ip_address)
@@ -116,14 +115,19 @@ def create_network_interface(context, subnet_id,
         os_port_body['port']['fixed_ips'] = fixed_ips
         try:
             os_port = neutron.create_port(os_port_body)['port']
-        except neutron_exception.IpAddressGenerationFailureClient as e:
+        except (neutron_exception.IpAddressGenerationFailureClient,
+                neutron_exception.OverQuotaClient):
             raise exception.NetworkInterfaceLimitExceeded(
                         subnet_id=subnet_id)
-        except Exception as e:
-            raise exception.InvalidParameterValue(
-                value=description,
-                parameter='network_interface',
-                reason=e.message)
+        except (neutron_exception.IpAddressInUseClient,
+                neutron_exception.BadRequest) as ex:
+            # NOTE(ft): AWS returns InvalidIPAddress.InUse for a primary IP
+            # address, but InvalidParameterValue for secondary one.
+            # AWS returns PrivateIpAddressLimitExceeded, but Neutron does
+            # general InvalidInput (converted to BadRequest) in the same case.
+            msg = _('Specified network interface parameters are invalid. '
+                    'Reason: %(reason)s') % {'reason': ex.message}
+            raise exception.InvalidParameterValue(msg)
         cleaner.addCleanup(neutron.delete_port, os_port['id'])
         if primary_ip is None:
             primary_ip = os_port['fixed_ips'][0]['ip_address']
@@ -173,11 +177,7 @@ def delete_network_interface(context, network_interface_id):
                            network_interface)
         try:
             neutron.delete_port(network_interface['os_id'])
-        except neutron_exception.NeutronClientException:
-            # TODO(Alex): do log error
-            # TODO(Alex): adjust caught exception classes to catch:
-            # the port doesn't exist
-            # port is in use
+        except neutron_exception.PortNotFoundClient:
             pass
     return True
 
@@ -251,14 +251,28 @@ def assign_private_ip_addresses(context, network_interface_id,
             if netaddr.IPAddress(ip_address) not in subnet_ipnet:
                 raise exception.InvalidParameterValue(
                     value=str(ip_address),
-                    parameter='private_ip_address',
+                    parameter='PrivateIpAddress',
                     reason='IP address is out of the subnet range')
             fixed_ips.append({'ip_address': str(ip_address)})
     elif secondary_private_ip_address_count > 0:
         for _i in range(secondary_private_ip_address_count):
             fixed_ips.append({'subnet_id': os_subnet['id']})
-    os_port = neutron.update_port(os_port['id'],
-                                  {'port': {'fixed_ips': fixed_ips}})
+    try:
+        neutron.update_port(os_port['id'],
+                            {'port': {'fixed_ips': fixed_ips}})
+    except neutron_exception.IpAddressGenerationFailureClient:
+        raise exception.NetworkInterfaceLimitExceeded(
+                    subnet_id=subnet['id'])
+    except neutron_exception.IpAddressInUseClient:
+        msg = _('Some of %(addresses)s is assigned, but move is not '
+                'allowed.') % {'addresses': private_ip_address}
+        raise exception.InvalidParameterValue(msg)
+    except neutron_exception.BadRequest as ex:
+        # NOTE(ft):AWS returns PrivateIpAddressLimitExceeded, but Neutron does
+        # general InvalidInput (converted to BadRequest) in the same case.
+        msg = _('Specified network interface parameters are invalid. '
+                'Reason: %(reason)s') % {'reason': ex.message}
+        raise exception.InvalidParameterValue(msg)
     return True
 
 
@@ -269,13 +283,17 @@ def unassign_private_ip_addresses(context, network_interface_id,
     if network_interface['private_ip_address'] in private_ip_address:
         raise exception.InvalidParameterValue(
                 value=str(network_interface['private_ip_address']),
-                parameter='private_ip_addresses',
+                parameter='PrivateIpAddresses',
                 reason='Primary IP address cannot be unassigned')
     neutron = clients.neutron(context)
     os_port = neutron.show_port(network_interface['os_id'])['port']
     fixed_ips = os_port['fixed_ips'] or []
     new_fixed_ips = [ip for ip in fixed_ips
                      if ip['ip_address'] not in private_ip_address]
+    if len(new_fixed_ips) + len(private_ip_address) != len(fixed_ips):
+        msg = _('Some of the specified addresses are not assigned to '
+                'interface %(id)s') % {'id': network_interface_id}
+        raise exception.InvalidParameterValue(msg)
     os_port = neutron.update_port(os_port['id'],
                                   {'port': {'fixed_ips': new_fixed_ips}})
     return True
@@ -312,17 +330,15 @@ def modify_network_interface_attribute(context, network_interface_id,
         network_interface['description'] = description
         db_api.update_item(context, network_interface)
     neutron = clients.neutron(context)
-    os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
     if security_group_id is not None:
         os_groups = [ec2utils.get_db_item(context, 'sg', ec2_id)['os_id']
                      for ec2_id in security_group_id]
-        os_port = neutron.update_port(os_port['id'],
-                                      {'port': {'security_groups': os_groups}})
+        neutron.update_port(network_interface['os_id'],
+                            {'port': {'security_groups': os_groups}})
     if source_dest_check is not None:
         allowed = [] if source_dest_check else [{'ip_address': '0.0.0.0/0'}]
-        os_port = neutron.update_port(
-            os_port['id'],
-            {'port': {'allowed_address_pairs': allowed}})
+        neutron.update_port(network_interface['os_id'],
+                            {'port': {'allowed_address_pairs': allowed}})
         network_interface['source_dest_check'] = source_dest_check
         db_api.update_item(context, network_interface)
     return True
@@ -347,13 +363,22 @@ def attach_network_interface(context, network_interface_id,
                              instance_id, device_index):
     network_interface = ec2utils.get_db_item(context, 'eni',
                                              network_interface_id)
-    neutron = clients.neutron(context)
+    if 'instance_id' in network_interface:
+        raise exception.InvalidParameterValue(
+            _("Network interface '%(id)s' is currently in use.") %
+            {'id': network_interface_id})
     os_instance_id = ec2utils.get_db_item(context, 'i', instance_id)['os_id']
     # TODO(Alex) Check that the instance is not yet attached to another VPC
     # TODO(Alex) Check that the instance is "our", not created via nova
     # (which means that it doesn't belong to any VPC and can't be attached)
-    # TODO(ft): Check that the instance doesn't have a network interface
-    # which is attached at device_index
+    if any(eni['device_index'] == device_index
+           for eni in db_api.get_items(context, 'eni')
+           if eni.get('instance_id') == instance_id):
+        raise exception.InvalidParameterValue(
+            _("Instance '%(id)s' already has an interface attached at "
+              "device index '%(index)s'.") % {'id': instance_id,
+                                              'index': device_index})
+    neutron = clients.neutron(context)
     os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
     nova = clients.nova(context)
     with common.OnCrashCleaner() as cleaner:
@@ -363,11 +388,8 @@ def attach_network_interface(context, network_interface_id,
                                        instance_id, device_index)
         cleaner.addCleanup(_detach_network_interface_item, context,
                            network_interface)
-        try:
-            nova.servers.interface_attach(os_instance_id, os_port['id'],
-                                          None, None)
-        except nova_exception.ClientException as e:
-            raise exception.IncorrectState(reason=e.message)
+        nova.servers.interface_attach(os_instance_id, os_port['id'],
+                                      None, None)
     return {'attachmentId': ec2utils.change_ec2_id_kind(
                     network_interface['id'], 'eni-attach')}
 
@@ -375,10 +397,11 @@ def attach_network_interface(context, network_interface_id,
 def detach_network_interface(context, attachment_id, force=None):
     network_interface = db_api.get_item_by_id(
             context, 'eni', ec2utils.change_ec2_id_kind(attachment_id, 'eni'))
-    if 'instance_id' not in network_interface:
+    if not network_interface or 'instance_id' not in network_interface:
         raise exception.InvalidAttachmentIDNotFound(id=attachment_id)
-    # TODO(Alex) Check that device index is not 0 (when we support it) and
-    # forbid detaching.
+    if network_interface['device_index'] == 0:
+        raise exception.OperationNotPermitted(
+            _('The network interface at device index 0 cannot be detached.'))
     neutron = clients.neutron(context)
     os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
     with common.OnCrashCleaner() as cleaner:

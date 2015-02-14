@@ -43,14 +43,14 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             if auto_ips:
                 self.neutron.create_port.assert_called_once_with(
                     {'port':
-                        {'network_id': fakes.OS_SUBNET_1['network_id'],
+                        {'network_id': fakes.ID_OS_NETWORK_1,
                          'fixed_ips':
                             [{'subnet_id': fakes.ID_OS_SUBNET_1}],
                          'security_groups': []}})
             else:
                 self.neutron.create_port.assert_called_once_with(
                     {'port':
-                        {'network_id': fakes.OS_SUBNET_1['network_id'],
+                        {'network_id': fakes.ID_OS_NETWORK_1,
                          'fixed_ips':
                             [{'ip_address': fakes.IP_NETWORK_INTERFACE_1}],
                          'security_groups': []}})
@@ -64,18 +64,17 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         resp = self.execute(
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_1,
-             'PrivateIpAddress':
-             fakes.EC2_NETWORK_INTERFACE_1['privateIpAddress'],
-                 'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_1})
+             'PrivateIpAddress': fakes.IP_NETWORK_INTERFACE_1,
+             'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_1})
         check_response(resp)
 
         resp = self.execute(
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_1,
-             'PrivateIpAddresses.1.PrivateIpAddress':
-                 fakes.EC2_NETWORK_INTERFACE_1['privateIpAddress'],
-                 'PrivateIpAddresses.1.Primary': True,
-                 'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_1})
+             'PrivateIpAddresses.1.PrivateIpAddress': (
+                    fakes.IP_NETWORK_INTERFACE_1),
+             'PrivateIpAddresses.1.Primary': True,
+             'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_1})
         check_response(resp)
 
         resp = self.execute(
@@ -136,33 +135,31 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              'SecondaryPrivateIpAddressCount': '3',
              'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_2})
         self.neutron.create_port.assert_called_once_with(
-            {'port': {'network_id': fakes.OS_SUBNET_2['network_id'],
-                      'fixed_ips': [
-                {'subnet_id': fakes.ID_OS_SUBNET_2},
-                {'subnet_id': fakes.ID_OS_SUBNET_2},
-                {'subnet_id': fakes.ID_OS_SUBNET_2}],
-                'security_groups': []}})
+            {'port': {'network_id': fakes.ID_OS_NETWORK_2,
+                      'fixed_ips': [{'subnet_id': fakes.ID_OS_SUBNET_2},
+                                    {'subnet_id': fakes.ID_OS_SUBNET_2},
+                                    {'subnet_id': fakes.ID_OS_SUBNET_2}],
+                      'security_groups': []}})
         check_response(resp)
 
         resp = self.execute(
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_2,
-             'PrivateIpAddress':
-             fakes.IPS_NETWORK_INTERFACE_2[0],
-                 'PrivateIpAddresses.1.PrivateIpAddress':
-                     fakes.IPS_NETWORK_INTERFACE_2[1],
-                 'PrivateIpAddresses.1.Primary': False,
-                 'PrivateIpAddresses.2.PrivateIpAddress':
-                     fakes.IPS_NETWORK_INTERFACE_2[2],
-                 'PrivateIpAddresses.2.Primary': False,
-                 'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_2})
+             'PrivateIpAddress': fakes.IPS_NETWORK_INTERFACE_2[0],
+             'PrivateIpAddresses.1.PrivateIpAddress':
+                 fakes.IPS_NETWORK_INTERFACE_2[1],
+             'PrivateIpAddresses.1.Primary': False,
+             'PrivateIpAddresses.2.PrivateIpAddress':
+                 fakes.IPS_NETWORK_INTERFACE_2[2],
+             'PrivateIpAddresses.2.Primary': False,
+             'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_2})
         self.neutron.create_port.assert_called_once_with(
             {'port':
-             {'network_id': fakes.OS_SUBNET_2['network_id'],
+             {'network_id': fakes.ID_OS_NETWORK_2,
               'fixed_ips': [
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[2]}],
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[2]}],
               'security_groups': []}})
         check_response(resp)
 
@@ -170,42 +167,41 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_2,
              'PrivateIpAddresses.1.PrivateIpAddress':
-             fakes.IPS_NETWORK_INTERFACE_2[0],
-                 'PrivateIpAddresses.1.Primary': True,
-                 'PrivateIpAddresses.2.PrivateIpAddress':
-                     fakes.IPS_NETWORK_INTERFACE_2[1],
-                 'PrivateIpAddresses.2.Primary': False,
-                 'PrivateIpAddresses.3.PrivateIpAddress':
-                     fakes.IPS_NETWORK_INTERFACE_2[2],
-                 'PrivateIpAddresses.3.Primary': False,
-                 'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_2})
+                 fakes.IPS_NETWORK_INTERFACE_2[0],
+             'PrivateIpAddresses.1.Primary': True,
+             'PrivateIpAddresses.2.PrivateIpAddress':
+                 fakes.IPS_NETWORK_INTERFACE_2[1],
+             'PrivateIpAddresses.2.Primary': False,
+             'PrivateIpAddresses.3.PrivateIpAddress':
+                 fakes.IPS_NETWORK_INTERFACE_2[2],
+             'PrivateIpAddresses.3.Primary': False,
+             'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_2})
         self.neutron.create_port.assert_called_once_with(
             {'port':
-             {'network_id': fakes.OS_SUBNET_2['network_id'],
+             {'network_id': fakes.ID_OS_NETWORK_2,
               'fixed_ips': [
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[2]}],
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[2]}],
               'security_groups': []}})
         check_response(resp)
 
         resp = self.execute(
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_2,
-             'PrivateIpAddress':
-             fakes.IPS_NETWORK_INTERFACE_2[0],
-                 'PrivateIpAddresses.1.PrivateIpAddress':
-                     fakes.IPS_NETWORK_INTERFACE_2[1],
-                 'PrivateIpAddresses.1.Primary': False,
-                 'SecondaryPrivateIpAddressCount': '1',
-                 'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_2})
+             'PrivateIpAddress': fakes.IPS_NETWORK_INTERFACE_2[0],
+             'PrivateIpAddresses.1.PrivateIpAddress':
+                 fakes.IPS_NETWORK_INTERFACE_2[1],
+             'PrivateIpAddresses.1.Primary': False,
+             'SecondaryPrivateIpAddressCount': '1',
+             'Description': fakes.DESCRIPTION_NETWORK_INTERFACE_2})
         self.neutron.create_port.assert_called_once_with(
             {'port':
-             {'network_id': fakes.OS_SUBNET_2['network_id'],
+             {'network_id': fakes.ID_OS_NETWORK_2,
               'fixed_ips': [
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
-                 {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
-                 {'subnet_id': fakes.ID_OS_SUBNET_2}],
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
+                  {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
+                  {'subnet_id': fakes.ID_OS_SUBNET_2}],
               'security_groups': []}})
         check_response(resp)
 
@@ -213,7 +209,6 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         def check_response(resp, error_code):
             self.assertEqual(400, resp['http_status_code'])
             self.assertEqual(error_code, resp['Error']['Code'])
-            self.assertEqual(0, self.neutron.create_port.call_count)
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
@@ -226,22 +221,30 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         check_response(resp, 'InvalidSubnetID.NotFound')
 
         self.db_api.get_item_by_id.return_value = fakes.DB_SUBNET_1
+        self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
         resp = self.execute(
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_1,
-             'PrivateIpAddress':
-             fakes.EC2_NETWORK_INTERFACE_2['privateIpAddress']})
+             'PrivateIpAddress': fakes.IP_NETWORK_INTERFACE_2})
         check_response(resp, 'InvalidParameterValue')
 
-        self.neutron.side_effect = (
-            neutron_exception.NeutronClientException())
-        self.neutron.create_port.return_value = {'port': fakes.OS_PORT_1}
-        resp = self.execute(
-            'CreateNetworkInterface',
-            {'SubnetId': fakes.ID_EC2_SUBNET_1,
-             'PrivateIpAddress':
-             fakes.EC2_NETWORK_INTERFACE_1['privateIpAddress']})
-        check_response(resp, 'InvalidParameterValue')
+        for cls in [neutron_exception.OverQuotaClient,
+                    neutron_exception.IpAddressGenerationFailureClient]:
+            self.neutron.create_port.side_effect = cls()
+            resp = self.execute(
+                'CreateNetworkInterface',
+                {'SubnetId': fakes.ID_EC2_SUBNET_1,
+                 'PrivateIpAddress': fakes.IP_NETWORK_INTERFACE_1})
+            check_response(resp, 'NetworkInterfaceLimitExceeded')
+
+        for cls in [neutron_exception.IpAddressInUseClient,
+                    neutron_exception.BadRequest]:
+            self.neutron.create_port.side_effect = cls()
+            resp = self.execute(
+                'CreateNetworkInterface',
+                {'SubnetId': fakes.ID_EC2_SUBNET_1,
+                 'PrivateIpAddress': fakes.IP_NETWORK_INTERFACE_1})
+            check_response(resp, 'InvalidParameterValue')
 
     @mock.patch('ec2api.api.dhcp_options._add_dhcp_opts_to_port')
     def test_create_network_interface_rollback(self, _add_dhcp_opts_to_port):
@@ -282,6 +285,18 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             fakes.ID_EC2_NETWORK_INTERFACE_1)
         self.neutron.delete_port.assert_called_once_with(
             fakes.ID_OS_PORT_1)
+
+    def test_delete_network_interface_obsolete(self):
+        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1
+        self.db_api.get_items.return_value = []
+        self.neutron.delete_port.side_effect = (
+            neutron_exception.PortNotFoundClient())
+        resp = self.execute(
+            'DeleteNetworkInterface',
+            {'NetworkInterfaceId':
+             fakes.ID_EC2_NETWORK_INTERFACE_1})
+        self.assertEqual(200, resp['http_status_code'])
+        self.assertEqual(True, resp['return'])
 
     def test_delete_network_interface_no_network_interface(self):
         self.db_api.get_item_by_id.return_value = None
@@ -384,20 +399,20 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             [('addresses.private-ip-address',
               fakes.IP_NETWORK_INTERFACE_2_EXT_1,),
              # TODO(ft): support filtering by a boolean value
-#              ('addresses.primary', False),
+             # ('addresses.primary', False),
              ('description', fakes.DESCRIPTION_NETWORK_INTERFACE_1),
              # TODO(ft): add security groups to fake data
-#              ('group-id', ),
-#              ('group-name'),
+             # ('group-id', ),
+             # ('group-name'),
              # TODO(ft): declare a constant for the mac in fakes
              ('mac-address', 'fb:10:2e:b2:ba:b7'),
              ('network-interface-id', fakes.ID_EC2_NETWORK_INTERFACE_1),
              ('owner-id', fakes.ID_OS_PROJECT),
              ('private-ip-address', fakes.IP_NETWORK_INTERFACE_1),
              # TODO(ft): support filtering by a boolean value
-#              ('requester-managed', False),
+             # ('requester-managed', False),
              # TODO(ft): support filtering by a boolean value
-#              ('source-dest-check', True),
+             # ('source-dest-check', True),
              ('status', 'available'),
              ('vpc-id', fakes.ID_EC2_VPC_1),
              ('subnet-id', fakes.ID_EC2_SUBNET_2)])
@@ -410,8 +425,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
         resp = self.execute(
             'DescribeNetworkInterfaceAttribute',
-            {'NetworkInterfaceId':
-             fakes.ID_EC2_NETWORK_INTERFACE_1,
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'Attribute': 'description'})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(fakes.ID_EC2_NETWORK_INTERFACE_1,
@@ -425,8 +439,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
         resp = self.execute(
             'ModifyNetworkInterfaceAttribute',
-            {'NetworkInterfaceId':
-             fakes.ID_EC2_NETWORK_INTERFACE_1,
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'Description.Value': 'New description'})
         self.assertEqual(200, resp['http_status_code'])
         self.db_api.update_item.assert_called_once_with(
@@ -437,8 +450,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_modify_network_interface_attribute_invalid_parameters(self):
         resp = self.execute(
             'ModifyNetworkInterfaceAttribute',
-            {'NetworkInterfaceId':
-             fakes.ID_EC2_NETWORK_INTERFACE_1,
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'Description.Value': 'New description',
              'SourceDestCheck.Value': 'True'})
         self.assertEqual(400, resp['http_status_code'])
@@ -456,26 +468,55 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_attach_network_interface(self):
         self.db_api.get_item_by_id.side_effect = (
             fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_NETWORK_INTERFACE_2: fakes.DB_NETWORK_INTERFACE_2,
+                fakes.ID_EC2_NETWORK_INTERFACE_1: fakes.DB_NETWORK_INTERFACE_1,
                 fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1}))
         self.neutron.list_ports.return_value = (
-            {'ports': [fakes.OS_PORT_2]})
+            {'ports': [fakes.OS_PORT_1]})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
         resp = self.execute(
             'AttachNetworkInterface',
-            {'NetworkInterfaceId':
-             fakes.ID_EC2_NETWORK_INTERFACE_2,
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'InstanceId': fakes.ID_EC2_INSTANCE_1,
              'DeviceIndex': '1'})
         self.assertEqual(200, resp['http_status_code'])
         self.nova_servers.interface_attach.assert_called_once_with(
-            fakes.ID_OS_INSTANCE_1, fakes.ID_OS_PORT_2, None, None)
+            fakes.ID_OS_INSTANCE_1, fakes.ID_OS_PORT_1, None, None)
         self.db_api.update_item.assert_called_once_with(
             mock.ANY,
-            tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
-                              {'device_index': 1,
-                               'instance_id': fakes.ID_EC2_INSTANCE_1,
-                               'delete_on_termination': False}))
+            tools.update_dict(
+                fakes.DB_NETWORK_INTERFACE_1,
+                {'device_index': 1,
+                 'instance_id': fakes.ID_EC2_INSTANCE_1,
+                 'delete_on_termination': False,
+                 'attach_time': fakes.TIME_ATTACH_NETWORK_INTERFACE}))
+
+    def test_attach_network_interface_invalid_parameters(self):
+        # NOTE(ft): eni is already attached
+        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_2
+        resp = self.execute(
+            'AttachNetworkInterface',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
+             'InstanceId': fakes.ID_EC2_INSTANCE_2,
+             'DeviceIndex': '1'})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('InvalidParameterValue',
+                         resp['Error']['Code'])
+
+        # NOTE(ft): device index is in use
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_NETWORK_INTERFACE_1: fakes.DB_NETWORK_INTERFACE_1,
+                fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1}))
+        self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
+                                              fakes.DB_NETWORK_INTERFACE_2]
+        resp = self.execute(
+            'AttachNetworkInterface',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
+             'InstanceId': fakes.ID_EC2_INSTANCE_1,
+             'DeviceIndex': '0'})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('InvalidParameterValue',
+                         resp['Error']['Code'])
 
     def test_attach_network_interface_rollback(self):
         self.db_api.get_item_by_id.return_value = (
@@ -494,8 +535,9 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             mock.ANY, fakes.DB_NETWORK_INTERFACE_2)
 
     def test_detach_network_interface(self):
-        self.db_api.get_item_by_id.return_value = (
-            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2))
+        network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
+                                              {'device_index': 1})
+        self.db_api.get_item_by_id.return_value = network_interface
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         resp = self.execute(
@@ -516,9 +558,31 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                               'delete_on_termination',
                               'attach_time'}))
 
+    def test_detach_network_interface_invalid_parameters(self):
+        # NOTE(ft): eni is not found
+        self.db_api.get_item_by_id.return_value = None
+        resp = self.execute(
+            'DetachNetworkInterface',
+            {'AttachmentId': ec2utils.change_ec2_id_kind(
+                    fakes.ID_EC2_NETWORK_INTERFACE_2, 'eni-attach')})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('InvalidAttachmentID.NotFound',
+                         resp['Error']['Code'])
+
+        # NOTE(ft): eni is attached with device index = 0
+        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_2
+        resp = self.execute(
+            'DetachNetworkInterface',
+            {'AttachmentId': ec2utils.change_ec2_id_kind(
+                    fakes.ID_EC2_NETWORK_INTERFACE_2, 'eni-attach')})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('OperationNotPermitted',
+                         resp['Error']['Code'])
+
     def test_detach_network_interface_rollback(self):
-        self.db_api.get_item_by_id.return_value = (
-            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2))
+        network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
+                                              {'device_index': 1})
+        self.db_api.get_item_by_id.return_value = network_interface
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         self.neutron.update_port.side_effect = Exception()
@@ -528,25 +592,24 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             {'AttachmentId': fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH})
 
         self.db_api.update_item.assert_any_call(
-            mock.ANY, fakes.DB_NETWORK_INTERFACE_2)
+            mock.ANY, network_interface)
 
     def test_assign_unassign_private_ip_addresses(self):
-        self.db_api.get_item_by_id.return_value = (
-            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1))
-        self.db_api.get_items.return_value = (
-            [fakes.DB_SUBNET_1,
-             fakes.DB_SUBNET_2])
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id(
+                {fakes.ID_EC2_NETWORK_INTERFACE_1: (
+                    fakes.DB_NETWORK_INTERFACE_1),
+                 fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
         self.neutron.show_subnet.return_value = (
             {'subnet': fakes.OS_SUBNET_1})
         self.neutron.show_port.return_value = (
             {'port': copy.deepcopy(fakes.OS_PORT_1)})
         resp = self.execute(
             'AssignPrivateIpAddresses',
-            {'NetworkInterfaceId':
-             fakes.ID_EC2_NETWORK_INTERFACE_1,
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'PrivateIpAddress.1': '10.10.1.5',
              'PrivateIpAddress.2': '10.10.1.6',
-            })
+             })
         self.assertEqual(200, resp['http_status_code'])
         self.neutron.update_port.assert_called_once_with(
             fakes.ID_OS_PORT_1,
@@ -558,11 +621,10 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                  {'ip_address': '10.10.1.6'}]}})
         resp = self.execute(
             'UnassignPrivateIpAddresses',
-            {'NetworkInterfaceId':
-             fakes.ID_EC2_NETWORK_INTERFACE_1,
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'PrivateIpAddress.1': '10.10.1.5',
              'PrivateIpAddress.2': '10.10.1.6',
-            })
+             })
         self.assertEqual(200, resp['http_status_code'])
         self.neutron.update_port.assert_any_call(
             fakes.ID_OS_PORT_1,
@@ -570,3 +632,54 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              {'fixed_ips': [
                  {'subnet_id': fakes.ID_OS_SUBNET_1,
                   'ip_address': fakes.IP_NETWORK_INTERFACE_1}]}})
+
+    def test_assign_private_ip_addresses_invalid_parameters(self):
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id(
+                {fakes.ID_EC2_NETWORK_INTERFACE_1: (
+                    fakes.DB_NETWORK_INTERFACE_1),
+                 fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
+        self.neutron.show_subnet.return_value = (
+            {'subnet': fakes.OS_SUBNET_1})
+        self.neutron.show_port.return_value = (
+            {'port': copy.deepcopy(fakes.OS_PORT_1)})
+
+        def do_check(error_code):
+            resp = self.execute(
+                'AssignPrivateIpAddresses',
+                {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
+                 'PrivateIpAddress.1': '10.10.1.5',
+                 'PrivateIpAddress.2': '10.10.1.6',
+                 })
+            self.assertEqual(400, resp['http_status_code'])
+            self.assertEqual(error_code, resp['Error']['Code'])
+
+        self.neutron.update_port.side_effect = (
+            neutron_exception.IpAddressGenerationFailureClient())
+        do_check('NetworkInterfaceLimitExceeded')
+
+        self.neutron.update_port.side_effect = (
+            neutron_exception.IpAddressInUseClient())
+        do_check('InvalidParameterValue')
+
+        self.neutron.update_port.side_effect = (
+            neutron_exception.BadRequest())
+        do_check('InvalidParameterValue')
+
+    def test_unassign_private_ip_addresses_invalid_parameters(self):
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id(
+                {fakes.ID_EC2_NETWORK_INTERFACE_2: (
+                    fakes.DB_NETWORK_INTERFACE_2),
+                 fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2}))
+        self.neutron.show_subnet.return_value = (
+            {'subnet': fakes.OS_SUBNET_2})
+        self.neutron.show_port.return_value = (
+            {'port': copy.deepcopy(fakes.OS_PORT_2)})
+
+        resp = self.execute(
+            'UnassignPrivateIpAddresses',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
+             'PrivateIpAddress.1': '10.10.2.55'})
+        self.assertEqual(400, resp['http_status_code'])
+        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
