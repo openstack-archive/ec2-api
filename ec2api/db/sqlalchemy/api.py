@@ -14,9 +14,9 @@
 
 """Implementation of SQLAlchemy backend."""
 
-import ast
 import copy
 import functools
+import json
 import random
 import sys
 
@@ -219,7 +219,7 @@ def get_items_by_ids(context, kind, item_ids):
 def get_public_items(context, kind, item_ids=None):
     query = (model_query(context, models.Item).
              filter(models.Item.id.like('%s-%%' % kind)).
-             filter(models.Item.data.like('%\'is_public\': True%')))
+             filter(models.Item.data.like('%"is_public": True%')))
     if item_ids:
         query = query.filter(models.Item.id.in_(item_ids))
     return [_unpack_item_data(item)
@@ -314,7 +314,7 @@ def _pack_item_data(item_data):
     return {
         "os_id": data.pop("os_id", None),
         "vpc_id": data.pop("vpc_id", None),
-        "data": str(data),
+        "data": json.dumps(data),
     }
 
 
@@ -322,7 +322,7 @@ def _unpack_item_data(item_ref):
     if item_ref is None:
         return None
     data = item_ref.data
-    data = ast.literal_eval(data) if data is not None else {}
+    data = json.loads(data) if data is not None else {}
     data["id"] = item_ref.id
     data["os_id"] = item_ref.os_id
     data["vpc_id"] = item_ref.vpc_id

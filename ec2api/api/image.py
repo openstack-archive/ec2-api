@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
 import base64
 import binascii
 import itertools
+import json
 import os
 import re
 import shutil
@@ -457,7 +457,7 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
 def _prepare_mappings(os_image):
     def prepare_property(property_name):
         if property_name in os_image.properties:
-            os_image.properties[property_name] = ast.literal_eval(
+            os_image.properties[property_name] = json.loads(
                     os_image.properties[property_name])
     prepare_property('mappings')
     prepare_property('block_device_mapping')
