@@ -22,14 +22,56 @@ export TEST_CONFIG="functional_tests.conf"
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
-IMAGE_ID=$(euca-describe-images | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
+  # find simple image
+  image_id=$(euca-describe-images --show-empty-fields | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
+
+  # create EBS image
+  MAX_FAIL=20
+  FLAVOR_NAME="m1.tiny"
+  volume_status() { cinder show $1|awk '/ status / {print $4}'; }
+  instance_status() { nova show $1|awk '/ status / {print $4}'; }
+
+  openstack_image_id=$(openstack image list --long | grep "cirros" | grep " ami " | awk '{print $2}')
+  volume_id=$(cinder create --image-id $openstack_image_id 1 | awk '/ id / {print $4}')
+  fail=0
+  until [[ $(volume_status $volume_id) == "available" ]]; do
+    if ((fail >= MAX_FAIL)); then
+      exit 1
+    fi
+    ((++fail)); sleep 5
+    if [[ $(volume_status $volume_id) == error ]]; then
+      cinder show $volume_id
+    fi
+  done
+  instance_name="i-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
+  instance_id=$(nova boot \
+    --flavor "$FLAVOR_NAME" \
+    --block-device-mapping "/dev/vda=$volume_id:::1" \
+    "$instance_name" | awk '/ id / {print $4}')
+  fail=0
+  until [[ $(instance_status $instance_id) == "ACTIVE" ]]; do
+    if ((fail >= MAX_FAIL)); then
+      exit 1
+    fi
+    ((++fail))
+    sleep 30
+    if [[ $(instance_status $instance_id) == "ERROR" ]]; then
+      nova show $instance_id
+      exit 1
+    fi
+  done
+  image_name="image-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
+  nova image-create $instance_name $image_name
+  ebs_image_id=$(euca-describe-images --show-empty-fields | grep $image_name | awk '{print $2}')
+  nova delete $instance_id
 
   sudo bash -c "cat > $TEST_CONFIG_DIR/$TEST_CONFIG <<EOF
 [aws]
 ec2_url = $EC2_URL
 aws_access = $EC2_ACCESS_KEY
 aws_secret = $EC2_SECRET_KEY
-image_id = $IMAGE_ID
+image_id = $image_id
+ebs_image_id = $ebs_image_id
 EOF"
 fi
 

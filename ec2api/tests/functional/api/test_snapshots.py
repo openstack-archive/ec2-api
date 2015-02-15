@@ -102,8 +102,9 @@ class SnapshotTest(base.EC2TestCase):
 
         resp, data = self.client.DescribeSnapshots(SnapshotIds=[snapshot_id])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual(1, len(data['Snapshots']))
-        data = data['Snapshots'][0]
+        data = [s for s in data['Snapshots'] if s['SnapshotId'] == snapshot_id]
+        self.assertEqual(1, len(data))
+        data = data[0]
         self.assertEqual(snapshot_id, data['SnapshotId'])
         self.assertEqual(desc, data['Description'])
         self.assertEqual(volume_id, data['VolumeId'])
@@ -115,9 +116,8 @@ class SnapshotTest(base.EC2TestCase):
 
         resp, data = self.client.DescribeSnapshots(OwnerIds=[ownerId])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual(1, len(data['Snapshots']))
-        data = data['Snapshots'][0]
-        self.assertEqual(snapshot_id, data['SnapshotId'])
+        data = [s for s in data['Snapshots'] if s['SnapshotId'] == snapshot_id]
+        self.assertEqual(1, len(data))
 
         resp, data = self.client.DeleteSnapshot(SnapshotId=snapshot_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
