@@ -14,13 +14,39 @@
 
 # This script is executed inside post_test_hook function in devstack gate.
 
-# Sleep some time until all services are started
+# Sleep some time until all services are starting
 sleep 5
 
 export TEST_CONFIG_DIR=$(readlink -f .)
 export TEST_CONFIG="functional_tests.conf"
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
+
+  # create separate user/project
+  tenant_name="tenant-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
+  eval $(openstack project create -f shell -c id $tenant_name)
+  tenant_id=$id
+  user_name="user-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
+  eval $(openstack user create "$user_name" --project "$tenant_id" --password "password" --email "$user_name@example.com" -f shell -c id)
+  user_id=$id
+  # create network
+  if [[ -n $(keystone service-list | grep neutron) ]]; then
+    net_id=$(neutron net-create --tenant-id $tenant_id "private" | grep ' id ' | awk '{print $4}')
+    subnet_id=$(neutron subnet-create --tenant-id $tenant_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
+    router_id=$(neutron router-create --tenant-id $tenant_id "private_router" | grep ' id ' | awk '{print $4}')
+    neutron router-interface-add $router_id $subnet_id
+    public_net_id=$(neutron net-list | grep public | awk '{print $2}')
+    neutron router-gateway-set $router_id $public_net_id
+  fi
+  # populate credentials
+  openstack ec2 credentials create --user $user_id --project $tenant_id 1>&2
+  line=`openstack ec2 credentials list --user $user_id | grep " $tenant_id "`
+  read EC2_ACCESS_KEY EC2_SECRET_KEY <<<  `echo $line | awk '{print $2 " " $4 }'`
+  export EC2_ACCESS_KEY
+  export EC2_SECRET_KEY
+  export OS_TENANT_NAME=$tenant_name
+  export OS_USERNAME=$user_name
+  export OS_PASSWORD="password"
 
   # find simple image
   image_id=$(euca-describe-images --show-empty-fields | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
@@ -54,7 +80,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
       exit 1
     fi
     ((++fail))
-    sleep 30
+    sleep 10
     if [[ $(instance_status $instance_id) == "ERROR" ]]; then
       nova show $instance_id
       exit 1
@@ -74,6 +100,8 @@ image_id = $image_id
 ebs_image_id = $ebs_image_id
 EOF"
 fi
+
+exit 0
 
 sudo pip install -r test-requirements.txt
 # botocore not in openstack requirements now, so install it manually
