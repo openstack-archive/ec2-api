@@ -101,8 +101,6 @@ ebs_image_id = $ebs_image_id
 EOF"
 fi
 
-exit 0
-
 sudo pip install -r test-requirements.txt
 # botocore not in openstack requirements now, so install it manually
 sudo pip install botocore==0.85

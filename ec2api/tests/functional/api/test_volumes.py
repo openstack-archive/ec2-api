@@ -99,6 +99,7 @@ class VolumeTest(base.EC2TestCase):
         volume_id_ext = data['VolumeId']
         res_clean_ext = self.addResourceCleanUp(self.client.DeleteVolume,
                                                 VolumeId=volume_id_ext)
+        self.get_volume_waiter().wait_available(volume_id_ext)
 
         resp, data = self.client.DescribeVolumes(VolumeIds=[volume_id])
         self.assertEqual(200, resp.status_code)
