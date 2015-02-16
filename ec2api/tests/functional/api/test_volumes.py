@@ -43,6 +43,8 @@ class VolumeTest(base.EC2TestCase):
             self.assertFalse(data['Encrypted'])
         if 'SnapshotId' in data:
             self.assertIsNone(data['SnapshotId'])
+        self.assertIsNotNone(data['CreateTime'])
+        self.assertEqual(CONF.aws.aws_zone, data['AvailabilityZone'])
 
         resp, data = self.client.DeleteVolume(VolumeId=volume_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -90,14 +92,20 @@ class VolumeTest(base.EC2TestCase):
         volume_id = data['VolumeId']
         res_clean = self.addResourceCleanUp(self.client.DeleteVolume,
                                             VolumeId=volume_id)
-
         self.get_volume_waiter().wait_available(volume_id)
+
+        resp, data = self.client.CreateVolume(*[], **kwargs)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        volume_id_ext = data['VolumeId']
+        res_clean_ext = self.addResourceCleanUp(self.client.DeleteVolume,
+                                                VolumeId=volume_id_ext)
 
         resp, data = self.client.DescribeVolumes(VolumeIds=[volume_id])
         self.assertEqual(200, resp.status_code)
         self.assertEqual(1, len(data['Volumes']))
 
         volume = data['Volumes'][0]
+        self.assertEqual(volume_id, volume['VolumeId'])
         if CONF.aws.run_incompatible_tests:
             self.assertEqual('standard', data['VolumeType'])
         self.assertEqual(1, volume['Size'])
@@ -105,6 +113,11 @@ class VolumeTest(base.EC2TestCase):
             self.assertFalse(volume['Encrypted'])
         if 'SnapshotId' in volume:
             self.assertIsNone(volume['SnapshotId'])
+
+        resp, data = self.client.DeleteVolume(VolumeId=volume_id_ext)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(res_clean_ext)
+        self.get_volume_waiter().wait_delete(volume_id_ext)
 
         resp, data = self.client.DeleteVolume(VolumeId=volume_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
