@@ -23,7 +23,7 @@ CONF = config.CONF
 
 class SnapshotTest(base.EC2TestCase):
 
-    def test_create_get_delete_snapshot(self):
+    def test_create_delete_snapshot(self):
         kwargs = {
             'Size': 1,
             'AvailabilityZone': CONF.aws.aws_zone
@@ -102,9 +102,8 @@ class SnapshotTest(base.EC2TestCase):
 
         resp, data = self.client.DescribeSnapshots(SnapshotIds=[snapshot_id])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        data = [s for s in data['Snapshots'] if s['SnapshotId'] == snapshot_id]
-        self.assertEqual(1, len(data))
-        data = data[0]
+        self.assertEqual(1, len(data['Snapshots']))
+        data = data['Snapshots'][0]
         self.assertEqual(snapshot_id, data['SnapshotId'])
         self.assertEqual(desc, data['Description'])
         self.assertEqual(volume_id, data['VolumeId'])
@@ -179,6 +178,63 @@ class SnapshotTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['Volumes']))
         self.assertEqual(volume_id2, data['Volumes'][0]['VolumeId'])
+
+        resp, data = self.client.DeleteSnapshot(SnapshotId=snapshot_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(res_clean)
+        self.get_snapshot_waiter().wait_delete(snapshot_id)
+
+        resp, data = self.client.DeleteVolume(VolumeId=volume_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_vol)
+        self.get_volume_waiter().wait_delete(volume_id)
+
+        resp, data = self.client.DeleteVolume(VolumeId=volume_id2)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_vol2)
+        self.get_volume_waiter().wait_delete(volume_id2)
+
+    def test_create_increased_volume_from_snapshot(self):
+        kwargs = {
+            'Size': 1,
+            'AvailabilityZone': CONF.aws.aws_zone
+        }
+        resp, data = self.client.CreateVolume(*[], **kwargs)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        volume_id = data['VolumeId']
+        clean_vol = self.addResourceCleanUp(self.client.DeleteVolume,
+                                            VolumeId=volume_id)
+        self.get_volume_waiter().wait_available(volume_id)
+        vol1 = data
+
+        desc = 'test snapshot'
+        kwargs = {
+            'VolumeId': volume_id,
+            'Description': desc
+        }
+        resp, data = self.client.CreateSnapshot(*[], **kwargs)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        snapshot_id = data['SnapshotId']
+        res_clean = self.addResourceCleanUp(self.client.DeleteSnapshot,
+                                            SnapshotId=snapshot_id)
+        self.get_snapshot_waiter().wait_available(snapshot_id,
+                                                  final_set=('completed'))
+
+        kwargs = {
+            'Size': 2,
+            'SnapshotId': snapshot_id,
+            'AvailabilityZone': CONF.aws.aws_zone
+        }
+        resp, data = self.client.CreateVolume(*[], **kwargs)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        volume_id2 = data['VolumeId']
+        clean_vol2 = self.addResourceCleanUp(self.client.DeleteVolume,
+                                             VolumeId=volume_id2)
+        self.get_volume_waiter().wait_available(volume_id2)
+
+        self.assertNotEqual(volume_id, volume_id2)
+        self.assertEqual(2, data['Size'])
+        self.assertEqual(snapshot_id, data['SnapshotId'])
 
         resp, data = self.client.DeleteSnapshot(SnapshotId=snapshot_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
