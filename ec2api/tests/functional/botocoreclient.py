@@ -52,8 +52,6 @@ class BotocoreClientBase(object):
 
         func.__name__ = name
         setattr(self, name, types.MethodType(func, self, self.__class__))
-        setattr(self.__class__, name,
-                types.MethodType(func, None, self.__class__))
         return getattr(self, name)
 
 
