@@ -108,7 +108,7 @@ class VolumeTest(base.EC2TestCase):
         volume = data['Volumes'][0]
         self.assertEqual(volume_id, volume['VolumeId'])
         if CONF.aws.run_incompatible_tests:
-            self.assertEqual('standard', data['VolumeType'])
+            self.assertEqual('standard', volume['VolumeType'])
         self.assertEqual(1, volume['Size'])
         if 'Encrypted' in volume:
             self.assertFalse(volume['Encrypted'])
@@ -221,6 +221,68 @@ class VolumeTest(base.EC2TestCase):
         volume = data['Volumes'][0]
         self.assertEqual('available', volume['State'])
         self.assertEqual(0, len(volume['Attachments']))
+
+        resp, data = self.client.DeleteVolume(VolumeId=volume_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_v)
+        self.get_volume_waiter().wait_delete(volume_id)
+
+        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_i)
+        self.get_instance_waiter().wait_delete(instance_id)
+
+    def test_attaching_stage(self):
+        instance_type = CONF.aws.instance_type
+        image_id = CONF.aws.image_id
+        if not image_id:
+            raise self.skipException('aws image_id does not provided')
+
+        kwargs = {
+            'ImageId': image_id,
+            'InstanceType': instance_type,
+            'MinCount': 1,
+            'MaxCount': 1,
+            'Placement': {'AvailabilityZone': CONF.aws.aws_zone}
+        }
+        resp, data = self.client.RunInstances(*[], **kwargs)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        instance_id = data['Instances'][0]['InstanceId']
+        clean_i = self.addResourceCleanUp(self.client.TerminateInstances,
+                                          InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        resp, data = self.client.CreateVolume(
+            AvailabilityZone=CONF.aws.aws_zone, Size=1)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        volume_id = data['VolumeId']
+        clean_v = self.addResourceCleanUp(self.client.DeleteVolume,
+                                          VolumeId=volume_id)
+        self.get_volume_waiter().wait_available(volume_id)
+
+        kwargs = {
+            'Device': '/dev/vdh',
+            'InstanceId': instance_id,
+            'VolumeId': volume_id,
+        }
+        resp, data = self.client.AttachVolume(*[], **kwargs)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        clean_vi = self.addResourceCleanUp(self.client.DetachVolume,
+                                           VolumeId=volume_id)
+        self.assertEqual('attaching', data['State'])
+
+        bdt = self.get_instance_bdm(instance_id, '/dev/vdh')
+        self.assertIsNotNone(bdt)
+        self.assertEqual('attaching', bdt['Ebs']['Status'])
+
+        self.get_volume_attachment_waiter().wait_available(
+            volume_id, final_set=('attached'))
+
+        resp, data = self.client.DetachVolume(VolumeId=volume_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_vi)
+        self.get_volume_attachment_waiter().wait_delete(volume_id)
 
         resp, data = self.client.DeleteVolume(VolumeId=volume_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))

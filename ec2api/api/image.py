@@ -184,7 +184,7 @@ def register_image(context, name=None, image_location=None,
         mappings = [instance_api._cloud_parse_block_device_mapping(context,
                                                                    bdm)
                     for bdm in block_device_mapping]
-        properties['block_device_mapping'] = mappings
+        properties['block_device_mapping'] = json.dumps(mappings)
     if architecture is not None:
         properties['architecture'] = architecture
     if kernel_id:

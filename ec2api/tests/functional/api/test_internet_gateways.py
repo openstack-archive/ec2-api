@@ -40,17 +40,13 @@ class InternetGatewayTest(base.EC2TestCase):
             raise cls.skipException('VPC is disabled')
 
         resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)
-        if resp.status_code != 200:
-            LOG.error(base.EC2ErrorConverter(data))
-        assert 200 == resp.status_code
+        cls.assertResultStatic(resp, data)
         cls.vpc_id = data['Vpc']['VpcId']
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
         cls.addResourceCleanUpStatic(cls.client.DeleteVpc, VpcId=cls.vpc_id)
 
         resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR_ALT)
-        if resp.status_code != 200:
-            LOG.error(base.EC2ErrorConverter(data))
-        assert 200 == resp.status_code
+        cls.assertResultStatic(resp, data)
         cls.vpc_id_alt = data['Vpc']['VpcId']
         cls.get_vpc_waiter().wait_available(cls.vpc_id_alt)
         cls.addResourceCleanUpStatic(cls.client.DeleteVpc,

@@ -84,11 +84,11 @@ class EC2Waiter(object):
         self.default_check_interval = CONF.aws.build_interval
 
     def _state_wait(self, f, f_args=None, f_kwargs=None,
-                    final_set=set(), valid_set=None):
+                    final_set=set(), error_set=('error')):
         if not isinstance(final_set, set):
             final_set = set((final_set,))
-        if not isinstance(valid_set, set) and valid_set is not None:
-            valid_set = set((valid_set,))
+        if not isinstance(error_set, set):
+            error_set = set((error_set,))
         interval = self.default_check_interval
         start_time = time.time()
         args = f_args if f_args is not None else []
@@ -103,14 +103,16 @@ class EC2Waiter(object):
                          old_status, status, time.time() - start_time)
             if status in final_set:
                 return status
-            if valid_set is not None and status not in valid_set:
-                return status
+            if error_set is not None and status in error_set:
+                raise testtools.TestCase.failureException(
+                    'State changes to error state! '
+                    'While waiting for %s at "%s"' %
+                    (final_set, status))
             dtime = time.time() - start_time
             if dtime > self.default_timeout:
                 raise testtools.TestCase.failureException(
-                    "State change timeout exceeded!"
-                    '(%ds) While waiting'
-                    'for %s at "%s"' %
+                    'State change timeout exceeded! '
+                    '(%ds) While waiting for %s at "%s"' %
                     (dtime, final_set, status))
             time.sleep(interval)
             interval += self.default_check_interval
@@ -172,19 +174,19 @@ def safe_setup(f):
     """A decorator used to wrap the setUpClass for safe setup."""
 
     def decorator(cls):
+        try:
+            f(cls)
+        except Exception as se:
+            etype, value, trace = sys.exc_info()
+            LOG.exception("setUpClass failed: %s" % se)
             try:
-                f(cls)
-            except Exception as se:
-                etype, value, trace = sys.exc_info()
-                LOG.exception("setUpClass failed: %s" % se)
-                try:
-                    cls.tearDownClass()
-                except Exception as te:
-                    LOG.exception("tearDownClass failed: %s" % te)
-                try:
-                    raise etype(value), None, trace
-                finally:
-                    del trace  # for avoiding circular refs
+                cls.tearDownClass()
+            except Exception as te:
+                LOG.exception("tearDownClass failed: %s" % te)
+            try:
+                raise etype(value), None, trace
+            finally:
+                del trace  # for avoiding circular refs
 
     return decorator
 
@@ -247,6 +249,12 @@ class EC2TestCase(base.BaseTestCase):
         TesterStateHolder().ec2_client = cls.client
 
     @classmethod
+    def assertResultStatic(cls, resp, data):
+        if resp.status_code != 200:
+            LOG.error(EC2ErrorConverter(data))
+        assert 200 == resp.status_code
+
+    @classmethod
     def addResourceCleanUpStatic(cls, function, *args, **kwargs):
         """Adds CleanUp callable, used by tearDownClass.
 
@@ -280,9 +288,9 @@ class EC2TestCase(base.BaseTestCase):
         self._sequence = self._sequence + 1
         self._resource_trash_bin[self._sequence] = (function, args, kwargs, tb)
 
-        # LOG.debug("For cleaning up: %s\n    From: %s" %
-        #     (self.friendly_function_call_str(function, *args, **kwargs),
-        #     str((tb[0], tb[1], tb[2]))))
+        LOG.debug("For cleaning up: %s\n    From: %s" %
+            (self.friendly_function_call_str(function, *args, **kwargs),
+            str((tb[0], tb[1], tb[2]))))
 
         return self._sequence
 
@@ -318,6 +326,9 @@ class EC2TestCase(base.BaseTestCase):
         'DeleteSnapshot': (
             'get_snapshot_waiter',
             lambda kwargs: kwargs['SnapshotId']),
+        'DeregisterImage': (
+            'get_image_waiter',
+            lambda kwargs: kwargs['ImageId']),
     }
 
     @classmethod
@@ -343,31 +354,35 @@ class EC2TestCase(base.BaseTestCase):
                           (cls.friendly_function_call_str(function, *pos_args,
                                                           **kw_args),
                            str((tb[0], tb[1], tb[2]))))
-                resp, data = function(*pos_args, **kw_args)
-                if resp.status_code != 200:
-                    error = data.get('Error', {})
-                    error_code = error.get('Code')
-                    for err in cls._VALID_CLEANUP_ERRORS:
-                        if err in error_code:
-                            break
-                    else:
-                        err_msg = (error if isinstance(error, basestring)
-                            else error.get('Message'))
-                        msg = ("Cleanup failed with status %d and message"
-                               " '%s'(Code = %s)"
-                               % (resp.status_code, err_msg, error_code))
-                        LOG.error(msg)
-                elif function.__name__ in cls._CLEANUP_WAITERS:
-                    (waiter, obj_id) = cls._CLEANUP_WAITERS[function.__name__]
-                    waiter = getattr(cls, waiter)
-                    obj_id = obj_id(kw_args)
-                    waiter().wait_delete(obj_id)
+                cls.cleanUpItem(function, pos_args, kw_args)
             except BaseException as exc:
                 fail_count += 1
                 LOG.exception(exc)
             finally:
                 del trash_bin[key]
         return fail_count
+
+    @classmethod
+    def cleanUpItem(cls, function, pos_args, kw_args):
+        resp, data = function(*pos_args, **kw_args)
+        if resp.status_code != 200:
+            error = data.get('Error', {})
+            error_code = error.get('Code')
+            for err in cls._VALID_CLEANUP_ERRORS:
+                if err in error_code:
+                    break
+            else:
+                err_msg = (error if isinstance(error, basestring)
+                    else error.get('Message'))
+                msg = ("Cleanup failed with status %d and message"
+                       " '%s'(Code = %s)"
+                       % (resp.status_code, err_msg, error_code))
+                LOG.error(msg)
+        elif function.__name__ in cls._CLEANUP_WAITERS:
+            (waiter, obj_id) = cls._CLEANUP_WAITERS[function.__name__]
+            waiter = getattr(cls, waiter)
+            obj_id = obj_id(kw_args)
+            waiter().wait_delete(obj_id)
 
     @classmethod
     def friendly_function_name_simple(cls, call_able):
@@ -514,8 +529,45 @@ class EC2TestCase(base.BaseTestCase):
     def get_snapshot_waiter(cls):
         return EC2Waiter(cls._snapshot_get_state)
 
+    @classmethod
+    def _image_get_state(cls, image_id):
+        resp, data = cls.client.DescribeImages(ImageIds=[image_id])
+        if resp.status_code == 200:
+            return data['Images'][0]['State']
+
+        if resp.status_code == 400:
+            error = data['Error']
+            if error['Code'] == 'InvalidAMIID.NotFound':
+                raise exceptions.NotFound()
+
+        raise EC2ResponceException(resp, data)
+
+    @classmethod
+    def get_image_waiter(cls):
+        return EC2Waiter(cls._image_get_state)
+
     def assertEmpty(self, list_obj, msg=None):
         self.assertTrue(len(list_obj) == 0, msg)
 
     def assertNotEmpty(self, list_obj, msg=None):
         self.assertTrue(len(list_obj) > 0, msg)
+
+    # NOTE(andrey-mp): Helpers zone
+
+    def get_instance_bdm(self, instance_id, device_name):
+        """
+
+        device_name=None means getting bdm of root instance device
+        """
+        resp, data = self.client.DescribeInstances(
+            InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code, EC2ErrorConverter(data))
+        self.assertEqual(1, len(data.get('Reservations', [])))
+        instances = data['Reservations'][0].get('Instances', [])
+        self.assertEqual(1, len(instances))
+        instance = instances[0]
+        if not device_name:
+            device_name = instance['RootDeviceName']
+        bdms = instance['BlockDeviceMappings']
+        bdt = [bdt for bdt in bdms if bdt['DeviceName'] == device_name]
+        return None if len(bdt) == 0 else bdt[0]

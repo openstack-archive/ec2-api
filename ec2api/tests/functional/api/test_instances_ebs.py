@@ -32,7 +32,7 @@ class InstanceWithEBSTest(base.EC2TestCase):
         cls.image_id = CONF.aws.ebs_image_id
         cls.zone = CONF.aws.aws_zone
 
-    def test_create_delete_ebs_instance(self):
+    def test_create_get_delete_ebs_instance(self):
         """Launch EBS-backed instance, check results, and terminate it."""
         resp, data = self.client.RunInstances(
             ImageId=self.image_id, InstanceType=CONF.aws.instance_type,
@@ -62,14 +62,14 @@ class InstanceWithEBSTest(base.EC2TestCase):
         self.assertEqual(1, len(bdt))
         ebs = bdt[0]['Ebs']
         self.assertIsNotNone(ebs)
-        volumeId = ebs.get('VolumeId')
-        self.assertIsNotNone(volumeId)
+        volume_id = ebs.get('VolumeId')
+        self.assertIsNotNone(volume_id)
         self.assertEqual('attached', ebs.get('Status'))
         if CONF.aws.run_incompatible_tests:
             self.assertTrue(ebs.get('AttachTime'))
             self.assertTrue(ebs.get('DeleteOnTermination'))
 
-        resp, data = self.client.DescribeVolumes(VolumeIds=[volumeId])
+        resp, data = self.client.DescribeVolumes(VolumeIds=[volume_id])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['Volumes']))
 
@@ -91,27 +91,17 @@ class InstanceWithEBSTest(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
-        resp, data = self.client.DescribeInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        reservations = data.get('Reservations', [])
-        self.assertNotEmpty(reservations)
-        instances = reservations[0].get('Instances', [])
-        self.assertNotEmpty(instances)
-        instance = instances[0]
-        self.assertEqual('ebs', instance.get('RootDeviceType'))
-        self.assertIsNotNone(instance.get('RootDeviceName'))
-        bdms = instance['BlockDeviceMappings']
-        rdn = instance['RootDeviceName']
-        bdt = [bdt for bdt in bdms if bdt['DeviceName'] == rdn]
-        volumeId = bdt[0]['Ebs'].get('VolumeId')
-        self.assertIsNotNone(volumeId)
+        bdt = self.get_instance_bdm(instance_id, None)
+        self.assertIsNotNone(bdt)
+        volume_id = bdt['Ebs'].get('VolumeId')
+        self.assertIsNotNone(volume_id)
 
         resp, data = self.client.StopInstances(InstanceIds=[instance_id])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('stopped'))
 
-        resp, data = self.client.DescribeVolumes(VolumeIds=[volumeId])
+        resp, data = self.client.DescribeVolumes(VolumeIds=[volume_id])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['Volumes']))
 

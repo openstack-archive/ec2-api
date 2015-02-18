@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+import json
 import os
 import tempfile
 
@@ -204,10 +205,10 @@ class ImageTestCase(base.ApiTestCase):
         self.glance.images.create.assert_called_once_with(
             is_public=False, size=0, name='fake_name',
             properties={'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
-                        'block_device_mapping': [
-                            {'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
-                             'delete_on_termination': True,
-                             'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2}]})
+                        'block_device_mapping': json.dumps(
+                            [{'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+                              'delete_on_termination': True,
+                              'snapshot_id': fakes.ID_OS_SNAPSHOT_1}])})
 
     def test_register_image_invalid_parameters(self):
         resp = self.execute('RegisterImage', {})

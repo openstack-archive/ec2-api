@@ -40,9 +40,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
             raise cls.skipException('VPC is disabled')
 
         resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)
-        if resp.status_code != 200:
-            LOG.error(base.EC2ErrorConverter(data))
-        assert 200 == resp.status_code
+        cls.assertResultStatic(resp, data)
         cls.vpc_id = data['Vpc']['VpcId']
         cls.addResourceCleanUpStatic(cls.client.DeleteVpc, VpcId=cls.vpc_id)
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
@@ -51,9 +49,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         resp, data = cls.client.CreateSubnet(VpcId=cls.vpc_id,
                                              CidrBlock=cls.SUBNET_CIDR,
                                              AvailabilityZone=aws_zone)
-        if resp.status_code != 200:
-            LOG.error(base.EC2ErrorConverter(data))
-        assert 200 == resp.status_code
+        cls.assertResultStatic(resp, data)
         cls.subnet_id = data['Subnet']['SubnetId']
         cls.addResourceCleanUpStatic(cls.client.DeleteSubnet,
                                      SubnetId=cls.subnet_id)
