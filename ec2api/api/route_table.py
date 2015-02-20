@@ -67,9 +67,9 @@ def delete_route(context, route_table_id, destination_cidr_block):
             raise exception.InvalidParameterValue(msg)
         break
     else:
-        raise exception.InvalidRouteNotFound({
-            'route_table_id': route_table_id,
-            'destination_cidr_block': destination_cidr_block})
+        raise exception.InvalidRouteNotFound(
+            route_table_id=route_table_id,
+            destination_cidr_block=destination_cidr_block)
     rollback_route_table_state = copy.deepcopy(route_table)
     del route_table['routes'][route_index]
     with common.OnCrashCleaner() as cleaner:

@@ -17,7 +17,7 @@ import datetime
 import itertools
 import random
 
-from glanceclient import exc as glance_exception
+from glanceclient.common import exceptions as glance_exception
 import mock
 from novaclient import exceptions as nova_exception
 from oslotest import base as test_base

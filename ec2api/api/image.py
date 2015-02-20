@@ -25,7 +25,7 @@ import time
 
 import boto.s3.connection
 import eventlet
-from glanceclient import exc as glance_exception
+from glanceclient.common import exceptions as glance_exception
 from lxml import etree
 from oslo.config import cfg
 from oslo_concurrency import processutils

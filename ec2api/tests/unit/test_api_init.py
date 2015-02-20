@@ -15,7 +15,13 @@
 import collections
 import uuid
 
+from boto import exception as boto_exception
+from cinderclient import exceptions as cinder_exception
+from glanceclient.common import exceptions as glance_exception
+from keystoneclient import exceptions as keystone_exception
 import mock
+from neutronclient.common import exceptions as neutron_exception
+from novaclient import exceptions as nova_exception
 from oslotest import base as test_base
 
 from ec2api import api
@@ -83,9 +89,21 @@ class ApiInitTestCase(test_base.BaseTestCase):
             self.controller.fake_action.assert_called_once_with(
                 self.fake_context, param='fake_param')
 
-        do_check(exception.EC2Exception('fake_msg'), 400,
-                 'EC2Exception', 'fake_msg')
-        do_check(KeyError('fake_msg'), 500,
-                 'KeyError', 'Unknown error occurred.')
-        do_check(exception.InvalidVpcIDNotFound('fake_msg'), 400,
-                 'InvalidVpcID.NotFound', 'fake_msg')
+        do_check(exception.EC2Exception('fake_msg'),
+                 400, 'EC2Exception', 'fake_msg')
+        do_check(KeyError('fake_msg'),
+                 500, 'KeyError', 'Unknown error occurred.')
+        do_check(exception.InvalidVpcIDNotFound('fake_msg'),
+                 400, 'InvalidVpcID.NotFound', 'fake_msg')
+        do_check(nova_exception.BadRequest(400, message='fake_msg'),
+                 400, 'BadRequest', 'fake_msg')
+        do_check(glance_exception.HTTPBadRequest(),
+                 400, 'HTTPBadRequest', 'HTTPBadRequest (HTTP 400)')
+        do_check(cinder_exception.BadRequest(400, message='fake_msg'),
+                 400, 'BadRequest', 'fake_msg')
+        do_check(neutron_exception.BadRequest(message='fake_msg'),
+                 400, 'BadRequest', 'fake_msg')
+        do_check(keystone_exception.BadRequest(message='fake_msg'),
+                 400, 'BadRequest', 'fake_msg')
+        do_check(boto_exception.S3ResponseError(400, '', 'fake_msg'),
+                 400, 'S3ResponseError', 'fake_msg')

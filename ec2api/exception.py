@@ -23,6 +23,7 @@ SHOULD include dedicated exception logging.
 import sys
 
 from oslo.config import cfg
+import six
 
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
@@ -60,7 +61,7 @@ class EC2Exception(Exception):
 
     """
     msg_fmt = _("An unknown exception occurred.")
-    code = 500
+    code = 400
     headers = {}
     safe = False
 
@@ -76,12 +77,12 @@ class EC2Exception(Exception):
         if not message:
             try:
                 message = self.msg_fmt % kwargs
-
             except Exception:
                 exc_info = sys.exc_info()
                 # kwargs doesn't match a variable in the message
                 # log the issue and the kwargs
-                LOG.exception(_('Exception in string format operation'))
+                LOG.exception(_('Exception in string format operation for '
+                                '%s exception'), self.__class__.__name__)
                 for name, value in kwargs.iteritems():
                     LOG.error("%s: %s" % (name, value))
 
@@ -90,6 +91,14 @@ class EC2Exception(Exception):
                 else:
                     # at least get the core message out if something happened
                     message = self.msg_fmt
+        elif not isinstance(message, six.string_types):
+            LOG.error(_("Message '%(msg)s' for %(ex)s exception is not "
+                        "a string"),
+                      {'msg': message, 'ex': self.__class__.__name__})
+            if CONF.fatal_exception_format_errors:
+                raise TypeError(_('Invalid exception message format'))
+            else:
+                message = self.msg_fmt
 
         super(EC2Exception, self).__init__(message)
 
@@ -101,17 +110,14 @@ class EC2Exception(Exception):
 
 class Unsupported(EC2Exception):
     msg_fmt = _("The specified request is unsupported. %(reason)s")
-    code = 400
 
 
 class Overlimit(EC2Exception):
     msg_fmt = _("Limit exceeded.")
-    code = 400
 
 
 class Invalid(EC2Exception):
     msg_fmt = _("Unacceptable parameters.")
-    code = 400
 
 
 class InvalidRequest(Invalid):
@@ -155,7 +161,6 @@ class ValidationError(Invalid):
 
 class EC2NotFound(EC2Exception):
     msg_fmt = _("Resource could not be found.")
-    code = 400
 
 
 class InvalidInstanceIDNotFound(EC2NotFound):
@@ -258,7 +263,6 @@ class InvalidAvailabilityZoneNotFound(EC2NotFound):
 
 class IncorrectState(EC2Exception):
     ec2_code = 'IncorrectState'
-    code = 400
     msg_fmt = _("The resource is in incorrect state for the request - reason: "
                 "'%(reason)s'")
 
@@ -407,4 +411,4 @@ class RulesPerSecurityGroupLimitExceeded(Overlimit):
 
 
 class NovaDbInstanceNotFound(EC2Exception):
-    pass
+    code = 500

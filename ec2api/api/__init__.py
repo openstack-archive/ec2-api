@@ -317,7 +317,7 @@ def exception_to_ec2code(ex):
     return code
 
 
-def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
+def ec2_error_ex(ex, req, unexpected=False):
     """Return an EC2 error response.
 
     Return an EC2 error response based on passed exception and log
@@ -332,12 +332,12 @@ def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
     Unexpected 5xx errors may contain sensitive information,
     suppress their messages for security.
     """
-    if not code:
-        code = exception_to_ec2code(ex)
-    status = getattr(ex, 'code', None)
-    if not isinstance(status, int):
-        status = getattr(ex, 'status', None)
-    if not status or not isinstance(status, int):
+    code = exception_to_ec2code(ex)
+    for status_name in ('code', 'status', 'status_code', 'http_status'):
+        status = getattr(ex, status_name, None)
+        if isinstance(status, int):
+            break
+    else:
         status = 500
 
     if unexpected:
@@ -347,12 +347,6 @@ def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
     else:
         log_fun = LOG.debug
         log_msg = _("%(ex_name)s raised: %(ex_str)s")
-        # NOTE(jruzicka): For compatibility with EC2 API, treat expected
-        # exceptions as client (4xx) errors. The exception error code is 500
-        # by default and most exceptions inherit this from EC2Exception even
-        # though they are actually client errors in most cases.
-        if status >= 500:
-            status = 400
         exc_info = None
 
     context = req.environ['ec2api.context']
@@ -363,8 +357,14 @@ def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
     }
     log_fun(log_msg % log_msg_args, context=context, exc_info=exc_info)
 
-    if ex.args and not message and (not unexpected or status < 500):
+    if unexpected and status >= 500:
+        message = _('Unknown error occurred.')
+    elif getattr(ex, 'message', None):
+        message = unicode(ex.message)
+    elif ex.args and any(arg for arg in ex.args):
         message = " ".join(map(unicode, ex.args))
+    else:
+        message = unicode(ex)
     if unexpected:
         # Log filtered environment for unexpected errors.
         env = req.environ.copy()
@@ -372,8 +372,6 @@ def ec2_error_ex(ex, req, code=None, message=None, unexpected=False):
             if not isinstance(env[k], six.string_types):
                 env.pop(k)
         log_fun(_('Environment: %s') % jsonutils.dumps(env))
-    if not message:
-        message = _('Unknown error occurred.')
     return faults.ec2_error_response(request_id, code, message, status=status)
 
 

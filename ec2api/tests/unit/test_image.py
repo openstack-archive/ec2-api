@@ -160,7 +160,7 @@ class ImageTestCase(base.ApiTestCase):
             {'ImageLocation': fakes.LOCATION_IMAGE_1})
         self.assertThat(resp, matchers.DictMatches(
             {'http_status_code': 200,
-            'imageId': fakes.ID_EC2_IMAGE_1}))
+             'imageId': fakes.ID_EC2_IMAGE_1}))
 
         s3_create.assert_called_once_with(
             mock.ANY,
@@ -174,7 +174,7 @@ class ImageTestCase(base.ApiTestCase):
              'Name': 'an image name'})
         self.assertThat(resp, matchers.DictMatches(
             {'http_status_code': 200,
-            'imageId': fakes.ID_EC2_IMAGE_1}))
+             'imageId': fakes.ID_EC2_IMAGE_1}))
 
         s3_create.assert_called_once_with(
             mock.ANY,
@@ -196,19 +196,31 @@ class ImageTestCase(base.ApiTestCase):
              'BlockDeviceMapping.1.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1})
         self.assertThat(resp, matchers.DictMatches(
             {'http_status_code': 200,
-            'imageId': fakes.ID_EC2_IMAGE_2}))
+             'imageId': fakes.ID_EC2_IMAGE_2}))
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, 'snap', fakes.ID_EC2_SNAPSHOT_1)
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': fakes.ID_OS_IMAGE_2,
                               'is_public': False})
-        self.glance.images.create.assert_called_once_with(
-            is_public=False, size=0, name='fake_name',
-            properties={'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
-                        'block_device_mapping': json.dumps(
-                            [{'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
-                              'delete_on_termination': True,
-                              'snapshot_id': fakes.ID_OS_SNAPSHOT_1}])})
+        self.assertEqual(1, self.glance.images.create.call_count)
+        self.assertEqual((), self.glance.images.create.call_args[0])
+        self.assertIn('properties', self.glance.images.create.call_args[1])
+        self.assertIsInstance(
+            self.glance.images.create.call_args[1]['properties'],
+            dict)
+        bdm = self.glance.images.create.call_args[1]['properties'].pop(
+            'block_device_mapping', None)
+        self.assertEqual(
+            {'is_public': False,
+             'size': 0,
+             'name': 'fake_name',
+             'properties': {
+                 'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2}},
+            self.glance.images.create.call_args[1])
+        self.assertEqual([{'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+                           'delete_on_termination': True,
+                           'snapshot_id': fakes.ID_OS_SNAPSHOT_1}],
+                         json.loads(bdm))
 
     def test_register_image_invalid_parameters(self):
         resp = self.execute('RegisterImage', {})
@@ -264,11 +276,11 @@ class ImageTestCase(base.ApiTestCase):
             'DescribeImages', 'imagesSet',
             [('architecture', 'x86_64'),
              # TODO(ft): store a description in DB
-#              ('description', ''),
+             # ('description', ''),
              ('image-id', fakes.ID_EC2_IMAGE_1),
              ('image-type', 'machine'),
              # TODO(ft): support filtering by a boolean value
-#              ('is-public', True),
+             # ('is-public', True),
              ('kernel_id', fakes.ID_EC2_IMAGE_AKI_1,),
              ('name', 'fake_name'),
              ('owner-id', fakes.ID_OS_PROJECT),
@@ -330,13 +342,13 @@ class ImageTestCase(base.ApiTestCase):
 
         do_check('blockDeviceMapping',
                  fakes.ID_EC2_IMAGE_1,
-                 {'blockDeviceMapping':
-                        fakes.EC2_IMAGE_1['blockDeviceMapping']})
+                 {'blockDeviceMapping': (
+                        fakes.EC2_IMAGE_1['blockDeviceMapping'])})
 
         do_check('blockDeviceMapping',
                  fakes.ID_EC2_IMAGE_2,
-                 {'blockDeviceMapping':
-                        fakes.EC2_IMAGE_2['blockDeviceMapping']})
+                 {'blockDeviceMapping': (
+                        fakes.EC2_IMAGE_2['blockDeviceMapping'])})
 
     @mock.patch.object(fakes.OSImage, 'update', autospec=True)
     def test_modify_image_attributes(self, osimage_update):
@@ -604,9 +616,11 @@ class S3TestCase(base.ApiTestCase):
                             'image_location': 'fake_bucket/fake_manifest'})
 
     def test_s3_malicious_tarballs(self):
-        self.assertRaises(exception.Invalid,
+        self.assertRaises(
+            exception.Invalid,
             image_api._s3_test_for_malicious_tarball,
             "/unused", os.path.join(os.path.dirname(__file__), 'abs.tar.gz'))
-        self.assertRaises(exception.Invalid,
+        self.assertRaises(
+            exception.Invalid,
             image_api._s3_test_for_malicious_tarball,
             "/unused", os.path.join(os.path.dirname(__file__), 'rel.tar.gz'))

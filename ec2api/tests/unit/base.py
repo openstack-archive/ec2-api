@@ -15,6 +15,7 @@
 import itertools
 
 import mock
+from oslo.config import cfg
 from oslotest import base as test_base
 
 import ec2api.api.apirequest
@@ -72,6 +73,10 @@ class ApiTestCase(test_base.BaseTestCase):
                                      'isotime')
         self.isotime = isotime_patcher.start()
         self.addCleanup(isotime_patcher.stop)
+
+        conf = cfg.CONF
+        conf.set_override('fatal_exception_format_errors', True)
+        self.addCleanup(conf.reset)
 
     def execute(self, action, args):
         ec2_request = ec2api.api.apirequest.APIRequest(action, 'fake_v1', args)

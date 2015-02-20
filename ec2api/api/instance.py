@@ -19,7 +19,7 @@ import itertools
 import random
 import re
 
-from glanceclient import exc as glance_exception
+from glanceclient.common import exceptions as glance_exception
 from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 

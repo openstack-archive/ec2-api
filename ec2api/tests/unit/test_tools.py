@@ -15,6 +15,8 @@
 
 import testtools
 
+from ec2api import exception
+from ec2api.tests.unit import base
 from ec2api.tests.unit import tools
 
 
@@ -43,3 +45,10 @@ class TestToolsTestCase(testtools.TestCase):
         res = tools.patch_dict(d1, d2, ('b', 'e'))
         self.assertEqual({'a': 1, 'c': 33, 'd': 44}, res)
         self.assertEqual({'a': 1, 'b': 2, 'c': 3}, d1)
+
+
+class TestBaseTestCase(base.ApiTestCase):
+
+    def test_validate_exception_format_is_enabled_for_tests(self):
+        self.assertRaises(KeyError, exception.InvalidVpcRange, fake='value')
+        self.assertRaises(TypeError, exception.InvalidId, {'id': 'value'})
