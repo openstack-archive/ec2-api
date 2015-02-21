@@ -23,8 +23,6 @@ CONF = config.CONF
 
 class ImageTest(base.EC2TestCase):
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
-                          "Openstack doesn't report right RootDeviceType")
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_check_ebs_image_type(self):
         image_id = CONF.aws.ebs_image_id

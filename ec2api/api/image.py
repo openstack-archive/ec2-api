@@ -441,7 +441,8 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
     for bdm in properties.get('block_device_mapping', []):
         if (('snapshot_id' in bdm or 'volume_id' in bdm) and
                 not bdm.get('no_device') and
-                (root_device_name ==
+                (bdm.get('boot_index') == 0 or
+                 root_device_name ==
                     instance_api._block_device_strip_dev(
                         bdm.get('device_name')))):
             root_device_type = 'ebs'

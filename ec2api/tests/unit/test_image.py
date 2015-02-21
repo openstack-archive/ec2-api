@@ -435,6 +435,20 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual('None (fake_name)', image['imageLocation'])
         self.assertEqual('fake_name', image['name'])
 
+        os_image['properties'] = {
+            'bdm_v2': True,
+            'root_device_name': '/dev/vda',
+            'block_device_mapping': [
+                {'boot_index': 0,
+                 'snapshot_id': fakes.ID_OS_SNAPSHOT_2}]}
+
+        image = image_api._format_image(
+                'fake_context', fakes.DB_IMAGE_1, fakes.OSImage(os_image),
+                None, image_ids,
+                snapshot_ids={fakes.ID_OS_SNAPSHOT_2: fakes.ID_EC2_SNAPSHOT_2})
+
+        self.assertEqual('ebs', image['rootDeviceType'])
+
     def test_cloud_format_mappings(self):
         properties = {
             'mappings': [
