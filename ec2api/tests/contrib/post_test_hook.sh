@@ -17,6 +17,8 @@
 # Sleep some time until all services are starting
 sleep 5
 
+sudo apt-get install euca2ools -fy
+
 export TEST_CONFIG_DIR=$(readlink -f .)
 export TEST_CONFIG="functional_tests.conf"
 
