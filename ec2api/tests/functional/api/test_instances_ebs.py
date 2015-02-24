@@ -13,7 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from tempest_lib.openstack.common import log
+from oslo_log import log
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config

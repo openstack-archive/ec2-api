@@ -16,7 +16,7 @@
 import types
 
 from botocore import session
-from tempest_lib.openstack.common import log as logging
+from oslo_log import log as logging
 
 from ec2api.tests.functional import config as cfg
 

@@ -15,7 +15,8 @@
 
 import time
 
-from tempest_lib.openstack.common import log
+from oslo_log import log
+from tempest_lib.common.utils import data_utils
 import testtools
 
 from ec2api.tests.functional import base
@@ -45,8 +46,8 @@ class SecurityGroupTest(base.EC2TestCase):
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
     def test_create_delete_security_group(self):
-        name = base.rand_name('sgName')
-        desc = base.rand_name('sgDesc')
+        name = data_utils.rand_name('sgName')
+        desc = data_utils.rand_name('sgDesc')
         resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
                                                      GroupName=name,
                                                      Description=desc)
@@ -71,7 +72,7 @@ class SecurityGroupTest(base.EC2TestCase):
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "MismatchError: 'InvalidParameterValue' != 'ValidationError'")
     def test_create_invalid_name_desc(self):
-        valid = base.rand_name('sgName')
+        valid = data_utils.rand_name('sgName')
         invalid = 'name%"'
         resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
                                                      GroupName=invalid,
@@ -106,8 +107,8 @@ class SecurityGroupTest(base.EC2TestCase):
                          'IpPermissionsEgress')
 
     def _test_rules(self, add_func, del_func, field):
-        name = base.rand_name('sgName')
-        desc = base.rand_name('sgDesc')
+        name = data_utils.rand_name('sgName')
+        desc = data_utils.rand_name('sgDesc')
         resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
                                                      GroupName=name,
                                                      Description=desc)

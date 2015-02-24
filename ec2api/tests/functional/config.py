@@ -19,7 +19,7 @@ import logging as std_logging
 import os
 
 from oslo.config import cfg
-from tempest_lib.openstack.common import log as logging
+from oslo_log import log as logging
 
 
 def register_opt_group(conf, opt_group, options):
@@ -82,10 +82,6 @@ class ConfigPrivate(object):
 
     DEFAULT_CONFIG_FILE = "functional_tests.conf"
 
-    def _set_attrs(self):
-        self.aws = cfg.CONF.aws
-        self.debug = cfg.CONF.debug
-
     def __init__(self, parse_conf=True):
         """Initialize a configuration from a conf directory and conf file."""
         super(ConfigPrivate, self).__init__()
@@ -102,11 +98,10 @@ class ConfigPrivate(object):
             config_files.append(path)
 
         cfg.CONF([], project='ec2api', default_config_files=config_files)
-        logging.setup('ec2api')
         LOG = logging.getLogger('ec2api')
         LOG.info("Using ec2api config file %s" % path)
         register_opts()
-        self._set_attrs()
+        self.aws = cfg.CONF.aws
         if parse_conf:
             cfg.CONF.log_opt_values(LOG, std_logging.DEBUG)
 

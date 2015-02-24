@@ -15,15 +15,14 @@
 
 import functools
 import logging
-import random
 import sys
 import time
 import traceback
 
+from oslo_log import log
 import six
 from tempest_lib import base
 from tempest_lib import exceptions
-from tempest_lib.openstack.common import log
 import testtools
 
 from ec2api.tests.functional import botocoreclient
@@ -36,15 +35,6 @@ logging.getLogger('botocore').setLevel(logging.INFO)
 logging.getLogger(
     'botocore.vendored.requests.packages.urllib3.connectionpool'
 ).setLevel(logging.WARNING)
-
-
-# TODO(andrey-mp): remove it when new tempest_lib with this will be
-def rand_name(name=''):
-    randbits = str(random.randint(1, 0x7fffffff))
-    if name:
-        return name + '-' + randbits
-    else:
-        return randbits
 
 
 class EC2ErrorConverter(object):

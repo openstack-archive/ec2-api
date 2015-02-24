@@ -14,7 +14,8 @@
 
 import math
 
-from tempest_lib.openstack.common import log
+from oslo_log import log
+from tempest_lib.common.utils import data_utils
 import testtools
 
 from ec2api.tests.functional import base
@@ -402,7 +403,7 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
                                                   final_set=('completed'))
 
         kwargs = {
-            'Name': base.rand_name('ebs-ami'),
+            'Name': data_utils.rand_name('ebs-ami'),
             'RootDeviceName': instance['RootDeviceName'],
             'BlockDeviceMappings': [{'DeviceName': instance['RootDeviceName'],
                                      'Ebs': {'SnapshotId': snapshot_id,

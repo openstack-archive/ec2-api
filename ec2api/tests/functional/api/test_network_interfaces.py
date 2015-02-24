@@ -15,7 +15,8 @@
 
 import time
 
-from tempest_lib.openstack.common import log
+from oslo_log import log
+from tempest_lib.common.utils import data_utils
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -71,7 +72,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
 
         kwargs = {
             'SubnetId': subnet_id,
-            'Description': base.rand_name('ni')
+            'Description': data_utils.rand_name('ni')
         }
         resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -98,7 +99,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
     def test_create_network_interface(self):
         kwargs = {
             'SubnetId': self.subnet_id,
-            'Description': base.rand_name('ni')
+            'Description': data_utils.rand_name('ni')
         }
         resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -317,7 +318,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.get_network_interface_waiter().wait_delete(ni_id)
 
     def test_network_interface_attribute(self):
-        desc = base.rand_name('ni')
+        desc = data_utils.rand_name('ni')
         kwargs = {
             'SubnetId': self.subnet_id,
             'Description': desc
@@ -335,7 +336,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(desc, data['Description']['Value'])
 
-        new_desc = base.rand_name('new-ni')
+        new_desc = data_utils.rand_name('new-ni')
         kwargs = {
             'NetworkInterfaceId': ni_id,
             'Description': {'Value': new_desc}
