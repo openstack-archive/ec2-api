@@ -235,7 +235,9 @@ class EC2TestCase(base.BaseTestCase):
     @safe_setup
     def setUpClass(cls):
         super(EC2TestCase, cls).setUpClass()
-        cls.client = botocoreclient.APIClientEC2()
+        cls.client = botocoreclient.APIClientEC2(
+            CONF.aws.ec2_url, CONF.aws.aws_region,
+            CONF.aws.aws_access, CONF.aws.aws_secret)
         TesterStateHolder().ec2_client = cls.client
 
     @classmethod

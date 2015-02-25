@@ -18,23 +18,18 @@ import types
 from botocore import session
 from oslo_log import log as logging
 
-from ec2api.tests.functional import config as cfg
-
-CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 
 class BotocoreClientBase(object):
 
-    def __init__(self, *args, **kwargs):
-        self.region = CONF.aws.aws_region
+    def __init__(self, region, access, secret):
+        self.region = region
         self.connection_data = {
             'config_file': (None, 'AWS_CONFIG_FILE', None),
             'region': ('region', 'BOTO_DEFAULT_REGION', self.region),
         }
 
-        access = CONF.aws.aws_access
-        secret = CONF.aws.aws_secret
         if not access or not secret:
             raise Exception('Auth params did not provided')
 
@@ -57,9 +52,10 @@ class BotocoreClientBase(object):
 
 class APIClientEC2(BotocoreClientBase):
 
-    def __init__(self, *args, **kwargs):
-        super(APIClientEC2, self).__init__(*args, **kwargs)
+    def __init__(self, url, region, access, secret, *args, **kwargs):
+        super(APIClientEC2, self).__init__(region, access, secret,
+                                           *args, **kwargs)
         self.service = self.session.get_service('ec2')
         self.endpoint = self.service.get_endpoint(
             region_name=self.region,
-            endpoint_url=CONF.aws.ec2_url)
+            endpoint_url=url)
