@@ -32,8 +32,6 @@ from ec2api.tests.unit import tools
 
 class InstanceTestCase(base.ApiTestCase):
 
-    # TODO(ft): make negative tests on invalid parameters
-
     def setUp(self):
         super(InstanceTestCase, self).setUp()
         network_interface_api_patcher = mock.patch(
@@ -137,8 +135,8 @@ class InstanceTestCase(base.ApiTestCase):
             if create_network_interface_kwargs is not None:
                 (self.network_interface_api.
                  create_network_interface.assert_called_once_with(
-                    mock.ANY, fakes.ID_EC2_SUBNET_1,
-                    **create_network_interface_kwargs))
+                     mock.ANY, fakes.ID_EC2_SUBNET_1,
+                     **create_network_interface_kwargs))
             self.nova_servers.create.assert_called_once_with(
                 '%s-%s' % (fakes.ID_EC2_RESERVATION_1, 0),
                 fakes.ID_OS_IMAGE_1, self.fake_flavor,
@@ -153,9 +151,9 @@ class InstanceTestCase(base.ApiTestCase):
                 mock.ANY, 'i', tools.purge_dict(fakes.DB_INSTANCE_1, ('id',)))
             (self.network_interface_api.
              _attach_network_interface_item.assert_called_once_with(
-                mock.ANY, fakes.DB_NETWORK_INTERFACE_1,
-                fakes.ID_EC2_INSTANCE_1, 0,
-                delete_on_termination=delete_port_on_termination))
+                 mock.ANY, fakes.DB_NETWORK_INTERFACE_1,
+                 fakes.ID_EC2_INSTANCE_1, 0,
+                 delete_on_termination=delete_port_on_termination))
             self.novadb.instance_get_by_uuid.assert_called_once_with(
                 mock.ANY, fakes.ID_OS_INSTANCE_1)
             get_ec2_network_interfaces.assert_called_once_with(
@@ -187,10 +185,10 @@ class InstanceTestCase(base.ApiTestCase):
 
         do_check({'NetworkInterface.1.DeviceIndex': '0',
                   'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
-                  'NetworkInterface.1.SecurityGroupId.1':
-                        fakes.ID_EC2_SECURITY_GROUP_1,
-                  'NetworkInterface.1.PrivateIpAddress.1':
-                        fakes.IP_FIRST_SUBNET_1},
+                  'NetworkInterface.1.SecurityGroupId.1': (
+                        fakes.ID_EC2_SECURITY_GROUP_1),
+                  'NetworkInterface.1.PrivateIpAddress.1': (
+                        fakes.IP_FIRST_SUBNET_1)},
                  create_network_interface_kwargs={
                     'security_group_id': [fakes.ID_EC2_SECURITY_GROUP_1],
                     'private_ip_address': [fakes.IP_FIRST_SUBNET_1]})
@@ -202,16 +200,16 @@ class InstanceTestCase(base.ApiTestCase):
                  delete_on_termination=False)
         do_check({'NetworkInterface.1.DeviceIndex': '0',
                   'NetworkInterface.1.SubnetId': fakes.ID_EC2_SUBNET_1,
-                  'NetworkInterface.1.SecurityGroupId.1':
-                        fakes.ID_EC2_SECURITY_GROUP_1,
+                  'NetworkInterface.1.SecurityGroupId.1': (
+                        fakes.ID_EC2_SECURITY_GROUP_1),
                   'NetworkInterface.1.DeleteOnTermination': 'False'},
                  create_network_interface_kwargs={
                     'security_group_id': [fakes.ID_EC2_SECURITY_GROUP_1]},
                  delete_on_termination=False)
 
         do_check({'NetworkInterface.1.DeviceIndex': '0',
-                  'NetworkInterface.1.NetworkInterfaceId':
-                        fakes.ID_EC2_NETWORK_INTERFACE_1})
+                  'NetworkInterface.1.NetworkInterfaceId': (
+                        fakes.ID_EC2_NETWORK_INTERFACE_1)})
 
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
                 'get_ec2_network_interfaces')
@@ -297,14 +295,14 @@ class InstanceTestCase(base.ApiTestCase):
                                         zip(*[iter(self.IDS_OS_PORT)] * 2))])
         (self.network_interface_api.
          _attach_network_interface_item.assert_has_calls([
-            mock.call(mock.ANY, eni, ec2_instance_id, dev_ind,
-                      delete_on_termination=dot)
-            for eni, ec2_instance_id, dev_ind, dot in zip(
-                self.DB_DETACHED_ENIS,
-                itertools.chain(*map(lambda i: [i] * 2,
-                                     self.IDS_EC2_INSTANCE)),
-                [0, 1] * 2,
-                [True, False, True, False])]))
+             mock.call(mock.ANY, eni, ec2_instance_id, dev_ind,
+                       delete_on_termination=dot)
+             for eni, ec2_instance_id, dev_ind, dot in zip(
+                 self.DB_DETACHED_ENIS,
+                 itertools.chain(*map(lambda i: [i] * 2,
+                                      self.IDS_EC2_INSTANCE)),
+                 [0, 1] * 2,
+                 [True, False, True, False])]))
         self.db_api.add_item.assert_has_calls([
             mock.call(mock.ANY, 'i', tools.purge_dict(db_instance, ['id']))
             for db_instance in self.DB_INSTANCES])
@@ -376,7 +374,7 @@ class InstanceTestCase(base.ApiTestCase):
         do_check(
             instance_api.InstanceEngineNeutron(),
             extra_kwargs={
-               'nics': [
+                'nics': [
                     {'net-id': get_ec2_classic_os_network.return_value['id']}],
             },
             extra_db_instance={'vpc_id': None})
@@ -489,8 +487,8 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.get_db_api_get_item_by_id(
                 {fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
                  fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
-                 fakes.ID_EC2_NETWORK_INTERFACE_1:
-                        fakes.DB_NETWORK_INTERFACE_1}))
+                 fakes.ID_EC2_NETWORK_INTERFACE_1: (
+                        fakes.DB_NETWORK_INTERFACE_1)}))
         self.db_api.get_item_ids.return_value = [
                 (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
@@ -553,8 +551,8 @@ class InstanceTestCase(base.ApiTestCase):
                  delete_on_termination=False)
 
         do_check({'NetworkInterface.1.DeviceIndex': '0',
-                  'NetworkInterface.1.NetworkInterfaceId':
-                        fakes.ID_EC2_NETWORK_INTERFACE_1},
+                  'NetworkInterface.1.NetworkInterfaceId': (
+                        fakes.ID_EC2_NETWORK_INTERFACE_1)},
                  new_port=False)
 
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
@@ -612,8 +610,8 @@ class InstanceTestCase(base.ApiTestCase):
                             matchers.DictMatches(
                                 {'reservationId': fakes.ID_EC2_RESERVATION_1,
                                  'instancesSet': [
-                                    {'instanceId': inst['id']}
-                                    for inst in instances[:2]]}))
+                                     {'instanceId': inst['id']}
+                                     for inst in instances[:2]]}))
 
             self.nova_servers.delete.assert_called_once_with(
                 instances[2]['os_id'])
@@ -628,7 +626,7 @@ class InstanceTestCase(base.ApiTestCase):
          assert_called_once_with(mock.ANY, network_interfaces[2]))
         (self.network_interface_api.delete_network_interface.
          assert_called_once_with(
-            mock.ANY, network_interface_id=network_interfaces[2]['id']))
+             mock.ANY, network_interface_id=network_interfaces[2]['id']))
 
         do_check(instance_api.InstanceEngineNova())
 
@@ -695,7 +693,7 @@ class InstanceTestCase(base.ApiTestCase):
             set([fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]))
         (self.network_interface_api.
          detach_network_interface.assert_called_once_with(
-            mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH))
+             mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH))
         self.assertEqual(2, self.nova_servers.get.call_count)
         self.nova_servers.get.assert_any_call(fakes.ID_OS_INSTANCE_1)
         self.nova_servers.get.assert_any_call(fakes.ID_OS_INSTANCE_2)
@@ -927,7 +925,7 @@ class InstanceTestCase(base.ApiTestCase):
               fakes.ROOT_DEVICE_NAME_INSTANCE_2),
              ('client-token', fakes.CLIENT_TOKEN_INSTANCE_2),
              # TODO(ft): support filtering by none/empty value
-#              ('dns-name', ''),
+             # ('dns-name', ''),
              ('image-id', fakes.ID_EC2_IMAGE_1),
              ('instance-id', fakes.ID_EC2_INSTANCE_2),
              ('instance-type', 'fake_flavor'),
@@ -935,9 +933,9 @@ class InstanceTestCase(base.ApiTestCase):
              ('kernel-id', fakes.ID_EC2_IMAGE_AKI_1),
              ('key-name', fakes.NAME_KEY_PAIR),
              # TODO(ft): support filtering by a none/empty value
-#              ('launch-index', 0),
+             # ('launch-index', 0),
              # TODO(ft): fill the field in fakes with correct value
-#              ('launch-time', ),
+             # ('launch-time', ),
              ('private-dns-name', '%s-%s' % (fakes.ID_EC2_RESERVATION_1, 0)),
              ('private-ip-address', fakes.IP_NETWORK_INTERFACE_2),
              ('ramdisk-id', fakes.ID_EC2_IMAGE_ARI_1),
@@ -953,14 +951,14 @@ class InstanceTestCase(base.ApiTestCase):
               fakes.ID_EC2_NETWORK_INTERFACE_2),
              ('network-interface.owner-id', fakes.ID_OS_PROJECT),
              # TODO(ft): support filtering by a boolean value
-#              ('network-interface.requester-managed', False),
+             # ('network-interface.requester-managed', False),
              ('network-interface.status', 'in-use'),
              # TODO(ft): declare a constant for the mac in fakes
              ('network-interface.mac-address', 'fb:10:2e:b2:ba:b7'),
              # TODO(ft): support filtering by a boolean value
-#              ('network-interface.source-destination-check', True),
-            ('reservation-id', fakes.ID_EC2_RESERVATION_1),
-            ('owner-id', fakes.ID_OS_PROJECT)])
+             # ('network-interface.source-destination-check', True),
+             ('reservation-id', fakes.ID_EC2_RESERVATION_1),
+             ('owner-id', fakes.ID_OS_PROJECT)])
         self.check_tag_support(
             'DescribeInstances', ['reservationSet', 'instancesSet'],
             fakes.ID_EC2_INSTANCE_1, 'instanceId')
@@ -1035,9 +1033,9 @@ class InstanceTestCase(base.ApiTestCase):
                             ec2_network_interfaces=enis,
                             reservation_id=fakes.ID_EC2_RESERVATION_1)
                          for l_i, (inst_id, ip, enis) in enumerate(zip(
-                            self.IDS_EC2_INSTANCE,
-                            ec2_instance_ips,
-                            ec2_enis_by_instance))]
+                             self.IDS_EC2_INSTANCE,
+                             ec2_instance_ips,
+                             ec2_enis_by_instance))]
             reservation_set = [fakes.gen_ec2_reservation(
                                     fakes.ID_EC2_RESERVATION_1, instances)]
             self.assertThat({'reservationSet': reservation_set},
@@ -1313,6 +1311,254 @@ class InstanceTestCase(base.ApiTestCase):
 
 class InstancePrivateTestCase(test_base.BaseTestCase):
 
+    def test_merge_network_interface_parameters(self):
+        engine = instance_api.InstanceEngineNeutron()
+
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, 'subnet-1', None, None,
+            [{'device_index': 0, 'private_ip_address': '10.10.10.10'}])
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, None, '10.10.10.10', None,
+            [{'device_index': 0, 'subnet_id': 'subnet-1'}])
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            ['default'], None, None, None,
+            [{'device_index': 0, 'subnet_id': 'subnet-1'}])
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, None, None, ['sg-1'],
+            [{'device_index': 0, 'subnet_id': 'subnet-1'}])
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, 'subnet-1', None, None,
+            [{'device_index': 1, 'associate_public_ip_address': True}])
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, 'subnet-1', None, None,
+            [{'device_index': 0, 'associate_public_ip_address': True},
+             {'device_index': 1, 'subnet_id': 'subnet-2'}])
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, 'subnet-1', None, None,
+            [{'device_index': 0}])
+
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            ['default'], 'subnet-1', None, None, None)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, None, '10.10.10.10', None, None)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.merge_network_interface_parameters,
+            None, None, None, ['sg-1'], None)
+
+        self.assertEqual(
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1'}]),
+            engine.merge_network_interface_parameters(
+                None, 'subnet-1', None, None, None))
+        self.assertEqual(
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1',
+                     'private_ip_address': '10.10.10.10'}]),
+            engine.merge_network_interface_parameters(
+                None, 'subnet-1', '10.10.10.10', None, None))
+        self.assertEqual(
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1',
+                     'private_ip_address': '10.10.10.10',
+                     'security_group_id': ['sg-1']}]),
+            engine.merge_network_interface_parameters(
+                None, 'subnet-1', '10.10.10.10', ['sg-1'], None))
+        self.assertEqual(
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1',
+                     'security_group_id': ['sg-1']}]),
+            engine.merge_network_interface_parameters(
+                None, 'subnet-1', None, ['sg-1'], None))
+
+        self.assertEqual(
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1'}]),
+            engine.merge_network_interface_parameters(
+                None, None, None, None,
+                [{'device_index': 0, 'subnet_id': 'subnet-1'}]))
+        self.assertEqual(
+            (['default'], []),
+            engine.merge_network_interface_parameters(
+                ['default'], None, None, None, None))
+        self.assertEqual((None, []),
+                         engine.merge_network_interface_parameters(
+                                None, None, None, None, None))
+
+    def test_check_network_interface_parameters(self):
+        engine = instance_api.InstanceEngineNeutron()
+
+        self.assertRaises(
+            exception.InvalidParameterValue,
+            engine.check_network_interface_parameters,
+            [{'subnet_id': 'subnet-1'}], False)
+        self.assertRaises(
+            exception.InvalidParameterValue,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0, 'subnet_id': 'subnet-1'},
+             {'device_index': 0, 'subnet_id': 'subnet-2'}], False)
+        self.assertRaises(
+            exception.InvalidParameterValue,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0, 'private_ip_address': '10.10.10.10'}], False)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0,
+              'network_interface_id': 'eni-1',
+              'subnet_id': 'subnet-1'}],
+            False)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0,
+              'network_interface_id': 'eni-1',
+              'private_ip_address': '10.10.10.10'}],
+            False)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0,
+              'network_interface_id': 'eni-1',
+              'security_group_id': ['sg-1']}],
+            False)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0,
+              'network_interface_id': 'eni-1',
+              'delete_on_termination': True}],
+            False)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0, 'network_interface_id': 'eni-1'}],
+            True)
+        self.assertRaises(
+            exception.InvalidParameterCombination,
+            engine.check_network_interface_parameters,
+            [{'device_index': 0,
+              'subnet_id': 'subnet-1',
+              'private_ip_address': '10.10.10.10'}],
+            True)
+        self.assertRaises(
+            exception.UnsupportedOperation,
+            engine.check_network_interface_parameters,
+            [{'device_index': 1, 'subnet_id': 'subnet-1'}], False)
+
+        engine.check_network_interface_parameters(
+            [{'device_index': 0, 'subnet_id': 'subnet-1'}], False)
+        engine.check_network_interface_parameters(
+            [{'device_index': 0,
+              'subnet_id': 'subnet-1',
+              'private_ip_address': '10.10.10.10',
+              'security_group_id': ['sg-1'],
+              'delete_on_termination': True}],
+            False)
+        engine.check_network_interface_parameters(
+            [{'device_index': 0, 'network_interface_id': 'eni-1'}], False)
+        engine.check_network_interface_parameters(
+            [{'device_index': 0,
+              'subnet_id': 'subnet-1',
+              'security_group_id': ['sg-1'],
+              'delete_on_termination': True},
+             {'device_index': 1,
+              'subnet_id': 'subnet-2'}],
+            True)
+        engine.check_network_interface_parameters([], False)
+
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_parse_network_interface_parameters(self, db_api):
+        engine = instance_api.InstanceEngineNeutron()
+        context = mock.Mock()
+        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id({
+            fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
+            fakes.ID_EC2_SUBNET_2: tools.update_dict(
+                                         fakes.DB_SUBNET_2,
+                                         {'vpc_id': fakes.ID_EC2_VPC_2}),
+            fakes.ID_EC2_NETWORK_INTERFACE_1: fakes.DB_NETWORK_INTERFACE_1,
+            fakes.ID_EC2_NETWORK_INTERFACE_2: fakes.DB_NETWORK_INTERFACE_2})
+
+        resp = engine.parse_network_interface_parameters(
+            context,
+            [{'device_index': 1,
+              'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1},
+             {'device_index': 0,
+              'subnet_id': fakes.ID_EC2_SUBNET_1,
+              'delete_on_termination': False,
+              'security_group_id': [fakes.ID_EC2_SECURITY_GROUP_1]}])
+        self.assertEqual(
+            (fakes.ID_EC2_VPC_1,
+             [{'device_index': 0,
+               'create_args': (fakes.ID_EC2_SUBNET_1,
+                               {'security_group_id': (
+                                     [fakes.ID_EC2_SECURITY_GROUP_1])}),
+               'delete_on_termination': False},
+              {'device_index': 1,
+               'network_interface': fakes.DB_NETWORK_INTERFACE_1,
+               'detach_on_crash': True,
+               'delete_on_termination': False}]),
+            resp)
+        resp = engine.parse_network_interface_parameters(
+            context,
+            [{'device_index': 0,
+              'subnet_id': fakes.ID_EC2_SUBNET_1,
+              'associate_public_ip_address': True}])
+        self.assertEqual(
+            (fakes.ID_EC2_VPC_1,
+             [{'device_index': 0,
+               'create_args': (fakes.ID_EC2_SUBNET_1, {}),
+               'delete_on_termination': True}]),
+            resp)
+
+        # NOTE(ft): a network interface has being attached twice
+        self.assertRaises(
+            exception.InvalidParameterValue,
+            engine.parse_network_interface_parameters, context,
+            [{'device_index': 0,
+              'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1},
+             {'device_index': 1,
+              'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1}])
+        # NOTE(ft): a network interface is in use
+        self.assertRaises(
+            exception.InvalidNetworkInterfaceInUse,
+            engine.parse_network_interface_parameters, context,
+            [{'device_index': 0,
+              'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_2}])
+        # NOTE(ft): specified objects are belonging to different VPCs
+        self.assertRaises(
+            exception.InvalidParameterValue,
+            engine.parse_network_interface_parameters, context,
+            [{'device_index': 0,
+              'subnet_id': fakes.ID_EC2_SUBNET_1},
+             {'device_index': 1,
+              'subnet_id': fakes.ID_EC2_SUBNET_2}])
+        self.assertRaises(
+            exception.InvalidParameterValue,
+            engine.parse_network_interface_parameters, context,
+            [{'device_index': 0,
+              'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1},
+             {'device_index': 1,
+              'subnet_id': fakes.ID_EC2_SUBNET_2}])
+
     @mock.patch('glanceclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_image_parameters(self, db_api, glance):
@@ -1551,9 +1797,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                     'delete_on_termination': False,
                                     'snapshot_id': '1',
                                     'volume_id': '21',
-                                    'no_device': False}]
-
-                }))
+                                    'no_device': False}]}))
 
         db_volumes_1 = {'2': {'id': 'vol-00000002'},
                         '3': {'id': 'vol-00000003'},

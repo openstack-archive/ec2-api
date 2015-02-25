@@ -959,15 +959,15 @@ class InstanceEngineNeutron(object):
                 msg = _('Each network interface requires either a subnet or '
                         'a network interface ID.')
                 raise exception.InvalidParameterValue(msg)
-            if ni_exists and (subnet_exists or ip_exists):
-                param = (_('subnet') if subnet_exists else
-                         _('private IP address'))
+            if ni_exists and (subnet_exists or ip_exists or
+                              param.get('security_group_id') or
+                              param.get('delete_on_termination')):
+                param = (_('a subnet') if subnet_exists else
+                         _('a private IP address') if ip_exists else
+                         _('security groups') if param.get('security_group_id')
+                         else _('delete on termination as true'))
                 msg = _('A network interface may not specify both a network '
-                        'interface ID and a %(param)s') % {'param': param}
-                raise exception.InvalidParameterCombination(msg)
-            if ni_exists and param.get('delete_on_termination'):
-                msg = _('A network interface may not specify a network '
-                        'interface ID and delete on termination as true')
+                        'interface ID and %(param)s') % {'param': param}
                 raise exception.InvalidParameterCombination(msg)
             if multiple_instances and (ni_exists or ip_exists):
                 msg = _('Multiple instances creation is not compatible with '
@@ -991,14 +991,10 @@ class InstanceEngineNeutron(object):
             if 'network_interface_id' in param:
                 ec2_eni_id = param['network_interface_id']
                 if ec2_eni_id in network_interface_ids:
-                    msg = _("Network interface ID '%(network_interface_id)s' "
+                    msg = _("Network interface ID '%(id)s' "
                             "may not be specified on multiple interfaces.")
-                    msg = msg % {'network_interface_id': ec2_eni_id}
+                    msg = msg % {'id': ec2_eni_id}
                     raise exception.InvalidParameterValue(msg)
-                if 'security_group_id' in param:
-                    msg = _('A network interface may not specify both a '
-                            'network interface ID and security groups')
-                    raise exception.InvalidParameterCombination
                 network_interface = ec2utils.get_db_item(context, 'eni',
                                                          ec2_eni_id)
                 if 'instance_id' in network_interface:
