@@ -34,7 +34,7 @@ def create_volume(context, availability_zone=None, size=None,
                   snapshot_id=None, volume_type=None, iops=None,
                   encrypted=None, kms_key_id=None):
     if snapshot_id is not None:
-        snapshot = ec2utils.get_db_item(context, 'snap', snapshot_id)
+        snapshot = ec2utils.get_db_item(context, snapshot_id)
         os_snapshot_id = snapshot['os_id']
     else:
         os_snapshot_id = None
@@ -54,8 +54,8 @@ def create_volume(context, availability_zone=None, size=None,
 
 
 def attach_volume(context, volume_id, instance_id, device):
-    volume = ec2utils.get_db_item(context, 'vol', volume_id)
-    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    volume = ec2utils.get_db_item(context, volume_id)
+    instance = ec2utils.get_db_item(context, instance_id)
 
     nova = clients.nova(context)
     try:
@@ -72,7 +72,7 @@ def attach_volume(context, volume_id, instance_id, device):
 
 def detach_volume(context, volume_id, instance_id=None, device=None,
                   force=None):
-    volume = ec2utils.get_db_item(context, 'vol', volume_id)
+    volume = ec2utils.get_db_item(context, volume_id)
 
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
@@ -92,7 +92,7 @@ def detach_volume(context, volume_id, instance_id=None, device=None,
 
 
 def delete_volume(context, volume_id):
-    volume = ec2utils.get_db_item(context, 'vol', volume_id)
+    volume = ec2utils.get_db_item(context, volume_id)
     cinder = clients.cinder(context)
     try:
         cinder.volumes.delete(volume['os_id'])

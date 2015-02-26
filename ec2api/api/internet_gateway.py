@@ -55,14 +55,14 @@ def create_internet_gateway(context):
 
 
 def attach_internet_gateway(context, internet_gateway_id, vpc_id):
-    igw = ec2utils.get_db_item(context, 'igw', internet_gateway_id)
+    igw = ec2utils.get_db_item(context, internet_gateway_id)
     if igw.get('vpc_id'):
         msg_params = {'igw_id': igw['id'],
                       'vpc_id': igw['vpc_id']}
         msg = _("resource %(igw_id)s is already attached to "
                 "network %(vpc_id)s") % msg_params
         raise exception.ResourceAlreadyAssociated(msg)
-    vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
+    vpc = ec2utils.get_db_item(context, vpc_id)
     # TODO(ft): move search by vpc_id to DB api
     for gw in db_api.get_items(context, 'igw'):
         if gw.get('vpc_id') == vpc['id']:
@@ -86,8 +86,8 @@ def attach_internet_gateway(context, internet_gateway_id, vpc_id):
 
 
 def detach_internet_gateway(context, internet_gateway_id, vpc_id):
-    igw = ec2utils.get_db_item(context, 'igw', internet_gateway_id)
-    vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
+    igw = ec2utils.get_db_item(context, internet_gateway_id)
+    vpc = ec2utils.get_db_item(context, vpc_id)
     if igw.get('vpc_id') != vpc['id']:
         raise exception.GatewayNotAttached(igw_id=igw['id'],
                                            vpc_id=vpc['id'])
@@ -106,7 +106,7 @@ def detach_internet_gateway(context, internet_gateway_id, vpc_id):
 
 
 def delete_internet_gateway(context, internet_gateway_id):
-    igw = ec2utils.get_db_item(context, 'igw', internet_gateway_id)
+    igw = ec2utils.get_db_item(context, internet_gateway_id)
     if igw.get('vpc_id'):
         msg = _("The internetGateway '%(igw_id)s' has dependencies and "
                 "cannot be deleted.") % {'igw_id': igw['id']}

@@ -30,7 +30,7 @@ Validator = common.Validator
 
 
 def create_snapshot(context, volume_id, description=None):
-    volume = ec2utils.get_db_item(context, 'vol', volume_id)
+    volume = ec2utils.get_db_item(context, volume_id)
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
     # NOTE(ft): Easy fix to allow snapshot creation in statuses other than
@@ -55,7 +55,7 @@ def create_snapshot(context, volume_id, description=None):
 
 
 def delete_snapshot(context, snapshot_id):
-    snapshot = ec2utils.get_db_item(context, 'snap', snapshot_id)
+    snapshot = ec2utils.get_db_item(context, snapshot_id)
     cinder = clients.cinder(context)
     try:
         cinder.volume_snapshots.delete(snapshot['os_id'])

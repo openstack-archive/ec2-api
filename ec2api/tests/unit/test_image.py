@@ -521,6 +521,10 @@ class S3TestCase(base.ApiTestCase):
                 'ari': ({'id': fakes.ID_EC2_IMAGE_ARI_1,
                          'os_id': fakes.ID_OS_IMAGE_ARI_1},)}))
         self.db_api.get_item_by_id.return_value = None
+        self.glance.images.get.side_effect = (
+            fakes.get_by_1st_arg_getter({
+                fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
+                fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
 
         fake_context = self._create_context()
         metadata, image_parts, key, iv = image_api._s3_parse_manifest(

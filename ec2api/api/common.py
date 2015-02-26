@@ -425,7 +425,7 @@ class TaggableItemsDescriber(UniversalDescriber):
                         return True
             return False
         return super(TaggableItemsDescriber,
-            self).is_filtering_value_found(filter_value, value)
+                     self).is_filtering_value_found(filter_value, value)
 
 
 class NonOpenstackItemsDescriber(UniversalDescriber):

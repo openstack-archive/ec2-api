@@ -32,7 +32,7 @@ class EC2UtilsTestCase(testtools.TestCase):
 
         def check_normal_flow(kind, ec2_id):
             item['id'] = ec2_id
-            res = ec2utils.get_db_item('fake_context', kind, ec2_id)
+            res = ec2utils.get_db_item('fake_context', ec2_id)
             self.assertThat(res, matchers.DictMatches(item))
             db_api.get_item_by_id.assert_called_once_with('fake_context',
                                                           kind, ec2_id)
@@ -45,7 +45,7 @@ class EC2UtilsTestCase(testtools.TestCase):
             ec2_id = fakes.random_ec2_id(kind)
             self.assertRaises(ex_class,
                               ec2utils.get_db_item,
-                              'fake_context', kind, ec2_id)
+                              'fake_context', ec2_id)
             db_api.get_item_by_id.assert_called_once_with('fake_context',
                                                           kind, ec2_id)
             db_api.reset_mock()

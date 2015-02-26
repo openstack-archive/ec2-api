@@ -314,8 +314,7 @@ def start_instances(context, instance_id):
 
 
 def get_password_data(context, instance_id):
-    # NOTE(Alex): AWS supports one and only one instance_id here
-    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    instance = ec2utils.get_db_item(context, instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
     password = os_instance.get_password()
@@ -328,8 +327,7 @@ def get_password_data(context, instance_id):
 
 
 def get_console_output(context, instance_id):
-    # NOTE(Alex): AWS supports one and only one instance_id here
-    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    instance = ec2utils.get_db_item(context, instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
     console_output = os_instance.get_console_output()
@@ -340,7 +338,7 @@ def get_console_output(context, instance_id):
 
 
 def describe_instance_attribute(context, instance_id, attribute):
-    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    instance = ec2utils.get_db_item(context, instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
     novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
@@ -980,8 +978,8 @@ class InstanceEngineNeutron(object):
                             "may not be specified on multiple interfaces.")
                     msg = msg % {'id': ec2_eni_id}
                     raise exception.InvalidParameterValue(msg)
-                network_interface = ec2utils.get_db_item(context, 'eni',
-                                                         ec2_eni_id)
+                network_interface = ec2utils.get_db_item(context, ec2_eni_id,
+                                                         'eni')
                 if 'instance_id' in network_interface:
                     busy_network_interfaces.append(ec2_eni_id)
                 vpc_ids.add(network_interface['vpc_id'])
@@ -991,8 +989,8 @@ class InstanceEngineNeutron(object):
                                      'detach_on_crash': True,
                                      'delete_on_termination': False})
             else:
-                subnet = ec2utils.get_db_item(context, 'subnet',
-                                              param['subnet_id'])
+                subnet = ec2utils.get_db_item(context, param['subnet_id'],
+                                              'subnet')
                 vpc_ids.add(subnet['vpc_id'])
                 args = copy.deepcopy(param)
                 delete_on_termination = args.pop('delete_on_termination', True)
@@ -1043,9 +1041,8 @@ class InstanceEngineNeutron(object):
             filter=[{'name': 'vpc-id', 'value': [vpc_id]},
                     {'name': 'group-name', 'value': ['default']}]
         )['securityGroupInfo']
-        security_groups = [ec2utils.get_db_item(context, 'sg',
-                                                default_group['groupId'])
-                           for default_group in default_groups]
+        security_groups = db_api.get_items_by_ids(
+            context, 'sg', [sg['groupId'] for sg in default_groups])
         return [sg['os_id'] for sg in security_groups]
 
     def get_ec2_classic_os_network(self, context, neutron):
@@ -1175,10 +1172,10 @@ def _cloud_parse_block_device_mapping(context, bdm):
         ec2_id = ebs.pop('snapshot_id', None)
         if ec2_id:
             if ec2_id.startswith('snap-'):
-                snapshot = ec2utils.get_db_item(context, 'snap', ec2_id)
+                snapshot = ec2utils.get_db_item(context, ec2_id)
                 bdm['snapshot_id'] = snapshot['os_id']
             elif ec2_id.startswith('vol-'):
-                volume = ec2utils.get_db_item(context, 'vol', ec2_id)
+                volume = ec2utils.get_db_item(context, ec2_id)
                 bdm['volume_id'] = volume['os_id']
             else:
                 # NOTE(ft): AWS returns undocumented InvalidSnapshotID.NotFound

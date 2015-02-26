@@ -41,7 +41,7 @@ Validator = common.Validator
 
 def create_subnet(context, vpc_id, cidr_block,
                   availability_zone=None):
-    vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
+    vpc = ec2utils.get_db_item(context, vpc_id)
     vpc_ipnet = netaddr.IPNetwork(vpc['cidr_block'])
     subnet_ipnet = netaddr.IPNetwork(cidr_block)
     if subnet_ipnet not in vpc_ipnet:
@@ -89,7 +89,7 @@ def create_subnet(context, vpc_id, cidr_block,
 
 
 def delete_subnet(context, subnet_id):
-    subnet = ec2utils.get_db_item(context, 'subnet', subnet_id)
+    subnet = ec2utils.get_db_item(context, subnet_id)
     vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
     network_interfaces = network_interface_api.describe_network_interfaces(
         context,
