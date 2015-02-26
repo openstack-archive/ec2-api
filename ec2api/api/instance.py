@@ -19,7 +19,6 @@ import itertools
 import random
 import re
 
-from glanceclient.common import exceptions as glance_exception
 from novaclient import exceptions as nova_exception
 from oslo.config import cfg
 
@@ -610,25 +609,11 @@ def _check_min_max_count(min_count, max_count):
 
 
 def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
-    glance = clients.glance(context)
-
-    # TODO(ft): we can't get all images from DB per one request due different
-    # kinds. It's need to refactor DB API and ec2utils functions to work with
-    # kind smarter
-    def get_os_image(kind, ec2_image_id):
-        images = db_api.get_public_items(context, kind, (ec2_image_id,))
-        image = (images[0] if len(images) else
-                 ec2utils.get_db_item(context, kind, ec2_image_id))
-        try:
-            return glance.images.get(image['os_id'])
-        except glance_exception.HTTPNotFound:
-            raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
-
-    os_kernel_id = (get_os_image('aki', kernel_id).id
+    os_kernel_id = (ec2utils.get_os_image(context, kernel_id).id
                     if kernel_id else None)
-    os_ramdisk_id = (get_os_image('ari', ramdisk_id).id
+    os_ramdisk_id = (ec2utils.get_os_image(context, ramdisk_id).id
                      if ramdisk_id else None)
-    os_image = get_os_image('ami', image_id)
+    os_image = ec2utils.get_os_image(context, image_id)
 
     if _cloud_get_image_state(os_image) != 'available':
         # TODO(ft): Change the message with the real AWS message

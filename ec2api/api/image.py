@@ -188,9 +188,11 @@ def register_image(context, name=None, image_location=None,
     if architecture is not None:
         properties['architecture'] = architecture
     if kernel_id:
-        properties['kernel_id'] = kernel_id
+        properties['kernel_id'] = ec2utils.get_os_image(context,
+                                                        kernel_id).id
     if ramdisk_id:
-        properties['ramdisk_id'] = ramdisk_id
+        properties['ramdisk_id'] = ec2utils.get_os_image(context,
+                                                         ramdisk_id).id
 
     with common.OnCrashCleaner() as cleaner:
         if 'image_location' in properties:
@@ -242,6 +244,9 @@ class ImageDescriber(common.TaggableItemsDescriber):
                              self.ids_dict, self.snapshot_ids)
 
     def get_db_items(self):
+        # TODO(ft): we can't get all images from DB per one request due
+        # different kinds. It's need to refactor DB API and ec2utils functions
+        # to work with kind smarter
         local_images = [db_api.get_items_by_ids(self.context, kind, self.ids)
                         for kind in ('ami', 'ari', 'aki')]
         public_images = [db_api.get_public_items(self.context, kind, self.ids)

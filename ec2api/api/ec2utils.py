@@ -14,6 +14,9 @@
 
 import re
 
+from glanceclient.common import exceptions as glance_exception
+
+from ec2api.api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
@@ -273,3 +276,15 @@ def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
     if ids_by_os_id is not None:
         ids_by_os_id[os_id] = item_id
     return item_id
+
+
+def get_os_image(context, ec2_image_id):
+    kind = get_ec2_id_kind(ec2_image_id)
+    images = db_api.get_public_items(context, kind, (ec2_image_id,))
+    image = (images[0] if len(images) else
+             get_db_item(context, kind, ec2_image_id))
+    glance = clients.glance(context)
+    try:
+        return glance.images.get(image['os_id'])
+    except glance_exception.HTTPNotFound:
+        raise exception.InvalidAMIIDNotFound(id=ec2_image_id)

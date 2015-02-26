@@ -17,7 +17,6 @@ import datetime
 import itertools
 import random
 
-from glanceclient.common import exceptions as glance_exception
 import mock
 from novaclient import exceptions as nova_exception
 from oslotest import base as test_base
@@ -1559,97 +1558,55 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
              {'device_index': 1,
               'subnet_id': fakes.ID_EC2_SUBNET_2}])
 
-    @mock.patch('glanceclient.client.Client')
-    @mock.patch('ec2api.db.api.IMPL')
-    def test_parse_image_parameters(self, db_api, glance):
-        glance = glance.return_value
+    @mock.patch('ec2api.api.ec2utils.get_os_image')
+    def test_parse_image_parameters(self, get_os_image):
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
 
+        # NOTE(ft): check normal flow
+        os_image = fakes.OSImage(fakes.OS_IMAGE_1)
+        get_os_image.side_effect = [
+            fakes.OSImage(fakes.OS_IMAGE_AKI_1),
+            fakes.OSImage(fakes.OS_IMAGE_ARI_1),
+            os_image]
+        self.assertEqual(
+            (os_image, fakes.ID_OS_IMAGE_AKI_1, fakes.ID_OS_IMAGE_ARI_1),
+            instance_api._parse_image_parameters(
+                fake_context, fakes.ID_EC2_IMAGE_1,
+                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1))
+        get_os_image.assert_has_calls(
+            [mock.call(fake_context, fakes.ID_EC2_IMAGE_AKI_1),
+             mock.call(fake_context, fakes.ID_EC2_IMAGE_ARI_1),
+             mock.call(fake_context, fakes.ID_EC2_IMAGE_1)])
+
+        get_os_image.side_effect = None
+        get_os_image.return_value = os_image
+        get_os_image.reset_mock()
+        self.assertEqual(
+            (os_image, None, None),
+            instance_api._parse_image_parameters(
+                fake_context, fakes.ID_EC2_IMAGE_1, None, None))
+        get_os_image.assert_called_once_with(
+                fake_context, fakes.ID_EC2_IMAGE_1)
+
         # NOTE(ft): check cases of not available image
-        image = {'id': fakes.random_ec2_id('ami'),
-                 'os_id': fakes.random_os_id()}
-        db_api.get_public_items.return_value = [image]
         os_image = fakes.OSImage({
-            'id': image['os_id'],
+            'id': fakes.random_os_id(),
             'status': None,
             'properties': {}})
-        glance.images.get.return_value = os_image
+        get_os_image.return_value = os_image
 
-        self.assertRaises(exception.ImageNotActive,
-                          instance_api._parse_image_parameters,
-                          fake_context, image['id'], None, None)
+        self.assertRaises(
+            exception.ImageNotActive,
+            instance_api._parse_image_parameters,
+            fake_context, fakes.random_ec2_id('ami'), None, None)
 
         os_image.status = 'active'
         os_image.properties['image_state'] = 'decrypting'
 
-        self.assertRaises(exception.ImageNotActive,
-                          instance_api._parse_image_parameters,
-                          fake_context, image['id'], None, None)
-
-        # NOTE(ft): check normal flow for user owned images
-        db_api.get_public_items.return_value = []
-        db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
-                fakes.ID_EC2_IMAGE_AKI_1: fakes.DB_IMAGE_AKI_1,
-                fakes.ID_EC2_IMAGE_ARI_1: fakes.DB_IMAGE_ARI_1}))
-        glance.images.get.side_effect = (
-            fakes.get_by_1st_arg_getter({
-                fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
-                fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
-                fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
-
-        self.assertEqual(
-            (fakes.OSImage(fakes.OS_IMAGE_1),
-             fakes.ID_OS_IMAGE_AKI_1, fakes.ID_OS_IMAGE_ARI_1),
-            instance_api._parse_image_parameters(
-                fake_context, fakes.ID_EC2_IMAGE_1,
-                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1))
-
-        # NOTE(ft): check cases of unknown image id
-        self.assertRaises(exception.InvalidAMIIDNotFound,
-                          instance_api._parse_image_parameters,
-                          fake_context, fakes.random_ec2_id('ami'),
-                          fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1)
-        self.assertRaises(exception.InvalidAMIIDNotFound,
-                          instance_api._parse_image_parameters,
-                          fake_context, fakes.ID_EC2_IMAGE_1,
-                          fakes.random_ec2_id('aki'), fakes.ID_EC2_IMAGE_ARI_1)
-        self.assertRaises(exception.InvalidAMIIDNotFound,
-                          instance_api._parse_image_parameters,
-                          fake_context, fakes.ID_EC2_IMAGE_1,
-                          fakes.ID_EC2_IMAGE_AKI_1, fakes.random_ec2_id('ari'))
-
-        # NOTE(ft): check cases of absence of images in OS
-        for n in range(3):
-            glance.images.get.side_effect = (
-                [fakes.OSImage(fakes.OS_IMAGE_1)] * n +
-                [glance_exception.HTTPNotFound()])
-            self.assertRaises(
-                exception.InvalidAMIIDNotFound,
-                instance_api._parse_image_parameters,
-                fake_context, fakes.ID_EC2_IMAGE_1,
-                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1)
-
-        # NOTE(ft): check normal flow for public images
-        db_api.get_item_by_id.side_effect = None
-        db_api.get_public_items.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                (fakes.ID_EC2_IMAGE_1,): [fakes.DB_IMAGE_1],
-                (fakes.ID_EC2_IMAGE_AKI_1,): [fakes.DB_IMAGE_AKI_1],
-                (fakes.ID_EC2_IMAGE_ARI_1,): [fakes.DB_IMAGE_ARI_1]}))
-        glance.images.get.side_effect = (
-            fakes.get_by_1st_arg_getter({
-                fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
-                fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
-                fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
-
-        self.assertEqual(
-            (fakes.OSImage(fakes.OS_IMAGE_1),
-             fakes.ID_OS_IMAGE_AKI_1, fakes.ID_OS_IMAGE_ARI_1),
-            instance_api._parse_image_parameters(
-                fake_context, fakes.ID_EC2_IMAGE_1,
-                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1))
+        self.assertRaises(
+            exception.ImageNotActive,
+            instance_api._parse_image_parameters,
+            fake_context, fakes.random_ec2_id('ami'), None, None)
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_block_device_mapping(self, db_api):

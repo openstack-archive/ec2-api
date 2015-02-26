@@ -377,7 +377,7 @@ class CloudController(object):
     @module_and_param_types(instance, 'ami_id', 'int', 'int',
                             'str255', 'sg_ids',
                             'security_group_strs', 'str', 'str',
-                            'dummy', 'ami_id', 'ami_id',
+                            'dummy', 'aki_id', 'ari_id',
                             'dummy', 'dummy',
                             'subnet_id', 'bool',
                             'str',
@@ -916,8 +916,8 @@ class CloudController(object):
     @module_and_param_types(image, 'str', 'str',
                             'str', 'str',
                             'str', 'dummy',
-                            'str', 'ami_id',
-                            'ami_id', 'str')
+                            'str', 'aki_id',
+                            'ari_id', 'str')
     def register_image(self, context, name=None, image_location=None,
                        description=None, architecture=None,
                        root_device_name=None, block_device_mapping=None,
@@ -965,7 +965,7 @@ class CloudController(object):
             The ID of the new AMI.
         """
 
-    @module_and_param_types(image, 'ami_id')
+    @module_and_param_types(image, 'amiariaki_id')
     def deregister_image(self, context, image_id):
         """Deregisters the specified AMI.
 
@@ -977,7 +977,7 @@ class CloudController(object):
             true if the request succeeds.
         """
 
-    @module_and_param_types(image, 'strs', 'ami_ids',
+    @module_and_param_types(image, 'strs', 'amiariaki_ids',
                             'strs', 'filter')
     def describe_images(self, context, executable_by=None, image_id=None,
                         owner=None, filter=None):
@@ -998,7 +998,7 @@ class CloudController(object):
             A list of images.
         """
 
-    @module_and_param_types(image, 'ami_id', 'str')
+    @module_and_param_types(image, 'amiariaki_id', 'str')
     def describe_image_attribute(self, context, image_id, attribute):
         """Describes the specified attribute of the specified AMI.
 
@@ -1015,7 +1015,7 @@ class CloudController(object):
         """
         return image.describe_image_attribute(context, image_id, attribute)
 
-    @module_and_param_types(image, 'ami_id', 'str',
+    @module_and_param_types(image, 'amiariaki_id', 'str',
                             'strs', 'str',
                             'dummy', 'dummy',
                             'dummy', 'dummy', 'dummy')

@@ -60,7 +60,8 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
             assert 1 == len(data['Snapshots'])
             cls.root_device_size = data['Snapshots'][0]['VolumeSize']
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+    @testtools.skipUnless(
+        CONF.aws.run_incompatible_tests,
         "Error from nova: "
         "Block Device Mapping is Invalid: Unrecognized legacy format.")
     def test_launch_ebs_instance_with_persistent_root_device(self):
@@ -106,7 +107,8 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean_vol)
         self.get_volume_waiter().wait_delete(volume_id)
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+    @testtools.skipUnless(
+        CONF.aws.run_incompatible_tests,
         "Error from nova: "
         "Block Device Mapping is Invalid: Unrecognized legacy format.")
     def test_launch_ebs_instance_with_resized_root_device(self):
@@ -143,7 +145,8 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+    @testtools.skipUnless(
+        CONF.aws.run_incompatible_tests,
         "Error from nova: "
         "Block Device Mapping is Invalid: Unrecognized legacy format.")
     def test_launch_ebs_instance_with_creating_blank_volume(self):
@@ -411,11 +414,10 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
         }
         if 'Architecture' in instance:
             kwargs['Architecture'] = instance['Architecture']
-        if CONF.aws.run_incompatible_tests:
-            if 'KernelId' in instance:
-                kwargs['KernelId'] = instance['KernelId']
-            if 'RamdiskId' in instance:
-                kwargs['RamdiskId'] = instance['RamdiskId']
+        if 'KernelId' in instance:
+            kwargs['KernelId'] = instance['KernelId']
+        if 'RamdiskId' in instance:
+            kwargs['RamdiskId'] = instance['RamdiskId']
         resp, data = self.client.RegisterImage(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         image_id = data['ImageId']
@@ -466,7 +468,8 @@ class EC2_EBSInstanceResizeRootDevice(base.EC2TestCase):
         cls.image_id = CONF.aws.ebs_image_id
         cls.zone = CONF.aws.aws_zone
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+    @testtools.skipUnless(
+        CONF.aws.run_incompatible_tests,
         "Error from nova: "
         "Unexpected Forbidden raised: Can't detach root device volume")
     def test_resize_root_ebs_device(self):
