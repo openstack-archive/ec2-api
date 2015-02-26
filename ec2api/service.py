@@ -17,10 +17,10 @@
 import multiprocessing
 
 from oslo.config import cfg
+from oslo_utils import importutils
 
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import importutils
 from ec2api.openstack.common import log as logging
 from ec2api.openstack.common import service
 from ec2api import wsgi
