@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from glanceclient.common import exceptions as glance_exception
 import mock
 import testtools
 
@@ -147,3 +148,46 @@ class EC2UtilsTestCase(testtools.TestCase):
         self.assertEqual(conv('add'), 'add')
         self.assertEqual(conv('remove'), 'remove')
         self.assertEqual(conv(''), '')
+
+    @mock.patch('glanceclient.client.Client')
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_get_os_image(self, db_api, glance):
+        glance = glance.return_value
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+
+        os_image = fakes.OSImage(fakes.OS_IMAGE_1)
+        glance.images.get.return_value = os_image
+        # NOTE(ft): check normal flow for an user owned image
+        db_api.get_public_items.return_value = []
+        db_api.get_item_by_id.return_value = fakes.DB_IMAGE_1
+        self.assertEqual(
+            os_image,
+            ec2utils.get_os_image(fake_context, fakes.ID_EC2_IMAGE_1))
+        db_api.get_item_by_id.assert_called_with(
+            mock.ANY, 'ami', fakes.ID_EC2_IMAGE_1)
+        glance.images.get.assert_called_with(fakes.ID_OS_IMAGE_1)
+
+        # NOTE(ft): check normal flow for a public image
+        db_api.get_public_items.return_value = [fakes.DB_IMAGE_1]
+        db_api.get_item_by_id.return_value = None
+        self.assertEqual(
+            os_image,
+            ec2utils.get_os_image(fake_context, fakes.ID_EC2_IMAGE_1))
+        db_api.get_public_items.assert_called_with(
+            mock.ANY, 'ami', (fakes.ID_EC2_IMAGE_1,))
+        glance.images.get.assert_called_with(fakes.ID_OS_IMAGE_1)
+
+        # NOTE(ft): check case of absence of an image in OS
+        glance.images.get.side_effect = glance_exception.HTTPNotFound()
+        self.assertRaises(
+            exception.InvalidAMIIDNotFound,
+            ec2utils.get_os_image,
+            fake_context, fakes.ID_EC2_IMAGE_1)
+
+        # NOTE(ft): check case of an unknown image id
+        db_api.get_public_items.return_value = []
+        db_api.get_item_by_id.return_value = None
+        self.assertRaises(
+            exception.InvalidAMIIDNotFound,
+            ec2utils.get_os_image,
+            fake_context, fakes.random_ec2_id('ami'))

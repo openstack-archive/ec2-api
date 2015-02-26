@@ -181,24 +181,31 @@ class ImageTestCase(base.ApiTestCase):
             {'name': 'an image name',
              'properties': {'image_location': fakes.LOCATION_IMAGE_1}})
 
-    def test_register_image_by_bdm(self):
+    @mock.patch('ec2api.api.ec2utils.get_os_image')
+    def test_register_image_by_bdm(self, get_os_image):
         self.glance.images.create.return_value = (
             fakes.OSImage(fakes.OS_IMAGE_2))
         self.db_api.add_item.side_effect = (
             fakes.get_db_api_add_item(fakes.ID_EC2_IMAGE_2))
-        self.db_api.get_item_by_id.return_value = fakes.DB_SNAPSHOT_1
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id({
+                fakes.ID_EC2_SNAPSHOT_1: fakes.DB_SNAPSHOT_1,
+                fakes.ID_EC2_IMAGE_AKI_1: fakes.DB_IMAGE_AKI_1,
+                fakes.ID_EC2_IMAGE_ARI_1: fakes.DB_IMAGE_ARI_1}))
+        get_os_image.side_effect = [fakes.OSImage(fakes.OS_IMAGE_AKI_1),
+                                    fakes.OSImage(fakes.OS_IMAGE_ARI_1)]
 
         resp = self.execute(
             'RegisterImage',
             {'RootDeviceName': fakes.ROOT_DEVICE_NAME_IMAGE_2,
              'Name': 'fake_name',
+             'KernelId': fakes.ID_EC2_IMAGE_AKI_1,
+             'RamdiskId': fakes.ID_EC2_IMAGE_ARI_1,
              'BlockDeviceMapping.1.DeviceName': fakes.ROOT_DEVICE_NAME_IMAGE_2,
              'BlockDeviceMapping.1.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1})
         self.assertThat(resp, matchers.DictMatches(
             {'http_status_code': 200,
              'imageId': fakes.ID_EC2_IMAGE_2}))
-        self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'snap', fakes.ID_EC2_SNAPSHOT_1)
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': fakes.ID_OS_IMAGE_2,
                               'is_public': False})
@@ -215,12 +222,17 @@ class ImageTestCase(base.ApiTestCase):
              'size': 0,
              'name': 'fake_name',
              'properties': {
-                 'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2}},
+                 'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+                 'kernel_id': fakes.ID_OS_IMAGE_AKI_1,
+                 'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1}},
             self.glance.images.create.call_args[1])
         self.assertEqual([{'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
                            'delete_on_termination': True,
                            'snapshot_id': fakes.ID_OS_SNAPSHOT_1}],
                          json.loads(bdm))
+        get_os_image.assert_has_calls(
+            [mock.call(mock.ANY, fakes.ID_EC2_IMAGE_AKI_1),
+             mock.call(mock.ANY, fakes.ID_EC2_IMAGE_ARI_1)])
 
     def test_register_image_invalid_parameters(self):
         resp = self.execute('RegisterImage', {})
@@ -547,11 +559,11 @@ class S3TestCase(base.ApiTestCase):
         with mock.patch(
                 'ec2api.api.image._s3_conn') as s3_conn, mock.patch(
                 'ec2api.api.image._s3_download_file'
-                    ) as s3_download_file, mock.patch(
+                     ) as s3_download_file, mock.patch(
                 'ec2api.api.image._s3_decrypt_image'
-                    ) as s3_decrypt_image, mock.patch(
+                     ) as s3_decrypt_image, mock.patch(
                 'ec2api.api.image._s3_untarzip_image'
-                    ) as s3_untarzip_image:
+                     ) as s3_untarzip_image:
 
             (s3_conn.return_value.
              get_bucket.return_value.
