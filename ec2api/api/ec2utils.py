@@ -182,7 +182,20 @@ NOT_FOUND_EXCEPTION_MAP = {
 }
 
 
-def get_db_item(context, kind, ec2_id):
+def get_db_item(context, ec2_id, expected_kind=None):
+    """Get an DB item, raise AWS compliant exception if it's not found.
+
+        Args:
+            context (RequestContext): The request context.
+            ec2_id (str): The ID of the requested item.
+            expected_kind (str): The expected kind of the requested item.
+                It should be specified for a kind of ec2_id to be validated,
+                if you need it.
+
+        Returns:
+            The DB item.
+    """
+    kind = expected_kind or get_ec2_id_kind(ec2_id)
     item = db_api.get_item_by_id(context, kind, ec2_id)
     if item is None:
         params = {'id': ec2_id}
@@ -282,7 +295,7 @@ def get_os_image(context, ec2_image_id):
     kind = get_ec2_id_kind(ec2_image_id)
     images = db_api.get_public_items(context, kind, (ec2_image_id,))
     image = (images[0] if len(images) else
-             get_db_item(context, kind, ec2_image_id))
+             get_db_item(context, ec2_image_id))
     glance = clients.glance(context)
     try:
         return glance.images.get(image['os_id'])

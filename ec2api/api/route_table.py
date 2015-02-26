@@ -30,7 +30,7 @@ Validator = common.Validator
 
 
 def create_route_table(context, vpc_id):
-    vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
+    vpc = ec2utils.get_db_item(context, vpc_id)
     route_table = _create_route_table(context, vpc)
     return {'routeTable': _format_route_table(context, route_table,
                                               is_main=False)}
@@ -55,7 +55,7 @@ def replace_route(context, route_table_id, destination_cidr_block,
 
 
 def delete_route(context, route_table_id, destination_cidr_block):
-    route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
+    route_table = ec2utils.get_db_item(context, route_table_id)
     for route_index, route in enumerate(route_table['routes']):
         if route['destination_cidr_block'] != destination_cidr_block:
             continue
@@ -84,8 +84,8 @@ def delete_route(context, route_table_id, destination_cidr_block):
 
 
 def associate_route_table(context, route_table_id, subnet_id):
-    route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
-    subnet = ec2utils.get_db_item(context, 'subnet', subnet_id)
+    route_table = ec2utils.get_db_item(context, route_table_id)
+    subnet = ec2utils.get_db_item(context, subnet_id)
     if route_table['vpc_id'] != subnet['vpc_id']:
         msg = _('Route table %(rtb_id)s and subnet %(subnet_id)s belong to '
                 'different networks')
@@ -114,7 +114,7 @@ def associate_route_table(context, route_table_id, subnet_id):
 
 
 def replace_route_table_association(context, association_id, route_table_id):
-    route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
+    route_table = ec2utils.get_db_item(context, route_table_id)
     if route_table['vpc_id'] == ec2utils.change_ec2_id_kind(association_id,
                                                             'vpc'):
         vpc = db_api.get_item_by_id(context, 'vpc',
@@ -200,7 +200,7 @@ def disassociate_route_table(context, association_id):
 
 
 def delete_route_table(context, route_table_id):
-    route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
+    route_table = ec2utils.get_db_item(context, route_table_id)
     vpc = db_api.get_item_by_id(context, 'vpc', route_table['vpc_id'])
     _delete_route_table(context, route_table['id'], vpc)
     return True
@@ -286,7 +286,7 @@ def _delete_route_table(context, route_table_id, vpc=None, cleaner=None):
 def _set_route(context, route_table_id, destination_cidr_block,
                gateway_id, instance_id, network_interface_id,
                vpc_peering_connection_id, do_replace):
-    route_table = ec2utils.get_db_item(context, 'rtb', route_table_id)
+    route_table = ec2utils.get_db_item(context, route_table_id)
     vpc = db_api.get_item_by_id(context, 'vpc', route_table['vpc_id'])
     vpc_ipnet = netaddr.IPNetwork(vpc['cidr_block'])
     route_ipnet = netaddr.IPNetwork(destination_cidr_block)
@@ -324,7 +324,7 @@ def _set_route(context, route_table_id, destination_cidr_block,
             raise exception.InvalidParameterValue(msg)
 
     if gateway_id:
-        gateway = ec2utils.get_db_item(context, 'igw', gateway_id)
+        gateway = ec2utils.get_db_item(context, gateway_id)
         if gateway.get('vpc_id') != route_table['vpc_id']:
             msg = _('Route table %(rtb_id)s and network gateway %(igw_id)s '
                     'belong to different networks')
@@ -333,8 +333,7 @@ def _set_route(context, route_table_id, destination_cidr_block,
             raise exception.InvalidParameterValue(msg)
         route = {'gateway_id': gateway['id']}
     elif network_interface_id:
-        network_interface = ec2utils.get_db_item(context, 'eni',
-                                                 network_interface_id)
+        network_interface = ec2utils.get_db_item(context, network_interface_id)
         if network_interface['vpc_id'] != route_table['vpc_id']:
             msg = _('Route table %(rtb_id)s and interface %(eni_id)s '
                     'belong to different networks')

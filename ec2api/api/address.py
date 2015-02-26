@@ -241,7 +241,7 @@ class AddressEngineNeutron(object):
             return AddressEngineNova().release_address(context,
                                                        public_ip, None)
 
-        address = ec2utils.get_db_item(context, 'eipalloc', allocation_id)
+        address = ec2utils.get_db_item(context, allocation_id)
         if not _is_address_valid(context, neutron, address):
             raise exception.InvalidAllocationIDNotFound(
                 id=allocation_id)
@@ -295,7 +295,7 @@ class AddressEngineNeutron(object):
         if instance_id:
             if not instance_network_interfaces:
                 # NOTE(ft): check the instance exists
-                ec2utils.get_db_item(context, 'i', instance_id)
+                ec2utils.get_db_item(context, instance_id)
                 msg = _('You must specify an IP address when mapping '
                         'to a non-VPC instance')
                 raise exception.InvalidParameterCombination(msg)
@@ -303,12 +303,12 @@ class AddressEngineNeutron(object):
                 raise exception.InvalidInstanceId(instance_id=instance_id)
             network_interface = instance_network_interfaces[0]
         else:
-            network_interface = ec2utils.get_db_item(context, 'eni',
+            network_interface = ec2utils.get_db_item(context,
                                                      network_interface_id)
         if not private_ip_address:
             private_ip_address = network_interface['private_ip_address']
 
-        address = ec2utils.get_db_item(context, 'eipalloc', allocation_id)
+        address = ec2utils.get_db_item(context, allocation_id)
         if not _is_address_valid(context, neutron, address):
             raise exception.InvalidAllocationIDNotFound(
                 id=allocation_id)
@@ -414,8 +414,7 @@ class AddressEngineNova(object):
     def associate_address(self, context, public_ip=None, instance_id=None,
                           allocation_id=None, network_interface_id=None,
                           private_ip_address=None, allow_reassociation=False):
-        os_instance_id = ec2utils.get_db_item(context, 'i',
-                                              instance_id)['os_id']
+        os_instance_id = ec2utils.get_db_item(context, instance_id)['os_id']
         # NOTE(ft): check the public IP exists to raise AWS exception otherwise
         self.get_nova_ip_by_public_ip(context, public_ip)
         nova = clients.nova(context)

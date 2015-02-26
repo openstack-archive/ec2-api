@@ -64,7 +64,7 @@ def create_vpc(context, cidr_block, instance_tenancy='default'):
 
 
 def delete_vpc(context, vpc_id):
-    vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
+    vpc = ec2utils.get_db_item(context, vpc_id)
     subnets = subnet_api.describe_subnets(
         context,
         filter=[{'name': 'vpc-id', 'value': [vpc_id]}])['subnetSet']

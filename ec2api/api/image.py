@@ -99,7 +99,7 @@ IMAGE_TYPES = {'aki': 'kernel',
 # care of it for now. Ostrich algorithm
 def create_image(context, instance_id, name=None, description=None,
                  no_reboot=False, block_device_mapping=None):
-    instance = ec2utils.get_db_item(context, 'i', instance_id)
+    instance = ec2utils.get_db_item(context, instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
 
@@ -213,8 +213,7 @@ def register_image(context, name=None, image_location=None,
 def deregister_image(context, image_id):
     # TODO(ft): AWS returns AuthFailure for public images,
     # but we return NotFound due searching for local images only
-    kind = ec2utils.get_ec2_id_kind(image_id)
-    image = ec2utils.get_db_item(context, kind, image_id)
+    image = ec2utils.get_db_item(context, image_id)
     glance = clients.glance(context)
     try:
         glance.images.delete(image['os_id'])
@@ -346,8 +345,7 @@ def describe_image_attribute(context, image_id, attribute):
     # TODO(ft): AWS returns AuthFailure for not own public images,
     # but we return NotFound for this case because we search for local images
     # only
-    kind = ec2utils.get_ec2_id_kind(image_id)
-    image = ec2utils.get_db_item(context, kind, image_id)
+    image = ec2utils.get_db_item(context, image_id)
     fn = supported_attributes.get(attribute)
     if fn is None:
         # TODO(ft): Change the error code and message with the real AWS ones
@@ -385,8 +383,7 @@ def modify_image_attribute(context, image_id, attribute,
 
     # TODO(ft): AWS returns AuthFailure for public images,
     # but we return NotFound due searching for local images only
-    kind = ec2utils.get_ec2_id_kind(image_id)
-    image = ec2utils.get_db_item(context, kind, image_id)
+    image = ec2utils.get_db_item(context, image_id)
     glance = clients.glance(context)
     image = glance.images.get(image['os_id'])
 
@@ -686,10 +683,8 @@ def _s3_parse_manifest(context, manifest):
         if image_id == 'true':
             image_format = kind
         else:
-            images = db_api.get_public_items(context, kind, (image_id,))
-            image = (images[0] if len(images) else
-                     ec2utils.get_db_item(context, kind, image_id))
-            properties[image_key] = image['os_id']
+            os_image = ec2utils.get_os_image(context, image_id)
+            properties[image_key] = os_image.id
 
     set_dependent_image_id('kernel_id', 'aki')
     set_dependent_image_id('ramdisk_id', 'ari')

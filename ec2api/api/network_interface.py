@@ -49,7 +49,7 @@ def create_network_interface(context, subnet_id,
                              secondary_private_ip_address_count=None,
                              description=None,
                              security_group_id=None):
-    subnet = ec2utils.get_db_item(context, 'subnet', subnet_id)
+    subnet = ec2utils.get_db_item(context, subnet_id)
     if subnet is None:
         raise exception.InvalidSubnetIDNotFound(id=subnet_id)
     neutron = clients.neutron(context)
@@ -101,8 +101,7 @@ def create_network_interface(context, subnet_id,
         )['securityGroupInfo']
         security_group_id = [default_group['groupId']
                              for default_group in default_groups]
-    security_groups = [ec2utils.get_db_item(context, 'sg', ec2_id)
-                       for ec2_id in security_group_id]
+    security_groups = db_api.get_items_by_ids(context, 'sg', security_group_id)
     if any(security_group['vpc_id'] != vpc['id']
            for security_group in security_groups):
         msg = _('You have specified two resources that belong to '
@@ -159,8 +158,7 @@ def create_network_interface(context, subnet_id,
 
 
 def delete_network_interface(context, network_interface_id):
-    network_interface = ec2utils.get_db_item(context, 'eni',
-                                             network_interface_id)
+    network_interface = ec2utils.get_db_item(context, network_interface_id)
     if 'instance_id' in network_interface:
         msg = _("Network interface '%(eni_id)s' is currently in use.")
         msg = msg % {'eni_id': network_interface_id}
@@ -237,10 +235,9 @@ def assign_private_ip_addresses(context, network_interface_id,
                                 secondary_private_ip_address_count=None,
                                 allow_reassignment=False):
     # TODO(Alex): allow_reassignment is not supported at the moment
-    network_interface = ec2utils.get_db_item(context, 'eni',
-                                             network_interface_id)
-    subnet = ec2utils.get_db_item(context, 'subnet',
-                                  network_interface['subnet_id'])
+    network_interface = ec2utils.get_db_item(context, network_interface_id)
+    subnet = db_api.get_item_by_id(context, 'subnet',
+                                   network_interface['subnet_id'])
     neutron = clients.neutron(context)
     os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
     os_port = neutron.show_port(network_interface['os_id'])['port']
@@ -278,8 +275,7 @@ def assign_private_ip_addresses(context, network_interface_id,
 
 def unassign_private_ip_addresses(context, network_interface_id,
                                   private_ip_address):
-    network_interface = ec2utils.get_db_item(context, 'eni',
-                                             network_interface_id)
+    network_interface = ec2utils.get_db_item(context, network_interface_id)
     if network_interface['private_ip_address'] in private_ip_address:
         raise exception.InvalidParameterValue(
                 value=str(network_interface['private_ip_address']),
@@ -301,8 +297,7 @@ def unassign_private_ip_addresses(context, network_interface_id,
 
 def describe_network_interface_attribute(context, network_interface_id,
                                          attribute):
-    network_interface = ec2utils.get_db_item(context, 'eni',
-                                             network_interface_id)
+    network_interface = ec2utils.get_db_item(context, network_interface_id)
     # TODO(Alex): Implement attachments, groupSet
 
     db_key = attribute if attribute == 'description' else 'source_dest_check'
@@ -323,16 +318,16 @@ def modify_network_interface_attribute(context, network_interface_id,
     if params_count != 1:
         raise exception.InvalidParameterCombination(
             'Multiple attributes specified')
-    network_interface = ec2utils.get_db_item(context, 'eni',
-                                             network_interface_id)
+    network_interface = ec2utils.get_db_item(context, network_interface_id)
     # TODO(Alex): Implement attachments
     if description is not None:
         network_interface['description'] = description
         db_api.update_item(context, network_interface)
     neutron = clients.neutron(context)
     if security_group_id is not None:
-        os_groups = [ec2utils.get_db_item(context, 'sg', ec2_id)['os_id']
-                     for ec2_id in security_group_id]
+        os_groups = [sg['os_id']
+                     for sg in ec2utils.get_db_items(context, 'sg',
+                                                     security_group_id)]
         neutron.update_port(network_interface['os_id'],
                             {'port': {'security_groups': os_groups}})
     if source_dest_check is not None:
@@ -361,13 +356,12 @@ def reset_network_interface_attribute(context, network_interface_id,
 
 def attach_network_interface(context, network_interface_id,
                              instance_id, device_index):
-    network_interface = ec2utils.get_db_item(context, 'eni',
-                                             network_interface_id)
+    network_interface = ec2utils.get_db_item(context, network_interface_id)
     if 'instance_id' in network_interface:
         raise exception.InvalidParameterValue(
             _("Network interface '%(id)s' is currently in use.") %
             {'id': network_interface_id})
-    os_instance_id = ec2utils.get_db_item(context, 'i', instance_id)['os_id']
+    os_instance_id = ec2utils.get_db_item(context, instance_id)['os_id']
     # TODO(Alex) Check that the instance is not yet attached to another VPC
     # TODO(Alex) Check that the instance is "our", not created via nova
     # (which means that it doesn't belong to any VPC and can't be attached)

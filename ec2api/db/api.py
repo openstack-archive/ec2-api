@@ -63,7 +63,7 @@ class EC2DBAPI(object):
     def _db_api(self):
         if not self.__db_api:
             ec2_db_api = db_api.DBAPI(CONF.database.backend,
-                                       backend_mapping=_BACKEND_MAPPING)
+                                      backend_mapping=_BACKEND_MAPPING)
             if CONF.database.use_tpool:
                 self.__db_api = tpool.Proxy(ec2_db_api)
             else:

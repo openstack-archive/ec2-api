@@ -94,8 +94,7 @@ def delete_dhcp_options(context, dhcp_options_id):
     if not dhcp_options_id:
         raise exception.MissingParameter(
             _('DHCP options ID must be specified'))
-    dhcp_options = ec2utils.get_db_item(context, 'dopt',
-                                        dhcp_options_id)
+    dhcp_options = ec2utils.get_db_item(context, dhcp_options_id)
     vpcs = db_api.get_items(context, 'vpc')
     for vpc in vpcs:
         if dhcp_options['id'] == vpc.get('dhcp_options_id'):
@@ -125,13 +124,13 @@ def describe_dhcp_options(context, dhcp_options_id=None,
 
 
 def associate_dhcp_options(context, dhcp_options_id, vpc_id):
-    vpc = ec2utils.get_db_item(context, 'vpc', vpc_id)
+    vpc = ec2utils.get_db_item(context, vpc_id)
     rollback_dhcp_options_id = vpc.get('dhcp_options_id')
     if dhcp_options_id == 'default':
         dhcp_options_id = None
         dhcp_options = None
     else:
-        dhcp_options = ec2utils.get_db_item(context, 'dopt', dhcp_options_id)
+        dhcp_options = ec2utils.get_db_item(context, dhcp_options_id)
         dhcp_options_id = dhcp_options['id']
     neutron = clients.neutron(context)
     os_ports = neutron.list_ports()['ports']

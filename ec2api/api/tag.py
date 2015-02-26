@@ -69,7 +69,7 @@ def create_tags(context, resource_id, tag):
         # NOTE(ft): check items exist (excluding images because AWS allows to
         # create a tag with any image id)
         if kind not in ('ami', 'ari', 'aki'):
-            ec2utils.get_db_item(context, kind, item_id)
+            ec2utils.get_db_item(context, item_id)
 
     tags = [dict(item_id=item_id,
                  key=tag_pair['key'],

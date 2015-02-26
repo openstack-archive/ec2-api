@@ -71,7 +71,7 @@ def create_security_group(context, group_name, group_description,
                            os_security_group.id)
         if vpc_id:
             # NOTE(Alex) Check if such vpc exists
-            ec2utils.get_db_item(context, 'vpc', vpc_id)
+            ec2utils.get_db_item(context, vpc_id)
             security_group = db_api.add_item(context, 'sg',
                                              {'vpc_id': vpc_id,
                                               'os_id': os_security_group.id})
@@ -110,7 +110,7 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
                                       self.all_db_items, self.os_items)
 
     def get_os_items(self):
-        if self.all_db_items == None:
+        if self.all_db_items is None:
             self.all_db_items = ec2utils.get_db_items(self.context, 'sg', None)
         os_groups = security_group_engine.get_os_groups(self.context)
         for os_group in os_groups:
@@ -385,7 +385,7 @@ class SecurityGroupEngineNeutron(object):
             return SecurityGroupEngineNova().delete_group(context,
                                                           group_name,
                                                           group_id)
-        security_group = ec2utils.get_db_item(context, 'sg', group_id)
+        security_group = ec2utils.get_db_item(context, group_id)
         try:
             neutron.delete_security_group(security_group['os_id'])
         except neutron_exception.Conflict as ex:
@@ -430,7 +430,7 @@ class SecurityGroupEngineNeutron(object):
             return SecurityGroupEngineNova().get_group_os_id(context,
                                                              group_id,
                                                              group_name)
-        return ec2utils.get_db_item(context, 'sg', group_id)['os_id']
+        return ec2utils.get_db_item(context, group_id, 'sg')['os_id']
 
 
 class SecurityGroupEngineNova(object):
@@ -500,7 +500,7 @@ class SecurityGroupEngineNova(object):
         return neutron_security_groups
 
     def convert_rule_to_neutron(self, context, nova_rule,
-                                 nova_security_groups=None):
+                                nova_security_groups=None):
         neutron_rule = {'id': nova_rule['id'],
                         'protocol': nova_rule['ip_protocol'],
                         'port_range_min': nova_rule['from_port'],
@@ -519,7 +519,7 @@ class SecurityGroupEngineNova(object):
         return neutron_rule
 
     def get_group_os_id(self, context, group_id, group_name,
-                         nova_security_groups=None):
+                        nova_security_groups=None):
         if group_id:
             return group_id
         nova_group = self.get_nova_group_by_name(context, group_name,
@@ -527,7 +527,7 @@ class SecurityGroupEngineNova(object):
         return nova_group.id
 
     def get_nova_group_by_name(self, context, group_name,
-                                nova_security_groups=None):
+                               nova_security_groups=None):
         if nova_security_groups is None:
             nova = clients.nova(context)
             nova_security_groups = nova.security_groups.list()
