@@ -368,8 +368,7 @@ class AddressEngineNeutron(object):
                     association_id=association_id)
 
         address = db_api.get_item_by_id(
-            context, 'eipalloc', ec2utils.change_ec2_id_kind(association_id,
-                                                             'eipalloc'))
+            context, ec2utils.change_ec2_id_kind(association_id, 'eipalloc'))
         if address is None or not _is_address_valid(context, neutron, address):
             raise exception.InvalidAssociationIDNotFound(
                     id=association_id)

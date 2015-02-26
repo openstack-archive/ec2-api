@@ -90,7 +90,7 @@ def create_network_interface(context, subnet_id,
     if secondary_private_ip_address_count > 0:
         for _i in range(secondary_private_ip_address_count):
             fixed_ips.append({'subnet_id': os_subnet['id']})
-    vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
+    vpc = db_api.get_item_by_id(context, subnet['vpc_id'])
     vpc_id = vpc['id']
     dhcp_options_id = vpc.get('dhcp_options_id', None)
     if not security_group_id:
@@ -145,7 +145,7 @@ def create_network_interface(context, subnet_id,
         if dhcp_options_id:
             dhcp_options._add_dhcp_opts_to_port(
                 context,
-                db_api.get_item_by_id(context, 'dopt', dhcp_options_id),
+                db_api.get_item_by_id(context, dhcp_options_id),
                 network_interface,
                 os_port)
     security_groups = security_group_api._format_security_groups_ids_names(
@@ -236,8 +236,7 @@ def assign_private_ip_addresses(context, network_interface_id,
                                 allow_reassignment=False):
     # TODO(Alex): allow_reassignment is not supported at the moment
     network_interface = ec2utils.get_db_item(context, network_interface_id)
-    subnet = db_api.get_item_by_id(context, 'subnet',
-                                   network_interface['subnet_id'])
+    subnet = db_api.get_item_by_id(context, network_interface['subnet_id'])
     neutron = clients.neutron(context)
     os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
     os_port = neutron.show_port(network_interface['os_id'])['port']
@@ -390,7 +389,7 @@ def attach_network_interface(context, network_interface_id,
 
 def detach_network_interface(context, attachment_id, force=None):
     network_interface = db_api.get_item_by_id(
-            context, 'eni', ec2utils.change_ec2_id_kind(attachment_id, 'eni'))
+            context, ec2utils.change_ec2_id_kind(attachment_id, 'eni'))
     if not network_interface or 'instance_id' not in network_interface:
         raise exception.InvalidAttachmentIDNotFound(id=attachment_id)
     if network_interface['device_index'] == 0:

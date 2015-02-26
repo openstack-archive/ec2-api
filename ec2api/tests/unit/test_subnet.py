@@ -84,7 +84,7 @@ class SubnetTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.return_value = None
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': fakes.CIDR_SUBNET_1})
-        self.db_api.get_item_by_id.assert_called_once_with(mock.ANY, 'vpc',
+        self.db_api.get_item_by_id.assert_called_once_with(mock.ANY,
                                                            fakes.ID_EC2_VPC_1)
         check_response(resp, 'InvalidVpcID.NotFound')
 
@@ -101,7 +101,7 @@ class SubnetTestCase(base.ApiTestCase):
 
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': '10.20.0.0/24'})
-        self.db_api.get_item_by_id.assert_called_once_with(mock.ANY, 'vpc',
+        self.db_api.get_item_by_id.assert_called_once_with(mock.ANY,
                                                            fakes.ID_EC2_VPC_1)
         check_response(resp, 'InvalidSubnet.Range')
 

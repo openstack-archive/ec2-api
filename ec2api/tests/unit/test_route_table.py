@@ -46,7 +46,7 @@ class RouteTableTestCase(base.ApiTestCase):
              'routes': [{'destination_cidr_block': fakes.CIDR_VPC_1,
                          'gateway_id': None}]})
         self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'vpc', fakes.ID_EC2_VPC_1)
+            mock.ANY, fakes.ID_EC2_VPC_1)
 
     def test_route_table_create_invalid_parameters(self):
         self.db_api.get_item_by_id.return_value = None
@@ -705,15 +705,14 @@ class RouteTableTestCase(base.ApiTestCase):
              ('association.route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
              ('association.subnet-id', fakes.ID_EC2_SUBNET_2),
              # TODO(ft): support filtering by a boolean value
-#              ('association.main', True),
+             # ('association.main', True),
              ('route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
              ('route.destination-cidr-block', fakes.CIDR_EXTERNAL_NETWORK),
              ('route.gateway-id', 'local'),
              ('route.instance-id', fakes.ID_EC2_INSTANCE_1),
              ('route.origin', 'CreateRouteTable'),
              ('route.state', 'active'),
-             ('vpc-id', fakes.ID_EC2_VPC_1)
-            ])
+             ('vpc-id', fakes.ID_EC2_VPC_1)])
         self.check_tag_support(
             'DescribeRouteTables', 'routeTableSet',
             fakes.ID_EC2_ROUTE_TABLE_1, 'routeTableId')
@@ -795,7 +794,7 @@ class RouteTableTestCase(base.ApiTestCase):
                 'main': False}]
         self.assertThat(resp['routeTableSet'],
                         matchers.ListMatches([ec2_route_table_1,
-                                                  ec2_route_table_2]))
+                                              ec2_route_table_2]))
 
     def test_get_subnet_host_routes(self):
         self.db_api.get_item_by_id.side_effect = (
@@ -894,8 +893,7 @@ class RouteTableTestCase(base.ApiTestCase):
             {'fake': 'table'})
 
         self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'vpc',
-            fakes.ID_EC2_VPC_1)
+            mock.ANY, fakes.ID_EC2_VPC_1)
         routes_updater.assert_called_once_with(
             mock.ANY, subnet_rtb_2, fakes.DB_ROUTE_TABLE_2,
             cleaner='fake_cleaner',

@@ -120,7 +120,7 @@ class ImageTestCase(base.ApiTestCase):
                           'imageId': image_id},
                          resp)
         self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'i', fakes.ID_EC2_INSTANCE_2)
+            mock.ANY, fakes.ID_EC2_INSTANCE_2)
         self.nova_servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
         is_ebs_instance.assert_called_once_with(mock.ANY, os_instance)
         self.db_api.add_item.assert_called_once_with(
@@ -384,29 +384,18 @@ class ImageTestCase(base.ApiTestCase):
                 fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
                 fakes.ID_EC2_IMAGE_2: fakes.DB_IMAGE_2}))
         self.db_api.get_items_by_ids.side_effect = (
-            fakes.get_db_api_get_items({
-                'ami': [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2],
-                'ari': [],
-                'aki': []}))
+            fakes.get_db_api_get_items_by_ids(
+                [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]))
         self.db_api.get_items.side_effect = (
             fakes.get_db_api_get_items({
                 'snap': [fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2]}))
         self.db_api.get_public_items.return_value = []
 
         self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
-                                              fakes.ID_OS_IMAGE_ARI_1)],
-                (fakes.ID_OS_IMAGE_AKI_1,): [(fakes.ID_EC2_IMAGE_AKI_1,
-                                              fakes.ID_OS_IMAGE_AKI_1)],
-                (fakes.ID_OS_SNAPSHOT_1,): [(fakes.ID_EC2_SNAPSHOT_1,
-                                             fakes.ID_OS_SNAPSHOT_1)],
-                (fakes.ID_OS_SNAPSHOT_2,): [(fakes.ID_EC2_SNAPSHOT_2,
-                                             fakes.ID_OS_SNAPSHOT_2)],
-                (fakes.ID_OS_VOLUME_1,): [(fakes.ID_EC2_VOLUME_1,
-                                           fakes.ID_OS_VOLUME_1)],
-                (fakes.ID_OS_VOLUME_2,): [(fakes.ID_EC2_VOLUME_2,
-                                           fakes.ID_OS_VOLUME_2)]}))
+            fakes.get_db_api_get_item_ids(
+                [fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1,
+                 fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
+                 fakes.DB_VOLUME_1, fakes. DB_VOLUME_2]))
 
         self.glance.images.list.side_effect = (
             lambda: [fakes.OSImage(fakes.OS_IMAGE_1),
@@ -515,11 +504,8 @@ class S3TestCase(base.ApiTestCase):
 
     def test_s3_parse_manifest(self):
         self.db_api.get_public_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'aki': ({'id': fakes.ID_EC2_IMAGE_AKI_1,
-                         'os_id': fakes.ID_OS_IMAGE_AKI_1},),
-                'ari': ({'id': fakes.ID_EC2_IMAGE_ARI_1,
-                         'os_id': fakes.ID_OS_IMAGE_ARI_1},)}))
+            fakes.get_db_api_get_items_by_ids(
+                [fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1]))
         self.db_api.get_item_by_id.return_value = None
         self.glance.images.get.side_effect = (
             fakes.get_by_1st_arg_getter({

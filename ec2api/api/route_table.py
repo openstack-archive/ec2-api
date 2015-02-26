@@ -98,9 +98,8 @@ def associate_route_table(context, route_table_id, subnet_id):
         msg = msg % {'rtb_id': route_table_id}
         raise exception.ResourceAlreadyAssociated(msg)
 
-    vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
-    main_route_table = db_api.get_item_by_id(context, 'rtb',
-                                             vpc['route_table_id'])
+    vpc = db_api.get_item_by_id(context, subnet['vpc_id'])
+    main_route_table = db_api.get_item_by_id(context, vpc['route_table_id'])
     with common.OnCrashCleaner() as cleaner:
         _associate_subnet_item(context, subnet, route_table['id'])
         cleaner.addCleanup(_disassociate_subnet_item, context, subnet)
@@ -117,15 +116,14 @@ def replace_route_table_association(context, association_id, route_table_id):
     route_table = ec2utils.get_db_item(context, route_table_id)
     if route_table['vpc_id'] == ec2utils.change_ec2_id_kind(association_id,
                                                             'vpc'):
-        vpc = db_api.get_item_by_id(context, 'vpc',
-                                    ec2utils.change_ec2_id_kind(association_id,
-                                                                'vpc'))
+        vpc = db_api.get_item_by_id(
+            context, ec2utils.change_ec2_id_kind(association_id, 'vpc'))
         if vpc is None:
             raise exception.InvalidAssociationIDNotFound(
                 id=association_id)
 
         rollabck_route_table_object = db_api.get_item_by_id(
-            context, 'rtb', vpc['route_table_id'])
+            context, vpc['route_table_id'])
         with common.OnCrashCleaner() as cleaner:
             _associate_vpc_item(context, vpc, route_table['id'])
             cleaner.addCleanup(_associate_vpc_item, context, vpc,
@@ -138,8 +136,7 @@ def replace_route_table_association(context, association_id, route_table_id):
                 rollabck_route_table_object, is_main=True)
     else:
         subnet = db_api.get_item_by_id(
-                context, 'subnet',
-                ec2utils.change_ec2_id_kind(association_id, 'subnet'))
+            context, ec2utils.change_ec2_id_kind(association_id, 'subnet'))
         if subnet is None or 'route_table_id' not in subnet:
             raise exception.InvalidAssociationIDNotFound(
                 id=association_id)
@@ -151,7 +148,7 @@ def replace_route_table_association(context, association_id, route_table_id):
             raise exception.InvalidParameterValue(msg)
 
         rollabck_route_table_object = db_api.get_item_by_id(
-            context, 'rtb', subnet['route_table_id'])
+            context, subnet['route_table_id'])
         with common.OnCrashCleaner() as cleaner:
             _associate_subnet_item(context, subnet, route_table['id'])
             cleaner.addCleanup(_associate_subnet_item, context, subnet,
@@ -165,13 +162,11 @@ def replace_route_table_association(context, association_id, route_table_id):
 
 
 def disassociate_route_table(context, association_id):
-    subnet = db_api.get_item_by_id(context, 'subnet',
-                                   ec2utils.change_ec2_id_kind(association_id,
-                                                               'subnet'))
+    subnet = db_api.get_item_by_id(
+        context, ec2utils.change_ec2_id_kind(association_id, 'subnet'))
     if not subnet:
-        vpc = db_api.get_item_by_id(context, 'vpc',
-                                    ec2utils.change_ec2_id_kind(association_id,
-                                                                'vpc'))
+        vpc = db_api.get_item_by_id(
+            context, ec2utils.change_ec2_id_kind(association_id, 'vpc'))
         if vpc is None:
             raise exception.InvalidAssociationIDNotFound(
                 id=association_id)
@@ -183,10 +178,9 @@ def disassociate_route_table(context, association_id):
             id=association_id)
 
     rollback_route_table_object = db_api.get_item_by_id(
-        context, 'rtb', subnet['route_table_id'])
-    vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
-    main_route_table = db_api.get_item_by_id(
-        context, 'rtb', vpc['route_table_id'])
+        context, subnet['route_table_id'])
+    vpc = db_api.get_item_by_id(context, subnet['vpc_id'])
+    main_route_table = db_api.get_item_by_id(context, vpc['route_table_id'])
     with common.OnCrashCleaner() as cleaner:
         _disassociate_subnet_item(context, subnet)
         cleaner.addCleanup(_associate_subnet_item, context, subnet,
@@ -201,7 +195,7 @@ def disassociate_route_table(context, association_id):
 
 def delete_route_table(context, route_table_id):
     route_table = ec2utils.get_db_item(context, route_table_id)
-    vpc = db_api.get_item_by_id(context, 'vpc', route_table['vpc_id'])
+    vpc = db_api.get_item_by_id(context, route_table['vpc_id'])
     _delete_route_table(context, route_table['id'], vpc)
     return True
 
@@ -277,7 +271,7 @@ def _delete_route_table(context, route_table_id, vpc=None, cleaner=None):
                 "be deleted.") % {'rtb_id': route_table_id}
         raise exception.DependencyViolation(msg)
     if cleaner:
-        route_table = db_api.get_item_by_id(context, 'rtb', route_table_id)
+        route_table = db_api.get_item_by_id(context, route_table_id)
     db_api.delete_item(context, route_table_id)
     if cleaner and route_table:
         cleaner.addCleanup(db_api.restore_item, context, 'rtb', route_table)
@@ -287,7 +281,7 @@ def _set_route(context, route_table_id, destination_cidr_block,
                gateway_id, instance_id, network_interface_id,
                vpc_peering_connection_id, do_replace):
     route_table = ec2utils.get_db_item(context, route_table_id)
-    vpc = db_api.get_item_by_id(context, 'vpc', route_table['vpc_id'])
+    vpc = db_api.get_item_by_id(context, route_table['vpc_id'])
     vpc_ipnet = netaddr.IPNetwork(vpc['cidr_block'])
     route_ipnet = netaddr.IPNetwork(destination_cidr_block)
     if route_ipnet in vpc_ipnet:
@@ -429,7 +423,7 @@ def _format_route_table(context, route_table, is_main=False,
                            None)
             state = 'blackhole'
             if instance_id:
-                instance = db_api.get_item_by_id(context, 'i', instance_id)
+                instance = db_api.get_item_by_id(context, instance_id)
                 if instance:
                     try:
                         os_instance = nova.servers.get(instance['os_id'])
@@ -467,7 +461,7 @@ def _update_routes_in_associated_subnets(context, route_table, cleaner,
                                          rollabck_route_table_object,
                                          is_main=None):
     if is_main is None:
-        vpc = db_api.get_item_by_id(context, 'vpc', route_table['vpc_id'])
+        vpc = db_api.get_item_by_id(context, route_table['vpc_id'])
         is_main = vpc['route_table_id'] == route_table['id']
     if is_main:
         appropriate_rtb_ids = (route_table['id'], None)
@@ -502,11 +496,10 @@ def _update_subnet_host_routes(context, subnet, route_table, cleaner=None,
 
 def _get_router_objects(context, route_table):
     return dict((route['gateway_id'],
-                 db_api.get_item_by_id(context, 'igw', route['gateway_id']))
+                 db_api.get_item_by_id(context, route['gateway_id']))
                 if route.get('gateway_id') else
                 (route['network_interface_id'],
-                 db_api.get_item_by_id(context, 'eni',
-                                       route['network_interface_id']))
+                 db_api.get_item_by_id(context, route['network_interface_id']))
                 for route in route_table['routes']
                 if route.get('gateway_id') or 'network_interface_id' in route)
 
@@ -519,16 +512,15 @@ def _get_subnet_host_routes(context, route_table, gateway_ip,
             if gateway_id:
                 gateway = (router_objects[route['gateway_id']]
                            if router_objects else
-                           db_api.get_item_by_id(context, 'igw', gateway_id))
+                           db_api.get_item_by_id(context, gateway_id))
                 if (not gateway or
                         gateway.get('vpc_id') != route_table['vpc_id']):
                     return '127.0.0.1'
             return gateway_ip
-        network_interface = (router_objects[route['network_interface_id']]
-                             if router_objects else
-                             db_api.get_item_by_id(
-            context, 'eni',
-            route['network_interface_id']))
+        network_interface = (
+            router_objects[route['network_interface_id']]
+            if router_objects else
+            db_api.get_item_by_id(context, route['network_interface_id']))
         if not network_interface:
             return '127.0.0.1'
         return network_interface['private_ip_address']

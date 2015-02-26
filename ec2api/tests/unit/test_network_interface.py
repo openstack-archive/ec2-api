@@ -217,7 +217,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_2})
         self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'subnet', fakes.ID_EC2_SUBNET_2)
+            mock.ANY, fakes.ID_EC2_SUBNET_2)
         check_response(resp, 'InvalidSubnetID.NotFound')
 
         self.db_api.get_item_by_id.return_value = fakes.DB_SUBNET_1

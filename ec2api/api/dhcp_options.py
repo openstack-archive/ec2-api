@@ -136,7 +136,7 @@ def associate_dhcp_options(context, dhcp_options_id, vpc_id):
     os_ports = neutron.list_ports()['ports']
     network_interfaces = db_api.get_items(context, 'eni')
     rollback_dhcp_options_object = (
-            db_api.get_item_by_id(context, 'dopt', rollback_dhcp_options_id)
+            db_api.get_item_by_id(context, rollback_dhcp_options_id)
             if dhcp_options_id is not None else
             None)
     with common.OnCrashCleaner() as cleaner:

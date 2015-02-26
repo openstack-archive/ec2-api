@@ -1031,7 +1031,7 @@ class InstanceEngineNeutron(object):
                                network_interface_id=ec2_network_interface_id)
             # TODO(ft): receive network_interface from a
             # create_network_interface sub-function
-            network_interface = db_api.get_item_by_id(context, 'eni',
+            network_interface = db_api.get_item_by_id(context,
                                                       ec2_network_interface_id)
             data['network_interface'] = network_interface
 

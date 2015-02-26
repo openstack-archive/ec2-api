@@ -20,6 +20,7 @@ import uuid
 
 from oslo_utils import timeutils
 
+from ec2api.api import ec2utils
 from ec2api.tests.unit import tools
 
 
@@ -40,18 +41,36 @@ def get_db_api_add_item(item_id_dict):
 
 
 def get_db_api_get_items(results_dict_by_kind):
-    def db_api_get_items(context, kind, *args):
+    def db_api_get_items(context, kind):
         return results_dict_by_kind.get(kind)
     return db_api_get_items
 
 
 def get_db_api_get_item_by_id(results_dict_by_id):
-    def db_api_get_item_by_id(context, kind, item_id):
+    def db_api_get_item_by_id(context, item_id):
         item = results_dict_by_id.get(item_id)
         if item is not None:
             item = copy.deepcopy(item)
         return item
     return db_api_get_item_by_id
+
+
+def get_db_api_get_items_by_ids(items):
+    def db_api_get_items_by_ids(context, kind, item_ids):
+        return [copy.deepcopy(item)
+                for item in items
+                if (ec2utils.get_ec2_id_kind(item['id']) == kind and
+                    not item_ids or item['id'] in item_ids)]
+    return db_api_get_items_by_ids
+
+
+def get_db_api_get_item_ids(items):
+    def db_api_get_item_ids(context, kind, item_os_ids):
+        return [(item['id'], item['os_id'])
+                for item in items
+                if (item['os_id'] in item_os_ids and
+                    ec2utils.get_ec2_id_kind(item['id']) == kind)]
+    return db_api_get_item_ids
 
 
 def get_neutron_create(kind, os_id, addon={}):

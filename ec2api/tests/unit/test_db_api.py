@@ -90,7 +90,7 @@ class DbApiTestCase(test_base.BaseTestCase):
         self.assertThat(item, matchers.DictMatches(new_item,
                                                    orderless_lists=True))
 
-        item = db_api.get_item_by_id(self.context, 'fake', item_id)
+        item = db_api.get_item_by_id(self.context, item_id)
         new_item['id'] = item_id
         self.assertThat(item, matchers.DictMatches(new_item,
                                                    orderless_lists=True))
@@ -146,7 +146,7 @@ class DbApiTestCase(test_base.BaseTestCase):
         os_id = fakes.random_os_id()
         item_id = db_api.add_item_id(self.context, 'fake', os_id)
         self.assertTrue(validator.validate_ec2_id(item_id, '', ['fake']))
-        item = db_api.get_item_by_id(self.context, 'fake', item_id)
+        item = db_api.get_item_by_id(self.context, item_id)
         self.assertIsNone(item)
         item = db_api.add_item(self.context, 'fake', {'os_id': os_id})
         self.assertThat(item, matchers.DictMatches({'id': item_id,
@@ -170,7 +170,7 @@ class DbApiTestCase(test_base.BaseTestCase):
         item['key2'] = 'val'
         item_id = item['id']
         db_api.update_item(self.context, item)
-        item = db_api.get_item_by_id(self.context, 'fake', item_id)
+        item = db_api.get_item_by_id(self.context, item_id)
         self.assertThat(item, matchers.DictMatches({'id': item_id,
                                                     'os_id': None,
                                                     'vpc_id': None,
@@ -187,7 +187,7 @@ class DbApiTestCase(test_base.BaseTestCase):
     def test_delete_item(self):
         item = db_api.add_item(self.context, 'fake', {})
         db_api.delete_item(self.context, item['id'])
-        item = db_api.get_item_by_id(self.context, 'fake', item['id'])
+        item = db_api.get_item_by_id(self.context, item['id'])
         self.assertIsNone(item)
 
         # NOTE(ft): delete not existing item should pass quitely
@@ -195,7 +195,7 @@ class DbApiTestCase(test_base.BaseTestCase):
 
         item = db_api.add_item(self.context, 'fake', {})
         db_api.delete_item(self.other_context, item['id'])
-        item = db_api.get_item_by_id(self.context, 'fake', item['id'])
+        item = db_api.get_item_by_id(self.context, item['id'])
         self.assertIsNotNone(item)
 
     def _setup_items(self):
@@ -221,18 +221,13 @@ class DbApiTestCase(test_base.BaseTestCase):
         item_id = db_api.get_items(self.context, 'fake')[0]['id']
         other_item_id = db_api.get_items(self.other_context, 'fake')[0]['id']
 
-        item = db_api.get_item_by_id(self.context, 'fake', item_id)
+        item = db_api.get_item_by_id(self.context, item_id)
         self.assertThat(item, matchers.DictMatches({'id': item_id,
                                                     'os_id': None,
                                                     'vpc_id': None}))
-        item = db_api.get_item_by_id(self.context, 'fake1', item_id)
+        item = db_api.get_item_by_id(self.context, other_item_id)
         self.assertIsNone(item)
-        item = db_api.get_item_by_id(self.context, 'fake0', item_id)
-        self.assertIsNone(item)
-        item = db_api.get_item_by_id(self.context, 'fake', other_item_id)
-        self.assertIsNone(item)
-        item = db_api.get_item_by_id(self.context, 'fake',
-                                     fakes.random_ec2_id('fake'))
+        item = db_api.get_item_by_id(self.context, fakes.random_ec2_id('fake'))
 
     def test_get_items_by_ids(self):
         self._setup_items()

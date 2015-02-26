@@ -244,7 +244,7 @@ class VpcTestCase(base.ApiTestCase):
             [('cidr', fakes.CIDR_VPC_1),
              ('dhcp-options-id', 'default'),
              # TODO(ft): support filtering by a boolean value
-#              ('is-default', False),
+             # ('is-default', False),
              ('state', 'available'),
              ('vpc-id', fakes.ID_EC2_VPC_1)])
         self.check_tag_support(
