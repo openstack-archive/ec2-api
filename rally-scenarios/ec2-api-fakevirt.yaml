@@ -1,0 +1,30 @@
+---
+  EC2APIPlugin.describe_instances:
+    -
+      runner:
+        type: "constant"
+        times: 20
+        concurrency: 1
+      context:
+        users:
+          tenants: 1
+          users_per_tenant: 1
+        servers:
+          flavor:
+              name: "m1.nano"
+          image:
+              name: "^cirros.*uec$"
+          servers_per_tenant: 500
+        prepare_ec2_client:
+
+  EC2APIPlugin.describe_regions:
+    -
+      runner:
+        type: "constant"
+        times: 10
+        concurrency: 1
+      context:
+        users:
+          tenants: 1
+          users_per_tenant: 1
+        prepare_ec2_client:
