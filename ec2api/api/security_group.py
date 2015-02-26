@@ -20,7 +20,8 @@ try:
 except ImportError:
     pass  # clients will log absense of neutronclient in this case
 from novaclient import exceptions as nova_exception
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
 
 from ec2api.api import clients
 from ec2api.api import common
@@ -28,8 +29,7 @@ from ec2api.api import ec2utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _
 
 
 CONF = cfg.CONF

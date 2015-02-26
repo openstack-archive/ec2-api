@@ -22,11 +22,11 @@ SHOULD include dedicated exception logging.
 
 import sys
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
 import six
 
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _
 
 LOG = logging.getLogger(__name__)
 

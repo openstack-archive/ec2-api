@@ -20,43 +20,37 @@ import json
 import random
 import sys
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_db import exception as db_exception
+from oslo_db.sqlalchemy import session as db_session
 from sqlalchemy import and_
 from sqlalchemy import or_
 from sqlalchemy.sql import bindparam
 
 import ec2api.context
 from ec2api.db.sqlalchemy import models
-from ec2api.openstack.common.db import exception as db_exception
-from ec2api.openstack.common.db.sqlalchemy import session as db_session
 
 CONF = cfg.CONF
-CONF.import_opt('connection',
-                'ec2api.openstack.common.db.sqlalchemy.session',
-                group='database')
 
 
 _MASTER_FACADE = None
 
 
-def _create_facade_lazily(use_slave=False):
+def _create_facade_lazily():
     global _MASTER_FACADE
 
     if _MASTER_FACADE is None:
-        _MASTER_FACADE = db_session.EngineFacade(
-            CONF.database.connection,
-            **dict(CONF.database.iteritems())
-        )
+        _MASTER_FACADE = db_session.EngineFacade.from_config(CONF)
     return _MASTER_FACADE
 
 
-def get_engine(use_slave=False):
-    facade = _create_facade_lazily(use_slave)
+def get_engine():
+    facade = _create_facade_lazily()
     return facade.get_engine()
 
 
-def get_session(use_slave=False, **kwargs):
-    facade = _create_facade_lazily(use_slave)
+def get_session(**kwargs):
+    facade = _create_facade_lazily()
     return facade.get_session(**kwargs)
 
 

@@ -15,13 +15,13 @@
 import re
 
 from glanceclient.common import exceptions as glance_exception
+from oslo_log import log as logging
 from oslo_utils import timeutils
 
 from ec2api.api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _
 
 LOG = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ def is_ec2_timestamp_expired(request, expires=None):
                         timeutils.is_newer_than(query_time, expires))
         return False
     except ValueError:
-        LOG.audit(_("Timestamp is invalid."))
+        LOG.exception(_("Timestamp is invalid: "))
         return True
 
 

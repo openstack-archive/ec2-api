@@ -27,8 +27,8 @@ import boto.s3.connection
 import eventlet
 from glanceclient.common import exceptions as glance_exception
 from lxml import etree
-from oslo.config import cfg
 from oslo_concurrency import processutils
+from oslo_config import cfg
 from oslo_utils import timeutils
 
 from ec2api.api import clients
@@ -38,7 +38,7 @@ from ec2api.api import instance as instance_api
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
+from ec2api.i18n import _
 
 
 s3_opts = [

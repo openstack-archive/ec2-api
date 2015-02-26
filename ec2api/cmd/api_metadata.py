@@ -18,14 +18,18 @@ EC2api API Metadata Server
 
 import sys
 
+from oslo_config import cfg
+from oslo_log import log as logging
+
 from ec2api import config
-from ec2api.openstack.common import log as logging
 from ec2api import service
+
+CONF = cfg.CONF
 
 
 def main():
     config.parse_args(sys.argv)
-    logging.setup("ec2api")
+    logging.setup(CONF, "ec2api")
 
     server = service.WSGIService('metadata')
     service.serve(server, workers=server.workers)

@@ -22,7 +22,7 @@ import sqlalchemy
 
 from ec2api.db.sqlalchemy import api as db_session
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
+from ec2api.i18n import _
 
 INIT_VERSION = 0
 _REPOSITORY = None

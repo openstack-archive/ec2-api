@@ -15,7 +15,7 @@
 
 import mock
 from neutronclient.common import exceptions as neutron_exception
-from oslo.config import cfg
+from oslo_config import cfg
 
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes

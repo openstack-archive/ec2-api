@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from oslo.config import cfg
+from oslo_config import cfg
 from oslotest import base as test_base
 from sqlalchemy import event
 from sqlalchemy.orm import exc as orm_exception
 
 from ec2api.api import validator
+from ec2api import config
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api.db import migration
@@ -35,6 +36,7 @@ class DbApiTestCase(test_base.BaseTestCase):
         super(DbApiTestCase, cls).setUpClass()
         conf = cfg.CONF
         try:
+            config.parse_args([], default_config_files=[])
             conf.set_override('connection', 'sqlite://', group='database')
             conf.set_override('sqlite_synchronous', False, group='database')
 
@@ -48,11 +50,6 @@ class DbApiTestCase(test_base.BaseTestCase):
                 # disable pysqlite's emitting of the BEGIN statement entirely.
                 # also stops it from emitting COMMIT before any DDL.
                 dbapi_connection.isolation_level = None
-
-            @event.listens_for(engine, "begin")
-            def do_begin(conn):
-                # emit our own BEGIN
-                conn.execute("BEGIN")
 
             conn = engine.connect()
             migration.db_sync()

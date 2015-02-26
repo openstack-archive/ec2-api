@@ -21,15 +21,15 @@ import datetime
 from xml.dom import minidom
 
 from lxml import etree
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
 from oslo_utils import encodeutils
 import six
 
 from ec2api.api import cloud
 from ec2api.api import ec2utils
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)

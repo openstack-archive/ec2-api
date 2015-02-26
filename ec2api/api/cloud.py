@@ -22,7 +22,8 @@ datastore.
 import collections
 import itertools
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
 
 from ec2api.api import address
 from ec2api.api import availability_zone
@@ -40,7 +41,6 @@ from ec2api.api import tag
 from ec2api.api import volume
 from ec2api.api import vpc
 from ec2api import exception
-from ec2api.openstack.common import log as logging
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)

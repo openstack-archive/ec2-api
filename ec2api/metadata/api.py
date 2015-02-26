@@ -15,14 +15,14 @@
 import itertools
 
 from novaclient import exceptions as nova_exception
+from oslo_log import log as logging
 
 from ec2api.api import clients
 from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
 from ec2api import exception
+from ec2api.i18n import _
 from ec2api.novadb import api as novadb
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
 
 LOG = logging.getLogger(__name__)
 

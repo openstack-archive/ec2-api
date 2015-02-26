@@ -23,7 +23,9 @@ import sys
 
 import eventlet.wsgi
 import greenlet
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
+from oslo_log import loggers
 from oslo_utils import excutils
 from paste import deploy
 import routes.middleware
@@ -31,8 +33,7 @@ import webob.dec
 import webob.exc
 
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _
 
 wsgi_opts = [
     cfg.StrOpt('api_paste_config',
@@ -101,7 +102,7 @@ class Server(object):
         self._protocol = protocol
         self._pool = eventlet.GreenPool(pool_size or self.default_pool_size)
         self._logger = logging.getLogger("ec2api.wsgi.server")
-        self._wsgi_logger = logging.WritableLogger(self._logger)
+        self._wsgi_logger = loggers.WritableLogger(self._logger)
         self._use_ssl = use_ssl
         self._max_url_len = max_url_len
 

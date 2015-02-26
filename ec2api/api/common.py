@@ -16,14 +16,14 @@ import collections
 import fnmatch
 import inspect
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
 
 from ec2api.api import ec2utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.openstack.common import gettextutils as textutils
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _LW
 
 
 ec2_opts = [
@@ -86,7 +86,7 @@ class OnCrashCleaner(object):
                         formatted_args += ', '
                     formatted_args += kwargs_string
                 LOG.warning(
-                    textutils._LW('Error cleaning up %(name)s(%(args)s)') %
+                    _LW('Error cleaning up %(name)s(%(args)s)') %
                     {'name': name, 'args': formatted_args},
                     exc_info=True)
                 pass

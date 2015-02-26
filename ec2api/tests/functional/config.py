@@ -18,7 +18,7 @@ from __future__ import print_function
 import logging as std_logging
 import os
 
-from oslo.config import cfg
+from oslo_config import cfg
 from oslo_log import log as logging
 
 

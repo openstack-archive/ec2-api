@@ -19,7 +19,8 @@
 SQLAlchemy models for nova data.
 """
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_db.sqlalchemy import models
 from sqlalchemy import Column, Index, Integer, Enum, String
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
 from sqlalchemy.ext.declarative import declarative_base
@@ -27,7 +28,6 @@ from sqlalchemy import DateTime, Boolean, Text
 from sqlalchemy.orm import object_mapper
 
 from ec2api.novadb.sqlalchemy import types
-from ec2api.openstack.common.db.sqlalchemy import models
 
 CONF = cfg.CONF
 BASE = declarative_base()

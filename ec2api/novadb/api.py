@@ -29,16 +29,13 @@ these objects be simple dictionaries.
 """
 
 from eventlet import tpool
-from oslo.config import cfg
-
-from ec2api.openstack.common.db import api as db_api
-from ec2api.openstack.common import log as logging
+from oslo_config import cfg
+from oslo_db import api as db_api
+from oslo_log import log as logging
 
 
 CONF = cfg.CONF
 CONF.import_opt('use_tpool', 'ec2api.db.api',
-                group='database')
-CONF.import_opt('backend', 'ec2api.openstack.common.db.options',
                 group='database')
 
 _BACKEND_MAPPING = {'sqlalchemy': 'ec2api.novadb.sqlalchemy.api'}
@@ -80,15 +77,12 @@ MAX_INT = 0x7FFFFFFF
 ####################
 
 
-def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):
+def instance_get_by_uuid(context, uuid, columns_to_join=None):
     """Get an instance or raise if it does not exist."""
-    return IMPL.instance_get_by_uuid(context, uuid,
-                                     columns_to_join, use_slave=use_slave)
+    return IMPL.instance_get_by_uuid(context, uuid, columns_to_join)
 
 
-def block_device_mapping_get_all_by_instance(context, instance_uuid,
-                                             use_slave=False):
+def block_device_mapping_get_all_by_instance(context, instance_uuid):
     """Get all block device mapping belonging to an instance."""
     return IMPL.block_device_mapping_get_all_by_instance(context,
-                                                         instance_uuid,
-                                                         use_slave)
+                                                         instance_uuid)

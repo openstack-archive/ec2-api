@@ -17,7 +17,7 @@ import copy
 import mock
 from neutronclient.common import exceptions as neutron_exception
 from novaclient import exceptions as nova_exception
-from oslo.config import cfg
+from oslo_config import cfg
 
 from ec2api.api import address
 from ec2api.tests.unit import base

@@ -18,7 +18,7 @@
 """Generic Node base class for all workers that run on hosts."""
 
 import errno
-import logging as std_logging
+import logging
 import os
 import random
 import signal
@@ -35,17 +35,14 @@ except ImportError:
 
 import eventlet
 from eventlet import event
-from oslo.config import cfg
+from oslo_config import cfg
 
 from ec2api.openstack.common import eventlet_backdoor
-from ec2api.openstack.common.gettextutils import _LE, _LI, _LW
-from ec2api.openstack.common import importutils
-from ec2api.openstack.common import log as logging
+from ec2api.openstack.common._i18n import _LE, _LI, _LW
 from ec2api.openstack.common import systemd
 from ec2api.openstack.common import threadgroup
 
 
-rpc = importutils.try_import('ec2api.openstack.common.rpc')
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
@@ -165,7 +162,7 @@ class ServiceLauncher(Launcher):
         signo = 0
 
         LOG.debug('Full set of CONF:')
-        CONF.log_opt_values(LOG, std_logging.DEBUG)
+        CONF.log_opt_values(LOG, logging.DEBUG)
 
         try:
             if ready_callback:
@@ -180,12 +177,6 @@ class ServiceLauncher(Launcher):
             status = exc.code
         finally:
             self.stop()
-            if rpc:
-                try:
-                    rpc.cleanup()
-                except Exception:
-                    # We're shutting down, so it doesn't matter at this point.
-                    LOG.exception(_LE('Exception during rpc cleanup.'))
 
         return status, signo
 
@@ -385,7 +376,7 @@ class ProcessLauncher(object):
 
         systemd.notify_once()
         LOG.debug('Full set of CONF:')
-        CONF.log_opt_values(LOG, std_logging.DEBUG)
+        CONF.log_opt_values(LOG, logging.DEBUG)
 
         try:
             while True:
@@ -405,7 +396,7 @@ class ProcessLauncher(object):
                 self.running = True
                 self.sigcaught = None
         except eventlet.greenlet.GreenletExit:
-            LOG.info(_LI("Wait called after thread killed.  Cleaning up."))
+            LOG.info(_LI("Wait called after thread killed. Cleaning up."))
 
         self.stop()
 
@@ -442,8 +433,8 @@ class Service(object):
     def start(self):
         pass
 
-    def stop(self):
-        self.tg.stop()
+    def stop(self, graceful=False):
+        self.tg.stop(graceful)
         self.tg.wait()
         # Signal that service cleanup is done:
         if not self._done.ready():

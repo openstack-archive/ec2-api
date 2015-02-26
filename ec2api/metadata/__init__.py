@@ -19,16 +19,15 @@ import urlparse
 
 import httplib2
 from keystoneclient.v2_0 import client as keystone_client
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
 import six
 import webob
 
 from ec2api import context as ec2context
 from ec2api import exception
+from ec2api.i18n import _, _LE, _LW
 from ec2api.metadata import api
-from ec2api.openstack.common import gettextutils as textutils
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
 from ec2api import utils
 from ec2api import wsgi
 
@@ -103,7 +102,7 @@ class MetadataRequestHandler(wsgi.Application):
         except exception.EC2MetadataNotFound:
             return webob.exc.HTTPNotFound()
         except Exception:
-            LOG.exception(textutils._LE("Unexpected error."))
+            LOG.exception(_LE("Unexpected error."))
             msg = _('An unknown error has occurred. '
                     'Please try your request again.')
             return webob.exc.HTTPInternalServerError(explanation=unicode(msg))
@@ -138,7 +137,7 @@ class MetadataRequestHandler(wsgi.Application):
             req.response.body = content
             return req.response
         elif resp.status == 403:
-            LOG.warn(textutils._LW(
+            LOG.warn(_LW(
                 'The remote metadata server responded with Forbidden. This '
                 'response usually occurs when shared secrets do not match.'
             ))
@@ -249,7 +248,7 @@ class MetadataRequestHandler(wsgi.Application):
             hashlib.sha256).hexdigest()
 
         if not utils.constant_time_compare(expected_signature, signature):
-            LOG.warning(textutils._LW(
+            LOG.warning(_LW(
                             'X-Instance-ID-Signature: %(signature)s does '
                             'not match the expected value: '
                             '%(expected_signature)s for id: '

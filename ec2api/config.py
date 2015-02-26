@@ -12,18 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_db import options
+from oslo_log import log
 
-from ec2api.openstack.common.db import options
 from ec2api import paths
 from ec2api import version
 
+
+CONF = cfg.CONF
+
 _DEFAULT_SQL_CONNECTION = 'sqlite:///' + paths.state_path_def('ec2api.sqlite')
+
+_DEFAULT_LOG_LEVELS = ['amqp=WARN', 'amqplib=WARN', 'boto=WARN',
+                       'qpid=WARN', 'sqlalchemy=WARN', 'suds=INFO',
+                       'oslo.messaging=INFO', 'iso8601=WARN',
+                       'requests.packages.urllib3.connectionpool=WARN',
+                       'urllib3.connectionpool=WARN', 'websocket=WARN',
+                       'keystonemiddleware=WARN', 'routes.middleware=WARN',
+                       'stevedore=WARN', 'glanceclient=WARN']
+
+_DEFAULT_LOGGING_CONTEXT_FORMAT = ('%(asctime)s.%(msecs)03d %(process)d '
+                                   '%(levelname)s %(name)s [%(request_id)s '
+                                   '%(user_identity)s] %(instance)s'
+                                   '%(message)s')
 
 
 def parse_args(argv, default_config_files=None):
-    options.set_defaults(sql_connection=_DEFAULT_SQL_CONNECTION,
+    log.set_defaults(_DEFAULT_LOGGING_CONTEXT_FORMAT, _DEFAULT_LOG_LEVELS)
+    log.register_options(CONF)
+    options.set_defaults(CONF, connection=_DEFAULT_SQL_CONNECTION,
                          sqlite_db='ec2api.sqlite')
+
     cfg.CONF(argv[1:],
              project='ec2api',
              version=version.version_info.version_string(),

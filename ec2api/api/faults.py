@@ -14,14 +14,13 @@
 
 from xml.sax import saxutils
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
 import webob.dec
 import webob.exc
 
 import ec2api.api
 from ec2api import context
-from ec2api.openstack.common import gettextutils
-from ec2api.openstack.common import log as logging
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -43,8 +42,6 @@ def utf8(value):
     """
     if isinstance(value, unicode):
         return value.encode('utf-8')
-    elif isinstance(value, gettextutils.Message):
-        return unicode(value).encode('utf-8')
     assert isinstance(value, str)
     return value
 

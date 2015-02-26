@@ -15,7 +15,7 @@
 import itertools
 
 import mock
-from oslo.config import cfg
+from oslo_config import cfg
 from oslotest import base as test_base
 
 import ec2api.api.apirequest

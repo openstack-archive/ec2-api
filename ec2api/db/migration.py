@@ -14,10 +14,10 @@
 
 """Database setup and migration commands."""
 
-from oslo.config import cfg
+from oslo_config import cfg
 
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
+from ec2api.i18n import _
 
 CONF = cfg.CONF
 

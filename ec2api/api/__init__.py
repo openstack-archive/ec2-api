@@ -18,7 +18,9 @@ Starting point for routing EC2 requests.
 import hashlib
 import sys
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_log import log as logging
+from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 import requests
 import six
@@ -31,9 +33,7 @@ from ec2api.api import ec2utils
 from ec2api.api import faults
 from ec2api import context
 from ec2api import exception
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import jsonutils
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _
 from ec2api import wsgi
 
 

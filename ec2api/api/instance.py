@@ -20,7 +20,7 @@ import random
 import re
 
 from novaclient import exceptions as nova_exception
-from oslo.config import cfg
+from oslo_config import cfg
 from oslo_utils import timeutils
 
 from ec2api.api import address as address_api
@@ -31,8 +31,8 @@ from ec2api.api import network_interface as network_interface_api
 from ec2api.api import security_group as security_group_api
 from ec2api.db import api as db_api
 from ec2api import exception
+from ec2api.i18n import _
 from ec2api import novadb
-from ec2api.openstack.common.gettextutils import _
 
 
 ec2_opts = [

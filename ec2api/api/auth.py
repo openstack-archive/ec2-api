@@ -17,9 +17,8 @@ Common Auth Middleware.
 
 """
 
-from oslo.config import cfg
-
-from ec2api.openstack.common import log as logging
+from oslo_config import cfg
+from oslo_log import log as logging
 
 
 auth_opts = [

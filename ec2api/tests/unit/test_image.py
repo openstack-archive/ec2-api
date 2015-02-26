@@ -19,7 +19,7 @@ import tempfile
 
 import eventlet
 import mock
-from oslo.config import cfg
+from oslo_config import cfg
 from oslotest import base as test_base
 
 from ec2api.api import image as image_api

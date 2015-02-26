@@ -20,25 +20,21 @@
 import functools
 import sys
 
-from oslo.config import cfg
+from oslo_config import cfg
+from oslo_db.sqlalchemy import session as db_session
+from oslo_log import log as logging
 from sqlalchemy import or_
 
 import ec2api.context
 from ec2api import exception
+from ec2api.i18n import _
 from ec2api.novadb.sqlalchemy import models
-from ec2api.openstack.common.db.sqlalchemy import session as db_session
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
 
 connection_opts = [
     cfg.StrOpt('connection_nova',
                secret=True,
                help='The SQLAlchemy connection string used to connect to the '
                     'nova database'),
-    cfg.StrOpt('slave_connection',
-               secret=True,
-               help='The SQLAlchemy connection string used to connect to the '
-                    'slave database'),
 ]
 
 CONF = cfg.CONF
@@ -48,37 +44,26 @@ LOG = logging.getLogger(__name__)
 
 
 _MASTER_FACADE = None
-_SLAVE_FACADE = None
 
 
-def _create_facade_lazily(use_slave=False):
+def _create_facade_lazily():
     global _MASTER_FACADE
-    global _SLAVE_FACADE
 
-    return_slave = use_slave and CONF.database.slave_connection
-    if not return_slave:
-        if _MASTER_FACADE is None:
-            _MASTER_FACADE = db_session.EngineFacade(
-                CONF.database.connection_nova,
-                **dict(CONF.database.iteritems())
-            )
-        return _MASTER_FACADE
-    else:
-        if _SLAVE_FACADE is None:
-            _SLAVE_FACADE = db_session.EngineFacade(
-                CONF.database.slave_connection,
-                **dict(CONF.database.iteritems())
-            )
-        return _SLAVE_FACADE
+    if _MASTER_FACADE is None:
+        _MASTER_FACADE = db_session.EngineFacade(
+            CONF.database.connection_nova,
+            **dict(CONF.database.iteritems())
+        )
+    return _MASTER_FACADE
 
 
-def get_engine(use_slave=False):
-    facade = _create_facade_lazily(use_slave)
+def get_engine():
+    facade = _create_facade_lazily()
     return facade.get_engine()
 
 
-def get_session(use_slave=False, **kwargs):
-    facade = _create_facade_lazily(use_slave)
+def get_session(**kwargs):
+    facade = _create_facade_lazily()
     return facade.get_session(**kwargs)
 
 
@@ -109,7 +94,6 @@ def model_query(context, model, *args, **kwargs):
     """Query helper that accounts for context's `read_deleted` field.
 
     :param context: context to query under
-    :param use_slave: If true, use slave_connection
     :param session: if present, the session to use
     :param read_deleted: if present, overrides context's read_deleted field.
     :param project_only: if present and context is user-type, then restrict
@@ -121,11 +105,7 @@ def model_query(context, model, *args, **kwargs):
             model parameter.
     """
 
-    use_slave = kwargs.get('use_slave') or False
-    if CONF.database.slave_connection == '':
-        use_slave = False
-
-    session = kwargs.get('session') or get_session(use_slave=use_slave)
+    session = kwargs.get('session') or get_session()
     read_deleted = kwargs.get('read_deleted') or context.read_deleted
     project_only = kwargs.get('project_only', False)
 
@@ -167,16 +147,15 @@ def model_query(context, model, *args, **kwargs):
 
 
 @require_context
-def instance_get_by_uuid(context, uuid, columns_to_join=None, use_slave=False):
+def instance_get_by_uuid(context, uuid, columns_to_join=None):
     return _instance_get_by_uuid(context, uuid,
-            columns_to_join=columns_to_join, use_slave=use_slave)
+            columns_to_join=columns_to_join)
 
 
 def _instance_get_by_uuid(context, uuid, session=None,
-                          columns_to_join=None, use_slave=False):
+                          columns_to_join=None):
     result = (_build_instance_get(context, session=session,
-                                 columns_to_join=columns_to_join,
-                                 use_slave=use_slave).
+                                 columns_to_join=columns_to_join).
                 filter_by(uuid=uuid).
                 first())
 
@@ -188,28 +167,25 @@ def _instance_get_by_uuid(context, uuid, session=None,
 
 
 def _build_instance_get(context, session=None,
-                        columns_to_join=None, use_slave=False):
+                        columns_to_join=None):
     query = model_query(context, models.Instance, session=session,
-                        project_only=True, use_slave=use_slave,
-                        read_deleted="no")
+                        project_only=True, read_deleted="no")
     return query
 
 
 def _block_device_mapping_get_query(context, session=None,
-        columns_to_join=None, use_slave=False):
+        columns_to_join=None):
     if columns_to_join is None:
         columns_to_join = []
 
     query = model_query(context, models.BlockDeviceMapping,
-                        session=session, use_slave=use_slave,
-                        read_deleted="no")
+                        session=session, read_deleted="no")
 
     return query
 
 
 @require_context
-def block_device_mapping_get_all_by_instance(context, instance_uuid,
-                                             use_slave=False):
-    return (_block_device_mapping_get_query(context, use_slave=use_slave).
+def block_device_mapping_get_all_by_instance(context, instance_uuid):
+    return (_block_device_mapping_get_query(context).
                  filter_by(instance_uuid=instance_uuid).
                  all())

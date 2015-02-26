@@ -16,11 +16,10 @@
 SQLAlchemy models for ec2api data.
 """
 
+from oslo_db.sqlalchemy import models
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, PrimaryKeyConstraint, String, Text
 from sqlalchemy import UniqueConstraint
-
-from ec2api.openstack.common.db.sqlalchemy import models
 
 BASE = declarative_base()
 

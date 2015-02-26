@@ -16,12 +16,12 @@
 from keystoneclient.v2_0 import client as kc
 from novaclient import client as novaclient
 from novaclient import shell as novashell
-from oslo.config import cfg
-from oslo import messaging
+from oslo_config import cfg
+from oslo_log import log as logging
+import oslo_messaging as messaging
 
 from ec2api import context as ec2_context
-from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import log as logging
+from ec2api.i18n import _
 
 logger = logging.getLogger(__name__)
 

@@ -28,10 +28,9 @@ functions from ec2api.db namespace, not the ec2api.db.api namespace.
 """
 
 from eventlet import tpool
-from oslo.config import cfg
-
-from ec2api.openstack.common.db import api as db_api
-from ec2api.openstack.common import log as logging
+from oslo_config import cfg
+from oslo_db import api as db_api
+from oslo_log import log as logging
 
 
 tpool_opts = [
@@ -45,8 +44,6 @@ tpool_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(tpool_opts, 'database')
-CONF.import_opt('backend', 'ec2api.openstack.common.db.options',
-                group='database')
 
 _BACKEND_MAPPING = {'sqlalchemy': 'ec2api.db.sqlalchemy.api'}
 
