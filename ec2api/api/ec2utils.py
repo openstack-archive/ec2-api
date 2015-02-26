@@ -15,13 +15,13 @@
 import re
 
 from glanceclient.common import exceptions as glance_exception
+from oslo_utils import timeutils
 
 from ec2api.api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
-from ec2api.openstack.common import timeutils
 
 LOG = logging.getLogger(__name__)
 

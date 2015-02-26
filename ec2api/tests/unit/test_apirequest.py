@@ -17,7 +17,7 @@ import uuid
 
 from lxml import etree
 import mock
-from oslo.utils import timeutils
+from oslo_utils import timeutils
 from oslotest import base as test_base
 
 from ec2api.api import apirequest

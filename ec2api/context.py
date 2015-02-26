@@ -16,13 +16,13 @@
 
 import uuid
 
+from oslo_utils import timeutils
 import six
 
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import local
 from ec2api.openstack.common import log as logging
-from ec2api.openstack.common import timeutils
 
 
 LOG = logging.getLogger(__name__)

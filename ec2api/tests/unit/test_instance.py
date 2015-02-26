@@ -834,7 +834,7 @@ class InstanceTestCase(base.ApiTestCase):
                                        instance_api.vm_states_ACTIVE,
                                        instance_api.vm_states_BUILDING)
 
-    @mock.patch('ec2api.openstack.common.timeutils.utcnow')
+    @mock.patch('oslo_utils.timeutils.utcnow')
     def _test_instance_get_operation(self, operation, getter, key, utcnow):
         self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_2
         self.nova_servers.get.return_value = fakes.OS_INSTANCE_2

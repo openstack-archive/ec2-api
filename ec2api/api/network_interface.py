@@ -18,6 +18,7 @@ import collections
 import netaddr
 from neutronclient.common import exceptions as neutron_exception
 from oslo.config import cfg
+from oslo_utils import timeutils
 
 from ec2api.api import address as address_api
 from ec2api.api import clients
@@ -29,7 +30,6 @@ from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import log as logging
-from ec2api.openstack.common import timeutils
 
 
 CONF = cfg.CONF

@@ -69,8 +69,7 @@ class ApiTestCase(test_base.BaseTestCase):
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)
 
-        isotime_patcher = mock.patch('ec2api.openstack.common.timeutils.'
-                                     'isotime')
+        isotime_patcher = mock.patch('oslo_utils.timeutils.isotime')
         self.isotime = isotime_patcher.start()
         self.addCleanup(isotime_patcher.stop)
 

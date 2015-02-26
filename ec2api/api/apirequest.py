@@ -22,7 +22,7 @@ from xml.dom import minidom
 
 from lxml import etree
 from oslo.config import cfg
-from oslo.utils import encodeutils
+from oslo_utils import encodeutils
 import six
 
 from ec2api.api import cloud

@@ -29,6 +29,7 @@ from glanceclient.common import exceptions as glance_exception
 from lxml import etree
 from oslo.config import cfg
 from oslo_concurrency import processutils
+from oslo_utils import timeutils
 
 from ec2api.api import clients
 from ec2api.api import common
@@ -38,7 +39,6 @@ from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
-from ec2api.openstack.common import timeutils
 
 
 s3_opts = [

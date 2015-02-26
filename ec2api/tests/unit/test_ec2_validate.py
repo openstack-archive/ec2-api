@@ -16,12 +16,12 @@
 
 import datetime
 
+from oslo_utils import timeutils
 import testtools
 
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api import exception
-from ec2api.openstack.common import timeutils
 
 
 class EC2ValidationTestCase(testtools.TestCase):

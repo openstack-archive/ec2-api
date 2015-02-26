@@ -19,6 +19,7 @@ import hashlib
 import sys
 
 from oslo.config import cfg
+from oslo_utils import timeutils
 import requests
 import six
 import webob
@@ -33,7 +34,6 @@ from ec2api import exception
 from ec2api.openstack.common.gettextutils import _
 from ec2api.openstack.common import jsonutils
 from ec2api.openstack.common import log as logging
-from ec2api.openstack.common import timeutils
 from ec2api import wsgi
 
 
