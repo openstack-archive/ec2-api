@@ -76,11 +76,8 @@ class InstanceTestCase(base.ApiTestCase):
                     copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1),
                  fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1}))
         self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
-                                              fakes.ID_OS_IMAGE_ARI_1)],
-                (fakes.ID_OS_IMAGE_AKI_1,): [(fakes.ID_EC2_IMAGE_AKI_1,
-                                              fakes.ID_OS_IMAGE_AKI_1)]}))
+            fakes.get_db_api_get_item_ids(
+                [fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1]))
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         self.network_interface_api.create_network_interface.return_value = (
             {'networkInterface': fakes.EC2_NETWORK_INTERFACE_1})
@@ -848,7 +845,7 @@ class InstanceTestCase(base.ApiTestCase):
                           key: 'fake_data'},
                          resp)
         self.db_api.get_item_by_id.assert_called_once_with(
-            mock.ANY, 'i', fakes.ID_EC2_INSTANCE_2)
+            mock.ANY, fakes.ID_EC2_INSTANCE_2)
         self.nova_servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
         getter.assert_called_once_with(fakes.OS_INSTANCE_2)
 
@@ -875,11 +872,8 @@ class InstanceTestCase(base.ApiTestCase):
                  'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2,
                          fakes.DB_VOLUME_3]}))
         self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
-                                              fakes.ID_OS_IMAGE_ARI_1)],
-                (fakes.ID_OS_IMAGE_AKI_1,): [(fakes.ID_EC2_IMAGE_AKI_1,
-                                              fakes.ID_OS_IMAGE_AKI_1)]}))
+            fakes.get_db_api_get_item_ids(
+                [fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1]))
         self.nova_servers.list.return_value = [fakes.OS_INSTANCE_1,
                                                fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.side_effect = (
@@ -1138,11 +1132,8 @@ class InstanceTestCase(base.ApiTestCase):
                 fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1,
                 fakes.ID_EC2_INSTANCE_2: fakes.DB_INSTANCE_2}))
         self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                (fakes.ID_OS_IMAGE_AKI_1,): [(fakes.ID_EC2_IMAGE_AKI_1,
-                                              fakes.ID_OS_IMAGE_AKI_1)],
-                (fakes.ID_OS_IMAGE_ARI_1,): [(fakes.ID_EC2_IMAGE_ARI_1,
-                                              fakes.ID_OS_IMAGE_ARI_1)]}))
+            fakes.get_db_api_get_item_ids(
+                [fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1]))
         self.nova_servers.get.side_effect = (
             fakes.get_by_1st_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.OS_INSTANCE_1,

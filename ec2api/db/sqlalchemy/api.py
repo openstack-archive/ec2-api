@@ -189,12 +189,11 @@ def get_items(context, kind):
 
 
 @require_context
-def get_item_by_id(context, kind, item_id):
-    return _unpack_item_data(model_query(context, models.Item).
+def get_item_by_id(context, item_id):
+    return (_unpack_item_data(model_query(context, models.Item).
             filter_by(project_id=context.project_id,
                       id=item_id).
-            filter(models.Item.id.like('%s-%%' % kind)).
-            first())
+            first()))
 
 
 @require_context

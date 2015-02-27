@@ -74,7 +74,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
             {'VpcId': fakes.ID_EC2_VPC_1,
              'GroupName': 'groupname',
              'GroupDescription': 'Group description'})
-        self.db_api.get_item_by_id.assert_called_once_with(mock.ANY, 'vpc',
+        self.db_api.get_item_by_id.assert_called_once_with(mock.ANY,
                                                            fakes.ID_EC2_VPC_1)
         check_response(resp, 'InvalidVpcID.NotFound')
 

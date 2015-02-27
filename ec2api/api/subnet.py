@@ -48,8 +48,7 @@ def create_subnet(context, vpc_id, cidr_block,
         raise exception.InvalidSubnetRange(cidr_block=cidr_block)
 
     gateway_ip = str(netaddr.IPAddress(subnet_ipnet.first + 1))
-    main_route_table = db_api.get_item_by_id(context, 'rtb',
-                                             vpc['route_table_id'])
+    main_route_table = db_api.get_item_by_id(context, vpc['route_table_id'])
     host_routes = route_table_api._get_subnet_host_routes(
             context, main_route_table, gateway_ip)
     neutron = clients.neutron(context)
@@ -90,7 +89,7 @@ def create_subnet(context, vpc_id, cidr_block,
 
 def delete_subnet(context, subnet_id):
     subnet = ec2utils.get_db_item(context, subnet_id)
-    vpc = db_api.get_item_by_id(context, 'vpc', subnet['vpc_id'])
+    vpc = db_api.get_item_by_id(context, subnet['vpc_id'])
     network_interfaces = network_interface_api.describe_network_interfaces(
         context,
         filter=[{'name': 'subnet-id',

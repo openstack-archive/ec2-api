@@ -35,7 +35,7 @@ class EC2UtilsTestCase(testtools.TestCase):
             res = ec2utils.get_db_item('fake_context', ec2_id)
             self.assertThat(res, matchers.DictMatches(item))
             db_api.get_item_by_id.assert_called_once_with('fake_context',
-                                                          kind, ec2_id)
+                                                          ec2_id)
             db_api.reset_mock()
 
         check_normal_flow('vpc', 'vpc-001234af')
@@ -47,7 +47,7 @@ class EC2UtilsTestCase(testtools.TestCase):
                               ec2utils.get_db_item,
                               'fake_context', ec2_id)
             db_api.get_item_by_id.assert_called_once_with('fake_context',
-                                                          kind, ec2_id)
+                                                          ec2_id)
             db_api.reset_mock()
 
         db_api.get_item_by_id.return_value = None
@@ -164,7 +164,7 @@ class EC2UtilsTestCase(testtools.TestCase):
             os_image,
             ec2utils.get_os_image(fake_context, fakes.ID_EC2_IMAGE_1))
         db_api.get_item_by_id.assert_called_with(
-            mock.ANY, 'ami', fakes.ID_EC2_IMAGE_1)
+            mock.ANY, fakes.ID_EC2_IMAGE_1)
         glance.images.get.assert_called_with(fakes.ID_OS_IMAGE_1)
 
         # NOTE(ft): check normal flow for a public image

@@ -64,7 +64,7 @@ class VolumeTestCase(base.ApiTestCase):
              ('create-time', fakes.TIME_CREATE_VOLUME_2),
              # TODO(ft): support filtering by a number value
              # NOTE(ft): declare a constant for the volume size in fakes
-#              ('size', 1),
+             # ('size', 1),
              ('snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
              ('status', 'available'),
              ('volume-id', fakes.ID_EC2_VOLUME_1)])
