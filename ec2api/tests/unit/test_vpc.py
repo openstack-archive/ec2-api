@@ -237,7 +237,7 @@ class VpcTestCase(base.ApiTestCase):
         self.assertThat(resp['vpcSet'],
                         matchers.ListMatches([fakes.EC2_VPC_1]))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'vpc', set([fakes.ID_EC2_VPC_1]))
+            mock.ANY, set([fakes.ID_EC2_VPC_1]))
 
         self.check_filtering(
             'DescribeVpcs', 'vpcSet',

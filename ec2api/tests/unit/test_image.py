@@ -269,7 +269,9 @@ class ImageTestCase(base.ApiTestCase):
             {'imagesSet': [fakes.EC2_IMAGE_1, fakes.EC2_IMAGE_2]},
             orderless_lists=True))
 
-        self.db_api.get_items_by_ids.assert_any_call(mock.ANY, 'ami', set([]))
+        self.db_api.get_items.assert_any_call(mock.ANY, 'ami')
+        self.db_api.get_items.assert_any_call(mock.ANY, 'aki')
+        self.db_api.get_items.assert_any_call(mock.ANY, 'ari')
 
         self.db_api.get_items_by_ids = tools.CopyingMock(
             side_effect=self.db_api.get_items_by_ids.side_effect)
@@ -282,7 +284,7 @@ class ImageTestCase(base.ApiTestCase):
             {'imagesSet': [fakes.EC2_IMAGE_1]},
             orderless_lists=True))
         self.db_api.get_items_by_ids.assert_any_call(
-            mock.ANY, 'ami', set([fakes.ID_EC2_IMAGE_1]))
+            mock.ANY, set([fakes.ID_EC2_IMAGE_1]))
 
         self.check_filtering(
             'DescribeImages', 'imagesSet',
@@ -388,7 +390,10 @@ class ImageTestCase(base.ApiTestCase):
                 [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]))
         self.db_api.get_items.side_effect = (
             fakes.get_db_api_get_items({
-                'snap': [fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2]}))
+                'snap': [fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2],
+                'ami': [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2],
+                'ari': [],
+                'aki': []}))
         self.db_api.get_public_items.return_value = []
 
         self.db_api.get_item_ids.side_effect = (
@@ -477,6 +482,25 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertThat(result,
                         matchers.DictMatches(expected, orderless_lists=True))
 
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_get_db_items(self, db_api):
+        describer = image_api.ImageDescriber()
+        describer.context = mock.Mock()
+
+        # NOTE(ft): the first requested image appears is user owend and public,
+        # the second is absent
+        db_api.get_items.side_effect = (
+            fakes.get_db_api_get_items({
+                'snap': []}))
+        db_api.get_items_by_ids.side_effect = (
+            fakes.get_db_api_get_items_by_ids([fakes.DB_IMAGE_1]))
+        db_api.get_public_items.side_effect = [
+            [fakes.DB_IMAGE_1], [], []]
+
+        describer.ids = set([fakes.ID_EC2_IMAGE_1, fakes.ID_EC2_IMAGE_2])
+        self.assertRaises(exception.InvalidAMIIDNotFound,
+                          describer.get_db_items)
+
     def test_block_device_properties_root_device_name(self):
         root_device0 = '/dev/sda'
         root_device1 = '/dev/sdb'
@@ -503,9 +527,9 @@ class S3TestCase(base.ApiTestCase):
     # its feature optimally
 
     def test_s3_parse_manifest(self):
-        self.db_api.get_public_items.side_effect = (
-            fakes.get_db_api_get_items_by_ids(
-                [fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1]))
+        self.db_api.get_public_items.side_effect = [
+                [fakes.DB_IMAGE_AKI_1],
+                [fakes.DB_IMAGE_ARI_1]]
         self.db_api.get_item_by_id.return_value = None
         self.glance.images.get.side_effect = (
             fakes.get_by_1st_arg_getter({

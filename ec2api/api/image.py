@@ -246,23 +246,29 @@ class ImageDescriber(common.TaggableItemsDescriber):
         # TODO(ft): we can't get all images from DB per one request due
         # different kinds. It's need to refactor DB API and ec2utils functions
         # to work with kind smarter
-        local_images = [db_api.get_items_by_ids(self.context, kind, self.ids)
-                        for kind in ('ami', 'ari', 'aki')]
+        if self.ids:
+            local_images = db_api.get_items_by_ids(self.context, self.ids)
+        else:
+            local_images = list(itertools.chain(
+                *(db_api.get_items(self.context, kind)
+                  for kind in ('ami', 'ari', 'aki'))))
         public_images = [db_api.get_public_items(self.context, kind, self.ids)
                          for kind in ('ami', 'ari', 'aki')]
 
-        images = list(itertools.chain(*itertools.chain(local_images,
-                                                       public_images)))
-        if len(images) < len(self.ids):
-            missed_ids = set(self.ids) - set(i['id']
-                                             for i in images)
-            raise exception.InvalidAMIIDNotFound(id=next(iter(missed_ids)))
-        self.images = images
+        images = list(itertools.chain(local_images, *public_images))
+        if self.ids:
+            # NOTE(ft): public images, owned by a current user, appear in both
+            # local and public lists of images. Therefore it's not enough to
+            # just compare length of requested and retrieved lists to make sure
+            # that all requested images are retrieved.
+            images_ids = set(i['id'] for i in images)
+            if len(images_ids) < len(self.ids):
+                missed_ids = self.ids - images_ids
+                raise exception.InvalidAMIIDNotFound(id=next(iter(missed_ids)))
         self.snapshot_ids = dict(
             (s['os_id'], s['id'])
             for s in db_api.get_items(self.context, 'snap'))
-        self.local_images_os_ids = set(i['os_id']
-                                       for i in itertools.chain(*local_images))
+        self.local_images_os_ids = set(i['os_id'] for i in local_images)
         self.ids_dict = {}
         return images
 

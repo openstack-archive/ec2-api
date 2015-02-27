@@ -393,7 +393,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                         matchers.ListMatches(
                             [fakes.EC2_NETWORK_INTERFACE_1]))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'eni', set([fakes.ID_EC2_NETWORK_INTERFACE_1]))
+            mock.ANY, set([fakes.ID_EC2_NETWORK_INTERFACE_1]))
 
         self.check_filtering(
             'DescribeNetworkInterfaces', 'networkInterfaceSet',

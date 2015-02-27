@@ -1042,7 +1042,7 @@ class InstanceEngineNeutron(object):
                     {'name': 'group-name', 'value': ['default']}]
         )['securityGroupInfo']
         security_groups = db_api.get_items_by_ids(
-            context, 'sg', [sg['groupId'] for sg in default_groups])
+            context, [sg['groupId'] for sg in default_groups])
         return [sg['os_id'] for sg in security_groups]
 
     def get_ec2_classic_os_network(self, context, neutron):

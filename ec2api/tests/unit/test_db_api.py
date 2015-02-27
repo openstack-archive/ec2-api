@@ -225,31 +225,40 @@ class DbApiTestCase(test_base.BaseTestCase):
         item = db_api.get_item_by_id(self.context, other_item_id)
         self.assertIsNone(item)
         item = db_api.get_item_by_id(self.context, fakes.random_ec2_id('fake'))
+        self.assertIsNone(item)
 
     def test_get_items_by_ids(self):
         self._setup_items()
-        item_id = db_api.get_items(self.context, 'fake')[0]['id']
+        fake_kind_items = db_api.get_items(self.context, 'fake')
+        fake1_kind_items = db_api.get_items(self.context, 'fake1')
+        item_id = fake_kind_items[0]['id']
         other_item_id = db_api.get_items(self.other_context, 'fake')[0]['id']
 
-        items = db_api.get_items_by_ids(self.context, 'fake', [])
+        items = db_api.get_items_by_ids(self.context, [])
+        self.assertEqual(0, len(items))
+        items = db_api.get_items_by_ids(self.context, set([]))
+        self.assertEqual(0, len(items))
+        items = db_api.get_items_by_ids(self.context,
+                                        [i['id'] for i in fake_kind_items])
         self.assertEqual(2, len(items))
-        items = db_api.get_items_by_ids(self.context, 'fake', set([]))
+        items = db_api.get_items_by_ids(
+            self.context, (fake_kind_items[0]['id'],
+                           fake1_kind_items[0]['id']))
         self.assertEqual(2, len(items))
-        items = db_api.get_items_by_ids(self.context, 'fake',
-                                        [i['id'] for i in items])
-        self.assertEqual(2, len(items))
-        items = db_api.get_items_by_ids(self.context, 'fake', (item_id,))
+        items = db_api.get_items_by_ids(self.context, (item_id,))
         self.assertEqual(1, len(items))
         self.assertEqual(item_id, items[0]['id'])
-        items = db_api.get_items_by_ids(self.context, 'fake0', [])
+        items = db_api.get_items_by_ids(self.context, (other_item_id,))
         self.assertEqual(0, len(items))
-        items = db_api.get_items_by_ids(self.context, 'fake', (other_item_id,))
-        self.assertEqual(0, len(items))
-        items = db_api.get_items_by_ids(self.context, 'fake',
+        items = db_api.get_items_by_ids(self.context,
+                                        (item_id, other_item_id))
+        self.assertEqual(1, len(items))
+        items = db_api.get_items_by_ids(self.context,
                                         (fakes.random_ec2_id('fake')),)
         self.assertEqual(0, len(items))
-        items = db_api.get_items_by_ids(self.context, 'fake1', (item_id,))
-        self.assertEqual(0, len(items))
+        items = db_api.get_items_by_ids(self.context,
+                                        (item_id, fakes.random_ec2_id('fake')))
+        self.assertEqual(1, len(items))
 
     def test_get_public_items(self):
         self._setup_items()

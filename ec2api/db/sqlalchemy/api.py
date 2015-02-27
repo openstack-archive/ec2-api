@@ -197,14 +197,11 @@ def get_item_by_id(context, item_id):
 
 
 @require_context
-def get_items_by_ids(context, kind, item_ids):
-    if not item_ids:
-        return get_items(context, kind)
+def get_items_by_ids(context, item_ids):
     return [_unpack_item_data(item)
             for item in (model_query(context, models.Item).
                          filter_by(project_id=context.project_id).
                          filter(models.Item.id.in_(item_ids)).
-                         filter(models.Item.id.like('%s-%%' % kind)).
                          all())]
 
 

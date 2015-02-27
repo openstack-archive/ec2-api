@@ -685,8 +685,7 @@ class InstanceTestCase(base.ApiTestCase):
                     tools.update_dict({'instanceId': fakes.ID_EC2_INSTANCE_2},
                                       fake_state_change)]}))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'i',
-            set([fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]))
+            mock.ANY, set([fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]))
         (self.network_interface_api.
          detach_network_interface.assert_called_once_with(
              mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH))
@@ -799,8 +798,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertEqual([mock.call(os_instance_1), mock.call(os_instance_2)],
                          os_instance_operation.mock_calls)
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'i', set([fakes.ID_EC2_INSTANCE_1,
-                                fakes.ID_EC2_INSTANCE_2]))
+            mock.ANY, set([fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]))
         get_os_instances_by_instances.assert_called_once_with(
             mock.ANY, [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2], exactly=True)
 
@@ -908,7 +906,7 @@ class InstanceTestCase(base.ApiTestCase):
             {'reservationSet': [fakes.EC2_RESERVATION_1]},
             orderless_lists=True))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'i', set([fakes.ID_EC2_INSTANCE_1]))
+            mock.ANY, set([fakes.ID_EC2_INSTANCE_1]))
         (self.network_interface_api.describe_network_interfaces.
          assert_called_with(mock.ANY))
 

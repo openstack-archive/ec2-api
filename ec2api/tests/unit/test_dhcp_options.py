@@ -112,7 +112,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                         matchers.ListMatches([fakes.EC2_DHCP_OPTIONS_1],
                                              orderless_lists=True))
         self.db_api.get_items_by_ids.assert_called_once_with(
-                mock.ANY, 'dopt', set([fakes.ID_EC2_DHCP_OPTIONS_1]))
+                mock.ANY, set([fakes.ID_EC2_DHCP_OPTIONS_1]))
 
         self.check_filtering(
             'DescribeDhcpOptions', 'dhcpOptionsSet',

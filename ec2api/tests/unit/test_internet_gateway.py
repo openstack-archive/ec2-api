@@ -276,7 +276,7 @@ class IgwTestCase(base.ApiTestCase):
         self.assertThat(resp['internetGatewaySet'],
                         matchers.ListMatches([fakes.EC2_IGW_2]))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'igw', set([fakes.ID_EC2_IGW_2]))
+            mock.ANY, set([fakes.ID_EC2_IGW_2]))
 
         self.check_filtering(
             'DescribeInternetGateways', 'internetGatewaySet',

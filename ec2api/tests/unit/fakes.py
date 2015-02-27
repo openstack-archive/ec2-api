@@ -56,11 +56,10 @@ def get_db_api_get_item_by_id(results_dict_by_id):
 
 
 def get_db_api_get_items_by_ids(items):
-    def db_api_get_items_by_ids(context, kind, item_ids):
+    def db_api_get_items_by_ids(context, item_ids):
         return [copy.deepcopy(item)
                 for item in items
-                if (ec2utils.get_ec2_id_kind(item['id']) == kind and
-                    not item_ids or item['id'] in item_ids)]
+                if (item['id'] in item_ids)]
     return db_api_get_items_by_ids
 
 

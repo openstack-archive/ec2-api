@@ -632,7 +632,7 @@ class AddressTestCase(base.ApiTestCase):
         self.assertThat(resp['addressesSet'],
                         matchers.ListMatches([fakes.EC2_ADDRESS_1]))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'eipalloc', set([fakes.ID_EC2_ADDRESS_1]))
+            mock.ANY, set([fakes.ID_EC2_ADDRESS_1]))
 
         self.check_filtering(
              'DescribeAddresses', 'addressesSet',

@@ -51,7 +51,7 @@ class SnapshotTestCase(base.ApiTestCase):
             {'snapshotSet': [fakes.EC2_SNAPSHOT_1]},
             orderless_lists=True))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'snap', set([fakes.ID_EC2_SNAPSHOT_1]))
+            mock.ANY, set([fakes.ID_EC2_SNAPSHOT_1]))
 
         self.check_filtering(
             'DescribeSnapshots', 'snapshotSet',
@@ -66,8 +66,8 @@ class SnapshotTestCase(base.ApiTestCase):
              ('volume-id', fakes.ID_EC2_VOLUME_2),
              # TODO(ft): support filtering by a number value
              # NOTE(ft): declare a constant for the volume size in fakes
-#              ('volume-size', 1)
-             ])
+             # ('volume-size', 1)
+            ])
         self.check_tag_support(
             'DescribeSnapshots', 'snapshotSet',
             fakes.ID_EC2_SNAPSHOT_1, 'snapshotId')
@@ -118,9 +118,10 @@ class SnapshotTestCase(base.ApiTestCase):
             fakes.get_db_api_get_item_by_id({
                 fakes.ID_EC2_VOLUME_2: fakes.DB_VOLUME_2}))
         self.cinder.volumes.get.side_effect = (
-            lambda vol_id: (fakes.CinderVolume(fakes.OS_VOLUME_2)
-               if vol_id == fakes.ID_OS_VOLUME_2
-               else None))
+            lambda vol_id: (
+                fakes.CinderVolume(fakes.OS_VOLUME_2)
+                if vol_id == fakes.ID_OS_VOLUME_2
+                else None))
 
         resp = self.execute(
             'CreateSnapshot',

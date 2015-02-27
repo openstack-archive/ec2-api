@@ -88,7 +88,7 @@ class EC2UtilsTestCase(testtools.TestCase):
             res = ec2utils.get_db_items('fake_context', 'fake', item_ids)
             self.assertThat(res, matchers.ListMatches(items))
             db_api.get_items_by_ids.assert_called_once_with(
-                'fake_context', 'fake', set(item_ids))
+                'fake_context', set(item_ids))
             db_api.reset_mock()
 
         item_ids = [i['id'] for i in items]

@@ -210,7 +210,7 @@ def get_db_items(context, kind, ec2_ids):
 
     if not isinstance(ec2_ids, set):
         ec2_ids = set(ec2_ids)
-    items = db_api.get_items_by_ids(context, kind, ec2_ids)
+    items = db_api.get_items_by_ids(context, ec2_ids)
     if len(items) < len(ec2_ids):
         missed_ids = ec2_ids - set((item['id'] for item in items))
         params = {'id': next(iter(missed_ids))}

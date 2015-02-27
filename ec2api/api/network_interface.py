@@ -101,7 +101,7 @@ def create_network_interface(context, subnet_id,
         )['securityGroupInfo']
         security_group_id = [default_group['groupId']
                              for default_group in default_groups]
-    security_groups = db_api.get_items_by_ids(context, 'sg', security_group_id)
+    security_groups = db_api.get_items_by_ids(context, security_group_id)
     if any(security_group['vpc_id'] != vpc['id']
            for security_group in security_groups):
         msg = _('You have specified two resources that belong to '

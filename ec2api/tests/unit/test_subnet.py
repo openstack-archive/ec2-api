@@ -293,7 +293,7 @@ class SubnetTestCase(base.ApiTestCase):
         self.assertThat(resp['subnetSet'],
                         matchers.ListMatches([fakes.EC2_SUBNET_2]))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'subnet', set([fakes.ID_EC2_SUBNET_2]))
+            mock.ANY, set([fakes.ID_EC2_SUBNET_2]))
 
         self.check_filtering(
             'DescribeSubnets', 'subnetSet',

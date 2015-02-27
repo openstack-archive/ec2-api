@@ -696,7 +696,7 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertThat(resp['routeTableSet'],
                         matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1]))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'rtb', set([fakes.ID_EC2_ROUTE_TABLE_1]))
+            mock.ANY, set([fakes.ID_EC2_ROUTE_TABLE_1]))
 
         self.check_filtering(
             'DescribeRouteTables', 'routeTableSet',

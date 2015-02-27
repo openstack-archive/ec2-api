@@ -56,7 +56,7 @@ class VolumeTestCase(base.ApiTestCase):
             {'volumeSet': [fakes.EC2_VOLUME_1]},
             orderless_lists=True))
         self.db_api.get_items_by_ids.assert_any_call(
-            mock.ANY, 'vol', set([fakes.ID_EC2_VOLUME_1]))
+            mock.ANY, set([fakes.ID_EC2_VOLUME_1]))
 
         self.check_filtering(
             'DescribeVolumes', 'volumeSet',

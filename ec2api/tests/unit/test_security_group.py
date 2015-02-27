@@ -284,7 +284,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
                             [fakes.EC2_SECURITY_GROUP_2],
                             orderless_lists=True))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, 'sg', set([fakes.ID_EC2_SECURITY_GROUP_2]))
+            mock.ANY, set([fakes.ID_EC2_SECURITY_GROUP_2]))
 
         self.check_filtering(
             'DescribeSecurityGroups', 'securityGroupInfo',
@@ -423,8 +423,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.neutron.create_security_group_rule.assert_called_with(
             {'security_group_rule':
              tools.patch_dict(
-                fakes.OS_SECURITY_GROUP_RULE_1, {'remote_ip_prefix': '::/0'},
-                {'id', 'remote_group_id', 'tenant_id'})})
+                 fakes.OS_SECURITY_GROUP_RULE_1, {'remote_ip_prefix': '::/0'},
+                 {'id', 'remote_group_id', 'tenant_id'})})
 
     def test_authorize_security_group_ip_ranges_nova(self):
         security_group.security_group_engine = (
