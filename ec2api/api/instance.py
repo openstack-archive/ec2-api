@@ -433,15 +433,14 @@ def _get_idempotent_run(context, client_token):
 
 def _format_reservation_body(context, reservation, formatted_instances,
                              os_groups):
-    formatted_reservation = {
+    return {
         'reservationId': reservation['id'],
         'ownerId': reservation['owner_id'],
         'instancesSet': sorted(formatted_instances,
-                               key=lambda i: i['amiLaunchIndex'])}
-    if os_groups is not None:
-        formatted_reservation['groupSet'] = _format_group_set(
-                context, os_groups)
-    return formatted_reservation
+                               key=lambda i: i['amiLaunchIndex']),
+        'groupSet': (_format_group_set(context, os_groups)
+                     if os_groups is not None else [])
+    }
 
 
 def _format_reservation(context, reservation_id, instances_info,
@@ -500,9 +499,8 @@ def _format_instance(context, instance, os_instance, novadb_instance,
         if fixed_ip6:
             ec2_instance['dnsNameV6'] = fixed_ip6
         dns_name = floating_ip
-        # TODO(ft): boto uses 2010-08-31 version of AWS protocol
-        # which doesn't contain groupSet element in an instance
-        # We should support different versions of output data
+        # TODO(ft): euca2ools require groupId for an instance security group.
+        # But ec2-api doesn't store IDs for EC2 Classic groups.
         # ec2_instance['groupSet'] = _format_group_set(
         #         context, os_instance.security_groups)
     else:
@@ -517,17 +515,14 @@ def _format_instance(context, instance, os_instance, novadb_instance,
                              'networkInterfaceSet': ec2_network_interfaces})
         fixed_ip = floating_ip = dns_name = None
         if primary_ec2_network_interface:
-            ec2_instance['subnetId'] = (
-                primary_ec2_network_interface['subnetId'])
+            ec2_instance.update({
+                'subnetId': primary_ec2_network_interface['subnetId'],
+                'groupSet': primary_ec2_network_interface['groupSet']})
             fixed_ip = primary_ec2_network_interface['privateIpAddress']
             if 'association' in primary_ec2_network_interface:
                 association = primary_ec2_network_interface['association']
                 floating_ip = association['publicIp']
                 dns_name = association['publicDnsName']
-        # TODO(ft): boto uses 2010-08-31 version of AWS protocol
-        # which doesn't contain groupSet element in an instance
-        # We should support different versions of output data
-        # ec2_instance['groupSet'] = primary_ec2_network_interface['groupSet']
     ec2_instance.update({
         'privateIpAddress': fixed_ip,
         'privateDnsName': (fixed_ip if CONF.ec2_private_dns_show_ip else

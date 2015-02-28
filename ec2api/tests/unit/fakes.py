@@ -571,6 +571,7 @@ EC2_INSTANCE_1 = {
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
     'vpcId': ID_EC2_VPC_1,
     'subnetId': ID_EC2_SUBNET_2,
+    'groupSet': [],
     'networkInterfaceSet': [
         {'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_2,
          'status': 'in-use',
@@ -654,6 +655,7 @@ EC2_RESERVATION_1 = {
     'reservationId': ID_EC2_RESERVATION_1,
     'ownerId': ID_OS_PROJECT,
     'instancesSet': [EC2_INSTANCE_1],
+    'groupSet': [],
 }
 EC2_RESERVATION_2 = {
     'reservationId': ID_EC2_RESERVATION_2,
@@ -1667,6 +1669,7 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
                             if eni['attachment']['deviceIndex'] == 0), None)
         if primary_eni:
             ec2_instance['subnetId'] = primary_eni['subnetId']
+            ec2_instance['groupSet'] = primary_eni['groupSet']
             if private_ip_address == '':
                 ec2_instance['privateIpAddress'] = (
                                     primary_eni['privateIpAddress'])
@@ -1681,4 +1684,5 @@ def gen_ec2_reservation(ec2_reservation_id, ec2_instances):
     """Generate EC2 Reservation dictionary."""
     return {'reservationId': ec2_reservation_id,
             'ownerId': ID_OS_PROJECT,
-            'instancesSet': [inst for inst in ec2_instances]}
+            'instancesSet': [inst for inst in ec2_instances],
+            'groupSet': []}
