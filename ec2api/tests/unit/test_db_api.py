@@ -14,7 +14,6 @@
 
 from oslo_config import cfg
 from oslotest import base as test_base
-from sqlalchemy import event
 from sqlalchemy.orm import exc as orm_exception
 
 from ec2api.api import validator
@@ -41,16 +40,6 @@ class DbApiTestCase(test_base.BaseTestCase):
             conf.set_override('sqlite_synchronous', False, group='database')
 
             engine = session.get_engine()
-
-            # NOTE(ft): enable savepoints in sqlite. See SAVEPOINT support
-            # section in sqlalchemy.dialects.sqlite.base.py
-
-            @event.listens_for(engine, "connect")
-            def do_connect(dbapi_connection, connection_record):
-                # disable pysqlite's emitting of the BEGIN statement entirely.
-                # also stops it from emitting COMMIT before any DDL.
-                dbapi_connection.isolation_level = None
-
             conn = engine.connect()
             migration.db_sync()
             cls.DB_SCHEMA = "".join(line
@@ -428,16 +417,16 @@ class DbApiTestCase(test_base.BaseTestCase):
                              'value': 'val_b'}])
         do_check(tag2_2)
 
-    def delete_tags_isolation(self):
+    def test_delete_tags_isolation(self):
         item_id = fakes.random_ec2_id('fake')
         tag1 = {'item_id': item_id,
                 'key': 'key',
                 'value': 'val1'}
-        db_api.add_tags(self.context, tag1)
+        db_api.add_tags(self.context, [tag1])
         tag2 = {'item_id': item_id,
                 'key': 'key',
                 'value': 'val2'}
-        db_api.add_tags(self.other_context, tag2)
+        db_api.add_tags(self.other_context, [tag2])
         db_api.delete_tags(self.context, item_id)
         self.assertThat(db_api.get_tags(self.other_context),
                         matchers.ListMatches([tag2]))
