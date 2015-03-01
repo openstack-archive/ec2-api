@@ -177,7 +177,8 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.assertNotEmpty(instances)
         self.assertEqual(instance_id, instances[0]['InstanceId'])
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+    @testtools.skipUnless(
+        CONF.aws.run_incompatible_tests,
         "Amazon can create instance with several network interfaces in"
         "one subnet. Openstack can't do it without additional configuration."
         "Worked only from Juno with parameter in config - "
@@ -279,7 +280,8 @@ class InstanceInVPCTest(base.EC2TestCase):
         }
         resp, data = self.client.RunInstances(*[], **kwargs)
         if resp.status_code == 200:
-            self.addResourceCleanUp(self.client.TerminateInstances,
+            self.addResourceCleanUp(
+                self.client.TerminateInstances,
                 InstanceIds=[data['Instances'][0]['InstanceId']])
         self.assertEqual(400, resp.status_code)
         self.assertEqual('InvalidParameterCombination', data['Error']['Code'])
@@ -294,7 +296,8 @@ class InstanceInVPCTest(base.EC2TestCase):
         }
         resp, data = self.client.RunInstances(*[], **kwargs)
         if resp.status_code == 200:
-            self.addResourceCleanUp(self.client.TerminateInstances,
+            self.addResourceCleanUp(
+                self.client.TerminateInstances,
                 InstanceIds=[data['Instances'][0]['InstanceId']])
         self.assertEqual(400, resp.status_code)
         self.assertEqual('InvalidParameterValue', data['Error']['Code'])
@@ -330,7 +333,8 @@ class InstanceInVPCTest(base.EC2TestCase):
             }
             resp, data = self.client.RunInstances(*[], **kwargs)
             if resp.status_code == 200:
-                self.addResourceCleanUp(self.client.TerminateInstances,
+                self.addResourceCleanUp(
+                    self.client.TerminateInstances,
                     InstanceIds=[data['Instances'][0]['InstanceId']])
             self.assertEqual(400, resp.status_code)
             self.assertEqual('InvalidParameterValue', data['Error']['Code'])

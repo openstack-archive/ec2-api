@@ -414,16 +414,15 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
-        if CONF.aws.run_incompatible_tests:
-            # NOTE(andrey-mp): Amazon can't attach to device index = 0
-            kwargs = {
-                'DeviceIndex': 0,
-                'InstanceId': instance_id,
-                'NetworkInterfaceId': ni_id
-            }
-            resp, data = self.client.AttachNetworkInterface(*[], **kwargs)
-            self.assertEqual(400, resp.status_code)
-            self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        # NOTE(andrey-mp): Amazon can't attach to device index = 0
+        kwargs = {
+            'DeviceIndex': 0,
+            'InstanceId': instance_id,
+            'NetworkInterfaceId': ni_id
+        }
+        resp, data = self.client.AttachNetworkInterface(*[], **kwargs)
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
 
         kwargs = {
             'DeviceIndex': 2,
