@@ -57,3 +57,9 @@ class EC2APIPlugin(base.Scenario):
     def describe_regions(self, client):
         resp, data = client.DescribeRegions()
         assert 200 == resp.status_code
+
+    @base.scenario()
+    @_both_api_runner()
+    def describe_images(self, client):
+        resp, data = client.DescribeImages()
+        assert 200 == resp.status_code

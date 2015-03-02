@@ -3,7 +3,7 @@
     -
       runner:
         type: "constant"
-        times: 20
+        times: 2
         concurrency: 1
       context:
         users:
@@ -14,7 +14,7 @@
               name: "m1.nano"
           image:
               name: "^cirros.*uec$"
-          servers_per_tenant: 500
+          servers_per_tenant: 1
         prepare_ec2_client:
 
   EC2APIPlugin.describe_regions:
@@ -27,4 +27,20 @@
         users:
           tenants: 1
           users_per_tenant: 1
+        prepare_ec2_client:
+
+  EC2APIPlugin.describe_images:
+    -
+      runner:
+        type: "constant"
+        times: 20
+        concurrency: 1
+      context:
+        users:
+          tenants: 1
+          users_per_tenant: 1
+        fake_images:
+          disk_format: "ami"
+          container_format: "ami"
+          images_per_tenant: 1000
         prepare_ec2_client:
