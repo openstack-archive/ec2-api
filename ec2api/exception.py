@@ -128,7 +128,7 @@ class InvalidAttribute(Invalid):
     msg_fmt = _("Attribute not supported: %(attr)s")
 
 
-class InvalidId(Invalid):
+class InvalidID(Invalid):
     msg_fmt = _("The ID '%(id)s' is not valid")
 
 

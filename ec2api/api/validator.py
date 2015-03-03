@@ -141,9 +141,13 @@ def validate_ec2_id(val, parameter_name, prefices):
             return True
     except Exception:
         pass
+
+    if not prefices:
+        reason = _('Invalid EC2 id was specified.')
+    else:
+        reason = _('Expected: %(prefix)s-...') % {'prefix': prefices[0]}
     raise exception.InvalidParameterValue(
-        value=val, parameter=parameter_name,
-        reason=_('Expected: %(prefix)s-...') % {'prefix': prefices[0]})
+        value=val, parameter=parameter_name, reason=reason)
 
 
 def validate_ec2_association_id(id, parameter_name, action):

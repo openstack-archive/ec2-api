@@ -51,4 +51,4 @@ class TestBaseTestCase(base.ApiTestCase):
 
     def test_validate_exception_format_is_enabled_for_tests(self):
         self.assertRaises(KeyError, exception.InvalidVpcRange, fake='value')
-        self.assertRaises(TypeError, exception.InvalidId, {'id': 'value'})
+        self.assertRaises(TypeError, exception.InvalidID, {'id': 'value'})

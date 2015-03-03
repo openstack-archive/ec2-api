@@ -116,7 +116,7 @@ class TagTestCase(base.ApiTestCase):
                              'Tag.1.Key': 'fake-key',
                              'Tag.1.Value': 'fake-value'})
         self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidId', resp['Error']['Code'])
+        self.assertEqual('InvalidID', resp['Error']['Code'])
 
         # NOTE(ft): check resource existence check
         self.db_api.get_item_by_id.return_value = None

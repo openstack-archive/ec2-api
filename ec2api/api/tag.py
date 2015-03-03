@@ -65,7 +65,7 @@ def create_tags(context, resource_id, tag):
     for item_id in resource_id:
         kind = ec2utils.get_ec2_id_kind(item_id)
         if kind not in RESOURCE_TYPES:
-            raise exception.InvalidId(id=item_id)
+            raise exception.InvalidID(id=item_id)
         # NOTE(ft): check items exist (excluding images because AWS allows to
         # create a tag with any image id)
         if kind not in ('ami', 'ari', 'aki'):

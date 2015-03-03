@@ -101,6 +101,10 @@ class EC2ValidationTestCase(testtools.TestCase):
 
         check_raise_invalid_parameters(validator.i_id)
 
+        invalid_ids = ['1234', '', 'foobar']
+
+        check_raise_invalid_parameters(validator.ec2_id)
+
     def test_validate_multi(self):
         validator = common.Validator()
         result_sum = {'value': 0}
