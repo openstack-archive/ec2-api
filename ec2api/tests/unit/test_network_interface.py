@@ -277,7 +277,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              fakes.ID_EC2_NETWORK_INTERFACE_1})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
-        self.db_api.get_item_by_id.assert_has_call(
+        self.db_api.get_item_by_id.assert_any_call(
             mock.ANY,
             fakes.ID_EC2_NETWORK_INTERFACE_1)
         self.db_api.delete_item.assert_called_once_with(
@@ -336,7 +336,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              fakes.ID_EC2_NETWORK_INTERFACE_1})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
-        self.db_api.get_item_by_id.assert_has_call(
+        self.db_api.get_item_by_id.assert_any_call(
             mock.ANY,
             fakes.ID_EC2_NETWORK_INTERFACE_1)
         self.db_api.delete_item.assert_called_once_with(
@@ -521,19 +521,19 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
     def test_attach_network_interface_rollback(self):
         self.db_api.get_item_by_id.return_value = (
-            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_2))
+            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1))
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
         self.nova_servers.interface_attach.side_effect = Exception()
 
         self.execute('AttachNetworkInterface',
-                     {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
+                     {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
                       'InstanceId': fakes.ID_EC2_INSTANCE_1,
                       'DeviceIndex': '1'})
 
-        self.db_api.update_item.assert_has_call(
-            mock.ANY, fakes.DB_NETWORK_INTERFACE_2)
+        self.db_api.update_item.assert_any_call(
+            mock.ANY, fakes.DB_NETWORK_INTERFACE_1)
 
     def test_detach_network_interface(self):
         network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,

@@ -20,6 +20,7 @@ from oslotest import base as test_base
 
 import ec2api.api.apirequest
 from ec2api.api import ec2utils
+import ec2api.db.sqlalchemy.api
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
@@ -65,7 +66,8 @@ class ApiTestCase(test_base.BaseTestCase):
         self.cinder = cinder_patcher.start().return_value
         self.addCleanup(cinder_patcher.stop)
 
-        db_api_patcher = mock.patch('ec2api.db.api.IMPL')
+        db_api_patcher = mock.patch('ec2api.db.api.IMPL',
+                                    autospec=ec2api.db.sqlalchemy.api)
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)
 

@@ -13,11 +13,15 @@
 # limitations under the License.
 
 import mock
+from oslo_config import cfg
 
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
+
+
+CONF = cfg.CONF
 
 
 class DhcpOptionsTestCase(base.ApiTestCase):
@@ -72,10 +76,10 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                             {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
-        self.db_api.get_item_by_id.assert_has_call(
+        self.db_api.get_item_by_id.assert_any_call(
                 mock.ANY,
                 fakes.ID_EC2_DHCP_OPTIONS_1)
-        self.db_api.get_items.assert_has_call(
+        self.db_api.get_items.assert_any_call(
                 mock.ANY,
                 'vpc')
         self.db_api.delete_item.assert_called_once_with(
@@ -137,14 +141,15 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                                  'vpcId': fakes.ID_EC2_VPC_1})
             self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
-            self.db_api.update_item.assert_has_call(
+            self.db_api.update_item.assert_any_call(
                     mock.ANY,
                     tools.update_dict(
                             fakes.DB_VPC_1,
                             {'dhcp_options_id': db_dhcp_options_id}))
-            self.neutron.update_port.assert_has_call(
-                        mock.ANY, fakes.ID_OS_PORT_1,
-                        {'port': os_dhcp_options})
+            self.assert_any_call(
+                self.neutron.update_port,
+                fakes.ID_OS_PORT_1,
+                {'port': self._effective_os_dhcp_options(os_dhcp_options)})
 
         check(fakes.ID_EC2_DHCP_OPTIONS_1, fakes.ID_EC2_DHCP_OPTIONS_1,
               fakes.OS_DHCP_OPTIONS_1)
@@ -180,3 +185,11 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                              {'port': fakes.OS_DHCP_OPTIONS_1})
         self.db_api.update_item.assert_any_call(
                 mock.ANY, vpc)
+
+    def _effective_os_dhcp_options(self, os_dhcp_options):
+        dhcp_opts = {
+            'extra_dhcp_opts': [{'opt_name': 'mtu',
+                                 'opt_value': str(CONF.network_device_mtu)}]}
+        dhcp_opts['extra_dhcp_opts'].extend(
+            os_dhcp_options.get('extra_dhcp_opts', []))
+        return dhcp_opts
