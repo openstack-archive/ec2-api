@@ -57,8 +57,8 @@ class InstanceTestCase(base.ApiTestCase):
 
         self.fake_flavor = mock.Mock()
         self.fake_flavor.configure_mock(name='fake_flavor')
-        self.nova_flavors.get.return_value = self.fake_flavor
-        self.nova_flavors.list.return_value = [self.fake_flavor]
+        self.nova.flavors.get.return_value = self.fake_flavor
+        self.nova.flavors.list.return_value = [self.fake_flavor]
 
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
                 'get_ec2_network_interfaces')
@@ -77,7 +77,7 @@ class InstanceTestCase(base.ApiTestCase):
             {'networkInterface': fakes.EC2_NETWORK_INTERFACE_1})
 
         self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
-        self.nova_servers.create.return_value = (
+        self.nova.servers.create.return_value = (
             fakes.OSInstance(
                 fakes.ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
                 image={'id': fakes.ID_OS_IMAGE_1}))
@@ -127,7 +127,7 @@ class InstanceTestCase(base.ApiTestCase):
                  create_network_interface.assert_called_once_with(
                      mock.ANY, fakes.ID_EC2_SUBNET_1,
                      **create_network_interface_kwargs))
-            self.nova_servers.create.assert_called_once_with(
+            self.nova.servers.create.assert_called_once_with(
                 '%s-%s' % (fakes.ID_EC2_RESERVATION_1, 0),
                 fakes.ID_OS_IMAGE_1, self.fake_flavor,
                 min_count=1, max_count=1,
@@ -155,7 +155,7 @@ class InstanceTestCase(base.ApiTestCase):
                 mock.ANY, 'ari', (fakes.ID_OS_IMAGE_ARI_1,))
 
             self.network_interface_api.reset_mock()
-            self.nova_servers.reset_mock()
+            self.nova.servers.reset_mock()
             self.db_api.reset_mock()
             self.novadb.reset_mock()
             get_ec2_network_interfaces.reset_mock()
@@ -237,7 +237,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.network_interface_api.create_network_interface.side_effect = (
             [{'networkInterface': eni}
              for eni in self.EC2_DETACHED_ENIS])
-        self.nova_servers.create.side_effect = [
+        self.nova.servers.create.side_effect = [
             fakes.OSInstance(os_instance_id, {'id': 'fakeFlavorId'})
             for os_instance_id in self.IDS_OS_INSTANCE]
         self.novadb.instance_get_by_uuid.side_effect = self.NOVADB_INSTANCES
@@ -264,7 +264,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.network_interface_api.create_network_interface.assert_has_calls([
             mock.call(mock.ANY, ec2_subnet_id)
             for ec2_subnet_id in self.IDS_EC2_SUBNET_BY_PORT])
-        self.nova_servers.create.assert_has_calls([
+        self.nova.servers.create.assert_has_calls([
             mock.call(
                 '%s-%s' % (fakes.ID_EC2_RESERVATION_1, launch_index),
                 fakes.ID_OS_IMAGE_1, self.fake_flavor,
@@ -329,14 +329,14 @@ class InstanceTestCase(base.ApiTestCase):
                  'BlockDeviceMapping.1.Ebs.DeleteOnTermination': 'False'})
             self.assertEqual(200, resp['http_status_code'])
 
-            self.nova_servers.create.assert_called_once_with(
+            self.nova.servers.create.assert_called_once_with(
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
                 userdata=None, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
                 ramdisk_id=fakes.ID_OS_IMAGE_ARI_1, key_name=None,
                 block_device_mapping='fake_bdm',
                 availability_zone='fake_zone', security_groups=['default'],
                 **extra_kwargs)
-            self.nova_servers.reset_mock()
+            self.nova.servers.reset_mock()
             db_instance = {'os_id': mock.ANY,
                            'reservation_id': mock.ANY,
                            'launch_index': 0,
@@ -473,7 +473,7 @@ class InstanceTestCase(base.ApiTestCase):
             {'networkInterface': fakes.EC2_NETWORK_INTERFACE_1})
         self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
-        self.nova_servers.create.return_value = (
+        self.nova.servers.create.return_value = (
             fakes.OSInstance(fakes.ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
                              image={'id': fakes.ID_OS_IMAGE_1}))
         self.novadb.instance_get_by_uuid.side_effect = Exception()
@@ -483,7 +483,7 @@ class InstanceTestCase(base.ApiTestCase):
             mock_manager.attach_mock(self.network_interface_api,
                                      'network_interface_api')
             mock_manager.attach_mock(self.neutron, 'neutron')
-            mock_manager.attach_mock(self.nova_servers, 'nova_servers')
+            mock_manager.attach_mock(self.nova.servers, 'nova_servers')
 
             params.update({'ImageId': fakes.ID_EC2_IMAGE_1,
                            'InstanceType': 'fake_flavor',
@@ -513,7 +513,7 @@ class InstanceTestCase(base.ApiTestCase):
 
             self.network_interface_api.reset_mock()
             self.neutron.reset_mock()
-            self.nova_servers.reset_mock()
+            self.nova.servers.reset_mock()
             self.db_api.reset_mock()
 
         do_check({'SubnetId': fakes.ID_EC2_SUBNET_1})
@@ -559,7 +559,7 @@ class InstanceTestCase(base.ApiTestCase):
                 {'networkInterface': {'networkInterfaceId': eni['id']}}
                 for eni in network_interfaces]
             self.db_api.add_item.side_effect = instances
-            self.nova_servers.create.side_effect = os_instances
+            self.nova.servers.create.side_effect = os_instances
             self.novadb.instance_get_by_uuid.side_effect = [
                 {}, {}, Exception()]
             format_reservation.side_effect = (
@@ -583,12 +583,12 @@ class InstanceTestCase(base.ApiTestCase):
                                      {'instanceId': inst['id']}
                                      for inst in instances[:2]]}))
 
-            self.nova_servers.delete.assert_called_once_with(
+            self.nova.servers.delete.assert_called_once_with(
                 instances[2]['os_id'])
             self.db_api.delete_item.assert_called_once_with(
                 mock.ANY, instances[2]['id'])
 
-            self.nova_servers.reset_mock()
+            self.nova.servers.reset_mock()
             self.db_api.reset_mock()
 
         do_check(instance_api.InstanceEngineNeutron())
@@ -635,7 +635,7 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
             fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2)
-        self.nova_servers.get.side_effect = [fakes.OS_INSTANCE_1,
+        self.nova.servers.get.side_effect = [fakes.OS_INSTANCE_1,
                                              fakes.OS_INSTANCE_2]
 
         resp = self.execute('TerminateInstances',
@@ -661,9 +661,9 @@ class InstanceTestCase(base.ApiTestCase):
         (self.network_interface_api.
          detach_network_interface.assert_called_once_with(
              mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH))
-        self.assertEqual(2, self.nova_servers.get.call_count)
-        self.nova_servers.get.assert_any_call(fakes.ID_OS_INSTANCE_1)
-        self.nova_servers.get.assert_any_call(fakes.ID_OS_INSTANCE_2)
+        self.assertEqual(2, self.nova.servers.get.call_count)
+        self.nova.servers.get.assert_any_call(fakes.ID_OS_INSTANCE_1)
+        self.nova.servers.get.assert_any_call(fakes.ID_OS_INSTANCE_2)
         self.assertEqual(
             0, self.address_api.dissassociate_address_item.call_count)
         self.assertFalse(self.db_api.delete_item.called)
@@ -690,7 +690,7 @@ class InstanceTestCase(base.ApiTestCase):
                                       fake_state_change),
                     tools.update_dict({'instanceId': fakes.ID_EC2_INSTANCE_2},
                                       fake_state_change)]}
-        self.nova_servers.get.side_effect = (
+        self.nova.servers.get.side_effect = (
             lambda ec2_id: fakes.OSInstance(ec2_id, vm_state='active'))
 
         def do_check(mock_eni_list=[], detached_enis=[], deleted_enis=[]):
@@ -801,7 +801,7 @@ class InstanceTestCase(base.ApiTestCase):
     @mock.patch('oslo_utils.timeutils.utcnow')
     def _test_instance_get_operation(self, operation, getter, key, utcnow):
         self.set_mock_db_items(fakes.DB_INSTANCE_2)
-        self.nova_servers.get.return_value = fakes.OS_INSTANCE_2
+        self.nova.servers.get.return_value = fakes.OS_INSTANCE_2
         getter.return_value = 'fake_data'
         utcnow.return_value = datetime.datetime(2015, 1, 19, 23, 34, 45, 123)
         resp = self.execute(operation,
@@ -813,7 +813,7 @@ class InstanceTestCase(base.ApiTestCase):
                          resp)
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_INSTANCE_2)
-        self.nova_servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
+        self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
         getter.assert_called_once_with(fakes.OS_INSTANCE_2)
 
     @mock.patch.object(fakes.OSInstance, 'get_password', autospec=True)
@@ -836,7 +836,7 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
             fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
-        self.nova_servers.list.return_value = [fakes.OS_INSTANCE_1,
+        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_1,
                                                fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.side_effect = (
             tools.get_by_2nd_arg_getter({
@@ -924,7 +924,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.set_mock_db_items(
             fakes.DB_INSTANCE_2, fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
-        self.nova_servers.list.return_value = [fakes.OS_INSTANCE_2]
+        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.return_value = (
             fakes.NOVADB_INSTANCE_2)
         self.novadb.block_device_mapping_get_all_by_instance.return_value = (
@@ -959,7 +959,7 @@ class InstanceTestCase(base.ApiTestCase):
             describe_network_interfaces.return_value = copy.deepcopy(
                 {'networkInterfaceSet': list(
                                 itertools.chain(*ec2_enis_by_instance))})
-            self.nova_servers.list.return_value = [
+            self.nova.servers.list.return_value = [
                 fakes.OSInstance(
                      os_id, {'id': 'fakeFlavorId'},
                      addresses=dict((subnet_name,
@@ -1018,7 +1018,7 @@ class InstanceTestCase(base.ApiTestCase):
     def test_describe_instances_auto_remove(self, remove_instances):
         self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
                                fakes.DB_VOLUME_2)
-        self.nova_servers.list.return_value = [fakes.OS_INSTANCE_2]
+        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.return_value = (
             fakes.NOVADB_INSTANCE_2)
         self.novadb.block_device_mapping_get_all_by_instance.return_value = (
@@ -1048,7 +1048,7 @@ class InstanceTestCase(base.ApiTestCase):
         os_instances = [
             fakes.OSInstance(inst['os_id'])
             for inst in db_instances]
-        self.nova_servers.list.return_value = os_instances
+        self.nova.servers.list.return_value = os_instances
         format_instance.side_effect = (
             lambda context, instance, *args: (
                 {'instanceId': instance['id'],
@@ -1078,7 +1078,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
                                fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
                                fakes.DB_VOLUME_2)
-        self.nova_servers.get.side_effect = (
+        self.nova.servers.get.side_effect = (
             tools.get_by_1st_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.OS_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.OS_INSTANCE_2}))

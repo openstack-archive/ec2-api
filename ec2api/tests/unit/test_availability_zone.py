@@ -23,14 +23,14 @@ from ec2api.tests.unit import matchers
 class AvailabilityZoneCase(base.ApiTestCase):
 
     def test_describe_availability_zones(self):
-        self.nova_availability_zones.list.return_value = [
+        self.nova.availability_zones.list.return_value = [
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE_INTERNAL)]
         resp = self.execute('DescribeAvailabilityZones', {})
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['availabilityZoneInfo'],
                         matchers.ListMatches([fakes.EC2_AVAILABILITY_ZONE]))
-        self.nova_availability_zones.list.assert_called_once()
+        self.nova.availability_zones.list.assert_called_once()
 
         self.check_filtering(
             'DescribeAvailabilityZones', 'availabilityZoneInfo',
@@ -38,14 +38,14 @@ class AvailabilityZoneCase(base.ApiTestCase):
              ('zone-name', fakes.NAME_AVAILABILITY_ZONE)])
 
     def test_describe_availability_zones_verbose(self):
-        self.nova_availability_zones.list.return_value = [
+        self.nova.availability_zones.list.return_value = [
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE_INTERNAL)]
         resp = self.execute('DescribeAvailabilityZones',
                             {'zoneName.1': 'verbose'})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(len(resp['availabilityZoneInfo']), 7)
-        self.nova_availability_zones.list.assert_called_once()
+        self.nova.availability_zones.list.assert_called_once()
 
     def test_regions(self):
         resp = self.execute('DescribeRegions', {})
@@ -55,7 +55,7 @@ class AvailabilityZoneCase(base.ApiTestCase):
                         is not None)
 
     def test_describe_account_attributes(self):
-        self.nova_quotas.get.return_value = mock.Mock(instances=77)
+        self.nova.quotas.get.return_value = mock.Mock(instances=77)
 
         availability_zone.account_attribute_engine = (
             availability_zone.AccountAttributeEngineNeutron())
@@ -74,7 +74,7 @@ class AvailabilityZoneCase(base.ApiTestCase):
                               'attributeValueSet': [
                                   {'attributeValue': 77}]}],
                             orderless_lists=True))
-        self.nova_quotas.get.assert_called_once_with(
+        self.nova.quotas.get.assert_called_once_with(
             fakes.ID_OS_PROJECT, fakes.ID_OS_USER)
 
         availability_zone.account_attribute_engine = (

@@ -582,7 +582,7 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
             fakes.DB_INSTANCE_1)
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
-        self.nova_servers.get.return_value = fake_server_class('ACTIVE')
+        self.nova.servers.get.return_value = fake_server_class('ACTIVE')
 
         resp = self.execute('DescribeRouteTables', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -648,7 +648,7 @@ class RouteTableTestCase(base.ApiTestCase):
             igw_1, igw_2, subnet_1, subnet_2,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2)
         fake_server_class = collections.namedtuple('FakeServer', ['status'])
-        self.nova_servers.get.return_value = fake_server_class('DOWN')
+        self.nova.servers.get.return_value = fake_server_class('DOWN')
         resp = self.execute('DescribeRouteTables', {})
         self.assertEqual(200, resp['http_status_code'])
         ec2_route_table_1 = copy.deepcopy(fakes.EC2_ROUTE_TABLE_1)

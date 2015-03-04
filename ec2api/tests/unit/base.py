@@ -44,19 +44,7 @@ class ApiTestCase(test_base.BaseTestCase):
         self.addCleanup(neutron_patcher.stop)
 
         nova_patcher = mock.patch('novaclient.v1_1.client.Client')
-        nova_mock = nova_patcher.start()
-        self.nova_availability_zones = (
-            nova_mock.return_value.availability_zones)
-        self.nova_servers = nova_mock.return_value.servers
-        self.nova_flavors = nova_mock.return_value.flavors
-        self.nova_floating_ips = nova_mock.return_value.floating_ips
-        self.nova_fixed_ips = nova_mock.return_value.fixed_ips
-        self.nova_key_pairs = nova_mock.return_value.keypairs
-        self.nova_security_groups = nova_mock.return_value.security_groups
-        self.nova_security_group_rules = (
-            nova_mock.return_value.security_group_rules)
-        self.nova_volumes = nova_mock.return_value.volumes
-        self.nova_quotas = nova_mock.return_value.quotas
+        self.nova = nova_patcher.start().return_value
         self.addCleanup(nova_patcher.stop)
 
         glance_patcher = mock.patch('glanceclient.client.Client')
