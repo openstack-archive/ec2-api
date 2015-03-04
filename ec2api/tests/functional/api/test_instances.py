@@ -16,6 +16,7 @@
 import base64
 
 from oslo_log import log
+from tempest_lib.common.utils import data_utils
 import testtools
 
 from ec2api.tests.functional import base
@@ -45,6 +46,7 @@ class InstanceTest(base.EC2TestCase):
         instance_id = data['Instances'][0]['InstanceId']
         res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
                                             InstanceIds=[instance_id])
+        self.assertEqual(1, len(data['Instances']))
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
@@ -64,6 +66,43 @@ class InstanceTest(base.EC2TestCase):
         # Amazon returns instance in 'terminated' state some time after
         # instance deletion. But Openstack doesn't return such instance.
 
+    def test_create_idempotent_instance(self):
+        client_token = data_utils.rand_name('t')
+        instance_type = CONF.aws.instance_type
+        image_id = CONF.aws.image_id
+        resp, data = self.client.RunInstances(
+            ImageId=image_id, InstanceType=instance_type,
+            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1,
+            ClientToken=client_token)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        instance_id = data['Instances'][0]['InstanceId']
+        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+                                            InstanceIds=[instance_id])
+        self.assertEqual(1, len(data['Instances']))
+        reservation_id = data['ReservationId']
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        resp, data = self.client.RunInstances(
+            ImageId=image_id, InstanceType=instance_type,
+            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1,
+            ClientToken=client_token)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+
+        # NOTE(andrey-mp): if idempotent run will fail this will terminate
+        # second instance
+        self.addResourceCleanUp(self.client.TerminateInstances,
+            InstanceIds=[data['Instances'][0]['InstanceId']])
+
+        self.assertEqual(1, len(data['Instances']))
+        self.assertEqual(reservation_id, data['ReservationId'])
+        self.assertEqual(instance_id, data['Instances'][0]['InstanceId'])
+
+        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(res_clean)
+        self.get_instance_waiter().wait_delete(instance_id)
+
     def test_describe_instances_filter(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id
@@ -80,7 +119,7 @@ class InstanceTest(base.EC2TestCase):
         # NOTE(andrey-mp): by real id
         resp, data = self.client.DescribeInstances(InstanceIds=[instance_id])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.assert_instance(data, instance_id)
+        self._assert_instance(data, instance_id)
         instances = data['Reservations'][0]['Instances']
         private_dns = instances[0]['PrivateDnsName']
         private_ip = instances[0]['PrivateIpAddress']
@@ -99,7 +138,7 @@ class InstanceTest(base.EC2TestCase):
         resp, data = self.client.DescribeInstances(
             Filters=[{'Name': 'private-ip-address', 'Values': [private_ip]}])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.assert_instance(data, instance_id)
+        self._assert_instance(data, instance_id)
 
         # NOTE(andrey-mp): by private dns
         resp, data = self.client.DescribeInstances(
@@ -110,14 +149,14 @@ class InstanceTest(base.EC2TestCase):
         resp, data = self.client.DescribeInstances(
             Filters=[{'Name': 'private-dns-name', 'Values': [private_dns]}])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.assert_instance(data, instance_id)
+        self._assert_instance(data, instance_id)
 
         resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
-    def assert_instance(self, data, instance_id):
+    def _assert_instance(self, data, instance_id):
         reservations = data.get('Reservations', [])
         self.assertNotEmpty(reservations)
         instances = reservations[0].get('Instances', [])

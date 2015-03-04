@@ -398,7 +398,7 @@ class InstanceTestCase(base.ApiTestCase):
             [(instances[1], os_instances[1], 'novadb_instance')],
             'ec2_network_interfaces')
         get_os_instances_by_instances.assert_called_once_with(
-            mock.ANY, {instances[1]['os_id']: instances[1]})
+            mock.ANY, instances[1:2])
         self.novadb.instance_get_by_uuid.assert_called_once_with(
             mock.ANY, os_instances[1].id)
         get_ec2_network_interfaces.assert_called_once_with(
@@ -454,8 +454,8 @@ class InstanceTestCase(base.ApiTestCase):
             [(instances[0], os_instances[0], 'novadb-instance-0'),
              (instances[2], os_instances[2], 'novadb-instance-2')],
             'ec2_network_interfaces')
-        get_os_instances_by_instances.assert_called_once_with(
-            mock.ANY, dict((inst['os_id'], inst) for inst in instances))
+        self.assert_any_call(get_os_instances_by_instances, mock.ANY,
+                             instances)
         self.assertEqual([mock.call(mock.ANY, os_instances[0].id),
                           mock.call(mock.ANY, os_instances[2].id)],
                          self.novadb.instance_get_by_uuid.mock_calls)

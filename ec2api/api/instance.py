@@ -415,7 +415,7 @@ def _get_idempotent_run(context, client_token):
                      if i.get('client_token') == client_token)
     if not instances:
         return
-    os_instances = _get_os_instances_by_instances(context, instances)
+    os_instances = _get_os_instances_by_instances(context, instances.values())
     instances_info = []
     instance_ids = []
     for os_instance in os_instances:
