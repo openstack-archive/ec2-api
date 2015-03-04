@@ -110,7 +110,7 @@ class ImageTestCase(base.ApiTestCase):
         self.nova_servers.get.return_value = os_instance
         is_ebs_instance.return_value = True
         image_id = fakes.random_ec2_id('ami')
-        self.db_api.add_item.side_effect = fakes.get_db_api_add_item(image_id)
+        self.db_api.add_item.side_effect = tools.get_db_api_add_item(image_id)
 
         resp = self.execute('CreateImage',
                             {'InstanceId': fakes.ID_EC2_INSTANCE_2,
@@ -153,7 +153,7 @@ class ImageTestCase(base.ApiTestCase):
     def test_register_image_by_s3(self, s3_create):
         s3_create.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_EC2_IMAGE_1))
+            tools.get_db_api_add_item(fakes.ID_EC2_IMAGE_1))
 
         resp = self.execute(
             'RegisterImage',
@@ -186,7 +186,7 @@ class ImageTestCase(base.ApiTestCase):
         self.glance.images.create.return_value = (
             fakes.OSImage(fakes.OS_IMAGE_2))
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_EC2_IMAGE_2))
+            tools.get_db_api_add_item(fakes.ID_EC2_IMAGE_2))
         self.set_mock_db_items(fakes.DB_SNAPSHOT_1,
                                fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
         get_os_image.side_effect = [fakes.OSImage(fakes.OS_IMAGE_AKI_1),
@@ -470,9 +470,9 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         # NOTE(ft): the first requested image appears is user owend and public,
         # the second is absent
         db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items())
+            tools.get_db_api_get_items())
         db_api.get_items_by_ids.side_effect = (
-            fakes.get_db_api_get_items_by_ids(fakes.DB_IMAGE_1))
+            tools.get_db_api_get_items_by_ids(fakes.DB_IMAGE_1))
         db_api.get_public_items.side_effect = [
             [fakes.DB_IMAGE_1], [], []]
 
@@ -511,7 +511,7 @@ class S3TestCase(base.ApiTestCase):
                 [fakes.DB_IMAGE_ARI_1]]
         self.db_api.get_item_by_id.return_value = None
         self.glance.images.get.side_effect = (
-            fakes.get_by_1st_arg_getter({
+            tools.get_by_1st_arg_getter({
                 fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
                 fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
 

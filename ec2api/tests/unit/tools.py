@@ -44,6 +44,90 @@ def patch_dict(dict1, dict2, trash_iter):
     return res
 
 
+def get_db_api_add_item(item_id_dict):
+    """Generate db_api.add_item mock function."""
+
+    def db_api_add_item(context, kind, data):
+        if isinstance(item_id_dict, dict):
+            item_id = item_id_dict[kind]
+        else:
+            item_id = item_id_dict
+        data = update_dict(data, {'id': item_id})
+        data.setdefault('os_id')
+        data.setdefault('vpc_id')
+        return data
+    return db_api_add_item
+
+
+def get_db_api_get_items(*items):
+    """Generate db_api.get_items mock function."""
+
+    def db_api_get_items(context, kind):
+        return [copy.deepcopy(item)
+                for item in items
+                if ec2utils.get_ec2_id_kind(item['id']) == kind]
+    return db_api_get_items
+
+
+def get_db_api_get_item_by_id(*items):
+    """Generate db_api.get_item_by_id mock function."""
+
+    def db_api_get_item_by_id(context, item_id):
+        return next((copy.deepcopy(item)
+                     for item in items
+                     if item['id'] == item_id),
+                    None)
+    return db_api_get_item_by_id
+
+
+def get_db_api_get_items_by_ids(*items):
+    """Generate db_api.get_items_by_ids mock function."""
+
+    def db_api_get_items_by_ids(context, item_ids):
+        return [copy.deepcopy(item)
+                for item in items
+                if (item['id'] in item_ids)]
+    return db_api_get_items_by_ids
+
+
+def get_db_api_get_item_ids(*items):
+    """Generate db_api.get_item_ids mock function."""
+
+    def db_api_get_item_ids(context, kind, item_os_ids):
+        return [(item['id'], item['os_id'])
+                for item in items
+                if (item['os_id'] in item_os_ids and
+                    ec2utils.get_ec2_id_kind(item['id']) == kind)]
+    return db_api_get_item_ids
+
+
+def get_neutron_create(kind, os_id, addon={}):
+    """Generate Neutron create an object mock function."""
+
+    def neutron_create(body):
+        body = copy.deepcopy(body)
+        body[kind].update(addon)
+        body[kind]['id'] = os_id
+        return body
+    return neutron_create
+
+
+def get_by_1st_arg_getter(results_dict_by_id):
+    """Generate mock function for getter by 1st argurment."""
+
+    def getter(obj_id):
+        return copy.deepcopy(results_dict_by_id.get(obj_id))
+    return getter
+
+
+def get_by_2nd_arg_getter(results_dict_by_id):
+    """Generate mock function for getter by 2nd argurment."""
+
+    def getter(_context, obj_id):
+        return copy.deepcopy(results_dict_by_id.get(obj_id))
+    return getter
+
+
 class CopyingMock(mock.MagicMock):
     """Mock class for calls with mutable arguments.
 

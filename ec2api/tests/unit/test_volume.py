@@ -32,7 +32,7 @@ class VolumeTestCase(base.ApiTestCase):
                                fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
                                fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2)
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
+            tools.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
 
         resp = self.execute('DescribeVolumes', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -105,7 +105,7 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.create.return_value = (
             fakes.CinderVolume(fakes.OS_VOLUME_1))
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_EC2_VOLUME_1))
+            tools.get_db_api_add_item(fakes.ID_EC2_VOLUME_1))
 
         resp = self.execute(
             'CreateVolume',
@@ -126,7 +126,7 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.create.return_value = (
             fakes.CinderVolume(fakes.OS_VOLUME_3))
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
+            tools.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
         self.set_mock_db_items(fakes.DB_SNAPSHOT_1)
 
         resp = self.execute(

@@ -26,12 +26,12 @@ class SubnetTestCase(base.ApiTestCase):
     def test_create_subnet(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.db_api.add_item.side_effect = (
-                fakes.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
+                tools.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
         self.neutron.create_network.side_effect = (
-                fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
+                tools.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
         self.neutron.create_subnet.side_effect = (
-                fakes.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
+                tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
 
         def check_response(resp):
             self.assertEqual(200, resp['http_status_code'])
@@ -105,10 +105,10 @@ class SubnetTestCase(base.ApiTestCase):
     def test_create_subnet_overlapped(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.create_network.side_effect = (
-                fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
+                tools.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
         self.neutron.create_subnet.side_effect = (
-                fakes.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
+                tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
         self.neutron.add_interface_router.side_effect = (
                 neutron_exception.BadRequest())
 
@@ -120,10 +120,10 @@ class SubnetTestCase(base.ApiTestCase):
     def test_create_subnet_overlimit(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.create_network.side_effect = (
-                fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
+                tools.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
         self.neutron.create_subnet.side_effect = (
-                fakes.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
+                tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
 
         def test_overlimit(func):
             self.neutron.reset_mock()
@@ -144,12 +144,12 @@ class SubnetTestCase(base.ApiTestCase):
     def test_create_subnet_rollback(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.db_api.add_item.side_effect = (
-                fakes.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
+                tools.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
         self.neutron.create_network.side_effect = (
-                fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
+                tools.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
         self.neutron.create_subnet.side_effect = (
-                fakes.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
+                tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
         self.neutron.update_network.side_effect = Exception()
 
         self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,

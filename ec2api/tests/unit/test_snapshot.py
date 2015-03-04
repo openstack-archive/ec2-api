@@ -108,7 +108,7 @@ class SnapshotTestCase(base.ApiTestCase):
         self.cinder.volume_snapshots.create.return_value = (
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1))
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_EC2_SNAPSHOT_1))
+            tools.get_db_api_add_item(fakes.ID_EC2_SNAPSHOT_1))
         self.set_mock_db_items(fakes.DB_VOLUME_2)
         self.cinder.volumes.get.side_effect = (
             lambda vol_id: (
