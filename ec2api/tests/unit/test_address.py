@@ -15,7 +15,6 @@
 import mock
 from neutronclient.common import exceptions as neutron_exception
 from novaclient import exceptions as nova_exception
-from oslo_config import cfg
 
 from ec2api.api import address
 from ec2api.tests.unit import base
@@ -43,9 +42,7 @@ class AddressTestCase(base.ApiTestCase):
     def test_allocate_vpc_address(self):
         address.address_engine = (
             address.AddressEngineNeutron())
-        conf = cfg.CONF
-        self.addCleanup(conf.reset)
-        conf.set_override('external_network', fakes.NAME_OS_PUBLIC_NETWORK)
+        self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.neutron.list_networks.return_value = (
             {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
         self.neutron.create_floatingip.return_value = (
@@ -100,9 +97,7 @@ class AddressTestCase(base.ApiTestCase):
     def test_allocate_address_vpc_rollback(self):
         address.address_engine = (
             address.AddressEngineNeutron())
-        conf = cfg.CONF
-        self.addCleanup(conf.reset)
-        conf.set_override('external_network', fakes.NAME_OS_PUBLIC_NETWORK)
+        self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.neutron.list_networks.return_value = (
             {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
         self.neutron.create_floatingip.return_value = (

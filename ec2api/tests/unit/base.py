@@ -16,7 +16,7 @@ import copy
 import itertools
 
 import mock
-from oslo_config import cfg
+from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 
 import ec2api.api.apirequest
@@ -76,9 +76,8 @@ class ApiTestCase(test_base.BaseTestCase):
         self.isotime = isotime_patcher.start()
         self.addCleanup(isotime_patcher.stop)
 
-        conf = cfg.CONF
-        conf.set_override('fatal_exception_format_errors', True)
-        self.addCleanup(conf.reset)
+        self._conf = self.useFixture(config_fixture.Config())
+        self.configure(fatal_exception_format_errors=True)
 
     def execute(self, action, args):
         ec2_request = ec2api.api.apirequest.APIRequest(action, 'fake_v1', args)
@@ -142,6 +141,9 @@ class ApiTestCase(test_base.BaseTestCase):
                                      if all(i['id'] != item['id']
                                             for i in items))
         self.set_mock_db_items(*merged_items)
+
+    def configure(self, **kwargs):
+        self._conf.config(**kwargs)
 
     def check_filtering(self, operation, resultset_key, filters):
         for name, value in filters:
