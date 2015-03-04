@@ -167,7 +167,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
              fakes.ID_EC2_SECURITY_GROUP_1})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
-        self.db_api.get_item_by_id.assert_has_call(
+        self.db_api.get_item_by_id.assert_any_call(
             mock.ANY,
             fakes.ID_EC2_SECURITY_GROUP_1)
         self.db_api.delete_item.assert_called_once_with(

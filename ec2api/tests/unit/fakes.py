@@ -782,7 +782,7 @@ EC2_DHCP_OPTIONS_2 = {
 
 OS_DHCP_OPTIONS_1 = {'extra_dhcp_opts': [{'opt_name': 'domain-name',
                                           'opt_value': 'my.domain.com'},
-                                         {'opt_name': 'dns-servers',
+                                         {'opt_name': 'dns-server',
                                           'opt_value': '8.8.8.8,127.0.0.1'}]}
 
 
