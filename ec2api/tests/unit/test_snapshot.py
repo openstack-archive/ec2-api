@@ -27,10 +27,8 @@ class SnapshotTestCase(base.ApiTestCase):
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1),
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_2)]
 
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'snap': [fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2],
-                'vol': [fakes.DB_VOLUME_2]}))
+        self.set_mock_db_items(fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
+                               fakes.DB_VOLUME_2)
 
         resp = self.execute('DescribeSnapshots', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -75,10 +73,7 @@ class SnapshotTestCase(base.ApiTestCase):
     def test_describe_snapshots_auto_remove(self):
         self.cinder.volume_snapshots.list.return_value = []
 
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'snap': [fakes.DB_SNAPSHOT_1],
-                'vol': [fakes.DB_VOLUME_2]}))
+        self.set_mock_db_items(fakes.DB_SNAPSHOT_1, fakes.DB_VOLUME_2)
 
         resp = self.execute('DescribeSnapshots', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -114,9 +109,7 @@ class SnapshotTestCase(base.ApiTestCase):
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1))
         self.db_api.add_item.side_effect = (
             fakes.get_db_api_add_item(fakes.ID_EC2_SNAPSHOT_1))
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_VOLUME_2: fakes.DB_VOLUME_2}))
+        self.set_mock_db_items(fakes.DB_VOLUME_2)
         self.cinder.volumes.get.side_effect = (
             lambda vol_id: (
                 fakes.CinderVolume(fakes.OS_VOLUME_2)
@@ -140,10 +133,7 @@ class SnapshotTestCase(base.ApiTestCase):
     def test_format_snapshot_maps_status(self):
         fake_snapshot = fakes.OSSnapshot(fakes.OS_SNAPSHOT_1)
         self.cinder.volume_snapshots.list.return_value = [fake_snapshot]
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'snap': [fakes.DB_SNAPSHOT_1],
-                'vol': [fakes.DB_VOLUME_2]}))
+        self.set_mock_db_items(fakes.DB_SNAPSHOT_1, fakes.DB_VOLUME_2)
 
         fake_snapshot.status = 'new'
         resp = self.execute('DescribeSnapshots', {})

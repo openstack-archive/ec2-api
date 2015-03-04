@@ -95,7 +95,7 @@ class ImageTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.instance._is_ebs_instance')
     def _test_create_image(self, instance_status, no_reboot, is_ebs_instance):
-        self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_2
+        self.set_mock_db_items(fakes.DB_INSTANCE_2)
         os_instance = mock.MagicMock()
         os_instance.configure_mock(id=fakes.ID_OS_INSTANCE_2,
                                    status=instance_status)
@@ -140,7 +140,7 @@ class ImageTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.instance._is_ebs_instance')
     def test_create_image_invalid_parameters(self, is_ebs_instance):
-        self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_1
+        self.set_mock_db_items(fakes.DB_INSTANCE_1)
         is_ebs_instance.return_value = False
 
         resp = self.execute('CreateImage',
@@ -187,11 +187,8 @@ class ImageTestCase(base.ApiTestCase):
             fakes.OSImage(fakes.OS_IMAGE_2))
         self.db_api.add_item.side_effect = (
             fakes.get_db_api_add_item(fakes.ID_EC2_IMAGE_2))
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_SNAPSHOT_1: fakes.DB_SNAPSHOT_1,
-                fakes.ID_EC2_IMAGE_AKI_1: fakes.DB_IMAGE_AKI_1,
-                fakes.ID_EC2_IMAGE_ARI_1: fakes.DB_IMAGE_ARI_1}))
+        self.set_mock_db_items(fakes.DB_SNAPSHOT_1,
+                               fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
         get_os_image.side_effect = [fakes.OSImage(fakes.OS_IMAGE_AKI_1),
                                     fakes.OSImage(fakes.OS_IMAGE_ARI_1)]
 
@@ -324,8 +321,6 @@ class ImageTestCase(base.ApiTestCase):
         self._setup_model()
 
         def do_check(attr, ec2_image_id, response):
-            self.db_api.reset_mock()
-            self.glance.reset_mock()
             resp = self.execute('DescribeImageAttribute',
                                 {'ImageId': ec2_image_id,
                                  'Attribute': attr})
@@ -381,26 +376,11 @@ class ImageTestCase(base.ApiTestCase):
                          osimage_update.call_args[0][0].id)
 
     def _setup_model(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
-                fakes.ID_EC2_IMAGE_2: fakes.DB_IMAGE_2}))
-        self.db_api.get_items_by_ids.side_effect = (
-            fakes.get_db_api_get_items_by_ids(
-                [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2]))
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'snap': [fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2],
-                'ami': [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2],
-                'ari': [],
-                'aki': []}))
+        self.set_mock_db_items(fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
+                               fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
+                               fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1,
+                               fakes.DB_VOLUME_1, fakes. DB_VOLUME_2)
         self.db_api.get_public_items.return_value = []
-
-        self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_ids(
-                [fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1,
-                 fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
-                 fakes.DB_VOLUME_1, fakes. DB_VOLUME_2]))
 
         self.glance.images.list.side_effect = (
             lambda: [fakes.OSImage(fakes.OS_IMAGE_1),
@@ -490,10 +470,9 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         # NOTE(ft): the first requested image appears is user owend and public,
         # the second is absent
         db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'snap': []}))
+            fakes.get_db_api_get_items())
         db_api.get_items_by_ids.side_effect = (
-            fakes.get_db_api_get_items_by_ids([fakes.DB_IMAGE_1]))
+            fakes.get_db_api_get_items_by_ids(fakes.DB_IMAGE_1))
         db_api.get_public_items.side_effect = [
             [fakes.DB_IMAGE_1], [], []]
 

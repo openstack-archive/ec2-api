@@ -54,9 +54,10 @@ class KeyPairCase(base.ApiTestCase):
         resp = self.execute('ImportKeyPair',
                             {'KeyName': fakes.NAME_KEY_PAIR,
                              'PublicKeyMaterial': base64.b64encode(
-                                fakes.PUBLIC_KEY_KEY_PAIR)})
+                                 fakes.PUBLIC_KEY_KEY_PAIR)})
         self.assertEqual(200, resp['http_status_code'])
-        self.assertThat(tools.purge_dict(fakes.EC2_KEY_PAIR, {'keyMaterial'}),
+        self.assertThat(
+            tools.purge_dict(fakes.EC2_KEY_PAIR, {'keyMaterial'}),
             matchers.DictMatches(tools.purge_dict(resp, {'http_status_code'})))
         self.nova_key_pairs.create.assert_called_once_with(
             fakes.NAME_KEY_PAIR, fakes.PUBLIC_KEY_KEY_PAIR)
@@ -67,7 +68,7 @@ class KeyPairCase(base.ApiTestCase):
         resp = self.execute('ImportKeyPair',
                             {'KeyName': fakes.NAME_KEY_PAIR,
                              'PublicKeyMaterial': base64.b64encode(
-                                fakes.PUBLIC_KEY_KEY_PAIR)})
+                                 fakes.PUBLIC_KEY_KEY_PAIR)})
         self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('ResourceLimitExceeded', resp['Error']['Code'])
 

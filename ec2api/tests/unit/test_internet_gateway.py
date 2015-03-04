@@ -46,11 +46,7 @@ class IgwTestCase(base.ApiTestCase):
         conf = cfg.CONF
         self.addCleanup(conf.reset)
         conf.set_override('external_network', fakes.NAME_OS_PUBLIC_NETWORK)
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_2: fakes.DB_IGW_2,
-                         fakes.ID_EC2_VPC_2: fakes.DB_VPC_2}))
-        self.db_api.get_items.return_value = [fakes.DB_IGW_1, fakes.DB_IGW_2]
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2)
         self.neutron.list_networks.return_value = (
                 {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
 
@@ -90,42 +86,25 @@ class IgwTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_2: None,
-                         fakes.ID_EC2_VPC_2: fakes.DB_VPC_2}))
+        self.set_mock_db_items(fakes.DB_VPC_2)
         do_check('InvalidInternetGatewayID.NotFound')
 
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_2: fakes.DB_IGW_2,
-                         fakes.ID_EC2_VPC_2: None}))
+        self.set_mock_db_items(fakes.DB_IGW_2)
         do_check('InvalidVpcID.NotFound')
 
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_2: self.DB_IGW_2_ATTACHED,
-                         fakes.ID_EC2_VPC_2: fakes.DB_VPC_2}))
+        self.set_mock_db_items(self.DB_IGW_2_ATTACHED, fakes.DB_VPC_2)
         do_check('Resource.AlreadyAssociated')
 
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_2: fakes.DB_IGW_2,
-                         fakes.ID_EC2_VPC_2: fakes.DB_VPC_2}))
-        self.db_api.get_items.return_value = (
-                [fakes.gen_db_igw(fakes.ID_EC2_IGW_1, fakes.ID_EC2_VPC_2),
-                 fakes.DB_IGW_2])
+        self.set_mock_db_items(
+            fakes.DB_IGW_2, fakes.DB_VPC_2,
+            fakes.gen_db_igw(fakes.ID_EC2_IGW_1, fakes.ID_EC2_VPC_2))
         do_check('InvalidParameterValue')
 
     def test_attach_igw_rollback(self):
         conf = cfg.CONF
         self.addCleanup(conf.reset)
         conf.set_override('external_network', fakes.NAME_OS_PUBLIC_NETWORK)
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_2: fakes.DB_IGW_2,
-                         fakes.ID_EC2_VPC_2: fakes.DB_VPC_2}))
-        self.db_api.get_items.return_value = [fakes.DB_IGW_1, fakes.DB_IGW_2]
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2)
         self.neutron.list_networks.return_value = (
                 {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
         self.neutron.add_gateway_router.side_effect = Exception()
@@ -138,10 +117,7 @@ class IgwTestCase(base.ApiTestCase):
                 mock.ANY, fakes.DB_IGW_2)
 
     def test_detach_igw(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
-                         fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
 
         resp = self.execute(
                 'DetachInternetGateway',
@@ -174,29 +150,17 @@ class IgwTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_1: None,
-                         fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1)
         do_check('InvalidInternetGatewayID.NotFound')
 
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
-                         fakes.ID_EC2_VPC_1: None}))
+        self.set_mock_db_items(fakes.DB_IGW_1)
         do_check('InvalidVpcID.NotFound')
 
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_1: self.DB_IGW_1_DETACHED,
-                         fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
+        self.set_mock_db_items(self.DB_IGW_1_DETACHED, fakes.DB_VPC_1)
         do_check('Gateway.NotAttached')
 
     def test_detach_igw_no_router(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
-                         fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
         self.neutron.remove_gateway_router.side_effect = (
                 neutron_exception.NotFound)
 
@@ -211,10 +175,7 @@ class IgwTestCase(base.ApiTestCase):
                 fakes.ID_OS_ROUTER_1)
 
     def test_detach_igw_rollback(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
-                         fakes.ID_EC2_VPC_1: fakes.DB_VPC_1}))
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
         self.neutron.remove_gateway_router.side_effect = Exception()
 
         self.execute(
@@ -226,7 +187,7 @@ class IgwTestCase(base.ApiTestCase):
                 mock.ANY, fakes.DB_IGW_1)
 
     def test_delete_igw(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_IGW_2
+        self.set_mock_db_items(fakes.DB_IGW_2)
 
         resp = self.execute(
                 'DeleteInternetGateway',
@@ -253,15 +214,14 @@ class IgwTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         do_check('InvalidInternetGatewayID.NotFound')
 
-        self.db_api.get_item_by_id.return_value = fakes.DB_IGW_1
+        self.set_mock_db_items(fakes.DB_IGW_1)
         do_check('DependencyViolation')
 
     def test_describe_igw(self):
-        self.db_api.get_items.return_value = [fakes.DB_IGW_1,
-                                              fakes.DB_IGW_2]
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2)
 
         resp = self.execute('DescribeInternetGateways', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -269,7 +229,6 @@ class IgwTestCase(base.ApiTestCase):
                         matchers.ListMatches([fakes.EC2_IGW_1,
                                               fakes.EC2_IGW_2]))
 
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_IGW_2]
         resp = self.execute('DescribeInternetGateways',
                             {'InternetGatewayId.1': fakes.ID_EC2_IGW_2})
         self.assertEqual(200, resp['http_status_code'])

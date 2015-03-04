@@ -40,22 +40,24 @@ def get_db_api_add_item(item_id_dict):
     return db_api_add_item
 
 
-def get_db_api_get_items(results_dict_by_kind):
+def get_db_api_get_items(*items):
     def db_api_get_items(context, kind):
-        return results_dict_by_kind.get(kind)
+        return [copy.deepcopy(item)
+                for item in items
+                if ec2utils.get_ec2_id_kind(item['id']) == kind]
     return db_api_get_items
 
 
-def get_db_api_get_item_by_id(results_dict_by_id):
+def get_db_api_get_item_by_id(*items):
     def db_api_get_item_by_id(context, item_id):
-        item = results_dict_by_id.get(item_id)
-        if item is not None:
-            item = copy.deepcopy(item)
-        return item
+        return next((copy.deepcopy(item)
+                     for item in items
+                     if item['id'] == item_id),
+                    None)
     return db_api_get_item_by_id
 
 
-def get_db_api_get_items_by_ids(items):
+def get_db_api_get_items_by_ids(*items):
     def db_api_get_items_by_ids(context, item_ids):
         return [copy.deepcopy(item)
                 for item in items
@@ -63,7 +65,7 @@ def get_db_api_get_items_by_ids(items):
     return db_api_get_items_by_ids
 
 
-def get_db_api_get_item_ids(items):
+def get_db_api_get_item_ids(*items):
     def db_api_get_item_ids(context, kind, item_os_ids):
         return [(item['id'], item['os_id'])
                 for item in items
@@ -83,6 +85,12 @@ def get_neutron_create(kind, os_id, addon={}):
 
 def get_by_1st_arg_getter(results_dict_by_id):
     def getter(obj_id):
+        return copy.deepcopy(results_dict_by_id.get(obj_id))
+    return getter
+
+
+def get_by_2nd_arg_getter(results_dict_by_id):
+    def getter(_context, obj_id):
         return copy.deepcopy(results_dict_by_id.get(obj_id))
     return getter
 

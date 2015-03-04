@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-import copy
-
 import mock
 from neutronclient.common import exceptions as neutron_exception
 from novaclient import exceptions as nova_exception
@@ -31,7 +29,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_create_security_group(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
+        self.set_mock_db_items(fakes.DB_VPC_1)
         self.db_api.add_item.return_value = fakes.DB_SECURITY_GROUP_1
         self.nova_security_groups.create.return_value = (
             fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_1))
@@ -68,7 +66,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         resp = self.execute(
             'CreateSecurityGroup',
             {'VpcId': fakes.ID_EC2_VPC_1,
@@ -144,11 +142,11 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_create_security_group_rollback(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
+        self.set_mock_db_items(fakes.DB_VPC_1)
         self.db_api.add_item.side_effect = Exception()
         self.nova_security_groups.create.return_value = (
             fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_1))
-        resp = self.execute(
+        self.execute(
             'CreateSecurityGroup',
             {'VpcId': fakes.ID_EC2_VPC_1,
              'GroupName': 'groupname',
@@ -159,8 +157,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_delete_security_group(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.return_value = fakes.DB_SECURITY_GROUP_1
-        self.db_api.get_items.return_value = []
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1)
         resp = self.execute(
             'DeleteSecurityGroup',
             {'GroupId':
@@ -211,7 +208,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_delete_security_group_invalid(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         resp = self.execute(
             'DeleteSecurityGroup',
             {'GroupId':
@@ -238,7 +235,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_delete_security_group_is_in_use(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.return_value = fakes.DB_SECURITY_GROUP_1
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1)
         self.neutron.delete_security_group.side_effect = (
             neutron_exception.Conflict())
         resp = self.execute(
@@ -252,8 +249,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_describe_security_groups(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_items.return_value = [fakes.DB_SECURITY_GROUP_1,
-                                              fakes.DB_SECURITY_GROUP_2]
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2)
         self.neutron.list_security_groups.return_value = (
             {'security_groups': [fakes.OS_SECURITY_GROUP_1,
                                  fakes.OS_SECURITY_GROUP_2]})
@@ -299,7 +296,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_describe_security_groups_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.db_api.get_items.return_value = []
+        self.set_mock_db_items()
         self.nova_security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
@@ -340,10 +337,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
              'IpPermissions.1.IpRanges.1.CidrIp': '0.0.0.0/0'})
         self.assertEqual(200, resp['http_status_code'])
         # Duplicate rule
-        self.db_api.get_item_by_id.side_effect = copy.deepcopy(
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2)
         self.neutron.create_security_group_rule.side_effect = (
             neutron_exception.Conflict)
         check_response('InvalidPermission.Duplicate', 'icmp',
@@ -392,10 +387,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_authorize_security_group_ingress_ip_ranges(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.side_effect = copy.deepcopy(
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2)
         self.neutron.create_security_group_rule.return_value = (
             {'security_group_rule': [fakes.OS_SECURITY_GROUP_RULE_1]})
         resp = self.execute(
@@ -449,10 +442,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_authorize_security_group_egress_groups(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.side_effect = copy.deepcopy(
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2)
         self.neutron.create_security_group_rule.return_value = (
             {'security_group_rule': [fakes.OS_SECURITY_GROUP_RULE_1]})
         resp = self.execute(
@@ -491,10 +482,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_revoke_security_group_ingress_ip_ranges(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.side_effect = copy.deepcopy(
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2)
         self.neutron.show_security_group.return_value = {
             'security_group': fakes.OS_SECURITY_GROUP_2}
         self.neutron.delete_security_group_rule.return_value = True
@@ -534,10 +523,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_revoke_security_group_egress_groups(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.db_api.get_item_by_id.side_effect = copy.deepcopy(
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_SECURITY_GROUP_1: fakes.DB_SECURITY_GROUP_1,
-                fakes.ID_EC2_SECURITY_GROUP_2: fakes.DB_SECURITY_GROUP_2}))
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2)
         self.neutron.show_security_group.return_value = {
             'security_group': fakes.OS_SECURITY_GROUP_2}
         self.neutron.delete_security_group_rule.return_value = True
