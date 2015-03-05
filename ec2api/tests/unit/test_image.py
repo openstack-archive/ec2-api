@@ -19,7 +19,6 @@ import tempfile
 
 import eventlet
 import mock
-from oslo_config import cfg
 from oslotest import base as test_base
 
 from ec2api.api import image as image_api
@@ -544,9 +543,7 @@ class S3TestCase(base.ApiTestCase):
 
     @mock.patch.object(fakes.OSImage, 'update', autospec=True)
     def test_s3_create_image_locations(self, osimage_update):
-        conf = cfg.CONF
-        conf.set_override('image_decryption_dir', None)
-        self.addCleanup(conf.reset)
+        self.configure(image_decryption_dir=None)
         _handle, tempf = tempfile.mkstemp()
         fake_context = self._create_context()
         with mock.patch(

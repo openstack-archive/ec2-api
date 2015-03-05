@@ -15,7 +15,6 @@
 
 import mock
 from neutronclient.common import exceptions as neutron_exception
-from oslo_config import cfg
 
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
@@ -43,9 +42,7 @@ class IgwTestCase(base.ApiTestCase):
                 mock.ANY, 'igw', {})
 
     def test_attach_igw(self):
-        conf = cfg.CONF
-        self.addCleanup(conf.reset)
-        conf.set_override('external_network', fakes.NAME_OS_PUBLIC_NETWORK)
+        self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2)
         self.neutron.list_networks.return_value = (
                 {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
@@ -101,9 +98,7 @@ class IgwTestCase(base.ApiTestCase):
         do_check('InvalidParameterValue')
 
     def test_attach_igw_rollback(self):
-        conf = cfg.CONF
-        self.addCleanup(conf.reset)
-        conf.set_override('external_network', fakes.NAME_OS_PUBLIC_NETWORK)
+        self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2)
         self.neutron.list_networks.return_value = (
                 {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})

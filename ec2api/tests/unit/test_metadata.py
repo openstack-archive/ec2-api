@@ -14,6 +14,7 @@
 
 import mock
 from oslo_config import cfg
+from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 import testtools
 import webob
@@ -29,21 +30,19 @@ class ProxyTestCase(test_base.BaseTestCase):
     def setUp(self):
         super(ProxyTestCase, self).setUp()
         self.handler = metadata.MetadataRequestHandler()
-        conf = cfg.CONF
-        self.addCleanup(conf.reset)
-        conf.set_override('nova_metadata_ip', '9.9.9.9', group='metadata')
-        conf.set_override('nova_metadata_port', 8775, group='metadata')
-        conf.set_override('nova_metadata_protocol', 'http', group='metadata')
-        conf.set_override('nova_metadata_insecure', True, group='metadata')
-        conf.set_override('auth_ca_cert', None, group='metadata')
-        conf.set_override('nova_client_cert', 'nova_cert', group='metadata')
-        conf.set_override('nova_client_priv_key', 'nova_priv_key',
-                          group='metadata')
-        conf.set_override('admin_user', 'admin', group='metadata')
-        conf.set_override('admin_password', 'password', group='metadata')
-        conf.set_override('admin_tenant_name', 'service', group='metadata')
-        conf.set_override('metadata_proxy_shared_secret', 'secret',
-                          group='metadata')
+        conf = config_fixture.Config()
+        conf.config(group='metadata',
+                    nova_metadata_ip='9.9.9.9',
+                    nova_metadata_port=8775,
+                    nova_metadata_protocol='http',
+                    nova_metadata_insecure=True,
+                    auth_ca_cert=None,
+                    nova_client_cert='nova_cert',
+                    nova_client_priv_key='nova_priv_key',
+                    admin_user='admin',
+                    admin_password='password',
+                    admin_tenant_name='service',
+                    metadata_proxy_shared_secret='secret')
 
     @mock.patch('ec2api.metadata.api.get_version_list')
     def test_callable(self, get_version_list):

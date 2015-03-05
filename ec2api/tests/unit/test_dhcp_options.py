@@ -21,9 +21,6 @@ from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
 
 
-CONF = cfg.CONF
-
-
 class DhcpOptionsTestCase(base.ApiTestCase):
 
     def test_create_dhcp_options(self):
@@ -178,6 +175,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                 mock.ANY, vpc)
 
     def _effective_os_dhcp_options(self, os_dhcp_options):
+        CONF = cfg.CONF
         dhcp_opts = {
             'extra_dhcp_opts': [{'opt_name': 'mtu',
                                  'opt_value': str(CONF.network_device_mtu)}]}
