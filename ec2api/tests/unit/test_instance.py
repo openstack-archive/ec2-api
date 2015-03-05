@@ -302,7 +302,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.set_mock_db_items(
             fakes.DB_IMAGE_1, fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
         self.glance.images.get.side_effect = (
-            fakes.get_by_1st_arg_getter({
+            tools.get_by_1st_arg_getter({
                 fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
                 fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
                 fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
@@ -839,11 +839,11 @@ class InstanceTestCase(base.ApiTestCase):
         self.nova_servers.list.return_value = [fakes.OS_INSTANCE_1,
                                                fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.side_effect = (
-            fakes.get_by_2nd_arg_getter({
+            tools.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2}))
         self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            fakes.get_by_2nd_arg_getter({
+            tools.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
         self.network_interface_api.describe_network_interfaces.side_effect = (
@@ -946,7 +946,7 @@ class InstanceTestCase(base.ApiTestCase):
 
         self.set_mock_db_items(*self.DB_INSTANCES)
         self.novadb.instance_get_by_uuid.side_effect = (
-            fakes.get_by_2nd_arg_getter(
+            tools.get_by_2nd_arg_getter(
                 dict((os_id, novadb_instance)
                      for os_id, novadb_instance in zip(
                         self.IDS_OS_INSTANCE,
@@ -1079,15 +1079,15 @@ class InstanceTestCase(base.ApiTestCase):
                                fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
                                fakes.DB_VOLUME_2)
         self.nova_servers.get.side_effect = (
-            fakes.get_by_1st_arg_getter({
+            tools.get_by_1st_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.OS_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.OS_INSTANCE_2}))
         self.novadb.instance_get_by_uuid.side_effect = (
-            fakes.get_by_2nd_arg_getter({
+            tools.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2}))
         self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            fakes.get_by_2nd_arg_getter({
+            tools.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
         self.cinder.volumes.get.return_value = (
@@ -1422,7 +1422,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     def test_parse_network_interface_parameters(self, db_api):
         engine = instance_api.InstanceEngineNeutron()
         context = mock.Mock()
-        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id(
+        db_api.get_item_by_id.side_effect = tools.get_db_api_get_item_by_id(
             fakes.DB_SUBNET_1,
             tools.update_dict(fakes.DB_SUBNET_2,
                               {'vpc_id': fakes.ID_EC2_VPC_2}),
@@ -1545,7 +1545,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
         os_image = fakes.OSImage(fakes.OS_IMAGE_1)
 
-        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id(
+        db_api.get_item_by_id.side_effect = tools.get_db_api_get_item_by_id(
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3,
             fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2)
 
@@ -1631,7 +1631,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         id_os_instance_1 = fakes.random_os_id()
         id_os_instance_2 = fakes.random_os_id()
         novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            fakes.get_by_2nd_arg_getter({
+            tools.get_by_2nd_arg_getter({
                 id_os_instance_1: [{'device_name': '/dev/sdb1',
                                     'delete_on_termination': False,
                                     'snapshot_id': '1',
@@ -1847,7 +1847,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                         network_interfaces[3]]
         addresses_to_dissassociate = [addresses[0]]
 
-        db_api.get_items.side_effect = fakes.get_db_api_get_items(
+        db_api.get_items.side_effect = tools.get_db_api_get_items(
             *(network_interfaces + addresses))
 
         def check_calls():

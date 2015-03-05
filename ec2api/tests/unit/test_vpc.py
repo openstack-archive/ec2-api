@@ -26,9 +26,9 @@ class VpcTestCase(base.ApiTestCase):
 
     def test_create_vpc(self):
         self.neutron.create_router.side_effect = (
-            fakes.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
+            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item({
+            tools.get_db_api_add_item({
                 'vpc': fakes.ID_EC2_VPC_1,
                 'rtb': fakes.ID_EC2_ROUTE_TABLE_1,
                 'sg': fakes.ID_EC2_SECURITY_GROUP_1}))
@@ -70,8 +70,8 @@ class VpcTestCase(base.ApiTestCase):
 
     def test_create_vpc_invalid_cidr(self):
         self.neutron.create_router.side_effect = (
-            fakes.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
-        self.db_api.add_item.side_effect = fakes.get_db_api_add_item(
+            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
+        self.db_api.add_item.side_effect = tools.get_db_api_add_item(
             fakes.ID_EC2_VPC_1)
 
         def check_response(resp, error_code):
@@ -91,7 +91,7 @@ class VpcTestCase(base.ApiTestCase):
     def test_create_vpc_overlimit(self):
         self.neutron.create_router.side_effect = (
             neutron_exception.OverQuotaClient)
-        self.db_api.add_item.side_effect = fakes.get_db_api_add_item(
+        self.db_api.add_item.side_effect = tools.get_db_api_add_item(
             fakes.ID_EC2_VPC_1)
 
         resp = self.execute('CreateVpc', {'CidrBlock': fakes.CIDR_VPC_1})
@@ -103,9 +103,9 @@ class VpcTestCase(base.ApiTestCase):
 
     def test_create_vpc_rollback(self):
         self.neutron.create_router.side_effect = (
-            fakes.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
+            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item({
+            tools.get_db_api_add_item({
                 'vpc': fakes.ID_EC2_VPC_1,
                 'rtb': fakes.ID_EC2_ROUTE_TABLE_1}))
         self.neutron.update_router.side_effect = Exception()

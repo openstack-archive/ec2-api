@@ -31,7 +31,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_route_table_create(self):
         self.set_mock_db_items(fakes.DB_VPC_1)
         self.db_api.add_item.side_effect = (
-            fakes.get_db_api_add_item(fakes.ID_EC2_ROUTE_TABLE_1))
+            tools.get_db_api_add_item(fakes.ID_EC2_ROUTE_TABLE_1))
         resp = self.execute('CreateRouteTable',
                             {'VpcId': fakes.ID_EC2_VPC_1})
         self.assertEqual(200, resp['http_status_code'])
