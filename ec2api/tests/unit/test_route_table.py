@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import copy
 
 import mock
@@ -581,8 +580,8 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.DB_VPC_1, fakes.DB_VPC_2, fakes.DB_IGW_1, fakes.DB_IGW_2,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
             fakes.DB_INSTANCE_1)
-        fake_server_class = collections.namedtuple('FakeServer', ['status'])
-        self.nova.servers.get.return_value = fake_server_class('ACTIVE')
+        self.nova.servers.get.return_value = (
+            mock.NonCallableMock(status='ACTIVE'))
 
         resp = self.execute('DescribeRouteTables', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -647,8 +646,8 @@ class RouteTableTestCase(base.ApiTestCase):
             route_table_1, route_table_2, fakes.DB_VPC_1, fakes.DB_VPC_2,
             igw_1, igw_2, subnet_1, subnet_2,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2)
-        fake_server_class = collections.namedtuple('FakeServer', ['status'])
-        self.nova.servers.get.return_value = fake_server_class('DOWN')
+        self.nova.servers.get.return_value = (
+            mock.NonCallableMock(status='DOWN'))
         resp = self.execute('DescribeRouteTables', {})
         self.assertEqual(200, resp['http_status_code'])
         ec2_route_table_1 = copy.deepcopy(fakes.EC2_ROUTE_TABLE_1)
