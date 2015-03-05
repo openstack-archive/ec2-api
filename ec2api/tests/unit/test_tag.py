@@ -34,9 +34,7 @@ class TagTestCase(base.ApiTestCase):
                              'Tag.1.Value': '',
                              'Tag.2.Key': 'admin',
                              'Tag.2.Value': 'John Smith'})
-        self.assertEqual({'http_status_code': 200,
-                          'return': True},
-                         resp)
+        self.assertEqual({'return': True}, resp)
         self.assertEqual(1, self.db_api.add_tags.call_count)
         self.assertEqual(2, len(self.db_api.add_tags.call_args))
         self.assertThat(self.db_api.add_tags.call_args[0][1],
@@ -67,9 +65,7 @@ class TagTestCase(base.ApiTestCase):
         params.update({'Tag.1.Key': 'tag',
                        'Tag.1.Value': 'value'})
         resp = self.execute('CreateTags', params)
-        self.assertEqual({'http_status_code': 200,
-                          'return': True},
-                         resp)
+        self.assertEqual({'return': True}, resp)
 
         # NOTE(ft): check create a tag for non-existing images
         self.db_api.get_item_by_id.return_value = None
@@ -79,61 +75,49 @@ class TagTestCase(base.ApiTestCase):
                              'ResourceId.3': fakes.ID_EC2_IMAGE_ARI_1,
                              'Tag.1.Key': 'Oracle RAC node',
                              'Tag.1.Value': ''})
-        self.assertEqual({'http_status_code': 200,
-                          'return': True},
-                         resp)
+        self.assertEqual({'return': True}, resp)
 
     def test_create_tags_invalid_parameters(self):
         # NOTE(ft): check tag validity checks
-        resp = self.execute('CreateTags',
-                            {'ResourceId.1': fakes.ID_EC2_VPC_1,
-                             'Tag.1.Value': ''})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'CreateTags',
+                                    {'ResourceId.1': fakes.ID_EC2_VPC_1,
+                                     'Tag.1.Value': ''})
 
-        resp = self.execute('CreateTags',
-                            {'ResourceId.1': fakes.ID_EC2_VPC_1,
-                             'Tag.1.Key': ''})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'CreateTags',
+                                    {'ResourceId.1': fakes.ID_EC2_VPC_1,
+                                     'Tag.1.Key': ''})
 
-        resp = self.execute('CreateTags',
-                            {'ResourceId.1': fakes.ID_EC2_VPC_1,
-                             'Tag.1.Key': 'a' * 128})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'CreateTags',
+                                    {'ResourceId.1': fakes.ID_EC2_VPC_1,
+                                     'Tag.1.Key': 'a' * 128})
 
-        resp = self.execute('CreateTags',
-                            {'ResourceId.1': fakes.ID_EC2_VPC_1,
-                             'Tag.1.Key': 'fake-key',
-                             'Tag.1.Value': 'a' * 256})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'CreateTags',
+                                    {'ResourceId.1': fakes.ID_EC2_VPC_1,
+                                     'Tag.1.Key': 'fake-key',
+                                     'Tag.1.Value': 'a' * 256})
 
         # NOTE(ft): check resource type check
-        resp = self.execute('CreateTags',
-                            {'ResourceId.1': fakes.random_ec2_id('fake'),
-                             'Tag.1.Key': 'fake-key',
-                             'Tag.1.Value': 'fake-value'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidID', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidID', 'CreateTags',
+            {'ResourceId.1': fakes.random_ec2_id('fake'),
+             'Tag.1.Key': 'fake-key',
+             'Tag.1.Value': 'fake-value'})
 
         # NOTE(ft): check resource existence check
         self.db_api.get_item_by_id.return_value = None
         for r_id in tag_api.RESOURCE_TYPES:
             if r_id in ('ami', 'ari', 'aki'):
                 continue
-            resp = self.execute('CreateTags',
-                                {'ResourceId.1': fakes.random_ec2_id(r_id),
-                                 'Tag.1.Key': 'fake-key',
-                                 'Tag.1.Value': 'fake-value'})
-            self.assertEqual(400, resp['http_status_code'])
             exc_class = ec2utils.NOT_FOUND_EXCEPTION_MAP[r_id]
             try:
                 error_code = exc_class.ec2_code
             except AttributeError:
                 error_code = exc_class.__name__
-            self.assertEqual(error_code, resp['Error']['Code'])
+            self.assert_execution_error(
+                error_code, 'CreateTags',
+                {'ResourceId.1': fakes.random_ec2_id(r_id),
+                 'Tag.1.Key': 'fake-key',
+                 'Tag.1.Value': 'fake-value'})
 
     def test_delete_tag(self):
         resp = self.execute('DeleteTags',
@@ -143,9 +127,7 @@ class TagTestCase(base.ApiTestCase):
                              'Tag.2.Value': 'value2',
                              'Tag.3.Key': 'key3',
                              'Tag.3.Value': 'value3'})
-        self.assertEqual({'http_status_code': 200,
-                          'return': True},
-                         resp)
+        self.assertEqual({'return': True}, resp)
         self.db_api.delete_tags.assert_called_once_with(
             mock.ANY, [fakes.ID_EC2_VPC_1, fakes.ID_EC2_SUBNET_1],
             [{'key': 'key1'},
@@ -155,9 +137,7 @@ class TagTestCase(base.ApiTestCase):
 
         resp = self.execute('DeleteTags',
                             {'ResourceId.1': fakes.ID_EC2_VPC_1})
-        self.assertEqual({'http_status_code': 200,
-                          'return': True},
-                         resp)
+        self.assertEqual({'return': True}, resp)
         self.db_api.delete_tags.assert_called_with(
             mock.ANY, [fakes.ID_EC2_VPC_1], None)
 
@@ -173,8 +153,6 @@ class TagTestCase(base.ApiTestCase):
                                               'value': 'value3'}
                                              ]
         resp = self.execute('DescribeTags', {})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp,
                         matchers.DictMatches(
                             {'tagSet': [{'resourceType': 'vpc',
@@ -219,8 +197,7 @@ class TagTestCase(base.ApiTestCase):
                                                   'key': 'fake-key',
                                                   'value': 'fake-value'}]
             resp = self.execute('DescribeTags', {})
-            self.assertEqual({'http_status_code': 200,
-                              'tagSet': [{'resourceType': r_type,
+            self.assertEqual({'tagSet': [{'resourceType': r_type,
                                           'resourceId': item_id,
                                           'key': 'fake-key',
                                           'value': 'fake-value'}]},

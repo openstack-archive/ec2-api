@@ -115,8 +115,7 @@ class ImageTestCase(base.ApiTestCase):
                             {'InstanceId': fakes.ID_EC2_INSTANCE_2,
                              'Name': 'fake_name',
                              'NoReboot': str(no_reboot)})
-        self.assertEqual({'http_status_code': 200,
-                          'imageId': image_id},
+        self.assertEqual({'imageId': image_id},
                          resp)
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_INSTANCE_2)
@@ -142,11 +141,9 @@ class ImageTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_INSTANCE_1)
         is_ebs_instance.return_value = False
 
-        resp = self.execute('CreateImage',
-                            {'InstanceId': fakes.ID_EC2_INSTANCE_1,
-                             'Name': 'fake_name'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'CreateImage',
+                                    {'InstanceId': fakes.ID_EC2_INSTANCE_1,
+                                     'Name': 'fake_name'})
 
     @mock.patch('ec2api.api.image._s3_create')
     def test_register_image_by_s3(self, s3_create):
@@ -158,8 +155,7 @@ class ImageTestCase(base.ApiTestCase):
             'RegisterImage',
             {'ImageLocation': fakes.LOCATION_IMAGE_1})
         self.assertThat(resp, matchers.DictMatches(
-            {'http_status_code': 200,
-             'imageId': fakes.ID_EC2_IMAGE_1}))
+            {'imageId': fakes.ID_EC2_IMAGE_1}))
 
         s3_create.assert_called_once_with(
             mock.ANY,
@@ -172,8 +168,7 @@ class ImageTestCase(base.ApiTestCase):
             {'ImageLocation': fakes.LOCATION_IMAGE_1,
              'Name': 'an image name'})
         self.assertThat(resp, matchers.DictMatches(
-            {'http_status_code': 200,
-             'imageId': fakes.ID_EC2_IMAGE_1}))
+            {'imageId': fakes.ID_EC2_IMAGE_1}))
 
         s3_create.assert_called_once_with(
             mock.ANY,
@@ -200,8 +195,7 @@ class ImageTestCase(base.ApiTestCase):
              'BlockDeviceMapping.1.DeviceName': fakes.ROOT_DEVICE_NAME_IMAGE_2,
              'BlockDeviceMapping.1.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1})
         self.assertThat(resp, matchers.DictMatches(
-            {'http_status_code': 200,
-             'imageId': fakes.ID_EC2_IMAGE_2}))
+            {'imageId': fakes.ID_EC2_IMAGE_2}))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': fakes.ID_OS_IMAGE_2,
                               'is_public': False})
@@ -231,17 +225,15 @@ class ImageTestCase(base.ApiTestCase):
              mock.call(mock.ANY, fakes.ID_EC2_IMAGE_ARI_1)])
 
     def test_register_image_invalid_parameters(self):
-        resp = self.execute('RegisterImage', {})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterCombination', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidParameterCombination', 'RegisterImage', {})
 
     def test_deregister_image(self):
         self._setup_model()
 
         resp = self.execute('DeregisterImage',
                             {'ImageId': fakes.ID_EC2_IMAGE_1})
-        self.assertThat(resp, matchers.DictMatches({'http_status_code': 200,
-                                                    'return': True}))
+        self.assertThat(resp, matchers.DictMatches({'return': True}))
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_IMAGE_1)
         self.glance.images.delete.assert_called_once_with(
@@ -250,17 +242,13 @@ class ImageTestCase(base.ApiTestCase):
     def test_deregister_image_invalid_parameters(self):
         self._setup_model()
 
-        resp = self.execute('DeregisterImage',
-                            {'ImageId': fakes.random_ec2_id('ami')})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidAMIID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error('InvalidAMIID.NotFound', 'DeregisterImage',
+                                    {'ImageId': fakes.random_ec2_id('ami')})
 
     def test_describe_images(self):
         self._setup_model()
 
         resp = self.execute('DescribeImages', {})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'imagesSet': [fakes.EC2_IMAGE_1, fakes.EC2_IMAGE_2]},
             orderless_lists=True))
@@ -274,8 +262,6 @@ class ImageTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeImages',
                             {'ImageId.1': fakes.ID_EC2_IMAGE_1})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'imagesSet': [fakes.EC2_IMAGE_1]},
             orderless_lists=True))
@@ -304,17 +290,13 @@ class ImageTestCase(base.ApiTestCase):
     def test_describe_images_invalid_parameters(self):
         self._setup_model()
 
-        resp = self.execute('DescribeImages',
-                            {'ImageId.1': fakes.random_ec2_id('ami')})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidAMIID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error('InvalidAMIID.NotFound', 'DescribeImages',
+                                    {'ImageId.1': fakes.random_ec2_id('ami')})
 
         self.glance.images.list.side_effect = lambda: []
 
-        resp = self.execute('DescribeImages',
-                            {'ImageId.1': fakes.ID_EC2_IMAGE_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidAMIID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error('InvalidAMIID.NotFound', 'DescribeImages',
+                                    {'ImageId.1': fakes.ID_EC2_IMAGE_1})
 
     def test_describe_image_attributes(self):
         self._setup_model()
@@ -323,7 +305,6 @@ class ImageTestCase(base.ApiTestCase):
             resp = self.execute('DescribeImageAttribute',
                                 {'ImageId': ec2_image_id,
                                  'Attribute': attr})
-            response['http_status_code'] = 200
             response['imageId'] = ec2_image_id
             self.assertThat(resp, matchers.DictMatches(response,
                                                        orderless_lists=True))
@@ -367,8 +348,7 @@ class ImageTestCase(base.ApiTestCase):
                              'attribute': 'launchPermission',
                              'operationType': 'add',
                              'userGroup.1': 'all'})
-        self.assertThat(resp, matchers.DictMatches({'http_status_code': 200,
-                                                    'return': True}))
+        self.assertThat(resp, matchers.DictMatches({'return': True}))
         osimage_update.assert_called_once_with(
                 mock.ANY, is_public=True)
         self.assertEqual(fakes.ID_OS_IMAGE_1,
