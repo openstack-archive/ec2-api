@@ -69,15 +69,9 @@ class InstanceTestCase(base.ApiTestCase):
         """Run instance with various network interface settings."""
         instance_api.instance_engine = (
             instance_api.InstanceEngineNeutron())
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
-                 fakes.ID_EC2_NETWORK_INTERFACE_1:
-                    copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1),
-                 fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1}))
-        self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_ids(
-                [fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1]))
+        self.set_mock_db_items(
+            fakes.DB_SUBNET_1, fakes.DB_NETWORK_INTERFACE_1, fakes.DB_IMAGE_1,
+            fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1)
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         self.network_interface_api.create_network_interface.return_value = (
             {'networkInterface': fakes.EC2_NETWORK_INTERFACE_1})
@@ -237,14 +231,9 @@ class InstanceTestCase(base.ApiTestCase):
         ec2_reservation = fakes.gen_ec2_reservation(fakes.ID_EC2_RESERVATION_1,
                                                     ec2_instances)
 
-        fakes_db_items = dict((eni['id'], eni)
-                              for eni in self.DB_DETACHED_ENIS)
-        fakes_db_items.update({
-            fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
-            fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
-            fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2})
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(fakes_db_items))
+        self.set_mock_db_items(
+            fakes.DB_IMAGE_1, fakes.DB_SUBNET_1, fakes.DB_SUBNET_2,
+            *self.DB_DETACHED_ENIS)
         self.network_interface_api.create_network_interface.side_effect = (
             [{'networkInterface': eni}
              for eni in self.EC2_DETACHED_ENIS])
@@ -310,11 +299,8 @@ class InstanceTestCase(base.ApiTestCase):
     def test_run_instances_other_parameters(self, get_ec2_classic_os_network,
                                             format_reservation,
                                             parse_block_device_mapping):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
-                fakes.ID_EC2_IMAGE_AKI_1: fakes.DB_IMAGE_AKI_1,
-                fakes.ID_EC2_IMAGE_ARI_1: fakes.DB_IMAGE_ARI_1}))
+        self.set_mock_db_items(
+            fakes.DB_IMAGE_1, fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
         self.glance.images.get.side_effect = (
             fakes.get_by_1st_arg_getter({
                 fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
@@ -394,7 +380,7 @@ class InstanceTestCase(base.ApiTestCase):
         format_reservation.return_value = {'key': 'value'}
 
         # NOTE(ft): check select corresponding instance by client_token
-        self.db_api.get_items.return_value = [instances[0], instances[1]]
+        self.set_mock_db_items(instances[0], instances[1])
         get_os_instances_by_instances.return_value = [os_instances[1]]
         self.novadb.instance_get_by_uuid.return_value = 'novadb_instance'
         get_ec2_network_interfaces.return_value = 'ec2_network_interfaces'
@@ -448,7 +434,7 @@ class InstanceTestCase(base.ApiTestCase):
         for inst in instances:
             inst['reservation_id'] = instances[0]['reservation_id']
             inst['client_token'] = 'client-token'
-        self.db_api.get_items.return_value = instances
+        self.set_mock_db_items(*instances)
         get_os_instances_by_instances.return_value = [os_instances[0],
                                                       os_instances[2]]
         self.novadb.instance_get_by_uuid.side_effect = ['novadb-instance-0',
@@ -479,14 +465,8 @@ class InstanceTestCase(base.ApiTestCase):
     def test_run_instances_rollback(self):
         instance_api.instance_engine = (
             instance_api.InstanceEngineNeutron())
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_IMAGE_1: fakes.DB_IMAGE_1,
-                 fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
-                 fakes.ID_EC2_NETWORK_INTERFACE_1: (
-                        fakes.DB_NETWORK_INTERFACE_1)}))
-        self.db_api.get_item_ids.return_value = [
-                (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
+        self.set_mock_db_items(fakes.DB_IMAGE_1, fakes.DB_SUBNET_1,
+                               fakes.DB_NETWORK_INTERFACE_1)
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
 
         self.network_interface_api.create_network_interface.return_value = (
@@ -565,14 +545,8 @@ class InstanceTestCase(base.ApiTestCase):
                                'os_id': fakes.random_os_id()}
                               for dummy in range(3)]
 
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(
-                dict((item['id'], item)
-                     for item in itertools.chain([fakes.DB_IMAGE_1,
-                                                  fakes.DB_SUBNET_1],
-                                                 network_interfaces))))
-        self.db_api.get_item_ids.return_value = [
-                (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
+        self.set_mock_db_items(fakes.DB_IMAGE_1, fakes.DB_SUBNET_1,
+                               *network_interfaces)
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
 
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
@@ -657,14 +631,12 @@ class InstanceTestCase(base.ApiTestCase):
         """Terminate 2 instances in one request."""
         instance_api.instance_engine = (
             instance_api.InstanceEngineNeutron())
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1,
-                                                     fakes.DB_INSTANCE_2]
+        self.set_mock_db_items(
+            fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
+            fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2)
         self.nova_servers.get.side_effect = [fakes.OS_INSTANCE_1,
                                              fakes.OS_INSTANCE_2]
-        self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
-            {'eni': [fakes.DB_NETWORK_INTERFACE_1,
-                     fakes.DB_NETWORK_INTERFACE_2],
-             'eipalloc': [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2]})
 
         resp = self.execute('TerminateInstances',
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
@@ -718,14 +690,12 @@ class InstanceTestCase(base.ApiTestCase):
                                       fake_state_change),
                     tools.update_dict({'instanceId': fakes.ID_EC2_INSTANCE_2},
                                       fake_state_change)]}
-        self.db_api.get_items_by_ids.return_value = self.DB_INSTANCES
         self.nova_servers.get.side_effect = (
             lambda ec2_id: fakes.OSInstance(ec2_id, vm_state='active'))
 
         def do_check(mock_eni_list=[], detached_enis=[], deleted_enis=[]):
-            self.db_api.get_items.side_effect = fakes.get_db_api_get_items({
-                'eni': copy.deepcopy(mock_eni_list) + [self.DB_FAKE_ENI],
-                'eipalloc': []})
+            self.set_mock_db_items(self.DB_FAKE_ENI,
+                                   *(self.DB_INSTANCES + mock_eni_list))
 
             resp = self.execute('TerminateInstances',
                                 {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
@@ -784,8 +754,7 @@ class InstanceTestCase(base.ApiTestCase):
         for inst in (os_instance_1, os_instance_2):
             setattr(inst, 'OS-EXT-STS:vm_state', valid_state)
 
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_1,
-                                                     fakes.DB_INSTANCE_2]
+        self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2)
         get_os_instances_by_instances.return_value = [os_instance_1,
                                                       os_instance_2]
 
@@ -831,7 +800,7 @@ class InstanceTestCase(base.ApiTestCase):
 
     @mock.patch('oslo_utils.timeutils.utcnow')
     def _test_instance_get_operation(self, operation, getter, key, utcnow):
-        self.db_api.get_item_by_id.return_value = fakes.DB_INSTANCE_2
+        self.set_mock_db_items(fakes.DB_INSTANCE_2)
         self.nova_servers.get.return_value = fakes.OS_INSTANCE_2
         getter.return_value = 'fake_data'
         utcnow.return_value = datetime.datetime(2015, 1, 19, 23, 34, 45, 123)
@@ -861,25 +830,20 @@ class InstanceTestCase(base.ApiTestCase):
         """Describe 2 instances, one of which is vpc instance."""
         instance_api.instance_engine = (
             instance_api.InstanceEngineNeutron())
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items(
-                {'eni': [fakes.DB_NETWORK_INTERFACE_1,
-                         fakes.DB_NETWORK_INTERFACE_2],
-                 'i': [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2],
-                 'ami': [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2],
-                 'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2,
-                         fakes.DB_VOLUME_3]}))
-        self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_ids(
-                [fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1]))
+        self.set_mock_db_items(
+            fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
+            fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
+            fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
+            fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
         self.nova_servers.list.return_value = [fakes.OS_INSTANCE_1,
                                                fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.side_effect = (
-            fakes.get_db_api_get_items({
+            fakes.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2}))
         self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            fakes.get_db_api_get_items({
+            fakes.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
         self.network_interface_api.describe_network_interfaces.side_effect = (
@@ -957,12 +921,9 @@ class InstanceTestCase(base.ApiTestCase):
     def test_describe_instances_ec2_classic(self):
         instance_api.instance_engine = (
             instance_api.InstanceEngineNova())
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items(
-                {'i': [fakes.DB_INSTANCE_2],
-                 'ami': [fakes.DB_IMAGE_1, fakes.DB_IMAGE_2],
-                 'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2,
-                         fakes.DB_VOLUME_3]}))
+        self.set_mock_db_items(
+            fakes.DB_INSTANCE_2, fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
+            fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
         self.nova_servers.list.return_value = [fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.return_value = (
             fakes.NOVADB_INSTANCE_2)
@@ -983,13 +944,9 @@ class InstanceTestCase(base.ApiTestCase):
             instance_api.InstanceEngineNeutron())
         self._build_multiple_data_model()
 
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items(
-                {'i': self.DB_INSTANCES,
-                 'ami': [],
-                 'vol': []}))
+        self.set_mock_db_items(*self.DB_INSTANCES)
         self.novadb.instance_get_by_uuid.side_effect = (
-            fakes.get_db_api_get_items(
+            fakes.get_by_2nd_arg_getter(
                 dict((os_id, novadb_instance)
                      for os_id, novadb_instance in zip(
                         self.IDS_OS_INSTANCE,
@@ -1059,11 +1016,8 @@ class InstanceTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.instance._remove_instances')
     def test_describe_instances_auto_remove(self, remove_instances):
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items(
-                {'i': [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2],
-                 'ami': [],
-                 'vol': [fakes.DB_VOLUME_2]}))
+        self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+                               fakes.DB_VOLUME_2)
         self.nova_servers.list.return_value = [fakes.OS_INSTANCE_2]
         self.novadb.instance_get_by_uuid.return_value = (
             fakes.NOVADB_INSTANCE_2)
@@ -1090,11 +1044,7 @@ class InstanceTestCase(base.ApiTestCase):
              'reservation_id': fakes.ID_EC2_RESERVATION_1}
             for i in range(5)]
         random.shuffle(db_instances)
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items(
-                {'i': db_instances,
-                 'ami': [],
-                 'vol': []}))
+        self.set_mock_db_items(*db_instances)
         os_instances = [
             fakes.OSInstance(inst['os_id'])
             for inst in db_instances]
@@ -1117,7 +1067,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidInstanceID.NotFound', resp['Error']['Code'])
 
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_INSTANCE_2]
+        self.set_mock_db_items(fakes.DB_INSTANCE_2)
         resp = self.execute('DescribeInstances',
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_2,
                              'InstanceId.2': fakes.random_ec2_id('i')})
@@ -1125,28 +1075,23 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertEqual('InvalidInstanceID.NotFound', resp['Error']['Code'])
 
     def test_describe_instance_attributes(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1,
-                fakes.ID_EC2_INSTANCE_2: fakes.DB_INSTANCE_2}))
-        self.db_api.get_item_ids.side_effect = (
-            fakes.get_db_api_get_item_ids(
-                [fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1]))
+        self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+                               fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
+                               fakes.DB_VOLUME_2)
         self.nova_servers.get.side_effect = (
             fakes.get_by_1st_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.OS_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.OS_INSTANCE_2}))
         self.novadb.instance_get_by_uuid.side_effect = (
-            fakes.get_db_api_get_items({
+            fakes.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2}))
         self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            fakes.get_db_api_get_items({
+            fakes.get_by_2nd_arg_getter({
                 fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
                 fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
-        self.cinder.volumes.get.return_value = fakes.CinderVolume(
-                                                            fakes.OS_VOLUME_2)
-        self.db_api.get_items.return_value = [fakes.DB_VOLUME_2]
+        self.cinder.volumes.get.return_value = (
+            fakes.CinderVolume(fakes.OS_VOLUME_2))
 
         def do_check(instance_id, attribute, expected):
             resp = self.execute('DescribeInstanceAttribute',
@@ -1477,13 +1422,11 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     def test_parse_network_interface_parameters(self, db_api):
         engine = instance_api.InstanceEngineNeutron()
         context = mock.Mock()
-        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id({
-            fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
-            fakes.ID_EC2_SUBNET_2: tools.update_dict(
-                                         fakes.DB_SUBNET_2,
-                                         {'vpc_id': fakes.ID_EC2_VPC_2}),
-            fakes.ID_EC2_NETWORK_INTERFACE_1: fakes.DB_NETWORK_INTERFACE_1,
-            fakes.ID_EC2_NETWORK_INTERFACE_2: fakes.DB_NETWORK_INTERFACE_2})
+        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id(
+            fakes.DB_SUBNET_1,
+            tools.update_dict(fakes.DB_SUBNET_2,
+                              {'vpc_id': fakes.ID_EC2_VPC_2}),
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2)
 
         resp = engine.parse_network_interface_parameters(
             context,
@@ -1602,12 +1545,9 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
         os_image = fakes.OSImage(fakes.OS_IMAGE_1)
 
-        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id({
-            fakes.ID_EC2_VOLUME_1: fakes.DB_VOLUME_1,
-            fakes.ID_EC2_VOLUME_2: fakes.DB_VOLUME_2,
-            fakes.ID_EC2_VOLUME_3: fakes.DB_VOLUME_3,
-            fakes.ID_EC2_SNAPSHOT_1: fakes.DB_SNAPSHOT_1,
-            fakes.ID_EC2_SNAPSHOT_2: fakes.DB_SNAPSHOT_2})
+        db_api.get_item_by_id.side_effect = fakes.get_db_api_get_item_by_id(
+            fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3,
+            fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2)
 
         res = instance_api._parse_block_device_mapping(
             fake_context, [], os_image)
@@ -1691,7 +1631,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         id_os_instance_1 = fakes.random_os_id()
         id_os_instance_2 = fakes.random_os_id()
         novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            fakes.get_db_api_get_items({
+            fakes.get_by_2nd_arg_getter({
                 id_os_instance_1: [{'device_name': '/dev/sdb1',
                                     'delete_on_termination': False,
                                     'snapshot_id': '1',
@@ -1907,9 +1847,8 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                         network_interfaces[3]]
         addresses_to_dissassociate = [addresses[0]]
 
-        db_api.get_items.side_effect = fakes.get_db_api_get_items({
-            'eni': network_interfaces,
-            'eipalloc': addresses})
+        db_api.get_items.side_effect = fakes.get_db_api_get_items(
+            *(network_interfaces + addresses))
 
         def check_calls():
             for eni in network_interfaces_to_detach:

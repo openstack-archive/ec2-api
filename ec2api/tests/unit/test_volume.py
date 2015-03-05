@@ -28,11 +28,9 @@ class VolumeTestCase(base.ApiTestCase):
             fakes.CinderVolume(fakes.OS_VOLUME_2),
             fakes.CinderVolume(fakes.OS_VOLUME_3)]
 
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2],
-                'i': [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2],
-                'snap': [fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2]}))
+        self.set_mock_db_items(fakes.DB_VOLUME_1, fakes.DB_VOLUME_2,
+                               fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+                               fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2)
         self.db_api.add_item.side_effect = (
             fakes.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
 
@@ -74,11 +72,7 @@ class VolumeTestCase(base.ApiTestCase):
 
     def test_describe_volumes_auto_remove(self):
         self.cinder.volumes.list.return_value = []
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'vol': [fakes.DB_VOLUME_1, fakes.DB_VOLUME_2],
-                'i': [],
-                'snap': []}))
+        self.set_mock_db_items(fakes.DB_VOLUME_1, fakes.DB_VOLUME_2)
         resp = self.execute('DescribeVolumes', {})
         self.assertEqual(200, resp['http_status_code'])
         resp.pop('http_status_code')
@@ -133,9 +127,7 @@ class VolumeTestCase(base.ApiTestCase):
             fakes.CinderVolume(fakes.OS_VOLUME_3))
         self.db_api.add_item.side_effect = (
             fakes.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_SNAPSHOT_1: fakes.DB_SNAPSHOT_1}))
+        self.set_mock_db_items(fakes.DB_SNAPSHOT_1)
 
         resp = self.execute(
             'CreateVolume',
@@ -154,7 +146,7 @@ class VolumeTestCase(base.ApiTestCase):
             availability_zone=fakes.NAME_AVAILABILITY_ZONE)
 
     def test_delete_volume(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_VOLUME_1
+        self.set_mock_db_items(fakes.DB_VOLUME_1)
         resp = self.execute('DeleteVolume',
                             {'VolumeId': fakes.ID_EC2_VOLUME_1})
         self.assertEqual(200, resp['http_status_code'])
@@ -167,7 +159,7 @@ class VolumeTestCase(base.ApiTestCase):
     def test_format_volume_maps_status(self):
         fake_volume = fakes.CinderVolume(fakes.OS_VOLUME_1)
         self.cinder.volumes.list.return_value = [fake_volume]
-        self.db_api.get_items.return_value = [fakes.DB_VOLUME_1]
+        self.set_mock_db_items(fakes.DB_VOLUME_1)
 
         fake_volume.status = 'creating'
         resp = self.execute('DescribeVolumes', {})
@@ -190,10 +182,7 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertEqual('banana', resp['volumeSet'][0]['status'])
 
     def test_attach_volume(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_INSTANCE_2: fakes.DB_INSTANCE_2,
-                fakes.ID_EC2_VOLUME_3: fakes.DB_VOLUME_3}))
+        self.set_mock_db_items(fakes.DB_INSTANCE_2, fakes.DB_VOLUME_3)
         os_volume = fakes.CinderVolume(fakes.OS_VOLUME_3)
         os_volume.attachments.append({'device': '/dev/vdf',
                                       'server_id': fakes.ID_OS_INSTANCE_2})
@@ -215,12 +204,8 @@ class VolumeTestCase(base.ApiTestCase):
 
     @mock.patch.object(fakes.CinderVolume, 'get', autospec=True)
     def test_detach_volume(self, os_volume_get):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_INSTANCE_2: fakes.DB_INSTANCE_2,
-                fakes.ID_EC2_VOLUME_2: fakes.DB_VOLUME_2}))
-        self.db_api.get_items.return_value = [fakes.DB_INSTANCE_1,
-                                              fakes.DB_INSTANCE_2]
+        self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+                               fakes.DB_VOLUME_2)
         os_volume = fakes.CinderVolume(fakes.OS_VOLUME_2)
         self.cinder.volumes.get.return_value = os_volume
         os_volume_get.side_effect = (
@@ -239,7 +224,7 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.get.assert_called_once_with(fakes.ID_OS_VOLUME_2)
 
     def test_detach_volume_invalid_parameters(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_VOLUME_1
+        self.set_mock_db_items(fakes.DB_VOLUME_1)
         self.cinder.volumes.get.return_value = (
             fakes.CinderVolume(fakes.OS_VOLUME_1))
 

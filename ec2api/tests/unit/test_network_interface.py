@@ -28,7 +28,7 @@ from ec2api.tests.unit import tools
 class NetworkInterfaceTestCase(base.ApiTestCase):
 
     def test_create_network_interface(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_SUBNET_1
+        self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_VPC_1)
         self.db_api.add_item.return_value = fakes.DB_NETWORK_INTERFACE_1
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
         self.neutron.create_port.return_value = {'port': fakes.OS_PORT_1}
@@ -98,7 +98,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         check_response(resp, True)
 
     def test_create_network_interface_multiple_ips(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_SUBNET_2
+        self.set_mock_db_items(fakes.DB_SUBNET_2, fakes.DB_VPC_1)
         self.db_api.add_item.return_value = fakes.DB_NETWORK_INTERFACE_2
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_2}
         self.neutron.create_port.return_value = {'port': fakes.OS_PORT_2}
@@ -212,7 +212,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         resp = self.execute(
             'CreateNetworkInterface',
             {'SubnetId': fakes.ID_EC2_SUBNET_2})
@@ -220,7 +220,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             mock.ANY, fakes.ID_EC2_SUBNET_2)
         check_response(resp, 'InvalidSubnetID.NotFound')
 
-        self.db_api.get_item_by_id.return_value = fakes.DB_SUBNET_1
+        self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_VPC_1)
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
         resp = self.execute(
             'CreateNetworkInterface',
@@ -248,14 +248,11 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.dhcp_options._add_dhcp_opts_to_port')
     def test_create_network_interface_rollback(self, _add_dhcp_opts_to_port):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_VPC_1: tools.update_dict(
-                    fakes.DB_VPC_1,
-                    {'dhcp_options_id':
-                     fakes.ID_EC2_DHCP_OPTIONS_1}),
-                fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1,
-                fakes.ID_EC2_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1}))
+        self.set_mock_db_items(
+            tools.update_dict(
+                fakes.DB_VPC_1,
+                {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1}),
+            fakes.DB_SUBNET_1, fakes.DB_DHCP_OPTIONS_1)
         self.db_api.add_item.return_value = fakes.DB_NETWORK_INTERFACE_1
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
         self.neutron.create_port.return_value = {'port': fakes.OS_PORT_1}
@@ -269,8 +266,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_1)
 
     def test_delete_network_interface(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1
-        self.db_api.get_items.return_value = []
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1)
         resp = self.execute(
             'DeleteNetworkInterface',
             {'NetworkInterfaceId':
@@ -287,8 +283,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             fakes.ID_OS_PORT_1)
 
     def test_delete_network_interface_obsolete(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1
-        self.db_api.get_items.return_value = []
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1)
         self.neutron.delete_port.side_effect = (
             neutron_exception.PortNotFoundClient())
         resp = self.execute(
@@ -299,7 +294,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
 
     def test_delete_network_interface_no_network_interface(self):
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         resp = self.execute(
             'DeleteNetworkInterface',
             {'NetworkInterfaceId':
@@ -310,7 +305,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertEqual(0, self.neutron.delete_port.call_count)
 
     def test_delete_network_interface_is_in_use(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_2
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_2)
         resp = self.execute(
             'DeleteNetworkInterface',
             {'NetworkInterfaceId':
@@ -326,19 +321,16 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             fakes.ID_EC2_VPC_1,
             fakes.ID_EC2_SUBNET_2,
             fakes.IP_NETWORK_INTERFACE_2)
-        self.db_api.get_item_by_id.return_value = detached_network_interface_2
-        self.db_api.get_items.return_value = (
-            [fakes.DB_ADDRESS_1,
-             copy.deepcopy(fakes.DB_ADDRESS_2)])
+        self.set_mock_db_items(detached_network_interface_2,
+                               fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2)
         resp = self.execute(
             'DeleteNetworkInterface',
-            {'NetworkInterfaceId':
-             fakes.ID_EC2_NETWORK_INTERFACE_1})
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_any_call(
             mock.ANY,
-            fakes.ID_EC2_NETWORK_INTERFACE_1)
+            fakes.ID_EC2_NETWORK_INTERFACE_2)
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY,
             fakes.ID_EC2_NETWORK_INTERFACE_2)
@@ -351,8 +343,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                               'private_ip_address']))
 
     def test_delete_network_interface_rollback(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1
-        self.db_api.get_items.return_value = []
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1)
         self.neutron.delete_port.side_effect = Exception()
 
         self.execute('DeleteNetworkInterface',
@@ -362,12 +353,10 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             mock.ANY, 'eni', fakes.DB_NETWORK_INTERFACE_1)
 
     def test_describe_network_interfaces(self):
-        self.db_api.get_items.side_effect = (
-            fakes.get_db_api_get_items({
-                'eni': [fakes.DB_NETWORK_INTERFACE_1,
-                        fakes.DB_NETWORK_INTERFACE_2],
-                'eipalloc': [fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2],
-                'i': [fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2]}))
+        self.set_mock_db_items(
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
+            fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2,
+            fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2)
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.neutron.list_floatingips.return_value = (
@@ -422,7 +411,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             fakes.ID_EC2_NETWORK_INTERFACE_1, 'networkInterfaceId')
 
     def test_describe_network_interface_attribute(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_1
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1)
 
         resp = self.execute(
             'DescribeNetworkInterfaceAttribute',
@@ -435,8 +424,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                          resp['description'].get('value', None))
 
     def test_modify_network_interface_attribute(self):
-        self.db_api.get_item_by_id.return_value = (
-            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1))
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1)
 
         resp = self.execute(
             'ModifyNetworkInterfaceAttribute',
@@ -467,10 +455,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.assertEqual(200, resp['http_status_code'])
 
     def test_attach_network_interface(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_NETWORK_INTERFACE_1: fakes.DB_NETWORK_INTERFACE_1,
-                fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1}))
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1,
+                               fakes.DB_INSTANCE_1)
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1]})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
@@ -493,7 +479,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
     def test_attach_network_interface_invalid_parameters(self):
         # NOTE(ft): eni is already attached
-        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_2
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_2)
         resp = self.execute(
             'AttachNetworkInterface',
             {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
@@ -504,12 +490,9 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                          resp['Error']['Code'])
 
         # NOTE(ft): device index is in use
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_NETWORK_INTERFACE_1: fakes.DB_NETWORK_INTERFACE_1,
-                fakes.ID_EC2_INSTANCE_1: fakes.DB_INSTANCE_1}))
-        self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
-                                              fakes.DB_NETWORK_INTERFACE_2]
+        self.set_mock_db_items(
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
+            fakes.DB_INSTANCE_1)
         resp = self.execute(
             'AttachNetworkInterface',
             {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
@@ -520,8 +503,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                          resp['Error']['Code'])
 
     def test_attach_network_interface_rollback(self):
-        self.db_api.get_item_by_id.return_value = (
-            copy.deepcopy(fakes.DB_NETWORK_INTERFACE_1))
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1,
+                               fakes.DB_INSTANCE_1)
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
@@ -538,7 +521,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_detach_network_interface(self):
         network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
                                               {'device_index': 1})
-        self.db_api.get_item_by_id.return_value = network_interface
+        self.set_mock_db_items(network_interface)
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         resp = self.execute(
@@ -561,7 +544,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
     def test_detach_network_interface_invalid_parameters(self):
         # NOTE(ft): eni is not found
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         resp = self.execute(
             'DetachNetworkInterface',
             {'AttachmentId': ec2utils.change_ec2_id_kind(
@@ -571,7 +554,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                          resp['Error']['Code'])
 
         # NOTE(ft): eni is attached with device index = 0
-        self.db_api.get_item_by_id.return_value = fakes.DB_NETWORK_INTERFACE_2
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_2)
         resp = self.execute(
             'DetachNetworkInterface',
             {'AttachmentId': ec2utils.change_ec2_id_kind(
@@ -583,7 +566,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_detach_network_interface_rollback(self):
         network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
                                               {'device_index': 1})
-        self.db_api.get_item_by_id.return_value = network_interface
+        self.set_mock_db_items(network_interface)
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_2]})
         self.neutron.update_port.side_effect = Exception()
@@ -596,11 +579,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             mock.ANY, network_interface)
 
     def test_assign_unassign_private_ip_addresses(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_NETWORK_INTERFACE_1: (
-                    fakes.DB_NETWORK_INTERFACE_1),
-                 fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1, fakes.DB_SUBNET_1)
         self.neutron.show_subnet.return_value = (
             {'subnet': fakes.OS_SUBNET_1})
         self.neutron.show_port.return_value = (
@@ -635,11 +614,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                   'ip_address': fakes.IP_NETWORK_INTERFACE_1}]}})
 
     def test_assign_private_ip_addresses_invalid_parameters(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_NETWORK_INTERFACE_1: (
-                    fakes.DB_NETWORK_INTERFACE_1),
-                 fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1, fakes.DB_SUBNET_1)
         self.neutron.show_subnet.return_value = (
             {'subnet': fakes.OS_SUBNET_1})
         self.neutron.show_port.return_value = (
@@ -668,11 +643,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         do_check('InvalidParameterValue')
 
     def test_unassign_private_ip_addresses_invalid_parameters(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id(
-                {fakes.ID_EC2_NETWORK_INTERFACE_2: (
-                    fakes.DB_NETWORK_INTERFACE_2),
-                 fakes.ID_EC2_SUBNET_2: fakes.DB_SUBNET_2}))
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_2, fakes.DB_SUBNET_2)
         self.neutron.show_subnet.return_value = (
             {'subnet': fakes.OS_SUBNET_2})
         self.neutron.show_port.return_value = (

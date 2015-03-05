@@ -70,8 +70,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
 
     def test_delete_dhcp_options(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_DHCP_OPTIONS_1
-        self.db_api.get_items.return_value = []
+        self.set_mock_db_items(fakes.DB_DHCP_OPTIONS_1)
         resp = self.execute('DeleteDhcpOptions',
                             {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
         self.assertEqual(200, resp['http_status_code'])
@@ -87,18 +86,19 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                 fakes.ID_EC2_DHCP_OPTIONS_1)
 
     def test_delete_dhcp_options_with_dependencies(self):
-        self.db_api.get_item_by_id.return_value = fakes.DB_DHCP_OPTIONS_1
-        self.db_api.get_items.return_value = [tools.update_dict(
-                            fakes.DB_VPC_1,
-                            {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1})]
+        self.set_mock_db_items(
+            fakes.DB_DHCP_OPTIONS_1,
+            tools.update_dict(
+                fakes.DB_VPC_1,
+                {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1}))
         resp = self.execute('DeleteDhcpOptions',
                             {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
         self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('DependencyViolation', resp['Error']['Code'])
 
     def test_describe_dhcp_options(self):
-        self.db_api.get_items.return_value = (
-                [fakes.DB_DHCP_OPTIONS_1, fakes.DB_DHCP_OPTIONS_2])
+        self.set_mock_db_items(fakes.DB_DHCP_OPTIONS_1,
+                               fakes.DB_DHCP_OPTIONS_2)
 
         resp = self.execute('DescribeDhcpOptions', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -107,8 +107,6 @@ class DhcpOptionsTestCase(base.ApiTestCase):
                                               fakes.EC2_DHCP_OPTIONS_2],
                                              orderless_lists=True))
 
-        self.db_api.get_items_by_ids.return_value = (
-                [fakes.DB_DHCP_OPTIONS_1])
         resp = self.execute('DescribeDhcpOptions',
                             {'DhcpOptionsId.1': fakes.ID_EC2_DHCP_OPTIONS_1})
         self.assertEqual(200, resp['http_status_code'])
@@ -127,11 +125,8 @@ class DhcpOptionsTestCase(base.ApiTestCase):
             fakes.ID_EC2_DHCP_OPTIONS_1, 'dhcpOptionsId')
 
     def test_associate_dhcp_options(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                    {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                     fakes.ID_EC2_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1}))
-        self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1]
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_DHCP_OPTIONS_1,
+                               fakes.DB_NETWORK_INTERFACE_1)
         self.neutron.list_ports.return_value = (
                 {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
 
@@ -160,13 +155,9 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         vpc = tools.update_dict(
                 fakes.DB_VPC_1,
                 {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1})
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                    {fakes.ID_EC2_VPC_1: vpc,
-                     fakes.ID_EC2_DHCP_OPTIONS_1: fakes.DB_DHCP_OPTIONS_1,
-                     fakes.ID_EC2_DHCP_OPTIONS_2: fakes.DB_DHCP_OPTIONS_2}))
-        self.db_api.get_items.return_value = [fakes.DB_NETWORK_INTERFACE_1,
-                                              fakes.DB_NETWORK_INTERFACE_2]
+        self.set_mock_db_items(
+            vpc, fakes.DB_DHCP_OPTIONS_1, fakes.DB_DHCP_OPTIONS_2,
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2)
         self.neutron.list_ports.return_value = (
                 {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
 

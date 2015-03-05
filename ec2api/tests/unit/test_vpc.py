@@ -32,7 +32,7 @@ class VpcTestCase(base.ApiTestCase):
                 'vpc': fakes.ID_EC2_VPC_1,
                 'rtb': fakes.ID_EC2_ROUTE_TABLE_1,
                 'sg': fakes.ID_EC2_SECURITY_GROUP_1}))
-        self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
+        self.set_mock_db_items(fakes.DB_VPC_1)
         self.neutron.create_security_group.return_value = {
             'security_group': fakes.OS_SECURITY_GROUP_1}
 
@@ -119,10 +119,7 @@ class VpcTestCase(base.ApiTestCase):
                                                 fakes.ID_EC2_ROUTE_TABLE_1)
 
     def test_delete_vpc(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
 
         resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
 
@@ -138,7 +135,7 @@ class VpcTestCase(base.ApiTestCase):
             fakes.ID_EC2_ROUTE_TABLE_1)
 
     def test_delete_vpc_not_found(self):
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
 
         resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
         self.assertEqual(400, resp['http_status_code'])
@@ -158,28 +155,15 @@ class VpcTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
-        self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
-            {'igw': [fakes.DB_IGW_1],
-             'subnet': [],
-             'rtb': [],
-             'vpc': [fakes.DB_VPC_1],
-             'eni': []})
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
         do_check()
 
-        self.db_api.get_items.side_effect = fakes.get_db_api_get_items(
-            {'igw': [],
-             'subnet': [],
-             'rtb': [fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2],
-             'vpc': [fakes.DB_VPC_1],
-             'eni': []})
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
+                               fakes.DB_VPC_1)
         do_check()
 
     def test_delete_vpc_not_conststent_os_vpc(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
 
         def check_response(resp):
             self.assertEqual(200, resp['http_status_code'])
@@ -205,10 +189,7 @@ class VpcTestCase(base.ApiTestCase):
         check_response(resp)
 
     def test_delete_vpc_rollback(self):
-        self.db_api.get_item_by_id.side_effect = (
-            fakes.get_db_api_get_item_by_id({
-                fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.delete_router.side_effect = Exception()
 
         self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
@@ -221,7 +202,7 @@ class VpcTestCase(base.ApiTestCase):
     def test_describe_vpcs(self):
         self.neutron.list_routers.return_value = (
             {'routers': [fakes.OS_ROUTER_1, fakes.OS_ROUTER_2]})
-        self.db_api.get_items.return_value = [fakes.DB_VPC_1, fakes.DB_VPC_2]
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_VPC_2)
 
         resp = self.execute('DescribeVpcs', {})
         self.assertEqual(200, resp['http_status_code'])
@@ -230,7 +211,6 @@ class VpcTestCase(base.ApiTestCase):
                                               fakes.EC2_VPC_2]))
         self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')
 
-        self.db_api.get_items_by_ids.return_value = [fakes.DB_VPC_1]
         resp = self.execute('DescribeVpcs',
                             {'VpcId.1': fakes.ID_EC2_VPC_1})
         self.assertEqual(200, resp['http_status_code'])
@@ -253,7 +233,7 @@ class VpcTestCase(base.ApiTestCase):
 
     def test_describe_vpcs_no_router(self):
         self.neutron.list_routers.return_value = {'routers': []}
-        self.db_api.get_items.return_value = [fakes.DB_VPC_1]
+        self.set_mock_db_items(fakes.DB_VPC_1)
 
         resp = self.execute('DescribeVpcs', {})
 

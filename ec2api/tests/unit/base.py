@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import itertools
 
 import mock
@@ -124,6 +125,23 @@ class ApiTestCase(test_base.BaseTestCase):
             if matchers.ListMatches(call_args, args, orderless_lists=True):
                 return
         self.assertEqual(False, True)
+
+    def set_mock_db_items(self, *items):
+        self._db_items = copy.copy(items)
+        self.db_api.get_items.side_effect = (
+            fakes.get_db_api_get_items(*self._db_items))
+        self.db_api.get_item_by_id.side_effect = (
+            fakes.get_db_api_get_item_by_id(*self._db_items))
+        self.db_api.get_items_by_ids.side_effect = (
+            fakes.get_db_api_get_items_by_ids(*self._db_items))
+        self.db_api.get_item_ids.side_effect = (
+            fakes.get_db_api_get_item_ids(*self._db_items))
+
+    def add_mock_db_items(self, *items):
+        merged_items = items + tuple(item for item in self._db_items
+                                     if all(i['id'] != item['id']
+                                            for i in items))
+        self.set_mock_db_items(*merged_items)
 
     def check_filtering(self, operation, resultset_key, filters):
         for name, value in filters:

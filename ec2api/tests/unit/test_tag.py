@@ -165,12 +165,12 @@ class TagTestCase(base.ApiTestCase):
         self.db_api.get_tags.return_value = [{'item_id': fakes.ID_EC2_VPC_1,
                                               'key': 'key1',
                                               'value': ''},
-                                            {'item_id': fakes.ID_EC2_VPC_2,
-                                             'key': 'key2',
-                                             'value': 'value2'},
-                                            {'item_id': fakes.ID_EC2_VPC_2,
-                                             'key': 'key1',
-                                             'value': 'value3'}
+                                             {'item_id': fakes.ID_EC2_VPC_2,
+                                              'key': 'key2',
+                                              'value': 'value2'},
+                                             {'item_id': fakes.ID_EC2_VPC_2,
+                                              'key': 'key1',
+                                              'value': 'value3'}
                                              ]
         resp = self.execute('DescribeTags', {})
         self.assertEqual(200, resp['http_status_code'])

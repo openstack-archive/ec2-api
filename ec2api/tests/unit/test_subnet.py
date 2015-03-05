@@ -24,10 +24,7 @@ from ec2api.tests.unit import tools
 class SubnetTestCase(base.ApiTestCase):
 
     def test_create_subnet(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id({
-                        fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                        fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.db_api.add_item.side_effect = (
                 fakes.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
         self.neutron.create_network.side_effect = (
@@ -81,14 +78,14 @@ class SubnetTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': fakes.CIDR_SUBNET_1})
         self.db_api.get_item_by_id.assert_called_once_with(mock.ANY,
                                                            fakes.ID_EC2_VPC_1)
         check_response(resp, 'InvalidVpcID.NotFound')
 
-        self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
+        self.set_mock_db_items(fakes.DB_VPC_1)
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': 'invalid_cidr'})
         self.assertEqual(0, self.db_api.get_item_by_id.call_count)
@@ -106,10 +103,7 @@ class SubnetTestCase(base.ApiTestCase):
         check_response(resp, 'InvalidSubnet.Range')
 
     def test_create_subnet_overlapped(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id({
-                        fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                        fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.create_network.side_effect = (
                 fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
@@ -124,10 +118,7 @@ class SubnetTestCase(base.ApiTestCase):
         self.assertEqual('InvalidSubnet.Conflict', resp['Error']['Code'])
 
     def test_create_subnet_overlimit(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id({
-                        fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                        fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.create_network.side_effect = (
                 fakes.get_neutron_create('network', fakes.ID_OS_NETWORK_1,
                                          {'status': 'available'}))
@@ -151,10 +142,7 @@ class SubnetTestCase(base.ApiTestCase):
         test_overlimit(self.neutron.create_subnet)
 
     def test_create_subnet_rollback(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id({
-                        fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                        fakes.ID_EC2_ROUTE_TABLE_1: fakes.DB_ROUTE_TABLE_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.db_api.add_item.side_effect = (
                 fakes.get_db_api_add_item(fakes.ID_EC2_SUBNET_1))
         self.neutron.create_network.side_effect = (
@@ -176,13 +164,9 @@ class SubnetTestCase(base.ApiTestCase):
                 mock.ANY, fakes.ID_EC2_SUBNET_1)
 
     def test_delete_subnet(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                         fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)
         self.neutron.show_subnet.return_value = (
                 {'subnet': fakes.OS_SUBNET_1})
-        self.db_api.get_items.return_value = []
 
         resp = self.execute('DeleteSubnet',
                             {'subnetId': fakes.ID_EC2_SUBNET_1})
@@ -206,11 +190,7 @@ class SubnetTestCase(base.ApiTestCase):
                     {'subnet_id': fakes.ID_OS_SUBNET_1})))
 
     def test_delete_subnet_inconsistent_os(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                         fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
-        self.db_api.get_items.return_value = []
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)
         self.neutron.remove_interface_router.side_effect = (
                 neutron_exception.NotFound())
         self.neutron.show_subnet.return_value = (
@@ -231,7 +211,7 @@ class SubnetTestCase(base.ApiTestCase):
         self.assertEqual(True, resp['return'])
 
     def test_delete_subnet_invalid_parameters(self):
-        self.db_api.get_item_by_id.return_value = None
+        self.set_mock_db_items()
         self.neutron.show_subnet.return_value = fakes.OS_SUBNET_1
         self.neutron.show_network.return_value = fakes.OS_NETWORK_1
 
@@ -246,10 +226,7 @@ class SubnetTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.network_interface.describe_network_interfaces')
     def test_delete_subnet_not_empty(self, describe_network_interfaces):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                         fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)
         describe_network_interfaces.return_value = (
                 {'networkInterfaceSet': [fakes.EC2_NETWORK_INTERFACE_1]})
         resp = self.execute('DeleteSubnet',
@@ -258,10 +235,7 @@ class SubnetTestCase(base.ApiTestCase):
         self.assertEqual('DependencyViolation', resp['Error']['Code'])
 
     def test_delete_subnet_rollback(self):
-        self.db_api.get_item_by_id.side_effect = (
-                fakes.get_db_api_get_item_by_id(
-                        {fakes.ID_EC2_VPC_1: fakes.DB_VPC_1,
-                         fakes.ID_EC2_SUBNET_1: fakes.DB_SUBNET_1}))
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)
         self.neutron.show_subnet.side_effect = Exception()
 
         self.execute('DeleteSubnet', {'subnetId': fakes.ID_EC2_SUBNET_1})
@@ -272,8 +246,7 @@ class SubnetTestCase(base.ApiTestCase):
                 fakes.ID_OS_ROUTER_1, {'subnet_id': fakes.ID_OS_SUBNET_1})
 
     def test_describe_subnets(self):
-        self.db_api.get_items.return_value = (
-                [fakes.DB_SUBNET_1, fakes.DB_SUBNET_2])
+        self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_SUBNET_2)
         self.neutron.list_subnets.return_value = (
                 {'subnets': [fakes.OS_SUBNET_1, fakes.OS_SUBNET_2]})
         self.neutron.list_networks.return_value = (
@@ -312,8 +285,7 @@ class SubnetTestCase(base.ApiTestCase):
             fakes.ID_EC2_SUBNET_2, 'subnetId')
 
     def test_describe_subnets_not_consistent_os_subnet(self):
-        self.db_api.get_items.return_value = (
-                [fakes.DB_SUBNET_1, fakes.DB_SUBNET_2])
+        self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_SUBNET_2)
         self.neutron.list_subnets.return_value = (
                 {'subnets': [fakes.OS_SUBNET_2]})
         self.neutron.list_networks.return_value = (

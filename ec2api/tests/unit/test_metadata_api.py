@@ -38,8 +38,7 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.instance_api = instance_api_patcher.start()
         self.addCleanup(instance_api_patcher.stop)
 
-        self.db_api.get_item_ids.return_value = [
-                (fakes.ID_EC2_INSTANCE_1, fakes.ID_OS_INSTANCE_1)]
+        self.set_mock_db_items(fakes.DB_INSTANCE_1)
         self.instance_api.describe_instances.return_value = {
                'reservationSet': [fakes.EC2_RESERVATION_1]}
         self.instance_api.describe_instance_attribute.return_value = {
