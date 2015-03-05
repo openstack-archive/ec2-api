@@ -31,7 +31,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
             security_group.SecurityGroupEngineNeutron())
         self.set_mock_db_items(fakes.DB_VPC_1)
         self.db_api.add_item.return_value = fakes.DB_SECURITY_GROUP_1
-        self.nova_security_groups.create.return_value = (
+        self.nova.security_groups.create.return_value = (
             fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_1))
 
         resp = self.execute(
@@ -39,9 +39,9 @@ class SecurityGroupTestCase(base.ApiTestCase):
             {'GroupName': 'groupname',
              'GroupDescription': 'Group description'})
         self.assertEqual(200, resp['http_status_code'])
-        self.nova_security_groups.create.assert_called_once_with(
+        self.nova.security_groups.create.assert_called_once_with(
             'groupname', 'Group description')
-        self.nova_security_groups.reset_mock()
+        self.nova.security_groups.reset_mock()
 
         resp = self.execute(
             'CreateSecurityGroup',
@@ -53,7 +53,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'sg',
             tools.purge_dict(fakes.DB_SECURITY_GROUP_1, ('id',)))
-        self.nova_security_groups.create.assert_called_once_with(
+        self.nova.security_groups.create.assert_called_once_with(
             'groupname', 'Group description')
 
     def test_create_security_group_invalid(self):
@@ -127,7 +127,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_create_security_group_over_quota(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.nova_security_groups.create.side_effect = (
+        self.nova.security_groups.create.side_effect = (
             nova_exception.OverLimit(413))
         resp = self.execute(
             'CreateSecurityGroup',
@@ -136,7 +136,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
              'GroupDescription': 'Group description'})
         self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('ResourceLimitExceeded', resp['Error']['Code'])
-        self.nova_security_groups.create.assert_called_once_with(
+        self.nova.security_groups.create.assert_called_once_with(
             'groupname', 'Group description')
 
     def test_create_security_group_rollback(self):
@@ -144,14 +144,14 @@ class SecurityGroupTestCase(base.ApiTestCase):
             security_group.SecurityGroupEngineNova())
         self.set_mock_db_items(fakes.DB_VPC_1)
         self.db_api.add_item.side_effect = Exception()
-        self.nova_security_groups.create.return_value = (
+        self.nova.security_groups.create.return_value = (
             fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_1))
         self.execute(
             'CreateSecurityGroup',
             {'VpcId': fakes.ID_EC2_VPC_1,
              'GroupName': 'groupname',
              'GroupDescription': 'Group description'})
-        self.nova_security_groups.delete.assert_called_once_with(
+        self.nova.security_groups.delete.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_1)
 
     def test_delete_security_group(self):
@@ -176,7 +176,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_delete_security_group_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.nova_security_groups.list.return_value = (
+        self.nova.security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_2)])
         resp = self.execute(
@@ -185,7 +185,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
              fakes.EC2_SECURITY_GROUP_2['groupName']})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
-        self.nova_security_groups.delete.assert_called_once_with(
+        self.nova.security_groups.delete.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_2)
 
     # NOTE(Alex) This test is disabled because it checks using non-AWS id.
@@ -193,7 +193,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_delete_security_group_nova_os_id(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.nova_security_groups.list.return_value = (
+        self.nova.security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_2)])
         resp = self.execute(
@@ -202,7 +202,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
              fakes.ID_OS_SECURITY_GROUP_2})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
-        self.nova_security_groups.delete.assert_called_once_with(
+        self.nova.security_groups.delete.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_2)
 
     def test_delete_security_group_invalid(self):
@@ -297,7 +297,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
         self.set_mock_db_items()
-        self.nova_security_groups.list.return_value = (
+        self.nova.security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
         resp = self.execute('DescribeSecurityGroups', {})
@@ -422,9 +422,9 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_authorize_security_group_ip_ranges_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.nova_security_group_rules.create.return_value = (
+        self.nova.security_group_rules.create.return_value = (
             {'security_group_rule': [fakes.NOVA_SECURITY_GROUP_RULE_1]})
-        self.nova_security_groups.list.return_value = (
+        self.nova.security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
         resp = self.execute(
@@ -435,7 +435,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
              'IpPermissions.1.IpProtocol': 'tcp',
              'IpPermissions.1.IpRanges.1.CidrIp': '192.168.1.0/24'})
         self.assertEqual(200, resp['http_status_code'])
-        self.nova_security_group_rules.create.assert_called_once_with(
+        self.nova.security_group_rules.create.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_2, 'tcp', 10, 10,
             '192.168.1.0/24', None)
 
@@ -463,9 +463,9 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_authorize_security_group_groups_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.nova_security_group_rules.create.return_value = (
+        self.nova.security_group_rules.create.return_value = (
             {'security_group_rule': [fakes.NOVA_SECURITY_GROUP_RULE_2]})
-        self.nova_security_groups.list.return_value = (
+        self.nova.security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
         resp = self.execute(
@@ -475,7 +475,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
              'IpPermissions.1.Groups.1.GroupName':
              fakes.EC2_NOVA_SECURITY_GROUP_1['groupName']})
         self.assertEqual(200, resp['http_status_code'])
-        self.nova_security_group_rules.create.assert_called_once_with(
+        self.nova.security_group_rules.create.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_2, 'icmp', -1, -1,
             None, fakes.ID_OS_SECURITY_GROUP_1)
 
@@ -503,12 +503,12 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_revoke_security_group_ingress_ip_ranges_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.nova_security_groups.list.return_value = (
+        self.nova.security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
-        self.nova_security_groups.get.return_value = (
+        self.nova.security_groups.get.return_value = (
             fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2))
-        self.nova_security_group_rules.delete.return_value = True
+        self.nova.security_group_rules.delete.return_value = True
         resp = self.execute(
             'RevokeSecurityGroupIngress',
             {'GroupName': fakes.EC2_NOVA_SECURITY_GROUP_2['groupName'],
@@ -517,7 +517,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
              'IpPermissions.1.IpProtocol': 'tcp',
              'IpPermissions.1.IpRanges.1.CidrIp': '192.168.1.0/24'})
         self.assertEqual(200, resp['http_status_code'])
-        self.nova_security_group_rules.delete.assert_called_once_with(
+        self.nova.security_group_rules.delete.assert_called_once_with(
             fakes.NOVA_SECURITY_GROUP_RULE_1['id'])
 
     def test_revoke_security_group_egress_groups(self):
@@ -544,12 +544,12 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_revoke_security_group_groups_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.nova_security_groups.list.return_value = (
+        self.nova.security_groups.list.return_value = (
             [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
              fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
-        self.nova_security_groups.get.return_value = (
+        self.nova.security_groups.get.return_value = (
             fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2))
-        self.nova_security_group_rules.delete.return_value = True
+        self.nova.security_group_rules.delete.return_value = True
         resp = self.execute(
             'RevokeSecurityGroupIngress',
             {'GroupName': fakes.EC2_NOVA_SECURITY_GROUP_2['groupName'],
@@ -557,5 +557,5 @@ class SecurityGroupTestCase(base.ApiTestCase):
              'IpPermissions.1.Groups.1.GroupName':
              fakes.EC2_NOVA_SECURITY_GROUP_1['groupName']})
         self.assertEqual(200, resp['http_status_code'])
-        self.nova_security_group_rules.delete.assert_called_once_with(
+        self.nova.security_group_rules.delete.assert_called_once_with(
             fakes.NOVA_SECURITY_GROUP_RULE_2['id'])

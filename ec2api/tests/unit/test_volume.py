@@ -199,7 +199,7 @@ class VolumeTestCase(base.ApiTestCase):
                           'status': 'attaching',
                           'volumeId': fakes.ID_EC2_VOLUME_3},
                          resp)
-        self.nova_volumes.create_server_volume.assert_called_once_with(
+        self.nova.volumes.create_server_volume.assert_called_once_with(
             fakes.ID_OS_INSTANCE_2, fakes.ID_OS_VOLUME_3, '/dev/vdf')
 
     @mock.patch.object(fakes.CinderVolume, 'get', autospec=True)
@@ -219,7 +219,7 @@ class VolumeTestCase(base.ApiTestCase):
                           'status': 'detaching',
                           'volumeId': fakes.ID_EC2_VOLUME_2},
                          resp)
-        self.nova_volumes.delete_server_volume.assert_called_once_with(
+        self.nova.volumes.delete_server_volume.assert_called_once_with(
             fakes.ID_OS_INSTANCE_2, fakes.ID_OS_VOLUME_2)
         self.cinder.volumes.get.assert_called_once_with(fakes.ID_OS_VOLUME_2)
 

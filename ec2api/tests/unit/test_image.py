@@ -106,7 +106,7 @@ class ImageTestCase(base.ApiTestCase):
         os_image = mock.MagicMock()
         os_image.configure_mock(id=fakes.random_os_id())
         os_instance.create_image.return_value = os_image
-        self.nova_servers.get.return_value = os_instance
+        self.nova.servers.get.return_value = os_instance
         is_ebs_instance.return_value = True
         image_id = fakes.random_ec2_id('ami')
         self.db_api.add_item.side_effect = tools.get_db_api_add_item(image_id)
@@ -120,7 +120,7 @@ class ImageTestCase(base.ApiTestCase):
                          resp)
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_INSTANCE_2)
-        self.nova_servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
+        self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
         is_ebs_instance.assert_called_once_with(mock.ANY, os_instance)
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': os_image.id,
@@ -131,7 +131,7 @@ class ImageTestCase(base.ApiTestCase):
             os_instance.start.assert_called_once_with()
             os_instance.create_image.assert_called_once_with('fake_name')
         self.db_api.reset_mock()
-        self.nova_servers.reset_mock()
+        self.nova.servers.reset_mock()
 
     def test_create_image(self):
         self._test_create_image('ACTIVE', False)
