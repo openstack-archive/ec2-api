@@ -113,7 +113,6 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(fakes.EC2_VOLUME_1, matchers.DictMatches(
             tools.purge_dict(resp, {'http_status_code'})))
-        self.cinder.volumes.create.assert_called_once(mock.ANY)
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vol',
             tools.purge_dict(fakes.DB_VOLUME_1, ('id',)))
@@ -136,7 +135,6 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(fakes.EC2_VOLUME_3, matchers.DictMatches(
             tools.purge_dict(resp, {'http_status_code'})))
-        self.cinder.volumes.create.assert_called_once(mock.ANY)
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vol',
             tools.purge_dict(fakes.DB_VOLUME_3, ('id',)))

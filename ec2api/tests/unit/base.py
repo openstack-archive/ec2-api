@@ -15,7 +15,10 @@
 import copy
 import itertools
 
+from cinderclient import client as cinderclient
+from glanceclient import client as glanceclient
 import mock
+from novaclient import client as novaclient
 from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 
@@ -39,20 +42,25 @@ class ApiTestCase(test_base.BaseTestCase):
     def setUp(self):
         super(ApiTestCase, self).setUp()
 
-        neutron_patcher = mock.patch('neutronclient.v2_0.client.Client')
+        neutron_patcher = mock.patch('neutronclient.v2_0.client.Client',
+                                     autospec=True)
         self.neutron = neutron_patcher.start().return_value
         self.addCleanup(neutron_patcher.stop)
 
-        nova_patcher = mock.patch('novaclient.v1_1.client.Client')
-        self.nova = nova_patcher.start().return_value
+        nova_patcher = mock.patch('novaclient.client.Client')
+        self.nova = mock.create_autospec(novaclient.Client('2'))
+        nova_patcher.start().return_value = self.nova
         self.addCleanup(nova_patcher.stop)
 
         glance_patcher = mock.patch('glanceclient.client.Client')
-        self.glance = glance_patcher.start().return_value
+        self.glance = mock.create_autospec(
+            glanceclient.Client(endpoint='/v1'))
+        glance_patcher.start().return_value = self.glance
         self.addCleanup(glance_patcher.stop)
 
-        cinder_patcher = mock.patch('cinderclient.v1.client.Client')
-        self.cinder = cinder_patcher.start().return_value
+        cinder_patcher = mock.patch('cinderclient.client.Client')
+        self.cinder = mock.create_autospec(cinderclient.Client('1'))
+        cinder_patcher.start().return_value = self.cinder
         self.addCleanup(cinder_patcher.stop)
 
         db_api_patcher = mock.patch('ec2api.db.api.IMPL',

@@ -33,11 +33,11 @@ class VpcTestCase(base.ApiTestCase):
                 'rtb': fakes.ID_EC2_ROUTE_TABLE_1,
                 'sg': fakes.ID_EC2_SECURITY_GROUP_1}))
         self.set_mock_db_items(fakes.DB_VPC_1)
-        self.neutron.create_security_group.return_value = {
-            'security_group': fakes.OS_SECURITY_GROUP_1}
+        self.nova.security_groups.create.return_value = (
+            fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1))
 
         def check_response(response):
-            self.assertEqual(response['http_status_code'], 200)
+            self.assertEqual(200, response['http_status_code'])
             self.assertIn('vpc', response)
             vpc = resp['vpc']
             self.assertThat(fakes.EC2_VPC_1, matchers.DictMatches(vpc))
