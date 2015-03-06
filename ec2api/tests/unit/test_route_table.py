@@ -761,7 +761,7 @@ class RouteTableTestCase(base.ApiTestCase):
         routes_getter.assert_any_call(
             mock.ANY, fakes.DB_ROUTE_TABLE_2, fakes.IP_GATEWAY_SUBNET_1,
             None)
-        self.neutron.update_subnet.any_call(
+        self.neutron.update_subnet.assert_any_call(
             fakes.ID_OS_SUBNET_1,
             {'subnet': {'host_routes': 'fake_previous_routes'}})
 

@@ -91,7 +91,7 @@ class KeyPairCase(base.ApiTestCase):
                         matchers.ListMatches([
                             tools.purge_dict(fakes.EC2_KEY_PAIR,
                                              {'keyMaterial'})]))
-        self.nova.keypairs.list.assert_called_once()
+        self.nova.keypairs.list.assert_called_once_with()
 
         self.check_filtering(
             'DescribeKeyPairs', 'keySet',
@@ -104,4 +104,4 @@ class KeyPairCase(base.ApiTestCase):
         resp = self.execute('DescribeKeyPairs', {'KeyName.1': 'badname'})
         self.assertEqual(400, resp['http_status_code'])
         self.assertEqual('InvalidKeyPair.NotFound', resp['Error']['Code'])
-        self.nova.keypairs.list.assert_called_once()
+        self.nova.keypairs.list.assert_called_once_with()

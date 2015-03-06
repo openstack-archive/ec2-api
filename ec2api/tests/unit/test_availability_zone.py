@@ -30,7 +30,8 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['availabilityZoneInfo'],
                         matchers.ListMatches([fakes.EC2_AVAILABILITY_ZONE]))
-        self.nova.availability_zones.list.assert_called_once()
+        self.nova.availability_zones.list.assert_called_once_with(
+            detailed=False)
 
         self.check_filtering(
             'DescribeAvailabilityZones', 'availabilityZoneInfo',
@@ -45,7 +46,7 @@ class AvailabilityZoneCase(base.ApiTestCase):
                             {'zoneName.1': 'verbose'})
         self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(len(resp['availabilityZoneInfo']), 7)
-        self.nova.availability_zones.list.assert_called_once()
+        self.nova.availability_zones.list.assert_called_once_with()
 
     def test_regions(self):
         resp = self.execute('DescribeRegions', {})
