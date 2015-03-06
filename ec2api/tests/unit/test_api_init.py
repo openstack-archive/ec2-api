@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import uuid
 
 from boto import exception as boto_exception
@@ -34,10 +33,6 @@ from ec2api import wsgi
 
 class ApiInitTestCase(test_base.BaseTestCase):
 
-    fake_context_class = collections.namedtuple('FakeRequestContext',
-                                                ['request_id'])
-    setattr(fake_context_class, 'to_dict', fake_context_class._asdict)
-
     def setUp(self):
         super(ApiInitTestCase, self).setUp()
 
@@ -46,7 +41,7 @@ class ApiInitTestCase(test_base.BaseTestCase):
         self.controller = self.controller_class.return_value
         self.addCleanup(controller_patcher.stop)
 
-        self.fake_context = self.fake_context_class(str(uuid.uuid4()))
+        self.fake_context = mock.NonCallableMock(request_id=str(uuid.uuid4()))
 
         ec2_request = apirequest.APIRequest('FakeAction', 'fake_v1',
                                             {'Param': 'fake_param'})

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import uuid
 
 from lxml import etree
@@ -28,11 +27,6 @@ from ec2api.tests.unit import tools
 
 class EC2RequesterTestCase(test_base.BaseTestCase):
 
-    fake_context_class = collections.namedtuple('FakeContext',
-                                                ['request_id'])
-    fake_request_class = collections.namedtuple('FakeRequest',
-                                                ['params', 'environ'])
-
     def setUp(self):
         super(EC2RequesterTestCase, self).setUp()
 
@@ -40,7 +34,7 @@ class EC2RequesterTestCase(test_base.BaseTestCase):
         self.controller = controller_patcher.start().return_value
         self.addCleanup(controller_patcher.stop)
 
-        self.fake_context = self.fake_context_class(str(uuid.uuid4()))
+        self.fake_context = mock.NonCallableMock(request_id=str(uuid.uuid4()))
 
     def test_invoke_returns_data(self):
         self.controller.fake_action.return_value = fakes.DICT_FAKE_RESULT_DATA
