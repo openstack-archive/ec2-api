@@ -35,8 +35,6 @@ class VolumeTestCase(base.ApiTestCase):
             tools.get_db_api_add_item(fakes.ID_EC2_VOLUME_3))
 
         resp = self.execute('DescribeVolumes', {})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'volumeSet': [fakes.EC2_VOLUME_1, fakes.EC2_VOLUME_2,
                            fakes.EC2_VOLUME_3]},
@@ -48,8 +46,6 @@ class VolumeTestCase(base.ApiTestCase):
             return_value=[fakes.DB_VOLUME_1])
         resp = self.execute('DescribeVolumes',
                             {'VolumeId.1': fakes.ID_EC2_VOLUME_1})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'volumeSet': [fakes.EC2_VOLUME_1]},
             orderless_lists=True))
@@ -74,8 +70,6 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.list.return_value = []
         self.set_mock_db_items(fakes.DB_VOLUME_1, fakes.DB_VOLUME_2)
         resp = self.execute('DescribeVolumes', {})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'volumeSet': []}))
 
@@ -89,17 +83,15 @@ class VolumeTestCase(base.ApiTestCase):
             fakes.CinderVolume(fakes.OS_VOLUME_1),
             fakes.CinderVolume(fakes.OS_VOLUME_2)]
 
-        resp = self.execute('DescribeVolumes',
-                            {'VolumeId.1': fakes.random_ec2_id('vol')})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidVolume.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidVolume.NotFound', 'DescribeVolumes',
+            {'VolumeId.1': fakes.random_ec2_id('vol')})
 
         self.cinder.volumes.list.side_effect = lambda: []
 
-        resp = self.execute('DescribeVolumes',
-                            {'VolumeId.1': fakes.ID_EC2_VOLUME_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidVolume.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidVolume.NotFound', 'DescribeVolumes',
+            {'VolumeId.1': fakes.ID_EC2_VOLUME_1})
 
     def test_create_volume(self):
         self.cinder.volumes.create.return_value = (
@@ -110,9 +102,7 @@ class VolumeTestCase(base.ApiTestCase):
         resp = self.execute(
             'CreateVolume',
             {'AvailabilityZone': fakes.NAME_AVAILABILITY_ZONE})
-        self.assertEqual(200, resp['http_status_code'])
-        self.assertThat(fakes.EC2_VOLUME_1, matchers.DictMatches(
-            tools.purge_dict(resp, {'http_status_code'})))
+        self.assertThat(fakes.EC2_VOLUME_1, matchers.DictMatches(resp))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vol',
             tools.purge_dict(fakes.DB_VOLUME_1, ('id',)))
@@ -132,9 +122,7 @@ class VolumeTestCase(base.ApiTestCase):
             'CreateVolume',
             {'AvailabilityZone': fakes.NAME_AVAILABILITY_ZONE,
              'SnapshotId': fakes.ID_EC2_SNAPSHOT_1})
-        self.assertEqual(200, resp['http_status_code'])
-        self.assertThat(fakes.EC2_VOLUME_3, matchers.DictMatches(
-            tools.purge_dict(resp, {'http_status_code'})))
+        self.assertThat(fakes.EC2_VOLUME_3, matchers.DictMatches(resp))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vol',
             tools.purge_dict(fakes.DB_VOLUME_3, ('id',)))
@@ -147,8 +135,6 @@ class VolumeTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_VOLUME_1)
         resp = self.execute('DeleteVolume',
                             {'VolumeId': fakes.ID_EC2_VOLUME_1})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertEqual({'return': True}, resp)
         self.cinder.volumes.delete.assert_called_once_with(
             fakes.ID_OS_VOLUME_1)
@@ -161,22 +147,18 @@ class VolumeTestCase(base.ApiTestCase):
 
         fake_volume.status = 'creating'
         resp = self.execute('DescribeVolumes', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('creating', resp['volumeSet'][0]['status'])
 
         fake_volume.status = 'attaching'
         resp = self.execute('DescribeVolumes', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('in-use', resp['volumeSet'][0]['status'])
 
         fake_volume.status = 'detaching'
         resp = self.execute('DescribeVolumes', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('in-use', resp['volumeSet'][0]['status'])
 
         fake_volume.status = 'banana'
         resp = self.execute('DescribeVolumes', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('banana', resp['volumeSet'][0]['status'])
 
     def test_attach_volume(self):
@@ -191,8 +173,7 @@ class VolumeTestCase(base.ApiTestCase):
                             {'VolumeId': fakes.ID_EC2_VOLUME_3,
                              'InstanceId': fakes.ID_EC2_INSTANCE_2,
                              'Device': '/dev/vdf'})
-        self.assertEqual({'http_status_code': 200,
-                          'device': '/dev/vdf',
+        self.assertEqual({'device': '/dev/vdf',
                           'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'status': 'attaching',
                           'volumeId': fakes.ID_EC2_VOLUME_3},
@@ -211,8 +192,7 @@ class VolumeTestCase(base.ApiTestCase):
 
         resp = self.execute('DetachVolume',
                             {'VolumeId': fakes.ID_EC2_VOLUME_2})
-        self.assertEqual({'http_status_code': 200,
-                          'device': os_volume.attachments[0]['device'],
+        self.assertEqual({'device': os_volume.attachments[0]['device'],
                           'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'status': 'detaching',
                           'volumeId': fakes.ID_EC2_VOLUME_2},
@@ -226,7 +206,5 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.get.return_value = (
             fakes.CinderVolume(fakes.OS_VOLUME_1))
 
-        resp = self.execute('DetachVolume',
-                            {'VolumeId': fakes.ID_EC2_VOLUME_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('IncorrectState', resp['Error']['Code'])
+        self.assert_execution_error('IncorrectState', 'DetachVolume',
+                                    {'VolumeId': fakes.ID_EC2_VOLUME_1})

@@ -39,6 +39,8 @@ def skip_not_implemented(test_item):
 
 class ApiTestCase(test_base.BaseTestCase):
 
+    ANY_EXECUTE_ERROR = object()
+
     def setUp(self):
         super(ApiTestCase, self).setUp()
 
@@ -76,42 +78,17 @@ class ApiTestCase(test_base.BaseTestCase):
         self.configure(fatal_exception_format_errors=True)
 
     def execute(self, action, args):
-        ec2_request = ec2api.api.apirequest.APIRequest(action, 'fake_v1', args)
-        ec2_context = self._create_context()
-        environ = {'REQUEST_METHOD': 'FAKE',
-                   'ec2.request': ec2_request,
-                   'ec2api.context': ec2_context}
-        request = ec2api.wsgi.Request(environ)
-        response = request.send(ec2api.api.Executor())
-        return self._check_and_transform_response(response, action)
+        status_code, response = self._execute(action, args)
+        self.assertEqual(200, status_code)
+        return response
 
-    def _create_context(self):
-        return ec2api.context.RequestContext(
-            fakes.ID_OS_USER, fakes.ID_OS_PROJECT,
-            service_catalog=[{'type': 'network',
-                              'endpoints': [{'publicUrl': 'fake_url'}]}])
-
-    def _check_and_transform_response(self, response, action):
-        body = tools.parse_xml(response.body)
-        if response.status_code == 200:
-            action_tag = '%sResponse' % action
-            self.assertIn(action_tag, body)
-            body = body.pop(action_tag)
-            self.assertIn('requestId', body)
-            body.pop('requestId')
+    def assert_execution_error(self, error_code, action, args):
+        status_code, response = self._execute(action, args)
+        if error_code == self.ANY_EXECUTE_ERROR:
+            self.assertLessEqual(400, status_code)
         else:
-            self.assertIn('Response', body)
-            body = body.pop('Response')
-            self.assertIn('RequestID', body)
-            body.pop('RequestID')
-            self.assertEqual(1, len(body))
-            self.assertIn('Errors', body)
-            body = body.pop('Errors')
-            self.assertEqual(1, len(body))
-            self.assertIn('Error', body)
-            self.assertEqual(2, len(body['Error']))
-        body['http_status_code'] = response.status_code
-        return body
+            self.assertEqual(400, status_code)
+            self.assertEqual(error_code, response['Error']['Code'])
 
     def assert_any_call(self, func, *args, **kwargs):
         calls = func.mock_calls
@@ -146,14 +123,12 @@ class ApiTestCase(test_base.BaseTestCase):
             resp = self.execute(operation,
                                 {'Filter.1.Name': name,
                                  'Filter.1.Value.1': str(value)})
-            self.assertEqual(200, resp['http_status_code'])
             self.assertTrue(len(resp[resultset_key]) > 0,
                             'Filter by %s does not work' % name)
 
             resp = self.execute(operation,
                                 {'Filter.1.Name': name,
                                  'Filter.1.Value.1': 'dummy filter value'})
-            self.assertEqual(200, resp['http_status_code'])
             self.assertTrue(resp[resultset_key] is None or
                             len(resp[resultset_key]) == 0)
 
@@ -167,7 +142,6 @@ class ApiTestCase(test_base.BaseTestCase):
                      'value': 'fake_value'}]
 
         resp = self.execute(operation, {})
-        self.assertEqual(200, resp['http_status_code'])
         tag_found = False
         if type(resultset_key) is list:
             resp_items = itertools.chain(*(r[resultset_key[1]]
@@ -195,7 +169,6 @@ class ApiTestCase(test_base.BaseTestCase):
 
         id_param = '%s%s.1' % (id_key[0].capitalize(), id_key[1:])
         resp = self.execute(operation, {id_param: sample_item_id})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertTrue(
             self.db_api.get_tags.call_count == 1 and
             (self.db_api.get_tags.mock_calls[0] in
@@ -207,3 +180,41 @@ class ApiTestCase(test_base.BaseTestCase):
              [('tag-key', 'fake_key'),
               ('tag-value', 'fake_value'),
               ('tag:fake_key', 'fake_value')])
+
+    def _create_context(self):
+        return ec2api.context.RequestContext(
+            fakes.ID_OS_USER, fakes.ID_OS_PROJECT,
+            service_catalog=[{'type': 'network',
+                              'endpoints': [{'publicUrl': 'fake_url'}]}])
+
+    def _execute(self, action, args):
+        ec2_request = ec2api.api.apirequest.APIRequest(action, 'fake_v1', args)
+        ec2_context = self._create_context()
+        environ = {'REQUEST_METHOD': 'FAKE',
+                   'ec2.request': ec2_request,
+                   'ec2api.context': ec2_context}
+        request = ec2api.wsgi.Request(environ)
+        response = request.send(ec2api.api.Executor())
+        return (response.status_code,
+                self._check_and_transform_response(response, action))
+
+    def _check_and_transform_response(self, response, action):
+        body = tools.parse_xml(response.body)
+        if response.status_code == 200:
+            action_tag = '%sResponse' % action
+            self.assertIn(action_tag, body)
+            body = body.pop(action_tag)
+            self.assertIn('requestId', body)
+            body.pop('requestId')
+        else:
+            self.assertIn('Response', body)
+            body = body.pop('Response')
+            self.assertIn('RequestID', body)
+            body.pop('RequestID')
+            self.assertEqual(1, len(body))
+            self.assertIn('Errors', body)
+            body = body.pop('Errors')
+            self.assertEqual(1, len(body))
+            self.assertIn('Error', body)
+            self.assertEqual(2, len(body['Error']))
+        return body

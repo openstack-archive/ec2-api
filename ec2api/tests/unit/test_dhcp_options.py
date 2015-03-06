@@ -48,7 +48,6 @@ class DhcpOptionsTestCase(base.ApiTestCase):
             resp = self.execute(
                     'CreateDhcpOptions',
                     gen_ec2_param_dhcp_options(ec2_fake))
-            self.assertEqual(200, resp['http_status_code'])
             self.assertThat(ec2_fake, matchers.DictMatches(
                     resp['dhcpOptions'], orderless_lists=True))
             self.assert_any_call(self.db_api.add_item,
@@ -60,17 +59,15 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         check(fakes.EC2_DHCP_OPTIONS_2, fakes.DB_DHCP_OPTIONS_2)
 
     def test_create_dhcp_options_invalid_parameters(self):
-        resp = self.execute('CreateDhcpOptions',
-                            {'DhcpConfiguration.1.Key': 'InvalidParameter',
-                             'DhcpConfiguration.1.Value.1': 'Value'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidParameterValue', 'CreateDhcpOptions',
+            {'DhcpConfiguration.1.Key': 'InvalidParameter',
+             'DhcpConfiguration.1.Value.1': 'Value'})
 
     def test_delete_dhcp_options(self):
         self.set_mock_db_items(fakes.DB_DHCP_OPTIONS_1)
         resp = self.execute('DeleteDhcpOptions',
                             {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.get_item_by_id.assert_any_call(
                 mock.ANY,
@@ -88,17 +85,15 @@ class DhcpOptionsTestCase(base.ApiTestCase):
             tools.update_dict(
                 fakes.DB_VPC_1,
                 {'dhcp_options_id': fakes.ID_EC2_DHCP_OPTIONS_1}))
-        resp = self.execute('DeleteDhcpOptions',
-                            {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('DependencyViolation', resp['Error']['Code'])
+        self.assert_execution_error(
+            'DependencyViolation', 'DeleteDhcpOptions',
+            {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_1})
 
     def test_describe_dhcp_options(self):
         self.set_mock_db_items(fakes.DB_DHCP_OPTIONS_1,
                                fakes.DB_DHCP_OPTIONS_2)
 
         resp = self.execute('DescribeDhcpOptions', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['dhcpOptionsSet'],
                         matchers.ListMatches([fakes.EC2_DHCP_OPTIONS_1,
                                               fakes.EC2_DHCP_OPTIONS_2],
@@ -106,7 +101,6 @@ class DhcpOptionsTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeDhcpOptions',
                             {'DhcpOptionsId.1': fakes.ID_EC2_DHCP_OPTIONS_1})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['dhcpOptionsSet'],
                         matchers.ListMatches([fakes.EC2_DHCP_OPTIONS_1],
                                              orderless_lists=True))
@@ -131,7 +125,6 @@ class DhcpOptionsTestCase(base.ApiTestCase):
             resp = self.execute('AssociateDhcpOptions',
                                 {'dhcpOptionsId': ec2_dhcp_options_id,
                                  'vpcId': fakes.ID_EC2_VPC_1})
-            self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
             self.db_api.update_item.assert_any_call(
                     mock.ANY,
@@ -164,9 +157,10 @@ class DhcpOptionsTestCase(base.ApiTestCase):
 
         self.neutron.update_port.side_effect = update_port_func
 
-        self.execute('AssociateDhcpOptions',
-                     {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_2,
-                      'vpcId': fakes.ID_EC2_VPC_1})
+        self.assert_execution_error(
+            self.ANY_EXECUTE_ERROR, 'AssociateDhcpOptions',
+            {'dhcpOptionsId': fakes.ID_EC2_DHCP_OPTIONS_2,
+             'vpcId': fakes.ID_EC2_VPC_1})
 
         self.assert_any_call(self.neutron.update_port,
                              fakes.ID_OS_PORT_1,

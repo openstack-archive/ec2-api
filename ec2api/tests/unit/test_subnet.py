@@ -34,7 +34,6 @@ class SubnetTestCase(base.ApiTestCase):
                 tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
 
         def check_response(resp):
-            self.assertEqual(200, resp['http_status_code'])
             self.assertThat(fakes.EC2_SUBNET_1, matchers.DictMatches(
                     resp['subnet']))
             self.db_api.add_item.assert_called_once_with(
@@ -68,39 +67,37 @@ class SubnetTestCase(base.ApiTestCase):
         check_response(resp)
 
     def test_create_subnet_invalid_parameters(self):
-        def check_response(resp, error_code):
-            self.assertEqual(400, resp['http_status_code'])
-            self.assertEqual(error_code, resp['Error']['Code'])
+        def do_check(args, error_code):
+            self.neutron.reset_mock()
+            self.db_api.reset_mock()
+            self.assert_execution_error(error_code, 'CreateSubnet', args)
             self.assertEqual(0, self.neutron.create_network.call_count)
             self.assertEqual(0, self.neutron.create_subnet.call_count)
             self.assertEqual(0, self.neutron.add_interface_router.call_count)
 
-            self.neutron.reset_mock()
-            self.db_api.reset_mock()
-
         self.set_mock_db_items()
-        resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
-                                             'CidrBlock': fakes.CIDR_SUBNET_1})
+        do_check({'VpcId': fakes.ID_EC2_VPC_1,
+                  'CidrBlock': fakes.CIDR_SUBNET_1},
+                 'InvalidVpcID.NotFound')
         self.db_api.get_item_by_id.assert_called_once_with(mock.ANY,
                                                            fakes.ID_EC2_VPC_1)
-        check_response(resp, 'InvalidVpcID.NotFound')
 
         self.set_mock_db_items(fakes.DB_VPC_1)
-        resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
-                                             'CidrBlock': 'invalid_cidr'})
+        do_check({'VpcId': fakes.ID_EC2_VPC_1,
+                  'CidrBlock': 'invalid_cidr'},
+                 'InvalidParameterValue')
         self.assertEqual(0, self.db_api.get_item_by_id.call_count)
-        check_response(resp, 'InvalidParameterValue')
 
-        resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
-                                             'CidrBlock': '10.10.0.0/30'})
+        do_check({'VpcId': fakes.ID_EC2_VPC_1,
+                  'CidrBlock': '10.10.0.0/30'},
+                 'InvalidSubnet.Range')
         self.assertEqual(0, self.db_api.get_item_by_id.call_count)
-        check_response(resp, 'InvalidSubnet.Range')
 
-        resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
-                                             'CidrBlock': '10.20.0.0/24'})
+        do_check({'VpcId': fakes.ID_EC2_VPC_1,
+                  'CidrBlock': '10.20.0.0/24'},
+                 'InvalidSubnet.Range')
         self.db_api.get_item_by_id.assert_called_once_with(mock.ANY,
                                                            fakes.ID_EC2_VPC_1)
-        check_response(resp, 'InvalidSubnet.Range')
 
     def test_create_subnet_overlapped(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
@@ -112,10 +109,9 @@ class SubnetTestCase(base.ApiTestCase):
         self.neutron.add_interface_router.side_effect = (
                 neutron_exception.BadRequest())
 
-        resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
-                                             'CidrBlock': fakes.CIDR_SUBNET_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidSubnet.Conflict', resp['Error']['Code'])
+        self.assert_execution_error('InvalidSubnet.Conflict', 'CreateSubnet',
+                                    {'VpcId': fakes.ID_EC2_VPC_1,
+                                     'CidrBlock': fakes.CIDR_SUBNET_1})
 
     def test_create_subnet_overlimit(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
@@ -130,12 +126,9 @@ class SubnetTestCase(base.ApiTestCase):
             saved_side_effect = func.side_effect
             func.side_effect = neutron_exception.OverQuotaClient
 
-            resp = self.execute('CreateSubnet',
-                                {'VpcId': fakes.ID_EC2_VPC_1,
-                                 'CidrBlock': fakes.CIDR_SUBNET_1})
-
-            self.assertEqual(400, resp['http_status_code'])
-            self.assertEqual('SubnetLimitExceeded', resp['Error']['Code'])
+            self.assert_execution_error('SubnetLimitExceeded', 'CreateSubnet',
+                                        {'VpcId': fakes.ID_EC2_VPC_1,
+                                         'CidrBlock': fakes.CIDR_SUBNET_1})
             func.side_effect = saved_side_effect
 
         test_overlimit(self.neutron.create_network)
@@ -152,8 +145,9 @@ class SubnetTestCase(base.ApiTestCase):
                 tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
         self.neutron.update_network.side_effect = Exception()
 
-        self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
-                                      'CidrBlock': fakes.CIDR_SUBNET_1})
+        self.assert_execution_error(self.ANY_EXECUTE_ERROR, 'CreateSubnet',
+                                    {'VpcId': fakes.ID_EC2_VPC_1,
+                                     'CidrBlock': fakes.CIDR_SUBNET_1})
 
         self.neutron.assert_has_calls([
             mock.call.remove_interface_router(
@@ -169,9 +163,8 @@ class SubnetTestCase(base.ApiTestCase):
                 {'subnet': fakes.OS_SUBNET_1})
 
         resp = self.execute('DeleteSubnet',
-                            {'subnetId': fakes.ID_EC2_SUBNET_1})
+                            {'SubnetId': fakes.ID_EC2_SUBNET_1})
 
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.db_api.delete_item.assert_called_once_with(
                 mock.ANY,
@@ -199,15 +192,13 @@ class SubnetTestCase(base.ApiTestCase):
                 neutron_exception.NetworkInUseClient())
 
         resp = self.execute('DeleteSubnet',
-                            {'subnetId': fakes.ID_EC2_SUBNET_1})
-        self.assertEqual(200, resp['http_status_code'])
+                            {'SubnetId': fakes.ID_EC2_SUBNET_1})
         self.assertEqual(True, resp['return'])
 
         self.neutron.show_subnet.side_effect = neutron_exception.NotFound()
 
         resp = self.execute('DeleteSubnet',
-                            {'subnetId': fakes.ID_EC2_SUBNET_1})
-        self.assertEqual(200, resp['http_status_code'])
+                            {'SubnetId': fakes.ID_EC2_SUBNET_1})
         self.assertEqual(True, resp['return'])
 
     def test_delete_subnet_invalid_parameters(self):
@@ -215,11 +206,8 @@ class SubnetTestCase(base.ApiTestCase):
         self.neutron.show_subnet.return_value = fakes.OS_SUBNET_1
         self.neutron.show_network.return_value = fakes.OS_NETWORK_1
 
-        resp = self.execute('DeleteSubnet',
-                            {'subnetId': fakes.ID_EC2_SUBNET_1})
-
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidSubnetID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error('InvalidSubnetID.NotFound', 'DeleteSubnet',
+                                    {'SubnetId': fakes.ID_EC2_SUBNET_1})
         self.assertEqual(0, self.neutron.delete_network.call_count)
         self.assertEqual(0, self.neutron.delete_subnet.call_count)
         self.assertEqual(0, self.neutron.remove_interface_router.call_count)
@@ -229,16 +217,15 @@ class SubnetTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)
         describe_network_interfaces.return_value = (
                 {'networkInterfaceSet': [fakes.EC2_NETWORK_INTERFACE_1]})
-        resp = self.execute('DeleteSubnet',
-                            {'subnetId': fakes.ID_EC2_SUBNET_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('DependencyViolation', resp['Error']['Code'])
+        self.assert_execution_error('DependencyViolation', 'DeleteSubnet',
+                                    {'SubnetId': fakes.ID_EC2_SUBNET_1})
 
     def test_delete_subnet_rollback(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)
         self.neutron.show_subnet.side_effect = Exception()
 
-        self.execute('DeleteSubnet', {'subnetId': fakes.ID_EC2_SUBNET_1})
+        self.assert_execution_error(self.ANY_EXECUTE_ERROR, 'DeleteSubnet',
+                                    {'SubnetId': fakes.ID_EC2_SUBNET_1})
 
         self.db_api.restore_item.assert_called_once_with(
                 mock.ANY, 'subnet', fakes.DB_SUBNET_1)
@@ -253,7 +240,6 @@ class SubnetTestCase(base.ApiTestCase):
                 {'networks': [fakes.OS_NETWORK_1, fakes.OS_NETWORK_2]})
 
         resp = self.execute('DescribeSubnets', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['subnetSet'],
                         matchers.ListMatches([fakes.EC2_SUBNET_1,
                                               fakes.EC2_SUBNET_2]))
@@ -262,7 +248,6 @@ class SubnetTestCase(base.ApiTestCase):
             return_value=[fakes.DB_SUBNET_2])
         resp = self.execute('DescribeSubnets',
                             {'SubnetId.1': fakes.ID_EC2_SUBNET_2})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['subnetSet'],
                         matchers.ListMatches([fakes.EC2_SUBNET_2]))
         self.db_api.get_items_by_ids.assert_called_once_with(
@@ -292,5 +277,4 @@ class SubnetTestCase(base.ApiTestCase):
                 {'networks': [fakes.OS_NETWORK_1]})
 
         resp = self.execute('DescribeSubnets', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual([], resp['subnetSet'])

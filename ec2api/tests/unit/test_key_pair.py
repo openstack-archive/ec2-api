@@ -28,25 +28,22 @@ class KeyPairCase(base.ApiTestCase):
         self.nova.keypairs.create.return_value = (
             fakes.NovaKeyPair(fakes.OS_KEY_PAIR))
         resp = self.execute('CreateKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
-        self.assertEqual(200, resp['http_status_code'])
-        self.assertThat(fakes.EC2_KEY_PAIR, matchers.DictMatches(
-            tools.purge_dict(resp, {'http_status_code'})))
+        self.assertThat(fakes.EC2_KEY_PAIR, matchers.DictMatches(resp))
         self.nova.keypairs.create.assert_called_once_with(fakes.NAME_KEY_PAIR)
 
     def test_create_key_pair_invalid(self):
         self.nova.keypairs.create.side_effect = (
             nova_exception.Conflict(409))
-        resp = self.execute('CreateKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidKeyPair.Duplicate', resp['Error']['Code'])
-        resp = self.execute('CreateKeyPair', {'KeyName': 'k' * 256})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('ValidationError', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidKeyPair.Duplicate', 'CreateKeyPair',
+            {'KeyName': fakes.NAME_KEY_PAIR})
+        self.assert_execution_error(
+            'ValidationError', 'CreateKeyPair', {'KeyName': 'k' * 256})
         self.nova.keypairs.create.side_effect = (
             nova_exception.OverLimit(413))
-        resp = self.execute('CreateKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('ResourceLimitExceeded', resp['Error']['Code'])
+        self.assert_execution_error(
+            'ResourceLimitExceeded', 'CreateKeyPair',
+            {'KeyName': fakes.NAME_KEY_PAIR})
 
     def test_import_key_pair(self):
         self.nova.keypairs.create.return_value = (
@@ -55,38 +52,32 @@ class KeyPairCase(base.ApiTestCase):
                             {'KeyName': fakes.NAME_KEY_PAIR,
                              'PublicKeyMaterial': base64.b64encode(
                                  fakes.PUBLIC_KEY_KEY_PAIR)})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(
             tools.purge_dict(fakes.EC2_KEY_PAIR, {'keyMaterial'}),
-            matchers.DictMatches(tools.purge_dict(resp, {'http_status_code'})))
+            matchers.DictMatches(resp))
         self.nova.keypairs.create.assert_called_once_with(
             fakes.NAME_KEY_PAIR, fakes.PUBLIC_KEY_KEY_PAIR)
 
     def test_import_key_pair_invalid(self):
         self.nova.keypairs.create.side_effect = (
             nova_exception.OverLimit(413))
-        resp = self.execute('ImportKeyPair',
-                            {'KeyName': fakes.NAME_KEY_PAIR,
-                             'PublicKeyMaterial': base64.b64encode(
-                                 fakes.PUBLIC_KEY_KEY_PAIR)})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('ResourceLimitExceeded', resp['Error']['Code'])
+        self.assert_execution_error(
+            'ResourceLimitExceeded', 'ImportKeyPair',
+            {'KeyName': fakes.NAME_KEY_PAIR,
+             'PublicKeyMaterial': base64.b64encode(fakes.PUBLIC_KEY_KEY_PAIR)})
 
     def test_delete_key_pair(self):
         self.nova.keypairs.delete.return_value = True
-        resp = self.execute('DeleteKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
-        self.assertEqual(200, resp['http_status_code'])
+        self.execute('DeleteKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
         self.nova.keypairs.delete.assert_called_once_with(fakes.NAME_KEY_PAIR)
         self.nova.keypairs.delete.side_effect = nova_exception.NotFound(404)
-        resp = self.execute('DeleteKeyPair', {'KeyName': 'keyname1'})
-        self.assertEqual(200, resp['http_status_code'])
+        self.execute('DeleteKeyPair', {'KeyName': 'keyname1'})
         self.nova.keypairs.delete.assert_any_call('keyname1')
 
     def test_describe_key_pairs(self):
         self.nova.keypairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
         resp = self.execute('DescribeKeyPairs', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['keySet'],
                         matchers.ListMatches([
                             tools.purge_dict(fakes.EC2_KEY_PAIR,
@@ -101,7 +92,7 @@ class KeyPairCase(base.ApiTestCase):
     def test_describe_key_pairs_invalid(self):
         self.nova.keypairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
-        resp = self.execute('DescribeKeyPairs', {'KeyName.1': 'badname'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidKeyPair.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidKeyPair.NotFound', 'DescribeKeyPairs',
+            {'KeyName.1': 'badname'})
         self.nova.keypairs.list.assert_called_once_with()

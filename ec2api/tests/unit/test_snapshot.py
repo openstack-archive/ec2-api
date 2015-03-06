@@ -31,8 +31,6 @@ class SnapshotTestCase(base.ApiTestCase):
                                fakes.DB_VOLUME_2)
 
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'snapshotSet': [fakes.EC2_SNAPSHOT_1, fakes.EC2_SNAPSHOT_2]},
             orderless_lists=True))
@@ -43,8 +41,6 @@ class SnapshotTestCase(base.ApiTestCase):
             return_value=[fakes.DB_SNAPSHOT_1])
         resp = self.execute('DescribeSnapshots',
                             {'SnapshotId.1': fakes.ID_EC2_SNAPSHOT_1})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'snapshotSet': [fakes.EC2_SNAPSHOT_1]},
             orderless_lists=True))
@@ -76,8 +72,6 @@ class SnapshotTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_SNAPSHOT_1, fakes.DB_VOLUME_2)
 
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'snapshotSet': []},
             orderless_lists=True))
@@ -92,17 +86,15 @@ class SnapshotTestCase(base.ApiTestCase):
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1),
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_2)]
 
-        resp = self.execute('DescribeSnapshots',
-                            {'SnapshotId.1': fakes.random_ec2_id('snap')})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidSnapshot.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidSnapshot.NotFound', 'DescribeSnapshots',
+            {'SnapshotId.1': fakes.random_ec2_id('snap')})
 
         self.cinder.volume_snapshots.list.side_effect = lambda: []
 
-        resp = self.execute('DescribeSnapshots',
-                            {'SnapshotId.1': fakes.ID_EC2_SNAPSHOT_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidSnapshot.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidSnapshot.NotFound', 'DescribeSnapshots',
+            {'SnapshotId.1': fakes.ID_EC2_SNAPSHOT_1})
 
     def test_create_snapshot_from_volume(self):
         self.cinder.volume_snapshots.create.return_value = (
@@ -119,9 +111,7 @@ class SnapshotTestCase(base.ApiTestCase):
         resp = self.execute(
             'CreateSnapshot',
             {'VolumeId': fakes.ID_EC2_VOLUME_2})
-        self.assertEqual(200, resp['http_status_code'])
-        self.assertThat(fakes.EC2_SNAPSHOT_1, matchers.DictMatches(
-            tools.purge_dict(resp, {'http_status_code'})))
+        self.assertThat(fakes.EC2_SNAPSHOT_1, matchers.DictMatches(resp))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'snap',
             tools.purge_dict(fakes.DB_SNAPSHOT_1, ('id',)))
@@ -136,35 +126,28 @@ class SnapshotTestCase(base.ApiTestCase):
 
         fake_snapshot.status = 'new'
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('pending', resp['snapshotSet'][0]['status'])
 
         fake_snapshot.status = 'creating'
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('pending', resp['snapshotSet'][0]['status'])
 
         fake_snapshot.status = 'available'
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('completed', resp['snapshotSet'][0]['status'])
 
         fake_snapshot.status = 'active'
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('completed', resp['snapshotSet'][0]['status'])
 
         fake_snapshot.status = 'deleting'
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('pending', resp['snapshotSet'][0]['status'])
 
         fake_snapshot.status = 'error'
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('error', resp['snapshotSet'][0]['status'])
 
         fake_snapshot.status = 'banana'
         resp = self.execute('DescribeSnapshots', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual('banana', resp['snapshotSet'][0]['status'])

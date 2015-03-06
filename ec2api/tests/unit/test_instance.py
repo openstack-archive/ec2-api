@@ -119,8 +119,6 @@ class InstanceTestCase(base.ApiTestCase):
                            'MinCount': '1', 'MaxCount': '1'})
             resp = self.execute('RunInstances', params)
 
-            self.assertEqual(200, resp['http_status_code'])
-            resp.pop('http_status_code')
             self.assertThat(resp, matchers.DictMatches(expected_reservation))
             if create_network_interface_kwargs is not None:
                 (self.network_interface_api.
@@ -256,8 +254,6 @@ class InstanceTestCase(base.ApiTestCase):
              'NetworkInterface.2.SubnetId': fakes.ID_EC2_SUBNET_2,
              'NetworkInterface.2.DeleteOnTermination': 'False'})
 
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(ec2_reservation),
                         verbose=True)
 
@@ -313,7 +309,7 @@ class InstanceTestCase(base.ApiTestCase):
         def do_check(engine, extra_kwargs={}, extra_db_instance={}):
             instance_api.instance_engine = engine
 
-            resp = self.execute(
+            self.execute(
                 'RunInstances',
                 {'ImageId': fakes.ID_EC2_IMAGE_1,
                  'InstanceType': 'fake_flavor',
@@ -327,7 +323,6 @@ class InstanceTestCase(base.ApiTestCase):
                  'BlockDeviceMapping.1.Ebs.SnapshotId': (
                                                     fakes.ID_EC2_SNAPSHOT_1),
                  'BlockDeviceMapping.1.Ebs.DeleteOnTermination': 'False'})
-            self.assertEqual(200, resp['http_status_code'])
 
             self.nova.servers.create.assert_called_once_with(
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
@@ -390,9 +385,7 @@ class InstanceTestCase(base.ApiTestCase):
                              'ImageId': fakes.ID_EC2_IMAGE_1,
                              'InstanceType': 'fake_flavor',
                              'ClientToken': 'client-token-1'})
-        self.assertEqual({'http_status_code': 200,
-                          'key': 'value'},
-                         resp)
+        self.assertEqual({'key': 'value'}, resp)
         format_reservation.assert_called_once_with(
             mock.ANY, instances[1]['reservation_id'],
             [(instances[1], os_instances[1], 'novadb_instance')],
@@ -446,9 +439,7 @@ class InstanceTestCase(base.ApiTestCase):
                              'ImageId': fakes.ID_EC2_IMAGE_1,
                              'InstanceType': 'fake_flavor',
                              'ClientToken': 'client-token'})
-        self.assertEqual({'http_status_code': 200,
-                          'key': 'value'},
-                         resp)
+        self.assertEqual({'key': 'value'}, resp)
         format_reservation.assert_called_once_with(
             mock.ANY, instances[0]['reservation_id'],
             [(instances[0], os_instances[0], 'novadb-instance-0'),
@@ -488,7 +479,8 @@ class InstanceTestCase(base.ApiTestCase):
             params.update({'ImageId': fakes.ID_EC2_IMAGE_1,
                            'InstanceType': 'fake_flavor',
                            'MinCount': '1', 'MaxCount': '1'})
-            self.execute('RunInstances', params)
+            self.assert_execution_error(
+                self.ANY_EXECUTE_ERROR, 'RunInstances', params)
 
             calls = []
             calls.append(
@@ -574,8 +566,6 @@ class InstanceTestCase(base.ApiTestCase):
                                  'InstanceType': 'fake_flavor',
                                  'MinCount': '2', 'MaxCount': '3',
                                  'SubnetId': fakes.ID_EC2_SUBNET_1})
-            self.assertEqual(200, resp['http_status_code'])
-            resp.pop('http_status_code')
             self.assertThat(resp,
                             matchers.DictMatches(
                                 {'reservationId': fakes.ID_EC2_RESERVATION_1,
@@ -601,29 +591,21 @@ class InstanceTestCase(base.ApiTestCase):
         do_check(instance_api.InstanceEngineNova())
 
     def test_run_instances_invalid_parameters(self):
-        resp = self.execute('RunInstances',
-                            {'ImageId': fakes.ID_EC2_IMAGE_1,
-                             'MinCount': '0', 'MaxCount': '0'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'RunInstances',
+                                    {'ImageId': fakes.ID_EC2_IMAGE_1,
+                                     'MinCount': '0', 'MaxCount': '0'})
 
-        resp = self.execute('RunInstances',
-                            {'ImageId': fakes.ID_EC2_IMAGE_1,
-                             'MinCount': '1', 'MaxCount': '0'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'RunInstances',
+                                    {'ImageId': fakes.ID_EC2_IMAGE_1,
+                                     'MinCount': '1', 'MaxCount': '0'})
 
-        resp = self.execute('RunInstances',
-                            {'ImageId': fakes.ID_EC2_IMAGE_1,
-                             'MinCount': '0', 'MaxCount': '1'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'RunInstances',
+                                    {'ImageId': fakes.ID_EC2_IMAGE_1,
+                                     'MinCount': '0', 'MaxCount': '1'})
 
-        resp = self.execute('RunInstances',
-                            {'ImageId': fakes.ID_EC2_IMAGE_1,
-                             'MinCount': '2', 'MaxCount': '1'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameterValue', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameterValue', 'RunInstances',
+                                    {'ImageId': fakes.ID_EC2_IMAGE_1,
+                                     'MinCount': '2', 'MaxCount': '1'})
 
     @mock.patch.object(fakes.OSInstance, 'delete', autospec=True)
     @mock.patch.object(fakes.OSInstance, 'get', autospec=True)
@@ -642,8 +624,6 @@ class InstanceTestCase(base.ApiTestCase):
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
                              'InstanceId.2': fakes.ID_EC2_INSTANCE_2})
 
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         fake_state_change = {'previousState': {'code': 0,
                                                'name': 'pending'},
                              'currentState': {'code': 0,
@@ -701,8 +681,6 @@ class InstanceTestCase(base.ApiTestCase):
                                 {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
                                  'InstanceId.2': fakes.ID_EC2_INSTANCE_2})
 
-            self.assertEqual(200, resp['http_status_code'])
-            resp.pop('http_status_code')
             self.assertThat(
                 resp, matchers.DictMatches(ec2_terminate_instances_result))
             detach_network_interface = (
@@ -740,10 +718,9 @@ class InstanceTestCase(base.ApiTestCase):
             deleted_enis=[])
 
     def test_terminate_instances_invalid_parameters(self):
-        resp = self.execute('TerminateInstances',
-                            {'InstanceId.1': fakes.random_ec2_id('i')})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidInstanceID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidInstanceID.NotFound', 'TerminateInstances',
+            {'InstanceId.1': fakes.random_ec2_id('i')})
 
     @mock.patch('ec2api.api.instance._get_os_instances_by_instances')
     def _test_instances_operation(self, operation, os_instance_operation,
@@ -761,9 +738,7 @@ class InstanceTestCase(base.ApiTestCase):
         resp = self.execute(operation,
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
                              'InstanceId.2': fakes.ID_EC2_INSTANCE_2})
-        self.assertEqual({'http_status_code': 200,
-                          'return': True},
-                         resp)
+        self.assertEqual({'return': True}, resp)
         self.assertEqual([mock.call(os_instance_1), mock.call(os_instance_2)],
                          os_instance_operation.mock_calls)
         self.db_api.get_items_by_ids.assert_called_once_with(
@@ -773,11 +748,9 @@ class InstanceTestCase(base.ApiTestCase):
 
         setattr(os_instance_2, 'OS-EXT-STS:vm_state', invalid_state)
         os_instance_operation.reset_mock()
-        resp = self.execute('StartInstances',
-                            {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
-                             'InstanceId.2': fakes.ID_EC2_INSTANCE_2})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('IncorrectInstanceState', resp['Error']['Code'])
+        self.assert_execution_error('IncorrectInstanceState', 'StartInstances',
+                                    {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
+                                     'InstanceId.2': fakes.ID_EC2_INSTANCE_2})
         self.assertEqual(0, os_instance_operation.call_count)
 
     @mock.patch.object(fakes.OSInstance, 'start', autospec=True)
@@ -806,8 +779,7 @@ class InstanceTestCase(base.ApiTestCase):
         utcnow.return_value = datetime.datetime(2015, 1, 19, 23, 34, 45, 123)
         resp = self.execute(operation,
                             {'InstanceId': fakes.ID_EC2_INSTANCE_2})
-        self.assertEqual({'http_status_code': 200,
-                          'instanceId': fakes.ID_EC2_INSTANCE_2,
+        self.assertEqual({'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'timestamp': '2015-01-19T23:34:45.000Z',
                           key: 'fake_data'},
                          resp)
@@ -853,8 +825,6 @@ class InstanceTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeInstances', {})
 
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'reservationSet': [fakes.EC2_RESERVATION_1,
                                 fakes.EC2_RESERVATION_2]},
@@ -864,8 +834,6 @@ class InstanceTestCase(base.ApiTestCase):
             return_value=[fakes.DB_INSTANCE_1])
         resp = self.execute('DescribeInstances',
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1})
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'reservationSet': [fakes.EC2_RESERVATION_1]},
             orderless_lists=True))
@@ -932,8 +900,6 @@ class InstanceTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeInstances', {})
 
-        self.assertEqual(200, resp['http_status_code'])
-        resp.pop('http_status_code')
         self.assertThat(resp, matchers.DictMatches(
             {'reservationSet': [fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
@@ -972,9 +938,6 @@ class InstanceTestCase(base.ApiTestCase):
                     ips_by_instance)]
 
             resp = self.execute('DescribeInstances', {})
-
-            self.assertEqual(200, resp['http_status_code'])
-            resp.pop('http_status_code')
 
             instances = [fakes.gen_ec2_instance(
                             inst_id, launch_index=l_i, private_ip_address=ip,
@@ -1028,8 +991,7 @@ class InstanceTestCase(base.ApiTestCase):
 
         self.assertThat(resp,
                         matchers.DictMatches(
-                            {'http_status_code': 200,
-                             'reservationSet': [fakes.EC2_RESERVATION_2]},
+                            {'reservationSet': [fakes.EC2_RESERVATION_2]},
                             orderless_lists=True))
         remove_instances.assert_called_once_with(
             mock.ANY, [fakes.DB_INSTANCE_1], purge_linked_items=False)
@@ -1055,24 +1017,21 @@ class InstanceTestCase(base.ApiTestCase):
                  'amiLaunchIndex': instance['launch_index']}))
 
         resp = self.execute('DescribeInstances', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(
             [0, 1, 2, 3, 4],
             [inst['amiLaunchIndex']
              for inst in resp['reservationSet'][0]['instancesSet']])
 
     def test_describe_instances_invalid_parameters(self):
-        resp = self.execute('DescribeInstances', {'InstanceId.1':
-                                                  fakes.random_ec2_id('i')})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidInstanceID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidInstanceID.NotFound', 'DescribeInstances',
+            {'InstanceId.1': fakes.random_ec2_id('i')})
 
         self.set_mock_db_items(fakes.DB_INSTANCE_2)
-        resp = self.execute('DescribeInstances',
-                            {'InstanceId.1': fakes.ID_EC2_INSTANCE_2,
-                             'InstanceId.2': fakes.random_ec2_id('i')})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidInstanceID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error(
+            'InvalidInstanceID.NotFound', 'DescribeInstances',
+            {'InstanceId.1': fakes.ID_EC2_INSTANCE_2,
+             'InstanceId.2': fakes.random_ec2_id('i')})
 
     def test_describe_instance_attributes(self):
         self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
@@ -1097,8 +1056,7 @@ class InstanceTestCase(base.ApiTestCase):
             resp = self.execute('DescribeInstanceAttribute',
                                 {'InstanceId': instance_id,
                                  'Attribute': attribute})
-            expected.update({'http_status_code': 200,
-                             'instanceId': instance_id})
+            expected.update({'instanceId': instance_id})
             self.assertThat(resp, matchers.DictMatches(expected))
 
         do_check(fakes.ID_EC2_INSTANCE_2, 'blockDeviceMapping',

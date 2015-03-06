@@ -37,7 +37,6 @@ class VpcTestCase(base.ApiTestCase):
             fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1))
 
         def check_response(response):
-            self.assertEqual(200, response['http_status_code'])
             self.assertIn('vpc', response)
             vpc = resp['vpc']
             self.assertThat(fakes.EC2_VPC_1, matchers.DictMatches(vpc))
@@ -74,19 +73,15 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.add_item.side_effect = tools.get_db_api_add_item(
             fakes.ID_EC2_VPC_1)
 
-        def check_response(resp, error_code):
-            self.assertEqual(400, resp['http_status_code'])
-            self.assertEqual(error_code, resp['Error']['Code'])
+        def do_check(args, error_code):
+            self.assert_execution_error(error_code, 'CreateVpc', args)
             self.assertEqual(0, self.neutron.create_router.call_count)
 
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        resp = self.execute('CreateVpc', {'CidrBlock': 'bad_cidr'})
-        check_response(resp, 'InvalidParameterValue')
-
-        resp = self.execute('CreateVpc', {'CidrBlock': '10.0.0.0/8'})
-        check_response(resp, 'InvalidVpc.Range')
+        do_check({'CidrBlock': 'bad_cidr'}, 'InvalidParameterValue')
+        do_check({'CidrBlock': '10.0.0.0/8'}, 'InvalidVpc.Range')
 
     def test_create_vpc_overlimit(self):
         self.neutron.create_router.side_effect = (
@@ -94,10 +89,8 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.add_item.side_effect = tools.get_db_api_add_item(
             fakes.ID_EC2_VPC_1)
 
-        resp = self.execute('CreateVpc', {'CidrBlock': fakes.CIDR_VPC_1})
-
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('VpcLimitExceeded', resp['Error']['Code'])
+        self.assert_execution_error('VpcLimitExceeded', 'CreateVpc',
+                                    {'CidrBlock': fakes.CIDR_VPC_1})
         self.neutron.create_router.assert_called_with({'router': {}})
         self.assertEqual(0, self.db_api.add_item.call_count)
 
@@ -110,7 +103,8 @@ class VpcTestCase(base.ApiTestCase):
                 'rtb': fakes.ID_EC2_ROUTE_TABLE_1}))
         self.neutron.update_router.side_effect = Exception()
 
-        self.execute('CreateVpc', {'CidrBlock': fakes.CIDR_VPC_1})
+        self.assert_execution_error(self.ANY_EXECUTE_ERROR, 'CreateVpc',
+                                    {'CidrBlock': fakes.CIDR_VPC_1})
 
         self.neutron.delete_router.assert_called_once_with(
             fakes.ID_OS_ROUTER_1)
@@ -123,7 +117,6 @@ class VpcTestCase(base.ApiTestCase):
 
         resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
 
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(True, resp['return'])
         self.neutron.delete_router.assert_called_once_with(
             fakes.ID_OS_ROUTER_1)
@@ -137,18 +130,15 @@ class VpcTestCase(base.ApiTestCase):
     def test_delete_vpc_not_found(self):
         self.set_mock_db_items()
 
-        resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidVpcID.NotFound', resp['Error']['Code'])
+        self.assert_execution_error('InvalidVpcID.NotFound', 'DeleteVpc',
+                                    {'VpcId': fakes.ID_EC2_VPC_1})
         self.assertEqual(0, self.neutron.delete_router.call_count)
         self.assertEqual(0, self.db_api.delete_item.call_count)
 
     def test_delete_vpc_dependency_violation(self):
         def do_check():
-            resp = self.execute('DeleteVpc',
-                                {'VpcId': fakes.ID_EC2_VPC_1})
-            self.assertEqual(400, resp['http_status_code'])
-            self.assertEqual('DependencyViolation', resp['Error']['Code'])
+            self.assert_execution_error('DependencyViolation', 'DeleteVpc',
+                                        {'VpcId': fakes.ID_EC2_VPC_1})
             self.assertEqual(0, self.neutron.delete_router.call_count)
             self.assertEqual(0, self.db_api.delete_item.call_count)
 
@@ -166,7 +156,6 @@ class VpcTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
 
         def check_response(resp):
-            self.assertEqual(200, resp['http_status_code'])
             self.assertEqual(True, resp['return'])
             self.neutron.delete_router.assert_called_once_with(
                 fakes.ID_OS_ROUTER_1)
@@ -192,7 +181,8 @@ class VpcTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.delete_router.side_effect = Exception()
 
-        self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
+        self.assert_execution_error(self.ANY_EXECUTE_ERROR, 'DeleteVpc',
+                                    {'VpcId': fakes.ID_EC2_VPC_1})
 
         self.db_api.restore_item.assert_any_call(
             mock.ANY, 'vpc', fakes.DB_VPC_1)
@@ -205,7 +195,6 @@ class VpcTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_VPC_2)
 
         resp = self.execute('DescribeVpcs', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['vpcSet'],
                         matchers.ListMatches([fakes.EC2_VPC_1,
                                               fakes.EC2_VPC_2]))
@@ -213,7 +202,6 @@ class VpcTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeVpcs',
                             {'VpcId.1': fakes.ID_EC2_VPC_1})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['vpcSet'],
                         matchers.ListMatches([fakes.EC2_VPC_1]))
         self.db_api.get_items_by_ids.assert_called_once_with(
@@ -237,7 +225,6 @@ class VpcTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeVpcs', {})
 
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['vpcSet'],
                         matchers.ListMatches([fakes.EC2_VPC_1]))
         self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')

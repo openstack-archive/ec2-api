@@ -27,7 +27,6 @@ class AvailabilityZoneCase(base.ApiTestCase):
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE_INTERNAL)]
         resp = self.execute('DescribeAvailabilityZones', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['availabilityZoneInfo'],
                         matchers.ListMatches([fakes.EC2_AVAILABILITY_ZONE]))
         self.nova.availability_zones.list.assert_called_once_with(
@@ -44,13 +43,11 @@ class AvailabilityZoneCase(base.ApiTestCase):
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE_INTERNAL)]
         resp = self.execute('DescribeAvailabilityZones',
                             {'zoneName.1': 'verbose'})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(len(resp['availabilityZoneInfo']), 7)
         self.nova.availability_zones.list.assert_called_once_with()
 
     def test_regions(self):
         resp = self.execute('DescribeRegions', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertEqual(resp['regionInfo'][0]['regionName'], 'nova')
         self.assertTrue(resp['regionInfo'][0].get('regionEndpoint')
                         is not None)
@@ -61,7 +58,6 @@ class AvailabilityZoneCase(base.ApiTestCase):
         availability_zone.account_attribute_engine = (
             availability_zone.AccountAttributeEngineNeutron())
         resp = self.execute('DescribeAccountAttributes', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['accountAttributeSet'],
                         matchers.ListMatches(
                             [{'attributeName': 'supported-platforms',
@@ -81,7 +77,6 @@ class AvailabilityZoneCase(base.ApiTestCase):
         availability_zone.account_attribute_engine = (
             availability_zone.AccountAttributeEngineNova())
         resp = self.execute('DescribeAccountAttributes', {})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['accountAttributeSet'],
                         matchers.ListMatches(
                             [{'attributeName': 'supported-platforms',
@@ -98,7 +93,6 @@ class AvailabilityZoneCase(base.ApiTestCase):
         resp = self.execute('DescribeAccountAttributes',
                             {'AttributeName.1': 'default-vpc',
                              'AttributeName.2': 'max-instances'})
-        self.assertEqual(200, resp['http_status_code'])
         self.assertThat(resp['accountAttributeSet'],
                         matchers.ListMatches(
                             [{'attributeName': 'default-vpc',
@@ -109,7 +103,6 @@ class AvailabilityZoneCase(base.ApiTestCase):
                                   {'attributeValue': 77}]}],
                             orderless_lists=True))
 
-        resp = self.execute('DescribeAccountAttributes',
-                            {'AttributeName.1': 'fake'})
-        self.assertEqual(400, resp['http_status_code'])
-        self.assertEqual('InvalidParameter', resp['Error']['Code'])
+        self.assert_execution_error('InvalidParameter',
+                                    'DescribeAccountAttributes',
+                                    {'AttributeName.1': 'fake'})
