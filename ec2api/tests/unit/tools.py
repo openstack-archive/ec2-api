@@ -14,8 +14,10 @@
 
 
 import copy
+import logging
 import re
 
+import fixtures
 from lxml import etree
 import mock
 
@@ -165,3 +167,68 @@ def parse_xml(xml_string):
         return node.tag, val
 
     return dict([convert_node(xml)])
+
+
+class KeepingHandler(logging.Handler):
+
+    def __init__(self):
+        super(KeepingHandler, self).__init__()
+        self._storage = []
+
+    def emit(self, record):
+        self._storage.append(record)
+
+    def emit_records_to(self, handlers, record_filter=None):
+        for record in self._storage:
+            if not record_filter or record_filter.filter(record):
+                for handler in handlers:
+                    if self != handler:
+                        handler.emit(record)
+
+
+class ScreeningFilter(logging.Filter):
+
+    def __init__(self, name=None):
+        self._name = name
+
+    def filter(self, record):
+        if self._name is not None and record.name == self._name:
+            return False
+        return True
+
+
+class ScreeningLogger(fixtures.Fixture):
+
+    def __init__(self, log_name=None):
+        super(ScreeningLogger, self).__init__()
+        self.handler = KeepingHandler()
+        if log_name:
+            self._filter = ScreeningFilter(name=log_name)
+        else:
+            self._filter = None
+
+    def setUp(self):
+        super(ScreeningLogger, self).setUp()
+        self.useFixture(fixtures.LogHandler(self.handler))
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        res = super(ScreeningLogger, self).__exit__(exc_type, exc_val, exc_tb)
+        handlers = logging.getLogger().handlers
+        if exc_type:
+            self.handler.emit_records_to(handlers)
+        elif self._filter:
+            self.handler.emit_records_to(handlers, self._filter)
+        return res
+
+
+def screen_logs(log_name=None):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            with ScreeningLogger(log_name):
+                return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+screen_unexpected_exception_logs = screen_logs('ec2api.api')
+screen_all_logs = screen_logs()

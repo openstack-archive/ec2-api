@@ -94,6 +94,7 @@ class VpcTestCase(base.ApiTestCase):
         self.neutron.create_router.assert_called_with({'router': {}})
         self.assertEqual(0, self.db_api.add_item.call_count)
 
+    @tools.screen_unexpected_exception_logs
     def test_create_vpc_rollback(self):
         self.neutron.create_router.side_effect = (
             tools.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
@@ -177,6 +178,7 @@ class VpcTestCase(base.ApiTestCase):
         resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
         check_response(resp)
 
+    @tools.screen_unexpected_exception_logs
     def test_delete_vpc_rollback(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.delete_router.side_effect = Exception()

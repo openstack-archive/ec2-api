@@ -64,8 +64,7 @@ class RouteTableTestCase(base.ApiTestCase):
             self.assertEqual(True, resp['return'])
 
             self.db_api.update_item.assert_called_once_with(
-                mock.ANY,
-                route_table)
+                mock.ANY, route_table)
             routes_updater.assert_called_once_with(
                 mock.ANY, route_table, mock.ANY,
                 rollback_route_table_state)
@@ -209,23 +208,25 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.gen_db_igw(fakes.ID_EC2_IGW_2, fakes.ID_EC2_VPC_1))
         routes_updater.side_effect = Exception()
 
-        self.assert_execution_error(
-            self.ANY_EXECUTE_ERROR, 'CreateRoute',
-            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
-             'DestinationCidrBlock': '0.0.0.0/0',
-             'GatewayId': fakes.ID_EC2_IGW_1})
+        with tools.ScreeningLogger(log_name='ec2api.api'):
+            self.assert_execution_error(
+                self.ANY_EXECUTE_ERROR, 'CreateRoute',
+                {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+                 'DestinationCidrBlock': '0.0.0.0/0',
+                 'GatewayId': fakes.ID_EC2_IGW_1})
 
-        self.db_api.update_item.assert_any_call(mock.ANY,
-                                                fakes.DB_ROUTE_TABLE_1)
+            self.db_api.update_item.assert_any_call(mock.ANY,
+                                                    fakes.DB_ROUTE_TABLE_1)
 
-        self.assert_execution_error(
-            self.ANY_EXECUTE_ERROR, 'ReplaceRoute',
-            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
-             'DestinationCidrBlock': '0.0.0.0/0',
-             'GatewayId': fakes.ID_EC2_IGW_2})
+        with tools.ScreeningLogger(log_name='ec2api.api'):
+            self.assert_execution_error(
+                self.ANY_EXECUTE_ERROR, 'ReplaceRoute',
+                {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                 'DestinationCidrBlock': '0.0.0.0/0',
+                 'GatewayId': fakes.ID_EC2_IGW_2})
 
-        self.db_api.update_item.assert_any_call(mock.ANY,
-                                                fakes.DB_ROUTE_TABLE_2)
+            self.db_api.update_item.assert_any_call(mock.ANY,
+                                                    fakes.DB_ROUTE_TABLE_2)
 
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
     def test_replace_route(self, routes_updater):
@@ -296,6 +297,7 @@ class RouteTableTestCase(base.ApiTestCase):
             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
              'DestinationCidrBlock': fakes.CIDR_VPC_1})
 
+    @tools.screen_unexpected_exception_logs
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
     def test_delete_route_rollback(self, routes_updater):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2)
@@ -359,6 +361,7 @@ class RouteTableTestCase(base.ApiTestCase):
                   'SubnetId': fakes.ID_EC2_SUBNET_2},
                  'Resource.AlreadyAssociated')
 
+    @tools.screen_unexpected_exception_logs
     @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
     def test_associate_route_table_rollback(self, routes_updater):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1,
@@ -462,23 +465,26 @@ class RouteTableTestCase(base.ApiTestCase):
                                fakes.DB_VPC_1)
         multiply_routes_updater.side_effect = Exception()
 
-        self.assert_execution_error(
-            self.ANY_EXECUTE_ERROR, 'ReplaceRouteTableAssociation',
-            {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
-             'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
+        with tools.ScreeningLogger(log_name='ec2api.api'):
+            self.assert_execution_error(
+                self.ANY_EXECUTE_ERROR, 'ReplaceRouteTableAssociation',
+                {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1,
+                 'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
 
-        self.db_api.update_item.assert_any_call(
-            mock.ANY, fakes.DB_VPC_1)
+            self.db_api.update_item.assert_any_call(
+                mock.ANY, fakes.DB_VPC_1)
+
         self.db_api.reset_mock()
         routes_updater.side_effect = Exception()
 
-        self.assert_execution_error(
-            self.ANY_EXECUTE_ERROR, 'ReplaceRouteTableAssociation',
-            {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
-             'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
+        with tools.ScreeningLogger(log_name='ec2api.api'):
+            self.assert_execution_error(
+                self.ANY_EXECUTE_ERROR, 'ReplaceRouteTableAssociation',
+                {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
+                 'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
 
-        self.db_api.update_item.assert_any_call(
-            mock.ANY, fakes.DB_SUBNET_2)
+            self.db_api.update_item.assert_any_call(
+                mock.ANY, fakes.DB_SUBNET_2)
 
     @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
     def test_disassociate_route_table(self, routes_updater):
@@ -514,6 +520,7 @@ class RouteTableTestCase(base.ApiTestCase):
         do_check({'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1},
                  'InvalidParameterValue')
 
+    @tools.screen_unexpected_exception_logs
     @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
     def test_disassociate_route_table_rollback(self, routes_updater):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_3,

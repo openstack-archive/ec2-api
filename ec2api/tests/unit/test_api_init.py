@@ -28,6 +28,7 @@ from ec2api.api import apirequest
 from ec2api import exception
 from ec2api.tests.unit import fakes_request_response as fakes
 from ec2api.tests.unit import matchers
+from ec2api.tests.unit import tools
 from ec2api import wsgi
 
 
@@ -68,6 +69,7 @@ class ApiInitTestCase(test_base.BaseTestCase):
                                                             param='fake_param')
 
     def test_execute_error(self):
+        @tools.screen_all_logs
         def do_check(ex, status, code, message):
             self.controller.reset_mock()
             self.controller.fake_action.side_effect = ex

@@ -117,6 +117,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.nova.security_groups.create.assert_called_once_with(
             'groupname', 'Group description')
 
+    @tools.screen_unexpected_exception_logs
     def test_create_security_group_rollback(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())

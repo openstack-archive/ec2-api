@@ -141,6 +141,7 @@ class DhcpOptionsTestCase(base.ApiTestCase):
 
         check('default', None, {'extra_dhcp_opts': []})
 
+    @tools.screen_unexpected_exception_logs
     def test_associate_dhcp_options_rollback(self):
         vpc = tools.update_dict(
                 fakes.DB_VPC_1,

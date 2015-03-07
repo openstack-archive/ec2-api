@@ -19,6 +19,7 @@ from neutronclient.common import exceptions as neutron_exception
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
+from ec2api.tests.unit import tools
 
 
 class IgwTestCase(base.ApiTestCase):
@@ -93,6 +94,7 @@ class IgwTestCase(base.ApiTestCase):
             fakes.gen_db_igw(fakes.ID_EC2_IGW_1, fakes.ID_EC2_VPC_2))
         do_check('InvalidParameterValue')
 
+    @tools.screen_unexpected_exception_logs
     def test_attach_igw_rollback(self):
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2)
@@ -162,6 +164,7 @@ class IgwTestCase(base.ApiTestCase):
         self.neutron.remove_gateway_router.assert_called_once_with(
                 fakes.ID_OS_ROUTER_1)
 
+    @tools.screen_unexpected_exception_logs
     def test_detach_igw_rollback(self):
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
         self.neutron.remove_gateway_router.side_effect = Exception()

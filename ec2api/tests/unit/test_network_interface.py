@@ -236,6 +236,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                       'PrivateIpAddress': fakes.IP_NETWORK_INTERFACE_1},
                      'InvalidParameterValue')
 
+    @tools.screen_unexpected_exception_logs
     @mock.patch('ec2api.api.dhcp_options._add_dhcp_opts_to_port')
     def test_create_network_interface_rollback(self, _add_dhcp_opts_to_port):
         self.set_mock_db_items(
@@ -321,6 +322,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                              ['network_interface_id',
                               'private_ip_address']))
 
+    @tools.screen_unexpected_exception_logs
     def test_delete_network_interface_rollback(self):
         self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1)
         self.neutron.delete_port.side_effect = Exception()
@@ -467,6 +469,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              'InstanceId': fakes.ID_EC2_INSTANCE_1,
              'DeviceIndex': '0'})
 
+    @tools.screen_unexpected_exception_logs
     def test_attach_network_interface_rollback(self):
         self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1,
                                fakes.DB_INSTANCE_1)
@@ -522,6 +525,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             {'AttachmentId': ec2utils.change_ec2_id_kind(
                     fakes.ID_EC2_NETWORK_INTERFACE_2, 'eni-attach')})
 
+    @tools.screen_unexpected_exception_logs
     def test_detach_network_interface_rollback(self):
         network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
                                               {'device_index': 1})

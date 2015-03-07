@@ -25,6 +25,7 @@ import webob.exc
 from ec2api import api as ec2
 from ec2api import context
 from ec2api import exception
+from ec2api.tests.unit import tools
 from ec2api import wsgi
 
 CONF = cfg.CONF
@@ -149,6 +150,7 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
                                         CONF.keystone_url + '/ec2tokens',
                                         data=mock.ANY, headers=mock.ANY)
 
+    @tools.screen_all_logs
     @mock.patch.object(requests, 'request', return_value=FakeResponse(200))
     def test_no_result_data(self, mock_request):
         req = wsgi.Request.blank('/test')

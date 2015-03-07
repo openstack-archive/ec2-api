@@ -134,6 +134,7 @@ class SubnetTestCase(base.ApiTestCase):
         test_overlimit(self.neutron.create_network)
         test_overlimit(self.neutron.create_subnet)
 
+    @tools.screen_unexpected_exception_logs
     def test_create_subnet_rollback(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.db_api.add_item.side_effect = (
@@ -220,6 +221,7 @@ class SubnetTestCase(base.ApiTestCase):
         self.assert_execution_error('DependencyViolation', 'DeleteSubnet',
                                     {'SubnetId': fakes.ID_EC2_SUBNET_1})
 
+    @tools.screen_unexpected_exception_logs
     def test_delete_subnet_rollback(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)
         self.neutron.show_subnet.side_effect = Exception()

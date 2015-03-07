@@ -89,6 +89,7 @@ class AddressTestCase(base.ApiTestCase):
         self.assert_execution_error('AddressLimitExceeded', 'AllocateAddress',
                                     {})
 
+    @tools.screen_unexpected_exception_logs
     def test_allocate_address_vpc_rollback(self):
         address.address_engine = (
             address.AddressEngineNeutron())
@@ -327,6 +328,7 @@ class AddressTestCase(base.ApiTestCase):
                                     {'AllocationId': fakes.ID_EC2_ADDRESS_1,
                                      'InstanceId': fakes.ID_EC2_INSTANCE_1})
 
+    @tools.screen_unexpected_exception_logs
     def test_associate_address_vpc_rollback(self):
         address.address_engine = (
             address.AddressEngineNeutron())
@@ -436,6 +438,7 @@ class AddressTestCase(base.ApiTestCase):
         do_check({'AssociationId': fakes.ID_EC2_ASSOCIATION_2},
                  'InvalidAssociationID.NotFound')
 
+    @tools.screen_unexpected_exception_logs
     def test_dissassociate_address_vpc_rollback(self):
         address.address_engine = (
             address.AddressEngineNeutron())
@@ -528,6 +531,7 @@ class AddressTestCase(base.ApiTestCase):
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_2},
                  'InvalidIPAddress.InUse')
 
+    @tools.screen_unexpected_exception_logs
     def test_release_address_vpc_rollback(self):
         address.address_engine = (
             address.AddressEngineNeutron())

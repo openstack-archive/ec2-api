@@ -469,6 +469,7 @@ class InstanceTestCase(base.ApiTestCase):
                              image={'id': fakes.ID_OS_IMAGE_1}))
         self.novadb.instance_get_by_uuid.side_effect = Exception()
 
+        @tools.screen_unexpected_exception_logs
         def do_check(params, new_port=True, delete_on_termination=None):
             mock_manager = mock.MagicMock()
             mock_manager.attach_mock(self.network_interface_api,
@@ -581,14 +582,16 @@ class InstanceTestCase(base.ApiTestCase):
             self.nova.servers.reset_mock()
             self.db_api.reset_mock()
 
-        do_check(instance_api.InstanceEngineNeutron())
-        (self.network_interface_api._detach_network_interface_item.
-         assert_called_once_with(mock.ANY, network_interfaces[2]))
-        (self.network_interface_api.delete_network_interface.
-         assert_called_once_with(
-             mock.ANY, network_interface_id=network_interfaces[2]['id']))
+        with tools.ScreeningLogger(log_name='ec2api.api'):
+            do_check(instance_api.InstanceEngineNeutron())
+            (self.network_interface_api._detach_network_interface_item.
+             assert_called_once_with(mock.ANY, network_interfaces[2]))
+            (self.network_interface_api.delete_network_interface.
+             assert_called_once_with(
+                 mock.ANY, network_interface_id=network_interfaces[2]['id']))
 
-        do_check(instance_api.InstanceEngineNova())
+        with tools.ScreeningLogger(log_name='ec2api.api'):
+            do_check(instance_api.InstanceEngineNova())
 
     def test_run_instances_invalid_parameters(self):
         self.assert_execution_error('InvalidParameterValue', 'RunInstances',

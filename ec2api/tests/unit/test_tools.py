@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import fixtures
+from oslo_log import log as logging
+from oslotest import base as test_base
 import testtools
 
 from ec2api import exception
@@ -50,5 +52,41 @@ class TestToolsTestCase(testtools.TestCase):
 class TestBaseTestCase(base.ApiTestCase):
 
     def test_validate_exception_format_is_enabled_for_tests(self):
-        self.assertRaises(KeyError, exception.InvalidVpcRange, fake='value')
-        self.assertRaises(TypeError, exception.InvalidID, {'id': 'value'})
+        with tools.ScreeningLogger():
+            self.assertRaises(KeyError, exception.InvalidVpcRange,
+                              fake='value')
+        with tools.ScreeningLogger():
+            self.assertRaises(TypeError, exception.InvalidID, {'id': 'value'})
+
+
+class LoggingTestCase(test_base.BaseTestCase):
+
+    def test_hide_logs(self):
+        with fixtures.FakeLogger() as logger:
+            with tools.ScreeningLogger():
+                LOG = logging.getLogger('ec2api.api')
+                LOG.critical('critical message')
+                LOG.error('error message')
+                LOG.warning('warning message')
+            self.assertEqual(0, len(logger.output))
+
+    def test_screen_logs(self):
+        with fixtures.FakeLogger() as logger:
+            with tools.ScreeningLogger(log_name='ec2api.api'):
+                LOG1 = logging.getLogger('ec2api.api')
+                LOG1.error('error message')
+                LOG2 = logging.getLogger('ec2api.api.vpc')
+                LOG2.warning('warning message')
+            self.assertIn('warning message', logger.output)
+            self.assertNotIn('error message', logger.output)
+
+    def test_show_logs_on_unhandled_exception(self):
+        with fixtures.FakeLogger() as logger:
+            try:
+                with tools.ScreeningLogger():
+                    LOG = logging.getLogger('ec2api.api')
+                    LOG.error('error message')
+                    raise Exception()
+            except Exception:
+                pass
+            self.assertIn('error message', logger.output)
