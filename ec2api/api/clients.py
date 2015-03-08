@@ -15,7 +15,6 @@
 
 from keystoneclient.v2_0 import client as kc
 from novaclient import client as novaclient
-from novaclient import shell as novashell
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging as messaging
@@ -45,26 +44,16 @@ except ImportError:
     logger.info(_('glanceclient not available'))
 
 
-def nova(context, service_type='compute'):
-    computeshell = novashell.OpenStackComputeShell()
-    extensions = computeshell._discover_extensions("1.1")
-
+def nova(context, microversion=None):
     args = {
         'project_id': context.project_id,
         'auth_url': CONF.keystone_url,
-        'service_type': service_type,
         'username': None,
         'api_key': None,
-        'extensions': extensions,
+        'auth_token': context.auth_token,
+        'bypass_url': _url_for(context, service_type='computev21'),
     }
-
-    client = novaclient.Client(1.1, **args)
-
-    management_url = _url_for(context, service_type=service_type)
-    client.client.auth_token = context.auth_token
-    client.client.management_url = management_url
-
-    return client
+    return novaclient.Client(microversion or 2, **args)
 
 
 def neutron(context):
