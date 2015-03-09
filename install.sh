@@ -296,9 +296,9 @@ iniset $CONF_FILE keystone_authtoken admin_tenant_name $SERVICE_TENANT
 iniset $CONF_FILE keystone_authtoken auth_protocol $AUTH_PROTO
 iniset $CONF_FILE keystone_authtoken auth_port $AUTH_PORT
 
-iniset $CONF_FILE metadata admin_user $SERVICE_USERNAME
-iniset $CONF_FILE metadata admin_password $SERVICE_PASSWORD
-iniset $CONF_FILE metadata admin_tenant_name $SERVICE_TENANT
+iniset $CONF_FILE DEFAULT admin_user $SERVICE_USERNAME
+iniset $CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
+iniset $CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT
 
 if [[ -f "$NOVA_CONF" ]]; then
     copynovaopt s3_host

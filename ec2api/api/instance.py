@@ -212,7 +212,7 @@ class InstanceDescriber(common.TaggableItemsDescriber):
                 # NOTE(ft): these filters are needed for metadata server
                 # which calls describe_instances with an admin account
                 # (but project_id is substituted to an instance's one).
-                search_opts={'all_tenants': self.context.cross_tenants,
+                search_opts={'all_tenants': self.context.is_os_admin,
                              'project_id': self.context.project_id})
 
     def auto_update_db(self, instance, os_instance):

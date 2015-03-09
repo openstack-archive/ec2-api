@@ -176,9 +176,9 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE keystone_authtoken admin_password $SERVICE_PASSWORD
     iniset $EC2API_CONF_FILE keystone_authtoken signing_dir $EC2API_KEYSTONE_SIGNING_DIR
 
-    iniset $EC2API_CONF_FILE metadata admin_tenant_name $SERVICE_TENANT_NAME
-    iniset $EC2API_CONF_FILE metadata admin_user $EC2API_ADMIN_USER
-    iniset $EC2API_CONF_FILE metadata admin_password $SERVICE_PASSWORD
+    iniset $EC2API_CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT_NAME
+    iniset $EC2API_CONF_FILE DEFAULT admin_user $EC2API_ADMIN_USER
+    iniset $EC2API_CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
 
     iniset $EC2API_CONF_FILE DEFAULT keystone_url "http://${KEYSTONE_AUTH_HOST}:35357/v2.0"
     iniset $EC2API_CONF_FILE DEFAULT region_list "$REGION_NAME"

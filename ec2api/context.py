@@ -16,6 +16,8 @@
 
 import uuid
 
+from keystoneclient.v2_0 import client as keystone_client
+from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import timeutils
 import six
@@ -24,6 +26,19 @@ from ec2api import exception
 from ec2api.i18n import _
 from ec2api.openstack.common import local
 
+
+ec2_opts = [
+    cfg.StrOpt('admin_user',
+               help=_("Admin user")),
+    cfg.StrOpt('admin_password',
+               help=_("Admin password"),
+               secret=True),
+    cfg.StrOpt('admin_tenant_name',
+               help=_("Admin tenant name")),
+]
+
+CONF = cfg.CONF
+CONF.register_opts(ec2_opts)
 
 LOG = logging.getLogger(__name__)
 
@@ -43,7 +58,7 @@ class RequestContext(object):
                  is_admin=None, roles=None, remote_address=None,
                  auth_token=None, user_name=None, project_name=None,
                  overwrite=True, service_catalog=None, api_version=None,
-                 cross_tenants=None, **kwargs):
+                 is_os_admin=None, **kwargs):
         """Parameters
 
             :param overwrite: Set to False to ensure that the greenthread local
@@ -55,7 +70,7 @@ class RequestContext(object):
         """
         if kwargs:
             LOG.warn(_('Arguments dropped when creating context: %s') %
-                    str(kwargs))
+                     str(kwargs))
 
         self.user_id = user_id
         self.project_id = project_id
@@ -78,7 +93,7 @@ class RequestContext(object):
         self.project_name = project_name
         self.is_admin = is_admin
         # TODO(ft): call policy.check_is_admin if is_admin is None
-        self.cross_tenants = cross_tenants
+        self.is_os_admin = is_os_admin
         self.api_version = api_version
         if overwrite or not hasattr(local.store, 'context'):
             self.update_store()
@@ -139,6 +154,24 @@ def is_user_context(context):
     if not context.user_id or not context.project_id:
         return False
     return True
+
+
+def get_os_admin_context():
+    """Create a context to interact with OpenStack as an administrator."""
+    # TODO(ft): make an authentification token reusable
+    keystone = keystone_client.Client(
+        username=CONF.admin_user,
+        password=CONF.admin_password,
+        tenant_name=CONF.admin_tenant_name,
+        auth_url=CONF.keystone_url,
+    )
+    service_catalog = keystone.service_catalog.get_data()
+    return RequestContext(
+            keystone.auth_user_id,
+            keystone.auth_tenant_id,
+            auth_token=keystone.auth_token,
+            service_catalog=service_catalog,
+            is_os_admin=True)
 
 
 def require_context(ctxt):

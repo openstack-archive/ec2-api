@@ -39,9 +39,6 @@ class ProxyTestCase(test_base.BaseTestCase):
                     auth_ca_cert=None,
                     nova_client_cert='nova_cert',
                     nova_client_priv_key='nova_priv_key',
-                    admin_user='admin',
-                    admin_password='password',
-                    admin_tenant_name='service',
                     metadata_proxy_shared_secret='secret')
 
     @mock.patch('ec2api.metadata.api.get_version_list')
@@ -91,7 +88,7 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.metadata.api.get_metadata_item')
     @mock.patch('ec2api.metadata.api.get_os_instance_and_project_id')
     @mock.patch.object(metadata.MetadataRequestHandler, '_get_remote_ip')
-    @mock.patch.object(metadata.MetadataRequestHandler, '_get_context')
+    @mock.patch('ec2api.context.get_os_admin_context')
     def test_get_metadata_by_ip(self, get_context, get_remote_ip, get_ids,
                                 get_metadata_item):
         get_context.return_value = mock.Mock(project_id='fake_admin_project')
@@ -116,7 +113,7 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.metadata.api.get_metadata_item')
     @mock.patch.object(metadata.MetadataRequestHandler,
                        '_unpack_request_attributes')
-    @mock.patch.object(metadata.MetadataRequestHandler, '_get_context')
+    @mock.patch('ec2api.context.get_os_admin_context')
     def test_get_metadata_by_instance_id(self, get_context, unpack_request,
                                          get_metadata_item):
         get_context.return_value = mock.Mock(project_id='fake_admin_project')
@@ -243,7 +240,7 @@ class ProxyTestCase(test_base.BaseTestCase):
             self._proxy_request_test_helper(response_code=302)
 
     @mock.patch.object(metadata.MetadataRequestHandler, '_sign_instance_id')
-    @mock.patch.object(metadata.MetadataRequestHandler, '_get_context')
+    @mock.patch('ec2api.context.get_os_admin_context')
     @mock.patch.object(metadata.MetadataRequestHandler, '_get_remote_ip')
     def test_build_proxy_request_headers(self, get_remote_ip, get_context,
                                          sign_instance_id):
@@ -299,28 +296,6 @@ class ProxyTestCase(test_base.BaseTestCase):
 
         cfg.CONF.set_override('use_forwarded_for', False)
         self.assertEqual('fake_addr', self.handler._get_remote_ip(req))
-
-    @mock.patch('keystoneclient.v2_0.client.Client')
-    def test_get_context(self, keystone):
-        service_catalog = mock.MagicMock()
-        service_catalog.get_data.return_value = 'fake_service_catalog'
-        keystone.return_value = mock.Mock(auth_user_id='fake_user_id',
-                                          auth_tenant_id='fake_project_id',
-                                          auth_token='fake_token',
-                                          service_catalog=service_catalog)
-        context = self.handler._get_context()
-        self.assertEqual('fake_user_id', context.user_id)
-        self.assertEqual('fake_project_id', context.project_id)
-        self.assertEqual('fake_token', context.auth_token)
-        self.assertEqual('fake_service_catalog', context.service_catalog)
-        self.assertTrue(context.is_admin)
-        self.assertTrue(context.cross_tenants)
-        conf = cfg.CONF
-        keystone.assert_called_with(
-                username=conf.metadata.admin_user,
-                password=conf.metadata.admin_password,
-                tenant_name=conf.metadata.admin_tenant_name,
-                auth_url=conf.keystone_url)
 
     def test_unpack_request_attributes(self):
         sign = (

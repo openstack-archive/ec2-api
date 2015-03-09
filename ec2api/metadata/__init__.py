@@ -18,7 +18,6 @@ import posixpath
 import urlparse
 
 import httplib2
-from keystoneclient.v2_0 import client as keystone_client
 from oslo_config import cfg
 from oslo_log import log as logging
 import six
@@ -59,13 +58,6 @@ metadata_opts = [
     cfg.StrOpt('nova_client_priv_key',
                default='',
                help=_("Private key of client certificate.")),
-    cfg.StrOpt('admin_user',
-               help=_("Admin user")),
-    cfg.StrOpt('admin_password',
-               help=_("Admin password"),
-               secret=True),
-    cfg.StrOpt('admin_tenant_name',
-               help=_("Admin tenant name")),
     cfg.StrOpt('metadata_proxy_shared_secret',
                default='',
                help=_('Shared secret to sign instance-id request'),
@@ -162,7 +154,7 @@ class MetadataRequestHandler(wsgi.Application):
             return req.headers
 
         remote_ip = self._get_remote_ip(req)
-        context = self._get_context()
+        context = ec2context.get_os_admin_context()
         instance_id, project_id = (
             api.get_os_instance_and_project_id(context, remote_ip))
         return {
@@ -180,30 +172,13 @@ class MetadataRequestHandler(wsgi.Application):
             raise exception.EC2MetadataInvalidAddress()
         return remote_ip
 
-    def _get_context(self):
-        # TODO(ft): make authentification token reusable
-        keystone = keystone_client.Client(
-            username=CONF.metadata.admin_user,
-            password=CONF.metadata.admin_password,
-            tenant_name=CONF.metadata.admin_tenant_name,
-            auth_url=CONF.keystone_url,
-        )
-        service_catalog = keystone.service_catalog.get_data()
-        return ec2context.RequestContext(
-                keystone.auth_user_id,
-                keystone.auth_tenant_id,
-                auth_token=keystone.auth_token,
-                service_catalog=service_catalog,
-                is_admin=True,
-                cross_tenants=True)
-
     def _sign_instance_id(self, instance_id):
         return hmac.new(CONF.metadata.metadata_proxy_shared_secret,
                         instance_id,
                         hashlib.sha256).hexdigest()
 
     def _get_metadata(self, req, path_tokens):
-        context = self._get_context()
+        context = ec2context.get_os_admin_context()
         if req.headers.get('X-Instance-ID'):
             os_instance_id, project_id, remote_ip = (
                 self._unpack_request_attributes(req))
