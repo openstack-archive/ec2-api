@@ -281,8 +281,8 @@ class EC2TestCase(base.BaseTestCase):
         self._resource_trash_bin[self._sequence] = (function, args, kwargs, tb)
 
         LOG.debug("For cleaning up: %s\n    From: %s" %
-            (self.friendly_function_call_str(function, *args, **kwargs),
-            str((tb[0], tb[1], tb[2]))))
+                  (self.friendly_function_call_str(function, *args, **kwargs),
+                   str((tb[0], tb[1], tb[2]))))
 
         return self._sequence
 
@@ -365,7 +365,7 @@ class EC2TestCase(base.BaseTestCase):
                     break
             else:
                 err_msg = (error if isinstance(error, basestring)
-                    else error.get('Message'))
+                           else error.get('Message'))
                 msg = ("Cleanup failed with status %d and message"
                        " '%s'(Code = %s)"
                        % (resp.status_code, err_msg, error_code))
@@ -392,7 +392,7 @@ class EC2TestCase(base.BaseTestCase):
             if len(args):
                 string += ", "
         string += ", ".join("=".join(map(str, (key, value)))
-                  for (key, value) in kwargs.items())
+                            for (key, value) in kwargs.items())
         return string + ")"
 
     @classmethod

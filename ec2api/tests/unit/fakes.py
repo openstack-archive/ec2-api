@@ -238,8 +238,10 @@ FINGERPRINT_KEY_PAIR = (
 # [<subtype>]<object_name>
 # where
 #    subtype - type of object storage, is not used for DB objects
+#        DB - object is stored in ec2api DB
 #        EC2 - object representation to end user
 #        OS - object is stored in OpenStack
+#        NOVA - object is stored in Nova (for EC2 Classic mode only)
 #    object_name - identifies the object
 
 # vpc objects
@@ -456,54 +458,6 @@ DB_INSTANCE_2 = {
     'client_token': CLIENT_TOKEN_INSTANCE_2,
 }
 
-NOVADB_INSTANCE_1 = {
-    'reservation_id': random_ec2_id('r'),
-    'launch_index': 0,
-    'kernel_id': ID_OS_IMAGE_AKI_1,
-    'ramdisk_id': ID_OS_IMAGE_ARI_1,
-    'root_device_name': ROOT_DEVICE_NAME_INSTANCE_1,
-    'hostname': '%s-%s' % (ID_EC2_RESERVATION_1, 0),
-    'key_data': PUBLIC_KEY_KEY_PAIR,
-    'user_data': None,
-}
-NOVADB_INSTANCE_2 = {
-    'reservation_id': ID_EC2_RESERVATION_2,
-    'launch_index': 0,
-    'kernel_id': None,
-    'ramdisk_id': None,
-    'root_device_name': ROOT_DEVICE_NAME_INSTANCE_2,
-    'hostname': 'Server %s' % ID_OS_INSTANCE_2,
-    'key_data': None,
-    'user_data': base64.b64encode(USER_DATA_INSTANCE_2),
-}
-
-NOVADB_BDM_INSTANCE_1 = []
-NOVADB_BDM_INSTANCE_2 = [
-    {'device_name': ROOT_DEVICE_NAME_INSTANCE_2,
-     'delete_on_termination': False,
-     'snapshot_id': None,
-     'volume_id': ID_OS_VOLUME_2,
-     'no_device': False,
-     'source_type': 'volume',
-    },
-    {'device_name': '/dev/sdc',
-     'snapshot_id': None,
-     'volume_id': None,
-     'virtual_name': 'swap',
-     'no_device': False,
-     'source_type': 'blank',
-     'guest_format': 'swap',
-    },
-    {'device_name': '/dev/sdd',
-     'snapshot_id': None,
-     'volume_id': None,
-     'virtual_name': 'ephemeral3',
-     'no_device': False,
-     'source_type': 'blank',
-     'guest_format': None,
-    },
-]
-
 EC2_INSTANCE_1 = {
     'instanceId': ID_EC2_INSTANCE_1,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
@@ -605,27 +559,28 @@ EC2_RESERVATION_2 = {
 EC2_BDM_METADATA_INSTANCE_1 = {}
 EC2_BDM_METADATA_INSTANCE_2 = {
     'ebs0': ROOT_DEVICE_NAME_INSTANCE_2,
-    'ephemeral0': '/dev/sdd',
-    'swap': '/dev/sdc',
 }
 
 
+# fake class for a instance received from Nova API with v2.3 microversion
+# support
 class OSInstance(object):
-    def __init__(self, instance_id, flavor=None, image=None, key_name=None,
-                 created=None, tenant_id=ID_OS_PROJECT, addresses={},
-                 security_groups=[], vm_state=None, host=None,
-                 availability_zone=None):
-        self.id = instance_id
-        self.flavor = flavor
-        self.image = image
-        self.key_name = key_name
-        self.created = created
-        self.tenant_id = tenant_id
-        self.addresses = addresses
-        self.security_groups = security_groups
-        setattr(self, 'OS-EXT-STS:vm_state', vm_state)
-        setattr(self, 'OS-EXT-SRV-ATTR:host', host)
-        setattr(self, 'OS-EXT-AZ:availability_zone', availability_zone)
+    def __init__(self, instance_dict):
+        self.id = instance_dict['id']
+        self.flavor = instance_dict.get('flavor')
+        self.image = instance_dict.get('image')
+        self.key_name = instance_dict.get('key_name')
+        self.created = instance_dict.get('created')
+        self.tenant_id = instance_dict.get('tenant_id', ID_OS_PROJECT)
+        self.addresses = copy.deepcopy(instance_dict.get('addresses', {}))
+        self.security_groups = copy.deepcopy(
+            instance_dict.get('security_groups', []))
+        setattr(self, 'OS-EXT-STS:vm_state', instance_dict.get('vm_state'))
+        setattr(self, 'OS-EXT-SRV-ATTR:host', instance_dict.get('host'))
+        setattr(self, 'OS-EXT-AZ:availability_zone',
+                instance_dict.get('availability_zone'))
+        setattr(self, 'os-extended-volumes:volumes_attached',
+                copy.deepcopy(instance_dict.get('volumes_attached', [])))
 
     def get(self):
         pass
@@ -648,10 +603,29 @@ class OSInstance(object):
     def get_console_output(self):
         return None
 
-OS_INSTANCE_1 = OSInstance(
-    ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
-    image={'id': ID_OS_IMAGE_1},
-    addresses={
+
+# fake class for a instance received with an admin account from Nova API
+# with v2.3 microversion support
+class OSInstance_full(OSInstance):
+    def __init__(self, instance_dict):
+        super(OSInstance_full, self).__init__(instance_dict)
+        setattr(self, 'OS-EXT-SRV-ATTR:root_device_name',
+                instance_dict.get('root_device_name'))
+        setattr(self, 'OS-EXT-SRV-ATTR:kernel_id',
+                instance_dict.get('kernel_id'))
+        setattr(self, 'OS-EXT-SRV-ATTR:ramdisk_id',
+                instance_dict.get('ramdisk_id'))
+        setattr(self, 'OS-EXT-SRV-ATTR:user_data',
+                instance_dict.get('user_data'))
+        setattr(self, 'OS-EXT-SRV-ATTR:hostname',
+                instance_dict.get('hostname'))
+
+
+OS_INSTANCE_1 = {
+    'id': ID_OS_INSTANCE_1,
+    'flavor': {'id': 'fakeFlavorId'},
+    'image': {'id': ID_OS_IMAGE_1},
+    'addresses': {
         ID_EC2_SUBNET_2: [{'addr': IP_NETWORK_INTERFACE_2,
                            'version': 4,
                            'OS-EXT-IPS:type': 'fixed'},
@@ -664,21 +638,31 @@ OS_INSTANCE_1 = OSInstance(
                           {'addr': IP_ADDRESS_2,
                            'version': 4,
                            'OS-EXT-IPS:type': 'floating'}]},
-    key_name=NAME_KEY_PAIR,
-    )
-OS_INSTANCE_2 = OSInstance(
-    ID_OS_INSTANCE_2, {'id': 'fakeFlavorId'},
-    security_groups=[{'name': NAME_DEFAULT_OS_SECURITY_GROUP},
-                     {'name': NAME_OTHER_OS_SECURITY_GROUP}],
-    availability_zone=NAME_AVAILABILITY_ZONE,
-    addresses={
+    'key_name': NAME_KEY_PAIR,
+    'root_device_name': ROOT_DEVICE_NAME_INSTANCE_1,
+    'kernel_id': ID_OS_IMAGE_AKI_1,
+    'ramdisk_id': ID_OS_IMAGE_ARI_1,
+    'hostname': '%s-%s' % (ID_EC2_RESERVATION_1, 0),
+}
+OS_INSTANCE_2 = {
+    'id': ID_OS_INSTANCE_2,
+    'flavor': {'id': 'fakeFlavorId'},
+    'security_groups': [{'name': NAME_DEFAULT_OS_SECURITY_GROUP},
+                        {'name': NAME_OTHER_OS_SECURITY_GROUP}],
+    'availability_zone': NAME_AVAILABILITY_ZONE,
+    'addresses': {
         ID_EC2_SUBNET_1: [{'addr': IPV6_INSTANCE_2,
                            'version': 6,
                            'OS-EXT-IPS:type': 'fixed'},
                           {'addr': IP_ADDRESS_NOVA_1,
                            'version': 4,
                            'OS-EXT-IPS:type': 'floating'}]},
-    )
+    'root_device_name': ROOT_DEVICE_NAME_INSTANCE_2,
+    'volumes_attached': [{'id': ID_OS_VOLUME_2,
+                          'delete_on_termination': False}],
+    'user_data': base64.b64encode(USER_DATA_INSTANCE_2),
+    'hostname': 'Server %s' % ID_OS_INSTANCE_2,
+}
 
 
 # DHCP options objects
@@ -1205,7 +1189,7 @@ OS_IMAGE_1 = {
              'volume_id': ID_OS_VOLUME_2},
             {'device_name': '/dev/sdc3', 'virtual_name': 'ephemeral6'},
             {'device_name': '/dev/sdc4', 'no_device': True}],
-        }
+    }
 }
 OS_IMAGE_2 = {
     'id': ID_OS_IMAGE_2,
@@ -1309,18 +1293,18 @@ OS_SNAPSHOT_2 = {
 
 
 # volume objects
-class CinderVolume(object):
+class OSVolume(object):
 
     def __init__(self, volume):
         self.id = volume['id']
         self.status = volume['status']
-        self.availability_zone = volume['availability_zone']
-        self.size = volume['size']
-        self.created_at = volume['created_at']
-        self.display_name = volume['display_name']
-        self.display_description = volume['display_description']
-        self.snapshot_id = volume['snapshot_id']
-        self.attachments = volume['attachments']
+        self.availability_zone = volume.get('availability_zone')
+        self.size = volume.get('size')
+        self.created_at = volume.get('created_at')
+        self.display_name = volume.get('display_name')
+        self.display_description = volume.get('display_description')
+        self.snapshot_id = volume.get('snapshot_id')
+        self.attachments = copy.deepcopy(volume.get('attachments'))
         self.volume_type = None
         self.encrypted = False
 
@@ -1359,7 +1343,6 @@ EC2_VOLUME_2 = {
     'attachmentSet': [{'status': 'attached',
                        'instanceId': ID_EC2_INSTANCE_2,
                        'volumeId': ID_EC2_VOLUME_2,
-                       'deleteOnTermination': False,
                        'device': ROOT_DEVICE_NAME_INSTANCE_2}],
     'encrypted': False,
     'volumeType': None,
@@ -1431,8 +1414,8 @@ class NovaAvailabilityZone(object):
 
     def __init__(self, nova_availability_zone_dict):
         self.zoneName = nova_availability_zone_dict['zoneName']
-        self.zoneState = {'available':
-            nova_availability_zone_dict['zoneState'] == 'available'}
+        self.zoneState = {'available': (
+            nova_availability_zone_dict['zoneState'] == 'available')}
         self.hosts = nova_availability_zone_dict['hosts']
 
 OS_AVAILABILITY_ZONE = {'zoneName': NAME_AVAILABILITY_ZONE,
@@ -1449,7 +1432,7 @@ OS_AVAILABILITY_ZONE = {'zoneName': NAME_AVAILABILITY_ZONE,
                                                 'active': 'True',
                                                 'available': 'True',
                                                 'updated_at': 'now'}}
-                                   }}
+                                  }}
 OS_AVAILABILITY_ZONE_INTERNAL = {'zoneName': 'internal',
                                  'zoneState': 'available',
                                  'hosts': {}}

@@ -23,7 +23,7 @@ from oslo_log import log as logging
 import six
 import webob
 
-from ec2api import context as ec2context
+from ec2api import context as ec2_context
 from ec2api import exception
 from ec2api.i18n import _, _LE, _LW
 from ec2api.metadata import api
@@ -154,7 +154,7 @@ class MetadataRequestHandler(wsgi.Application):
             return req.headers
 
         remote_ip = self._get_remote_ip(req)
-        context = ec2context.get_os_admin_context()
+        context = ec2_context.get_os_admin_context()
         instance_id, project_id = (
             api.get_os_instance_and_project_id(context, remote_ip))
         return {
@@ -178,7 +178,7 @@ class MetadataRequestHandler(wsgi.Application):
                         hashlib.sha256).hexdigest()
 
     def _get_metadata(self, req, path_tokens):
-        context = ec2context.get_os_admin_context()
+        context = ec2_context.get_os_admin_context()
         if req.headers.get('X-Instance-ID'):
             os_instance_id, project_id, remote_ip = (
                 self._unpack_request_attributes(req))

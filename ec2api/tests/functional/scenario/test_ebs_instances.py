@@ -375,12 +375,12 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
             ImageId=self.image_id, InstanceType=instance_type,
             Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        instance = data['Instances'][0]
         instance_id = data['Instances'][0]['InstanceId']
         res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
                                             InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
+        instance = self.get_instance(instance_id)
 
         bdt = self.get_instance_bdm(instance_id, None)
         self.assertIsNotNone(bdt)

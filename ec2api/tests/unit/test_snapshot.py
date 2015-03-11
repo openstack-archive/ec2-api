@@ -104,7 +104,7 @@ class SnapshotTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_VOLUME_2)
         self.cinder.volumes.get.side_effect = (
             lambda vol_id: (
-                fakes.CinderVolume(fakes.OS_VOLUME_2)
+                fakes.OSVolume(fakes.OS_VOLUME_2)
                 if vol_id == fakes.ID_OS_VOLUME_2
                 else None))
 

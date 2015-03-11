@@ -202,25 +202,6 @@ function copynovaopt() {
     iniset $CONF_FILE DEFAULT $option_name $option
 }
 
-#get nova settings
-if [[ -z "$NOVA_CONNECTION" ]]; then
-    if [[ ! -f "$NOVA_CONF" ]]; then
-        reason="$NOVA_CONF isn't found"
-    else
-        reason="Connection string isn't found in $NOVA_CONF"
-        NOVA_CONNECTION=$(iniget $NOVA_CONF database connection)
-        if [[ -z "$NOVA_CONNECTION" ]]; then
-            NOVA_CONNECTION=$(iniget $NOVA_CONF DEFAULT sql_connection)
-        fi
-        if [[ -z "$NOVA_CONNECTION" ]]; then
-            NOVA_CONNECTION=$(iniget $NOVA_CONF DATABASE sql_connection)
-        fi
-        if [[ -z "$NOVA_CONNECTION" ]]; then
-            NOVA_CONNECTION=$(iniget $NOVA_CONF sql connection)
-        fi
-    fi
-    die_if_not_set $LINENO NOVA_CONNECTION "$reason. Please set NOVA_CONNECTION environment variable to the connection string to Nova DB"
-fi
 if [[ -n $(keystone catalog --service network) ]]; then
     VPC_SUPPORT="True"
 else
@@ -284,7 +265,6 @@ iniset $CONF_FILE DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d
 iniset $CONF_FILE DEFAULT verbose True
 iniset $CONF_FILE DEFAULT keystone_url "$OS_AUTH_URL"
 iniset $CONF_FILE database connection "$CONNECTION"
-iniset $CONF_FILE database connection_nova "$NOVA_CONNECTION"
 iniset $CONF_FILE DEFAULT full_vpc_support "$VPC_SUPPORT"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
 

@@ -44,7 +44,7 @@ except ImportError:
     logger.info(_('glanceclient not available'))
 
 
-def nova(context, microversion=None):
+def nova(context):
     args = {
         'project_id': context.project_id,
         'auth_url': CONF.keystone_url,
@@ -53,7 +53,9 @@ def nova(context, microversion=None):
         'auth_token': context.auth_token,
         'bypass_url': _url_for(context, service_type='computev21'),
     }
-    return novaclient.Client(microversion or 2, **args)
+    # Nova API's 2.3 microversion provides additional EC2 complient instance
+    # attributes
+    return novaclient.Client(2.3, **args)
 
 
 def neutron(context):

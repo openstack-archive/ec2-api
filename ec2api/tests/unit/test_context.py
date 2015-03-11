@@ -17,7 +17,7 @@ from oslo_config import cfg
 from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 
-from ec2api import context as ec2context
+from ec2api import context as ec2_context
 
 cfg.CONF.import_opt('keystone_url', 'ec2api.api')
 
@@ -33,21 +33,26 @@ class ContextTestCase(test_base.BaseTestCase):
 
     @mock.patch('keystoneclient.v2_0.client.Client')
     def test_get_os_admin_context(self, keystone):
-        service_catalog = mock.MagicMock()
+        service_catalog = mock.Mock()
         service_catalog.get_data.return_value = 'fake_service_catalog'
         keystone.return_value = mock.Mock(auth_user_id='fake_user_id',
                                           auth_tenant_id='fake_project_id',
                                           auth_token='fake_token',
                                           service_catalog=service_catalog)
-        context = ec2context.get_os_admin_context()
+        context = ec2_context.get_os_admin_context()
         self.assertEqual('fake_user_id', context.user_id)
         self.assertEqual('fake_project_id', context.project_id)
         self.assertEqual('fake_token', context.auth_token)
         self.assertEqual('fake_service_catalog', context.service_catalog)
         self.assertTrue(context.is_os_admin)
         conf = cfg.CONF
-        keystone.assert_called_with(
+        keystone.assert_called_once_with(
                 username=conf.admin_user,
                 password=conf.admin_password,
                 tenant_name=conf.admin_tenant_name,
                 auth_url=conf.keystone_url)
+        service_catalog.get_data.assert_called_once_with()
+
+        keystone.reset_mock()
+        self.assertEqual(context, ec2_context.get_os_admin_context())
+        self.assertFalse(keystone.called)

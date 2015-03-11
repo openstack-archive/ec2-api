@@ -158,6 +158,9 @@ def is_user_context(context):
 
 def get_os_admin_context():
     """Create a context to interact with OpenStack as an administrator."""
+    if (getattr(local.store, 'context', None) and
+            local.store.context.is_os_admin):
+        return local.store.context
     # TODO(ft): make an authentification token reusable
     keystone = keystone_client.Client(
         username=CONF.admin_user,

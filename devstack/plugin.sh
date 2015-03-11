@@ -190,7 +190,6 @@ function configure_ec2api {
 
     # configure the database.
     iniset $EC2API_CONF_FILE database connection `database_connection_url ec2api`
-    iniset $EC2API_CONF_FILE database connection_nova `database_connection_url nova`
 
     configure_ec2api_networking
 

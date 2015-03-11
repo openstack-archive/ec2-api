@@ -194,7 +194,7 @@ class VolumeTest(base.EC2TestCase):
         resp, data = self.client.AttachVolume(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         clean_vi = self.addResourceCleanUp(self.client.DetachVolume,
-                                          VolumeId=volume_id)
+                                           VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_available(
             volume_id, final_set=('attached'))
 
@@ -205,7 +205,8 @@ class VolumeTest(base.EC2TestCase):
         self.assertEqual('in-use', volume['State'])
         self.assertEqual(1, len(volume['Attachments']))
         attachment = volume['Attachments'][0]
-        self.assertFalse(attachment['DeleteOnTermination'])
+        if CONF.aws.run_incompatible_tests:
+            self.assertFalse(attachment['DeleteOnTermination'])
         self.assertIsNotNone(attachment['Device'])
         self.assertEqual(instance_id, attachment['InstanceId'])
         self.assertEqual(volume_id, attachment['VolumeId'])
@@ -272,9 +273,10 @@ class VolumeTest(base.EC2TestCase):
                                            VolumeId=volume_id)
         self.assertEqual('attaching', data['State'])
 
-        bdt = self.get_instance_bdm(instance_id, '/dev/vdh')
-        self.assertIsNotNone(bdt)
-        self.assertEqual('attaching', bdt['Ebs']['Status'])
+        if CONF.aws.run_incompatible_tests:
+            bdt = self.get_instance_bdm(instance_id, '/dev/vdh')
+            self.assertIsNotNone(bdt)
+            self.assertEqual('attaching', bdt['Ebs']['Status'])
 
         self.get_volume_attachment_waiter().wait_available(
             volume_id, final_set=('attached'))
@@ -336,7 +338,7 @@ class VolumeTest(base.EC2TestCase):
         resp, data = self.client.AttachVolume(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         clean_vi = self.addResourceCleanUp(self.client.DetachVolume,
-                                          VolumeId=volume_id)
+                                           VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_available(
             volume_id, final_set=('attached'))
 

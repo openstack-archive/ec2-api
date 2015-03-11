@@ -100,16 +100,16 @@ IMAGE_TYPES = {'aki': 'kernel',
 def create_image(context, instance_id, name=None, description=None,
                  no_reboot=False, block_device_mapping=None):
     instance = ec2utils.get_db_item(context, instance_id)
-    nova = clients.nova(context)
-    os_instance = nova.servers.get(instance['os_id'])
 
-    if not instance_api._is_ebs_instance(context, os_instance):
+    if not instance_api._is_ebs_instance(context, instance['os_id']):
         # TODO(ft): Change the error code and message with the real AWS ones
         msg = _('The instance is not an EBS-backed instance.')
         raise exception.InvalidParameterValue(value=instance_id,
                                               parameter='InstanceId',
                                               reason=msg)
 
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
     restart_instance = False
     if not no_reboot and os_instance.status != 'SHUTOFF':
         if os_instance.status != 'ACTIVE':
@@ -333,11 +333,8 @@ def describe_image_attribute(context, image_id, attribute):
 
     # NOTE(ft): Openstack extension, AWS-incompability
     def _root_device_name_attribute(os_image, result):
-        _prop_root_dev_name = _block_device_properties_root_device_name
-        result['rootDeviceName'] = _prop_root_dev_name(os_image.properties)
-        if result['rootDeviceName'] is None:
-            result['rootDeviceName'] = (
-                    instance_api._block_device_DEFAULT_ROOT_DEV_NAME)
+        result['rootDeviceName'] = (
+            _block_device_properties_root_device_name(os_image.properties))
 
     supported_attributes = {
         'blockDeviceMapping': _block_device_mapping_attribute,
@@ -439,26 +436,26 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
 
     _prepare_mappings(os_image)
     properties = os_image.properties
-    ec2_image['rootDeviceName'] = (
-            _block_device_properties_root_device_name(properties) or
-            instance_api._block_device_DEFAULT_ROOT_DEV_NAME)
+    root_device_name = _block_device_properties_root_device_name(properties)
+    if root_device_name:
+        ec2_image['rootDeviceName'] = root_device_name
 
-    root_device_type = 'instance-store'
-    root_device_name = instance_api._block_device_strip_dev(
-            ec2_image['rootDeviceName'])
-    for bdm in properties.get('block_device_mapping', []):
-        if (('snapshot_id' in bdm or 'volume_id' in bdm) and
-                not bdm.get('no_device') and
-                (bdm.get('boot_index') == 0 or
-                 root_device_name ==
-                    instance_api._block_device_strip_dev(
-                        bdm.get('device_name')))):
-            root_device_type = 'ebs'
-            break
-    ec2_image['rootDeviceType'] = root_device_type
+        root_device_type = 'instance-store'
+        short_root_device_name = instance_api._block_device_strip_dev(
+                root_device_name)
+        for bdm in properties.get('block_device_mapping', []):
+            if (('snapshot_id' in bdm or 'volume_id' in bdm) and
+                    not bdm.get('no_device') and
+                    (bdm.get('boot_index') == 0 or
+                     short_root_device_name ==
+                        instance_api._block_device_strip_dev(
+                            bdm.get('device_name')))):
+                root_device_type = 'ebs'
+                break
+        ec2_image['rootDeviceType'] = root_device_type
 
     _cloud_format_mappings(context, properties, ec2_image,
-                           ec2_image['rootDeviceName'], snapshot_ids)
+                           root_device_name, snapshot_ids)
 
     return ec2_image
 
