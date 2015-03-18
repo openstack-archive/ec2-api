@@ -252,27 +252,29 @@ class AddressTest(base.EC2TestCase):
         if not image_id:
             raise self.skipException('aws image_id does not provided')
 
-        resp, data = self.client.CreateVpc(CidrBlock='10.2.0.0/20')
+        base_net = '10.3.0.0'
+        resp, data = self.client.CreateVpc(CidrBlock=base_net + '/20')
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         vpc_id = data['Vpc']['VpcId']
-        self.addResourceCleanUp(self.client.DeleteVpc, VpcId=vpc_id)
+        clean_vpc = self.addResourceCleanUp(self.client.DeleteVpc,
+                                            VpcId=vpc_id)
         self.get_vpc_waiter().wait_available(vpc_id)
 
-        cidr = '10.2.0.0/24'
+        cidr = base_net + '/24'
         resp, data = self.client.CreateSubnet(VpcId=vpc_id, CidrBlock=cidr,
                                               AvailabilityZone=aws_zone)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         subnet_id = data['Subnet']['SubnetId']
-        self.addResourceCleanUp(self.client.DeleteSubnet,
-                                SubnetId=subnet_id)
+        clean_subnet = self.addResourceCleanUp(self.client.DeleteSubnet,
+                                               SubnetId=subnet_id)
 
         resp, data = self.client.RunInstances(
             ImageId=image_id, InstanceType=instance_type, MinCount=1,
             MaxCount=1, SubnetId=subnet_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         instance_id = data['Instances'][0]['InstanceId']
-        self.addResourceCleanUp(self.client.TerminateInstances,
-                                InstanceIds=[instance_id])
+        clean_i = self.addResourceCleanUp(self.client.TerminateInstances,
+                                          InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
@@ -282,8 +284,8 @@ class AddressTest(base.EC2TestCase):
         resp, data = self.client.AllocateAddress(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         alloc_id = data['AllocationId']
-        self.addResourceCleanUp(self.client.ReleaseAddress,
-                                AllocationId=alloc_id)
+        clean_a = self.addResourceCleanUp(self.client.ReleaseAddress,
+                                          AllocationId=alloc_id)
 
         resp, data = self.client.AssociateAddress(InstanceId=instance_id,
                                                   AllocationId=alloc_id)
@@ -294,14 +296,14 @@ class AddressTest(base.EC2TestCase):
         resp, data = self.client.CreateInternetGateway()
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         gw_id = data['InternetGateway']['InternetGatewayId']
-        self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                InternetGatewayId=gw_id)
+        clean_ig = self.addResourceCleanUp(self.client.DeleteInternetGateway,
+                                           InternetGatewayId=gw_id)
         resp, data = self.client.AttachInternetGateway(VpcId=vpc_id,
                                                        InternetGatewayId=gw_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.addResourceCleanUp(self.client.DetachInternetGateway,
-                                VpcId=vpc_id,
-                                InternetGatewayId=gw_id)
+        clean_aig = self.addResourceCleanUp(self.client.DetachInternetGateway,
+                                            VpcId=vpc_id,
+                                            InternetGatewayId=gw_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
 
         resp, data = self.client.AssociateAddress(InstanceId=instance_id,
@@ -323,6 +325,37 @@ class AddressTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertIsNone(data['Addresses'][0].get('InstanceId'))
 
+        # NOTE(andrey-mp): cleanup
+        time.sleep(3)
+
+        resp, data = self.client.DetachInternetGateway(VpcId=vpc_id,
+                                                       InternetGatewayId=gw_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_aig)
+
+        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_ig)
+
+        resp, data = self.client.ReleaseAddress(AllocationId=alloc_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_a)
+
+        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_i)
+        self.get_instance_waiter().wait_delete(instance_id)
+
+        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_subnet)
+        self.get_subnet_waiter().wait_delete(subnet_id)
+
+        resp, data = self.client.DeleteVpc(VpcId=vpc_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_vpc)
+        self.get_vpc_waiter().wait_delete(vpc_id)
+
     def test_associate_disassociate_standard_addresses(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id
@@ -335,16 +368,16 @@ class AddressTest(base.EC2TestCase):
                                               MaxCount=1)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         instance_id = data['Instances'][0]['InstanceId']
-        self.addResourceCleanUp(self.client.TerminateInstances,
-                                InstanceIds=[instance_id])
+        clean_i = self.addResourceCleanUp(self.client.TerminateInstances,
+                                          InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
         resp, data = self.client.AllocateAddress(*[], **{})
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         ip = data['PublicIp']
-        self.addResourceCleanUp(self.client.ReleaseAddress,
-                                PublicIp=ip)
+        clean_a = self.addResourceCleanUp(self.client.ReleaseAddress,
+                                          PublicIp=ip)
 
         resp, data = self.client.AssociateAddress(InstanceId=instance_id,
                                                   PublicIp=ip)
@@ -360,3 +393,14 @@ class AddressTest(base.EC2TestCase):
         resp, data = self.client.DescribeAddresses(*[], **{})
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertIsNone(data['Addresses'][0].get('InstanceId'))
+
+        time.sleep(3)
+
+        resp, data = self.client.ReleaseAddress(PublicIp=ip)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_a)
+
+        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_i)
+        self.get_instance_waiter().wait_delete(instance_id)

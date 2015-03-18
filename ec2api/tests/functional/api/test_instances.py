@@ -245,13 +245,7 @@ class InstanceTest(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
-        resp, data = self.client.DescribeInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        reservations = data.get('Reservations', [])
-        self.assertNotEmpty(reservations)
-        instances = reservations[0].get('Instances', [])
-        self.assertNotEmpty(instances)
-        instance = instances[0]
+        instance = self.get_instance(instance_id)
         self.assertIsNotNone(instance.get('PublicIpAddress'))
         self.assertIsNotNone(instance.get('PrivateIpAddress'))
         self.assertNotEqual(instance.get('PublicIpAddress'),

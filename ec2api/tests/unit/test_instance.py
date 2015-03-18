@@ -641,9 +641,6 @@ class InstanceTestCase(base.ApiTestCase):
                                       fake_state_change)]}))
         self.db_api.get_items_by_ids.assert_called_once_with(
             mock.ANY, set([fakes.ID_EC2_INSTANCE_1, fakes.ID_EC2_INSTANCE_2]))
-        (self.network_interface_api.
-         detach_network_interface.assert_called_once_with(
-             mock.ANY, fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH))
         self.assertEqual(2, self.nova.servers.get.call_count)
         self.nova.servers.get.assert_any_call(fakes.ID_OS_INSTANCE_1)
         self.nova.servers.get.assert_any_call(fakes.ID_OS_INSTANCE_2)
@@ -676,7 +673,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.nova.servers.get.side_effect = (
             lambda ec2_id: fakes.OSInstance(ec2_id, vm_state='active'))
 
-        def do_check(mock_eni_list=[], detached_enis=[], deleted_enis=[]):
+        def do_check(mock_eni_list=[]):
             self.set_mock_db_items(self.DB_FAKE_ENI,
                                    *(self.DB_INSTANCES + mock_eni_list))
 
@@ -686,39 +683,17 @@ class InstanceTestCase(base.ApiTestCase):
 
             self.assertThat(
                 resp, matchers.DictMatches(ec2_terminate_instances_result))
-            detach_network_interface = (
-                self.network_interface_api.detach_network_interface)
-            self.assertEqual(len(detached_enis),
-                             detach_network_interface.call_count)
-            for ec2_eni in detached_enis:
-                detach_network_interface.assert_any_call(
-                    mock.ANY,
-                    ('eni-attach-%s' % ec2_eni['id'].split('-')[-1]))
             self.assertFalse(self.db_api.delete_item.called)
 
-            detach_network_interface.reset_mock()
             self.db_api.delete_item.reset_mock()
 
-        # NOTE(ft): 2 instances; the first has 2 correct ports;
-        # the second has the first port attached by EC2 API but later detached
-        # by OpenStack and the second port created through EC2 API but
-        # attached by OpenStack only
         do_check(
             mock_eni_list=[
                 self.DB_ATTACHED_ENIS[0], self.DB_ATTACHED_ENIS[1],
-                self.DB_ATTACHED_ENIS[2], self.DB_DETACHED_ENIS[3]],
-            detached_enis=[self.DB_ATTACHED_ENIS[1]],
-            deleted_enis=[self.DB_ATTACHED_ENIS[0],
-                          self.DB_ATTACHED_ENIS[2]])
+                self.DB_ATTACHED_ENIS[2], self.DB_DETACHED_ENIS[3]])
 
-        # NOTE(ft): 2 instances: the first has the first port attached by
-        # OpenStack only, the second port is attached correctly;
-        # the second instance has one port created and attached by OpenStack
-        # only
         do_check(
-            mock_eni_list=[self.DB_ATTACHED_ENIS[1]],
-            detached_enis=[self.DB_ATTACHED_ENIS[1]],
-            deleted_enis=[])
+            mock_eni_list=[self.DB_ATTACHED_ENIS[1]])
 
     def test_terminate_instances_invalid_parameters(self):
         self.assert_execution_error(
@@ -997,7 +972,7 @@ class InstanceTestCase(base.ApiTestCase):
                             {'reservationSet': [fakes.EC2_RESERVATION_2]},
                             orderless_lists=True))
         remove_instances.assert_called_once_with(
-            mock.ANY, [fakes.DB_INSTANCE_1], purge_linked_items=False)
+            mock.ANY, [fakes.DB_INSTANCE_1])
 
     @mock.patch('ec2api.api.instance._format_instance')
     def test_describe_instances_sorting(self, format_instance):
@@ -1773,11 +1748,13 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         do_check(True)
         do_check(False)
 
+    @mock.patch('ec2api.api.network_interface.delete_network_interface')
     @mock.patch('ec2api.api.network_interface._detach_network_interface_item')
     @mock.patch('ec2api.api.address._disassociate_address_item')
     @mock.patch('ec2api.db.api.IMPL')
     def test_remove_instances(self, db_api, disassociate_address_item,
-                              detach_network_interface_item):
+                              detach_network_interface_item,
+                              delete_network_interface):
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
 
         instances = [{'id': fakes.random_ec2_id('i')}
@@ -1798,15 +1775,8 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                          for dummy in range(2))
 
         instances_to_remove = instances[:2] + [instances[3]]
-        network_interfaces_of_removed_instances = {
-            instances[0]['id']: network_interfaces[0:2],
-            instances[1]['id']: network_interfaces[2:4],
-            instances[3]['id']: []}
-        network_interfaces_to_delete = [network_interfaces[0],
-                                        network_interfaces[1]]
-        network_interfaces_to_detach = [network_interfaces[2],
-                                        network_interfaces[3]]
-        addresses_to_dissassociate = [addresses[0]]
+        network_interfaces_to_delete = network_interfaces[0:2]
+        network_interfaces_to_detach = network_interfaces[0:4]
 
         db_api.get_items.side_effect = tools.get_db_api_get_items(
             *(network_interfaces + addresses))
@@ -1816,9 +1786,8 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                 detach_network_interface_item.assert_any_call(fake_context,
                                                               eni)
             for eni in network_interfaces_to_delete:
-                db_api.delete_item.assert_any_call(fake_context, eni['id'])
-            for addr in addresses_to_dissassociate:
-                disassociate_address_item.assert_any_call(fake_context, addr)
+                delete_network_interface.assert_any_call(fake_context,
+                                                         eni['id'])
             detach_network_interface_item.reset_mock()
             db_api.reset_mock()
             disassociate_address_item.reset_mock()
@@ -1826,8 +1795,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         instance_api._remove_instances(fake_context, instances_to_remove)
         check_calls()
 
-        instance_api._remove_instances(fake_context, instances_to_remove,
-                                       network_interfaces_of_removed_instances)
+        instance_api._remove_instances(fake_context, instances_to_remove)
         check_calls()
 
     @mock.patch('ec2api.api.instance.novadb')

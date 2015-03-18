@@ -23,7 +23,6 @@ from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_utils import timeutils
 
-from ec2api.api import address as address_api
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
@@ -93,17 +92,6 @@ def run_instances(context, image_id, min_count, max_count,
 def terminate_instances(context, instance_id):
     instance_ids = set(instance_id)
     instances = ec2utils.get_db_items(context, 'i', instance_ids)
-
-    # TODO(ft): implement search db items in DB layer
-    network_interfaces = collections.defaultdict(list)
-    for eni in db_api.get_items(context, 'eni'):
-        if eni.get('instance_id') in instance_ids:
-            if eni['delete_on_termination']:
-                network_interfaces[eni['instance_id']].append(eni)
-            else:
-                network_interface_api.detach_network_interface(
-                        context,
-                        ec2utils.change_ec2_id_kind(eni['id'], 'eni-attach'))
 
     nova = clients.nova(context)
     state_changes = []
@@ -267,15 +255,15 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
         if not reservation_filters:
             reservation_filters = None
 
-        instance_describer = InstanceDescriber()
-        formatted_instances = instance_describer.describe(
-                context, ids=ids, filter=instance_filters)
+        try:
+            instance_describer = InstanceDescriber()
+            formatted_instances = instance_describer.describe(
+                    context, ids=ids, filter=instance_filters)
+        except exception.InvalidInstanceIDNotFound:
+            _remove_instances(context, instance_describer.obsolete_instances)
+            raise
 
-        # NOTE(ft): remove obsolete instances' DB items only, because
-        # network interfaces and addresses are cleaned during appropriate
-        # describe operations called inside current operation
-        _remove_instances(context, instance_describer.obsolete_instances,
-                          purge_linked_items=False)
+        _remove_instances(context, instance_describer.obsolete_instances)
 
         self.reservations = instance_describer.reservations.values()
         self.instances = instance_describer.reservation_instances
@@ -559,29 +547,26 @@ def _format_state_change(instance, os_instance):
     }
 
 
-def _remove_instances(context, instances, purge_linked_items=True):
+def _remove_instances(context, instances):
     if not instances:
         return
+    ids = set([i['id'] for i in instances])
     network_interfaces = collections.defaultdict(list)
-    if purge_linked_items:
-        # TODO(ft): implement search db items by os_id in DB layer
-        for eni in db_api.get_items(context, 'eni'):
-            if 'instance_id' in eni:
-                network_interfaces[eni['instance_id']].append(eni)
-        addresses = db_api.get_items(context, 'eipalloc')
-        addresses = dict((a['network_interface_id'], a) for a in addresses
-                         if 'network_interface_id' in a)
-    for instance in instances:
-        for eni in network_interfaces[instance['id']]:
-            if eni['delete_on_termination']:
-                address = addresses.get(eni['id'])
-                if address:
-                    address_api._disassociate_address_item(context, address)
-                db_api.delete_item(context, eni['id'])
-            else:
-                network_interface_api._detach_network_interface_item(context,
-                                                                     eni)
-        db_api.delete_item(context, instance['id'])
+
+    # TODO(ft): implement search db items by os_id in DB layer
+    for eni in db_api.get_items(context, 'eni'):
+        if 'instance_id' in eni and eni['instance_id'] in ids:
+            network_interfaces[eni['instance_id']].append(eni)
+
+    for instance_id in ids:
+        for eni in network_interfaces[instance_id]:
+            delete_on_termination = eni['delete_on_termination']
+            network_interface_api._detach_network_interface_item(context,
+                                                                 eni)
+            if delete_on_termination:
+                network_interface_api.delete_network_interface(context,
+                                                               eni['id'])
+        db_api.delete_item(context, instance_id)
 
 
 def _check_min_max_count(min_count, max_count):

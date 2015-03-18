@@ -546,18 +546,21 @@ class EC2TestCase(base.BaseTestCase):
 
     # NOTE(andrey-mp): Helpers zone
 
-    def get_instance_bdm(self, instance_id, device_name):
-        """
-
-        device_name=None means getting bdm of root instance device
-        """
+    def get_instance(self, instance_id):
         resp, data = self.client.DescribeInstances(
             InstanceIds=[instance_id])
         self.assertEqual(200, resp.status_code, EC2ErrorConverter(data))
         self.assertEqual(1, len(data.get('Reservations', [])))
         instances = data['Reservations'][0].get('Instances', [])
         self.assertEqual(1, len(instances))
-        instance = instances[0]
+        return instances[0]
+
+    def get_instance_bdm(self, instance_id, device_name):
+        """
+
+        device_name=None means getting bdm of root instance device
+        """
+        instance = self.get_instance(instance_id)
         if not device_name:
             device_name = instance['RootDeviceName']
         bdms = instance['BlockDeviceMappings']

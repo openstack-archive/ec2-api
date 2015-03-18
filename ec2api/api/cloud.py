@@ -1650,12 +1650,14 @@ class VpcCloudController(CloudController):
     @module_and_param_types(network_interface, 'eni_id',
                             'str',
                             'bool',
-                            'sg_ids')
+                            'sg_ids',
+                            'dummy')
     def modify_network_interface_attribute(self, context,
                                            network_interface_id,
                                            description=None,
                                            source_dest_check=None,
-                                           security_group_id=None):
+                                           security_group_id=None,
+                                           attachment=None):
         """Modifies the specified attribute of the specified network interface.
 
 
@@ -1668,6 +1670,9 @@ class VpcCloudController(CloudController):
                 means checking is disabled.
                 This value must be false for a NAT instance to perform NAT.
             security_group_id [list of str]: List of secuirity groups to attach
+            attachment: Information about the interface attachment. If
+                modifying the 'delete on termination' attribute, you must
+                specify the ID of the interface attachment.
 
         Returns:
             true if the request succeeds.

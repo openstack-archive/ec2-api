@@ -308,17 +308,17 @@ def describe_network_interface_attribute(context, network_interface_id,
 def modify_network_interface_attribute(context, network_interface_id,
                                        description=None,
                                        source_dest_check=None,
-                                       security_group_id=None):
-    # NOTE(Alex) Later more parameters will appear
+                                       security_group_id=None,
+                                       attachment=None):
     params_count = (
         int(description is not None) +
         int(source_dest_check is not None) +
-        int(security_group_id is not None))
+        int(security_group_id is not None) +
+        int(attachment is not None))
     if params_count != 1:
         raise exception.InvalidParameterCombination(
             'Multiple attributes specified')
     network_interface = ec2utils.get_db_item(context, network_interface_id)
-    # TODO(Alex): Implement attachments
     if description is not None:
         network_interface['description'] = description
         db_api.update_item(context, network_interface)
@@ -334,6 +334,20 @@ def modify_network_interface_attribute(context, network_interface_id,
         neutron.update_port(network_interface['os_id'],
                             {'port': {'allowed_address_pairs': allowed}})
         network_interface['source_dest_check'] = source_dest_check
+        db_api.update_item(context, network_interface)
+    if attachment:
+        attachment_id = attachment.get('attachment_id')
+        delete_on_termination = attachment.get('delete_on_termination')
+        if attachment_id is None or delete_on_termination is None:
+            raise exception.MissingParameter(
+                _('The request must contain the parameter attachment '
+                  'deleteOnTermination'))
+        attachment_id_own = ec2utils.change_ec2_id_kind(
+                network_interface['id'], 'eni-attach')
+        if ('instance_id' not in network_interface
+                or attachment_id_own != attachment_id):
+            raise exception.InvalidAttachmentIDNotFound(id=attachment_id)
+        network_interface['delete_on_termination'] = delete_on_termination
         db_api.update_item(context, network_interface)
     return True
 

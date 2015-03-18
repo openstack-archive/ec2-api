@@ -183,7 +183,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         "one subnet. Openstack can't do it without additional configuration."
         "Worked only from Juno with parameter in config - "
         "nova.conf/neutron/allow_duplicate_networks = True")
-    def test_create_instance_with_interfaces(self):
+    def test_create_instance_with_two_interfaces(self):
         kwargs = {
             'SubnetId': self.subnet_id,
         }
@@ -222,13 +222,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
-        resp, data = self.client.DescribeInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        reservations = data.get('Reservations', [])
-        self.assertNotEmpty(reservations)
-        instances = reservations[0].get('Instances', [])
-        self.assertNotEmpty(instances)
-        instance = instances[0]
+        instance = self.get_instance(instance_id)
         nis = instance.get('NetworkInterfaces', [])
         self.assertEqual(2, len(nis))
 
@@ -256,13 +250,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
-        resp, data = self.client.DescribeInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        reservations = data.get('Reservations', [])
-        self.assertNotEmpty(reservations)
-        instances = reservations[0].get('Instances', [])
-        self.assertNotEmpty(instances)
-        instance = instances[0]
+        instance = self.get_instance(instance_id)
         self.assertEqual(ip, instance['PrivateIpAddress'])
 
         resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
@@ -322,7 +310,27 @@ class InstanceInVPCTest(base.EC2TestCase):
                                 NetworkInterfaceId=ni_id2)
         self.get_network_interface_waiter().wait_available(ni_id2)
 
+        # NOTE(andrey-mp): A network interface may not specify a network
+        # interface ID and delete on termination as true
+        kwargs = {
+            'ImageId': CONF.aws.image_id,
+            'InstanceType': CONF.aws.instance_type,
+            'MinCount': 1,
+            'MaxCount': 1,
+            'NetworkInterfaces': [{'NetworkInterfaceId': ni_id1,
+                                   'DeviceIndex': 0,
+                                   'DeleteOnTermination': True}]
+        }
+        resp, data = self.client.RunInstances(*[], **kwargs)
+        if resp.status_code == 200:
+            self.addResourceCleanUp(
+                self.client.TerminateInstances,
+                InstanceIds=[data['Instances'][0]['InstanceId']])
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('InvalidParameterCombination', data['Error']['Code'])
+
         if CONF.aws.run_incompatible_tests:
+            # NOTE(andrey-mp): Each network interface requires a device index.
             kwargs = {
                 'ImageId': CONF.aws.image_id,
                 'InstanceType': CONF.aws.instance_type,

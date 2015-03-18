@@ -25,7 +25,8 @@ LOG = log.getLogger(__name__)
 
 class SubnetTest(base.EC2TestCase):
 
-    VPC_CIDR = '10.2.0.0/20'
+    BASE_CIDR = '10.2.0.0'
+    VPC_CIDR = BASE_CIDR + '/20'
     vpc_id = None
 
     @classmethod
@@ -42,7 +43,7 @@ class SubnetTest(base.EC2TestCase):
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
     def test_create_delete_subnet(self):
-        cidr = '10.2.0.0/24'
+        cidr = self.BASE_CIDR + '/24'
         resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
                                               CidrBlock=cidr)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -75,7 +76,7 @@ class SubnetTest(base.EC2TestCase):
                                             VpcId=vpc_id)
         self.get_vpc_waiter().wait_available(vpc_id)
 
-        cidr = '10.2.0.0/24'
+        cidr = self.BASE_CIDR + '/24'
         resp, data = self.client.CreateSubnet(VpcId=vpc_id,
                                               CidrBlock=cidr)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -99,7 +100,7 @@ class SubnetTest(base.EC2TestCase):
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "bug with overlapped subnets")
     def test_create_overlapped_subnet(self):
-        cidr = '10.2.0.0/24'
+        cidr = self.BASE_CIDR + '/24'
         resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
                                               CidrBlock=cidr)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -134,7 +135,7 @@ class SubnetTest(base.EC2TestCase):
         self.assertEqual('InvalidSubnet.Range', data['Error']['Code'])
 
         # NOTE(andrey-mp): bigger cidr than VPC has
-        cidr = '10.2.0.0/19'
+        cidr = self.BASE_CIDR + '/19'
         resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
                                               CidrBlock=cidr)
         if resp.status_code == 200:
@@ -144,7 +145,7 @@ class SubnetTest(base.EC2TestCase):
         self.assertEqual('InvalidSubnet.Range', data['Error']['Code'])
 
         # NOTE(andrey-mp): too small cidr
-        cidr = '10.2.0.0/29'
+        cidr = self.BASE_CIDR + '/29'
         resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
                                               CidrBlock=cidr)
         if resp.status_code == 200:
@@ -154,7 +155,7 @@ class SubnetTest(base.EC2TestCase):
         self.assertEqual('InvalidSubnet.Range', data['Error']['Code'])
 
     def test_describe_subnets_base(self):
-        cidr = '10.2.0.0/24'
+        cidr = self.BASE_CIDR + '/24'
         resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
                                               CidrBlock=cidr)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -179,7 +180,7 @@ class SubnetTest(base.EC2TestCase):
         self.get_subnet_waiter().wait_delete(subnet_id)
 
     def test_describe_subnets_filters(self):
-        cidr = '10.2.0.0/24'
+        cidr = self.BASE_CIDR + '/24'
         resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
                                               CidrBlock=cidr)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
