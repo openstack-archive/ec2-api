@@ -15,12 +15,13 @@
 
 from keystoneclient.v2_0 import client as kc
 from novaclient import client as novaclient
+from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging as messaging
 
 from ec2api import context as ec2_context
-from ec2api.i18n import _
+from ec2api.i18n import _, _LW
 
 logger = logging.getLogger(__name__)
 
@@ -44,18 +45,46 @@ except ImportError:
     logger.info(_('glanceclient not available'))
 
 
+# Nova API's 2.3 microversion provides additional EC2 compliant instance
+# properties
+_novaclient_vertion = '2.3'
+_nova_service_type = 'computev21'
+
+
 def nova(context):
     args = {
-        'project_id': context.project_id,
         'auth_url': CONF.keystone_url,
+        'auth_token': context.auth_token,
+        # NOTE(ft): These parameters are not used for authentification,
+        # but are required by novaclient < v2.18 which may be installed in
+        # Icehouse deployment
         'username': None,
         'api_key': None,
-        'auth_token': context.auth_token,
-        'bypass_url': _url_for(context, service_type='computev21'),
+        'project_id': None,
     }
-    # Nova API's 2.3 microversion provides additional EC2 complient instance
-    # attributes
-    return novaclient.Client(2.3, **args)
+    global _novaclient_vertion, _nova_service_type
+    bypass_url = _url_for(context, service_type=_nova_service_type)
+    if not bypass_url and _nova_service_type == 'computev21':
+        # NOTE(ft): partial compatibility with pre Kilo OS releases:
+        # if computev21 isn't provided by Nova, use compute instead
+        logger.warning(_LW("Nova server doesn't support v2.1, use v2 instead. "
+                           "A lot of useful EC2 compliant instance properties "
+                           "will be unavailable."))
+        _nova_service_type = 'compute'
+        return nova(context)
+    try:
+        return novaclient.Client(_novaclient_vertion, bypass_url=bypass_url,
+                                 **args)
+    except nova_exception.UnsupportedVersion:
+        if _novaclient_vertion == '2':
+            raise
+        # NOTE(ft): partial compatibility with Nova client w/o microversion
+        # support
+        logger.warning(_LW("Nova client doesn't support v2.3, use v2 instead. "
+                           "A lot of useful EC2 compliant instance properties "
+                           "will be unavailable."))
+        _novaclient_vertion = '2'
+        return nova(context)
 
 
 def neutron(context):
@@ -123,16 +152,16 @@ def _url_for(context, **kwargs):
     service_catalog = context.service_catalog
     if not service_catalog:
         catalog = keystone(context).service_catalog.catalog
-        service_catalog = catalog["serviceCatalog"]
+        service_catalog = catalog['serviceCatalog']
         context.service_catalog = service_catalog
 
-    service_type = kwargs["service_type"]
+    service_type = kwargs['service_type']
     for service in service_catalog:
-        if service["type"] != service_type:
+        if service['type'] != service_type:
             continue
-        for endpoint in service["endpoints"]:
-            if "publicURL" in endpoint:
-                return endpoint["publicURL"]
+        for endpoint in service['endpoints']:
+            if 'publicURL' in endpoint:
+                return endpoint['publicURL']
         else:
             return None
 

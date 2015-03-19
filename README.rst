@@ -189,6 +189,35 @@ Additions to the legacy nova's EC2 API include:
 2. Filtering
 3. Tags
 
+Legacy OpenStack release notice
+===============================
+
+EC2 API supports Havana, Icehouse, Juno with additional limitations:
+
+
+Instance related:
+- rootDeviceName Instance property
+- kernelId Instance property
+- ramdiskId Instance property
+- userData Instance property
+- hostName Instance property
+- reservationId Reservation property (ec2api own ids are generated for
+instances launched not by ec2api)
+- launchIndex Instance property (0 for instances launched not by ec2api)
+
+Volume related:
+- deleteOnTermination property
+
+Network interface related:
+- deleteOnTermination (False value can be assigned but doesn't supported)
+
+All theese properties can be specified in RunInstance command though, they are
+not reported in describe operations.
+
+EC2 API supports Nova client (>=2.16.0) with no microversion support.
+Additional limitations are the same, except network interfaces's
+deleteOnTermination.
+
 References
 ==========
 
