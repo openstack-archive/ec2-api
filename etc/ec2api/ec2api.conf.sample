@@ -1,6 +1,20 @@
 [DEFAULT]
 
 #
+# Options defined in ec2api.context
+#
+
+# Admin user (string value)
+#admin_user=<None>
+
+# Admin password (string value)
+#admin_password=<None>
+
+# Admin tenant name (string value)
+#admin_tenant_name=<None>
+
+
+#
 # Options defined in ec2api.exception
 #
 
@@ -441,15 +455,6 @@
 
 # Private key of client certificate. (string value)
 #nova_client_priv_key=
-
-# Admin user (string value)
-#admin_user=<None>
-
-# Admin password (string value)
-#admin_password=<None>
-
-# Admin tenant name (string value)
-#admin_tenant_name=<None>
 
 # Shared secret to sign instance-id request (string value)
 #metadata_proxy_shared_secret=
