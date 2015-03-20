@@ -190,8 +190,8 @@ class InstanceInVPCTest(base.EC2TestCase):
         resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         ni_id1 = data['NetworkInterface']['NetworkInterfaceId']
-        self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                NetworkInterfaceId=ni_id1)
+        clean_ni1 = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
+                                            NetworkInterfaceId=ni_id1)
         self.get_network_interface_waiter().wait_available(ni_id1)
 
         kwargs = {
@@ -200,8 +200,8 @@ class InstanceInVPCTest(base.EC2TestCase):
         resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         ni_id2 = data['NetworkInterface']['NetworkInterfaceId']
-        self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                NetworkInterfaceId=ni_id2)
+        clean_ni2 = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
+                                            NetworkInterfaceId=ni_id2)
         self.get_network_interface_waiter().wait_available(ni_id2)
 
         kwargs = {
@@ -230,6 +230,21 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
+
+        self.get_network_interface_waiter().wait_available(ni_id1)
+        self.get_network_interface_waiter().wait_available(ni_id2)
+
+        resp, data = self.client.DeleteNetworkInterface(
+            NetworkInterfaceId=ni_id2)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_ni2)
+        self.get_network_interface_waiter().wait_delete(ni_id2)
+
+        resp, data = self.client.DeleteNetworkInterface(
+            NetworkInterfaceId=ni_id1)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_ni1)
+        self.get_network_interface_waiter().wait_delete(ni_id1)
 
     def test_create_instance_with_private_ip(self):
         ip = '10.16.0.12'

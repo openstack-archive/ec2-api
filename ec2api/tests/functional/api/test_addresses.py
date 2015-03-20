@@ -278,10 +278,7 @@ class AddressTest(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
-        kwargs = {
-            'Domain': 'vpc',
-        }
-        resp, data = self.client.AllocateAddress(*[], **kwargs)
+        resp, data = self.client.AllocateAddress(Domain='vpc')
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         alloc_id = data['AllocationId']
         clean_a = self.addResourceCleanUp(self.client.ReleaseAddress,
@@ -309,17 +306,17 @@ class AddressTest(base.EC2TestCase):
         resp, data = self.client.AssociateAddress(InstanceId=instance_id,
                                                   AllocationId=alloc_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        association_id = data['AssociationId']
+        assoc_id = data['AssociationId']
+        clean_aa = self.addResourceCleanUp(self.client.DisassociateAddress,
+                                           AssociationId=assoc_id)
 
         resp, data = self.client.DescribeAddresses(*[], **{})
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(instance_id, data['Addresses'][0]['InstanceId'])
 
-        kwargs = {
-            "AssociationId": association_id,
-        }
-        resp, data = self.client.DisassociateAddress(*[], **kwargs)
+        resp, data = self.client.DisassociateAddress(AssociationId=assoc_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_aa)
 
         resp, data = self.client.DescribeAddresses(*[], **{})
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -389,6 +386,8 @@ class AddressTest(base.EC2TestCase):
 
         resp, data = self.client.DisassociateAddress(PublicIp=ip)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        # NOTE(andrey-mp): Amazon needs some time to diassociate
+        time.sleep(2)
 
         resp, data = self.client.DescribeAddresses(*[], **{})
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
