@@ -141,7 +141,6 @@ Instance related:
 
 Network interface related:
 - availabilityZone NetworkInterface property
-- deleteOnTermination (modification is not supported)
 
 Snapshot related:
 - CopySnapshot

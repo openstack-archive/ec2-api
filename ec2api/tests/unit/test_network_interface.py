@@ -403,7 +403,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                          resp['description'].get('value', None))
 
     def test_modify_network_interface_attribute(self):
-        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1)
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1,
+                               fakes.DB_NETWORK_INTERFACE_2)
 
         self.execute(
             'ModifyNetworkInterfaceAttribute',
@@ -414,12 +415,52 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             tools.update_dict(fakes.DB_NETWORK_INTERFACE_1,
                               {'description': 'New description'}))
 
+        self.db_api.reset_mock()
+        self.execute(
+            'ModifyNetworkInterfaceAttribute',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
+             'Attachment.AttachmentId': (
+                 fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH),
+             'Attachment.DeleteOnTermination': 'True'})
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
+            tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
+                              {'delete_on_termination': True}))
+
     def test_modify_network_interface_attribute_invalid_parameters(self):
         self.assert_execution_error(
             'InvalidParameterCombination', 'ModifyNetworkInterfaceAttribute',
             {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
              'Description.Value': 'New description',
              'SourceDestCheck.Value': 'True'})
+
+        self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1,
+                               fakes.DB_NETWORK_INTERFACE_2)
+
+        self.assert_execution_error(
+            'MissingParameter', 'ModifyNetworkInterfaceAttribute',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
+             'Attachment.DeleteOnTermination': 'True'})
+
+        self.assert_execution_error(
+            'MissingParameter', 'ModifyNetworkInterfaceAttribute',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
+             'Attachment.AttachmentId': (
+                 fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH)})
+
+        self.assert_execution_error(
+            'InvalidAttachmentID.NotFound', 'ModifyNetworkInterfaceAttribute',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_1,
+             'Attachment.AttachmentId': (
+                 fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH),
+             'Attachment.DeleteOnTermination': 'True'})
+
+        self.assert_execution_error(
+            'InvalidAttachmentID.NotFound', 'ModifyNetworkInterfaceAttribute',
+            {'NetworkInterfaceId': fakes.ID_EC2_NETWORK_INTERFACE_2,
+             'Attachment.AttachmentId': ec2utils.change_ec2_id_kind(
+                 fakes.ID_EC2_NETWORK_INTERFACE_1, 'eni-attach'),
+             'Attachment.DeleteOnTermination': 'True'})
 
     def test_reset_network_interface_attribute(self):
         self.execute(
