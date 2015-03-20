@@ -29,6 +29,7 @@ from glanceclient.common import exceptions as glance_exception
 from lxml import etree
 from oslo_concurrency import processutils
 from oslo_config import cfg
+from oslo_log import log as logging
 from oslo_utils import timeutils
 
 from ec2api.api import clients
@@ -37,8 +38,10 @@ from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _
+from ec2api.i18n import _, _LE, _LI
 
+
+LOG = logging.getLogger(__name__)
 
 s3_opts = [
     cfg.StrOpt('image_decryption_dir',
@@ -588,6 +591,8 @@ def _s3_create(context, metadata):
         context.update_store()
         try:
             image_path = tempfile.mkdtemp(dir=CONF.image_decryption_dir)
+            log_vars = {'image_location': image_location,
+                        'image_path': image_path}
 
             _update_image_state('downloading')
             try:
@@ -604,6 +609,8 @@ def _s3_create(context, metadata):
                             shutil.copyfileobj(part, combined)
 
             except Exception:
+                LOG.exception(_LE('Failed to download %(image_location)s '
+                                  'to %(image_path)s'), log_vars)
                 _update_image_state('failed_download')
                 return
 
@@ -613,6 +620,8 @@ def _s3_create(context, metadata):
                 _s3_decrypt_image(context, enc_filename, encrypted_key,
                                   encrypted_iv, dec_filename)
             except Exception:
+                LOG.exception(_LE('Failed to decrypt %(image_location)s '
+                                  'to %(image_path)s'), log_vars)
                 _update_image_state('failed_decrypt')
                 return
 
@@ -620,6 +629,8 @@ def _s3_create(context, metadata):
             try:
                 unz_filename = _s3_untarzip_image(image_path, dec_filename)
             except Exception:
+                LOG.exception(_LE('Failed to untar %(image_location)s '
+                                  'to %(image_path)s'), log_vars)
                 _update_image_state('failed_untar')
                 return
 
@@ -628,6 +639,8 @@ def _s3_create(context, metadata):
                 with open(unz_filename) as image_file:
                     image.update(data=image_file)
             except Exception:
+                LOG.exception(_LE('Failed to upload %(image_location)s '
+                                  'to %(image_path)s'), log_vars)
                 _update_image_state('failed_upload')
                 return
 
@@ -635,11 +648,10 @@ def _s3_create(context, metadata):
 
             shutil.rmtree(image_path)
         except glance_exception.HTTPNotFound:
-            # TODO(ft): the image was deleted underneath us, add logging
-            return
+            LOG.info(_LI('Image %swas deleted underneath us'), image.id)
         except Exception:
-            # TODO(ft): add logging
-            return
+            LOG.exception(_LE('Failed to complete image %s creation'),
+                          image.id)
 
     eventlet.spawn_n(delayed_create)
 
