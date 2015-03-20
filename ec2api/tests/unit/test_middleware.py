@@ -23,7 +23,6 @@ import webob.dec
 import webob.exc
 
 from ec2api import api as ec2
-from ec2api import context
 from ec2api import exception
 from ec2api.tests.unit import tools
 from ec2api import wsgi
@@ -53,7 +52,7 @@ class ExecutorTestCase(test_base.BaseTestCase):
         fake_wsgi_request = Fake()
 
         fake_wsgi_request.environ = {
-                'ec2api.context': context.get_admin_context(),
+                'ec2api.context': mock.Mock(request_id='fake-request'),
                 'ec2.request': fake_ec2_request,
         }
         return self.executor(fake_wsgi_request)
