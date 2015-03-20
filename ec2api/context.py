@@ -178,9 +178,9 @@ def get_os_admin_context():
 
 
 def require_context(ctxt):
-    """Raise exception.Forbidden()
+    """Raise exception.AuthFailure()
 
     if context is not a user or an admin context.
     """
     if not ctxt.is_admin and not is_user_context(ctxt):
-        raise exception.Forbidden()
+        raise exception.AuthFailure()

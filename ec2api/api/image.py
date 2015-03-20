@@ -756,7 +756,8 @@ def _s3_test_for_malicious_tarball(path, filename):
     for n in tar_file.getnames():
         if not os.path.abspath(os.path.join(path, n)).startswith(path):
             tar_file.close()
-            raise exception.Invalid(_('Unsafe filenames in image'))
+            # TODO(ft): figure out actual AWS exception
+            raise exception.EC2InvalidException(_('Unsafe filenames in image'))
     tar_file.close()
 
 
