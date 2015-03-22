@@ -115,7 +115,7 @@ ROOT_DEVICE_NAME_INSTANCE_1 = '/dev/vda'
 ROOT_DEVICE_NAME_INSTANCE_2 = '/dev/sdb1'
 IPV6_INSTANCE_2 = 'fe80:b33f::a8bb:ccff:fedd:eeff'
 CLIENT_TOKEN_INSTANCE_2 = 'client-token-2'
-USER_DATA_INSTANCE_2 = 'fake-user data'
+USER_DATA_INSTANCE_2 = base64.b64encode('fake-user data')
 
 
 # DHCP options constants
@@ -660,7 +660,7 @@ OS_INSTANCE_2 = {
     'root_device_name': ROOT_DEVICE_NAME_INSTANCE_2,
     'volumes_attached': [{'id': ID_OS_VOLUME_2,
                           'delete_on_termination': False}],
-    'user_data': base64.b64encode(USER_DATA_INSTANCE_2),
+    'user_data': USER_DATA_INSTANCE_2,
     'hostname': 'Server %s' % ID_OS_INSTANCE_2,
 }
 

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import copy
 import datetime
 import itertools
@@ -324,6 +325,8 @@ class InstanceTestCase(base.ApiTestCase):
         def do_check(engine, extra_kwargs={}, extra_db_instance={}):
             instance_api.instance_engine = engine
 
+            user_data = base64.b64decode(fakes.USER_DATA_INSTANCE_2)
+
             self.execute(
                 'RunInstances',
                 {'ImageId': fakes.ID_EC2_IMAGE_1,
@@ -337,11 +340,12 @@ class InstanceTestCase(base.ApiTestCase):
                  'BlockDeviceMapping.1.DeviceName': '/dev/vdd',
                  'BlockDeviceMapping.1.Ebs.SnapshotId': (
                                                     fakes.ID_EC2_SNAPSHOT_1),
-                 'BlockDeviceMapping.1.Ebs.DeleteOnTermination': 'False'})
+                 'BlockDeviceMapping.1.Ebs.DeleteOnTermination': 'False',
+                 'UserData': fakes.USER_DATA_INSTANCE_2})
 
             self.nova.servers.create.assert_called_once_with(
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
-                userdata=None, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
+                userdata=user_data, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
                 ramdisk_id=fakes.ID_OS_IMAGE_ARI_1, key_name=None,
                 block_device_mapping='fake_bdm',
                 availability_zone='fake_zone', security_groups=['default'],

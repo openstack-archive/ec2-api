@@ -76,6 +76,9 @@ def run_instances(context, image_id, min_count, max_count,
         if idempotent_run:
             return idempotent_run
 
+    if user_data:
+        user_data = base64.b64decode(user_data)
+
     return instance_engine.run_instances(
         context, image_id, min_count, max_count,
         key_name, security_group_id,
@@ -355,8 +358,7 @@ def describe_instance_attribute(context, instance_id, attribute):
             raise exception.InvalidAttribute(attr=attribute)
         user_data = getattr(os_instance, 'OS-EXT-SRV-ATTR:user_data')
         if user_data:
-            value = base64.b64decode(user_data)
-            result['userData'] = {'value': value}
+            result['userData'] = {'value': user_data}
 
     attribute_formatter = {
         'blockDeviceMapping': _format_attr_block_device_mapping,

@@ -379,6 +379,8 @@ class AddressTest(base.EC2TestCase):
         resp, data = self.client.AssociateAddress(InstanceId=instance_id,
                                                   PublicIp=ip)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        clean_aa = self.addResourceCleanUp(self.client.DisassociateAddress,
+                                           PublicIp=ip)
 
         resp, data = self.client.DescribeAddresses(*[], **{})
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -386,6 +388,7 @@ class AddressTest(base.EC2TestCase):
 
         resp, data = self.client.DisassociateAddress(PublicIp=ip)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_aa)
         # NOTE(andrey-mp): Amazon needs some time to diassociate
         time.sleep(2)
 

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import itertools
 
 from novaclient import exceptions as nova_exception
@@ -179,17 +180,17 @@ def _build_metadata(context, ec2_instance, ec2_reservation,
     # meta-data/public-keys/0/ : 'openssh-key'
     # meta-data/public-keys/0/openssh-key : '%s' % publickey
     if ec2_instance['keyName']:
-        keypair = clients.nova(context).keypairs.get(ec2_instance['keyName'])
         metadata['public-keys'] = {
-            '0': {'_name': "0=" + keypair.name,
-                  'openssh-key': keypair.public_key}}
+            # TODO(andrey-mp): public key should be added in the future
+            '0': {'_name': "0=" + ec2_instance['keyName']}}
 
     full_metadata = {'meta-data': metadata}
 
     userdata = instance_api.describe_instance_attribute(
                     context, ec2_instance['instanceId'], 'userData')
     if 'userData' in userdata:
-        full_metadata['user-data'] = userdata['userData']['value']
+        userdata = userdata['userData']['value']
+        full_metadata['user-data'] = base64.b64decode(userdata)
 
     return full_metadata
 

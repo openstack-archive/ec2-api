@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+
 import mock
 from novaclient import exceptions as nova_exception
 
@@ -39,7 +41,7 @@ class MetadataApiTestCase(base.ApiTestCase):
                'reservationSet': [fakes.EC2_RESERVATION_1]}
         self.instance_api.describe_instance_attribute.return_value = {
                 'instanceId': fakes.ID_EC2_INSTANCE_1,
-                'userData': {'value': 'fake_user_data'}}
+                'userData': {'value': base64.b64encode('fake_user_data')}}
 
         self.fake_context = self._create_context()
 
@@ -166,17 +168,15 @@ class MetadataApiTestCase(base.ApiTestCase):
                fakes.ID_OS_INSTANCE_2, fakes.IP_NETWORK_INTERFACE_1)
         self.assertEqual(fakes.IP_NETWORK_INTERFACE_1, retval)
 
-    @mock.patch('novaclient.client.Client')
-    def test_pubkey(self, nova):
-        keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)
-        keypair.configure_mock(name=fakes.NAME_KEY_PAIR)
-        nova.return_value.keypairs.get.return_value = keypair
+    def test_pubkey_name(self):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'public-keys'],
                fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
         self.assertEqual('0=%s' % fakes.NAME_KEY_PAIR, retval)
 
+    @base.skip_not_implemented
+    def test_pubkey(self):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'public-keys', '0', 'openssh-key'],
