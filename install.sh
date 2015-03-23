@@ -236,7 +236,7 @@ add_role $SERVICE_USERID $SERVICE_TENANT $ADMIN_ROLE $SERVICE_USERNAME
 
 #create log dir
 echo Creating log dir
-sudo install -d $LOG_DIR
+sudo install -d $LOG_DIR --owner=$USER
 
 CONF_FILE=$CONF_DIR/ec2api.conf
 APIPASTE_FILE=$CONF_DIR/api-paste.ini
@@ -262,6 +262,7 @@ PUBLIC_URL=${OS_AUTH_URL%:*}:8788/
 #update default config with some values
 iniset $CONF_FILE DEFAULT api_paste_config $APIPASTE_FILE
 iniset $CONF_FILE DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [%(request_id)s %(user_name)s %(project_name)s] %(instance)s%(message)s"
+iniset $CONF_FILE DEFAULT log_dir "$LOG_DIR"
 iniset $CONF_FILE DEFAULT verbose True
 iniset $CONF_FILE DEFAULT keystone_url "$OS_AUTH_URL"
 iniset $CONF_FILE database connection "$CONNECTION"
