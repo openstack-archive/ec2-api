@@ -613,10 +613,10 @@ class S3TestCase(base.ApiTestCase):
 
     def test_s3_malicious_tarballs(self):
         self.assertRaises(
-            exception.Invalid,
+            exception.EC2InvalidException,
             image_api._s3_test_for_malicious_tarball,
             "/unused", os.path.join(os.path.dirname(__file__), 'abs.tar.gz'))
         self.assertRaises(
-            exception.Invalid,
+            exception.EC2InvalidException,
             image_api._s3_test_for_malicious_tarball,
             "/unused", os.path.join(os.path.dirname(__file__), 'rel.tar.gz'))

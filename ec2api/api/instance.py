@@ -581,7 +581,7 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
     if _cloud_get_image_state(os_image) != 'available':
         # TODO(ft): Change the message with the real AWS message
         msg = _('Image must be available')
-        raise exception.ImageNotActive(message=msg)
+        raise exception.InvalidAMIIDUnavailable(message=msg)
 
     return os_image, os_kernel_id, os_ramdisk_id
 

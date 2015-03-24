@@ -484,14 +484,14 @@ class Loader(object):
             self.config_path = config_path
 
         if not self.config_path:
-            raise exception.ConfigNotFound(path=config_path)
+            raise exception.EC2APIConfigNotFound(path=config_path)
 
     def load_app(self, name):
         """Return the paste URLMap wrapped WSGI application.
 
         :param name: Name of the application to load.
         :returns: Paste URLMap object wrapping the requested application.
-        :raises: `ec2api.exception.PasteAppNotFound`
+        :raises: `ec2api.exception.EC2APIPasteAppNotFound`
 
         """
         try:
@@ -500,4 +500,5 @@ class Loader(object):
             return deploy.loadapp("config:%s" % self.config_path, name=name)
         except LookupError as err:
             LOG.error(err)
-            raise exception.PasteAppNotFound(name=name, path=self.config_path)
+            raise exception.EC2APIPasteAppNotFound(name=name,
+                                                   path=self.config_path)

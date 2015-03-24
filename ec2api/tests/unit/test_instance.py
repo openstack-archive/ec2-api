@@ -1453,7 +1453,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         get_os_image.return_value = os_image
 
         self.assertRaises(
-            exception.ImageNotActive,
+            exception.InvalidAMIIDUnavailable,
             instance_api._parse_image_parameters,
             fake_context, fakes.random_ec2_id('ami'), None, None)
 
@@ -1461,7 +1461,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         os_image.properties['image_state'] = 'decrypting'
 
         self.assertRaises(
-            exception.ImageNotActive,
+            exception.InvalidAMIIDUnavailable,
             instance_api._parse_image_parameters,
             fake_context, fakes.random_ec2_id('ami'), None, None)
 
