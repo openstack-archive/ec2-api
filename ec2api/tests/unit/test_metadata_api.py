@@ -30,10 +30,6 @@ class MetadataApiTestCase(base.ApiTestCase):
     def setUp(self):
         super(MetadataApiTestCase, self).setUp()
 
-        novadb_patcher = mock.patch('ec2api.metadata.api.novadb')
-        self.novadb = novadb_patcher.start()
-        self.addCleanup(novadb_patcher.stop)
-
         instance_api_patcher = mock.patch('ec2api.metadata.api.instance_api')
         self.instance_api = instance_api_patcher.start()
         self.addCleanup(instance_api_patcher.stop)
@@ -44,9 +40,6 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.instance_api.describe_instance_attribute.return_value = {
                 'instanceId': fakes.ID_EC2_INSTANCE_1,
                 'userData': {'value': 'fake_user_data'}}
-        self.novadb.instance_get_by_uuid.return_value = fakes.NOVADB_INSTANCE_1
-        self.novadb.block_device_mapping_get_all_by_instance.return_value = (
-                fakes.NOVADB_BDM_INSTANCE_1)
 
         self.fake_context = self._create_context()
 
@@ -55,8 +48,9 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.assertEqual('\n'.join(api.VERSIONS + ['latest']), retval)
 
     def test_get_instance_and_project_id(self):
-        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_1,
-                                               fakes.OS_INSTANCE_2]
+        self.nova.servers.list.return_value = [
+            fakes.OSInstance(fakes.OS_INSTANCE_1),
+            fakes.OSInstance(fakes.OS_INSTANCE_2)]
         self.nova.fixed_ips.get.return_value = mock.Mock(hostname='fake_name')
         self.assertEqual(
             (fakes.ID_OS_INSTANCE_1, fakes.ID_OS_PROJECT),
@@ -74,12 +68,14 @@ class MetadataApiTestCase(base.ApiTestCase):
                               self.fake_context,
                               fakes.IP_NETWORK_INTERFACE_2)
 
-        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_2]
+        self.nova.servers.list.return_value = [
+            fakes.OSInstance(fakes.OS_INSTANCE_2)]
         check_raise()
 
         self.nova.fixed_ips.get.side_effect = nova_exception.NotFound('fake')
-        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_1,
-                                               fakes.OS_INSTANCE_2]
+        self.nova.servers.list.return_value = [
+            fakes.OSInstance(fakes.OS_INSTANCE_1),
+            fakes.OSInstance(fakes.OS_INSTANCE_2)]
         check_raise()
 
     def test_get_version_root(self):
@@ -99,10 +95,6 @@ class MetadataApiTestCase(base.ApiTestCase):
             self.fake_context, [fakes.ID_EC2_INSTANCE_1])
         self.instance_api.describe_instance_attribute.assert_called_with(
             self.fake_context, fakes.ID_EC2_INSTANCE_1, 'userData')
-        self.novadb.instance_get_by_uuid.assert_called_with(
-            self.fake_context, fakes.ID_OS_INSTANCE_1)
-        (self.novadb.block_device_mapping_get_all_by_instance.
-         assert_called_with(self.fake_context, fakes.ID_OS_INSTANCE_1))
 
     def test_invalid_path(self):
         self.assertRaises(exception.EC2MetadataNotFound,
@@ -174,7 +166,11 @@ class MetadataApiTestCase(base.ApiTestCase):
                fakes.ID_OS_INSTANCE_2, fakes.IP_NETWORK_INTERFACE_1)
         self.assertEqual(fakes.IP_NETWORK_INTERFACE_1, retval)
 
-    def test_pubkey(self):
+    @mock.patch('novaclient.client.Client')
+    def test_pubkey(self, nova):
+        keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)
+        keypair.configure_mock(name=fakes.NAME_KEY_PAIR)
+        nova.return_value.keypairs.get.return_value = keypair
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'public-keys'],
@@ -225,8 +221,6 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.instance_api._block_device_strip_dev.assert_called_with(
                 fakes.EC2_INSTANCE_1['rootDeviceName'])
 
-        self.novadb.block_device_mapping_get_all_by_instance.return_value = (
-            fakes.NOVADB_BDM_INSTANCE_2)
         self.instance_api._block_device_strip_dev.return_value = 'sdb1'
         retval = api._build_block_device_mappings(
                 'fake_context', fakes.EC2_INSTANCE_2, fakes.ID_OS_INSTANCE_2)
@@ -235,7 +229,5 @@ class MetadataApiTestCase(base.ApiTestCase):
         expected.update(fakes.EC2_BDM_METADATA_INSTANCE_2)
         self.assertThat(retval,
                         matchers.DictMatches(expected))
-        (self.novadb.block_device_mapping_get_all_by_instance.
-         assert_called_with('fake_context', fakes.ID_OS_INSTANCE_2))
         self.instance_api._block_device_strip_dev.assert_called_with(
                 fakes.EC2_INSTANCE_2['rootDeviceName'])

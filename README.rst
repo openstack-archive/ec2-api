@@ -137,6 +137,8 @@ Instance related:
 - spotInstanceRequestId Instance property
 - stateReason Instance property
 - virtualizationType Instance property
+- instanceInitiatedShutdownBehavior Instance attribute
+- disableApiTermination Instance attribute
 - attachTime EbsInstanceBlockDevice property
 
 Network interface related:

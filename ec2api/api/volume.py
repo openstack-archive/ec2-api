@@ -67,7 +67,7 @@ def attach_volume(context, volume_id, instance_id, device):
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
     return _format_attachment(context, volume, os_volume,
-                              instance_id=instance_id, short=True)
+                              instance_id=instance_id)
 
 
 def detach_volume(context, volume_id, instance_id=None, device=None,
@@ -88,7 +88,7 @@ def detach_volume(context, volume_id, instance_id=None, device=None,
     instance_id = next((i['id'] for i in db_api.get_items(context, 'i')
                         if i['os_id'] == os_instance_id), None)
     return _format_attachment(context, volume, os_volume,
-                              instance_id=instance_id, short=True)
+                              instance_id=instance_id)
 
 
 def delete_volume(context, volume_id):
@@ -172,7 +172,7 @@ def _format_volume(context, volume, os_volume, instances={},
 
 
 def _format_attachment(context, volume, os_volume, instances={},
-                       instance_id=None, short=False):
+                       instance_id=None):
     os_attachment = next(iter(os_volume.attachments), {})
     os_instance_id = os_attachment.get('server_id')
     if not instance_id and os_instance_id:
@@ -186,6 +186,4 @@ def _format_attachment(context, volume, os_volume, instances={},
                        if os_volume.status in ('attaching', 'detaching') else
                        'attached' if os_attachment else 'detached'),
             'volumeId': volume['id']}
-    if not short:
-        ec2_attachment['deleteOnTermination'] = False
     return ec2_attachment

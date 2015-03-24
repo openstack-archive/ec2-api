@@ -97,7 +97,8 @@ class SubnetTest(base.EC2TestCase):
         self.client.DeleteVpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(vpc_clean)
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+    @testtools.skipUnless(
+        CONF.aws.run_incompatible_tests,
         "bug with overlapped subnets")
     def test_create_overlapped_subnet(self):
         cidr = self.BASE_CIDR + '/24'

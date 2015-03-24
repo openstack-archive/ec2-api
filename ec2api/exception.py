@@ -408,7 +408,3 @@ class InvalidFilter(Invalid):
 class RulesPerSecurityGroupLimitExceeded(Overlimit):
     msg_fmt = _("You've reached the limit on the number of rules that "
                 "you can add to a security group.")
-
-
-class NovaDbInstanceNotFound(EC2Exception):
-    code = 500

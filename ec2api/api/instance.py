@@ -28,10 +28,10 @@ from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import security_group as security_group_api
+from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
-from ec2api import novadb
 
 
 ec2_opts = [
@@ -157,11 +157,10 @@ class InstanceDescriber(common.TaggableItemsDescriber):
         self.obsolete_instances = []
 
     def format(self, instance, os_instance):
-        novadb_instance = self.novadb_instances[os_instance.id]
         formatted_instance = _format_instance(
-                self.context, instance, os_instance, novadb_instance,
+                self.context, instance, os_instance,
                 self.ec2_network_interfaces.get(instance['id']),
-                self.image_ids, self.volumes)
+                self.image_ids, self.volumes, self.os_volumes)
 
         reservation_id = instance['reservation_id']
         if reservation_id in self.reservations:
@@ -172,8 +171,7 @@ class InstanceDescriber(common.TaggableItemsDescriber):
             self.reservations[reservation_id] = reservation
             if not instance['vpc_id']:
                 self.reservation_os_groups[reservation_id] = (
-                        os_instance.security_groups
-                        if hasattr(os_instance, 'security_groups') else [])
+                    getattr(os_instance, 'security_groups', []))
 
         self.reservation_instances[
                 reservation['id']].append(formatted_instance)
@@ -195,22 +193,17 @@ class InstanceDescriber(common.TaggableItemsDescriber):
         return instances
 
     def get_os_items(self):
-        self.novadb_instances = {}
-        return clients.nova(self.context).servers.list(
-                # NOTE(ft): these filters are needed for metadata server
-                # which calls describe_instances with an admin account
-                # (but project_id is substituted to an instance's one).
-                search_opts={'all_tenants': self.context.is_os_admin,
+        self.os_volumes = _get_os_volumes(self.context)
+        nova = clients.nova(ec2_context.get_os_admin_context())
+        return nova.servers.list(
+                search_opts={'all_tenants': True,
                              'project_id': self.context.project_id})
 
     def auto_update_db(self, instance, os_instance):
-        novadb_instance = novadb.instance_get_by_uuid(self.context,
-                                                      os_instance.id)
-        self.novadb_instances[os_instance.id] = novadb_instance
         if not instance:
             instance = ec2utils.get_db_item_by_os_id(
                     self.context, 'i', os_instance.id,
-                    novadb_instance=novadb_instance)
+                    os_instance=os_instance)
         return instance
 
     def get_name(self, os_item):
@@ -327,59 +320,47 @@ def get_console_output(context, instance_id):
 
 def describe_instance_attribute(context, instance_id, attribute):
     instance = ec2utils.get_db_item(context, instance_id)
-    nova = clients.nova(context)
+    nova = clients.nova(ec2_context.get_os_admin_context())
     os_instance = nova.servers.get(instance['os_id'])
-    novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
 
     def _format_attr_block_device_mapping(result):
-        root_device_name = _cloud_format_instance_root_device_name(
-                                                               novadb_instance)
         # TODO(ft): next call add 'rootDeviceType' to result,
         # but AWS doesn't. This is legacy behavior of Nova EC2
-        _cloud_format_instance_bdm(context, os_instance.id,
-                                   root_device_name, result)
-
-    def _format_attr_disable_api_termination(result):
-        result['disableApiTermination'] = {
-                    'value': novadb_instance.get('disable_terminate', False)}
+        _cloud_format_instance_bdm(context, os_instance, result)
 
     def _format_attr_group_set(result):
-        result['groupSet'] = _format_group_set(context,
-                                               os_instance.security_groups)
-
-    def _format_attr_instance_initiated_shutdown_behavior(result):
-        value = ('terminate' if novadb_instance.get('shutdown_terminate')
-                 else 'stop')
-        result['instanceInitiatedShutdownBehavior'] = {'value': value}
+        result['groupSet'] = _format_group_set(
+            context, getattr(os_instance, 'security_groups', []))
 
     def _format_attr_instance_type(result):
         result['instanceType'] = {'value': _cloud_format_instance_type(
                                                        context, os_instance)}
 
     def _format_attr_kernel(result):
-        value = _cloud_format_kernel_id(context, novadb_instance)
+        value = _cloud_format_kernel_id(context, os_instance)
         result['kernel'] = {'value': value}
 
     def _format_attr_ramdisk(result):
-        value = _cloud_format_ramdisk_id(context, novadb_instance)
+        value = _cloud_format_ramdisk_id(context, os_instance)
         result['ramdisk'] = {'value': value}
 
     def _format_attr_root_device_name(result):
         result['rootDeviceName'] = {
-                'value': _cloud_format_instance_root_device_name(
-                                                             novadb_instance)}
+                'value': getattr(os_instance,
+                                 'OS-EXT-SRV-ATTR:root_device_name', None)}
 
     def _format_attr_user_data(result):
-        if novadb_instance['user_data']:
-            value = base64.b64decode(novadb_instance['user_data'])
+        if not hasattr(os_instance, 'OS-EXT-SRV-ATTR:user_data'):
+            # NOTE(ft): partial compatibility with pre Kilo OS releases
+            raise exception.InvalidAttribute(attr=attribute)
+        user_data = getattr(os_instance, 'OS-EXT-SRV-ATTR:user_data')
+        if user_data:
+            value = base64.b64decode(user_data)
             result['userData'] = {'value': value}
 
     attribute_formatter = {
         'blockDeviceMapping': _format_attr_block_device_mapping,
-        'disableApiTermination': _format_attr_disable_api_termination,
         'groupSet': _format_attr_group_set,
-        'instanceInitiatedShutdownBehavior': (
-                _format_attr_instance_initiated_shutdown_behavior),
         'instanceType': _format_attr_instance_type,
         'kernel': _format_attr_kernel,
         'ramdisk': _format_attr_ramdisk,
@@ -403,13 +384,14 @@ def _get_idempotent_run(context, client_token):
                      if i.get('client_token') == client_token)
     if not instances:
         return
-    os_instances = _get_os_instances_by_instances(context, instances.values())
+    nova = clients.nova(ec2_context.get_os_admin_context())
+    os_instances = _get_os_instances_by_instances(context, instances.values(),
+                                                  nova=nova)
     instances_info = []
     instance_ids = []
     for os_instance in os_instances:
         instance = instances[os_instance.id]
-        novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
-        instances_info.append((instance, os_instance, novadb_instance,))
+        instances_info.append((instance, os_instance,))
         instance_ids.append(instance['id'])
     if not instances_info:
         return
@@ -434,9 +416,9 @@ def _format_reservation_body(context, reservation, formatted_instances,
 def _format_reservation(context, reservation_id, instances_info,
                         ec2_network_interfaces, image_ids={}):
     formatted_instances = []
-    for (instance, os_instance, novadb_instance) in instances_info:
+    for (instance, os_instance) in instances_info:
         ec2_instance = _format_instance(
-                context, instance, os_instance, novadb_instance,
+                context, instance, os_instance,
                 ec2_network_interfaces.get(instance['id']), image_ids)
         formatted_instances.append(ec2_instance)
 
@@ -444,11 +426,12 @@ def _format_reservation(context, reservation_id, instances_info,
                    'owner_id': os_instance.tenant_id}
     return _format_reservation_body(
             context, reservation, formatted_instances,
-            None if instance['vpc_id'] else os_instance.security_groups)
+            (None if instance['vpc_id'] else
+             getattr(os_instance, 'security_groups', [])))
 
 
-def _format_instance(context, instance, os_instance, novadb_instance,
-                     ec2_network_interfaces, image_ids, volumes=None):
+def _format_instance(context, instance, os_instance, ec2_network_interfaces,
+                     image_ids, volumes=None, os_volumes=None):
     ec2_instance = {
         'amiLaunchIndex': instance['launch_index'],
         'imageId': (ec2utils.os_id_to_ec2_id(context, 'ami',
@@ -465,16 +448,17 @@ def _format_instance(context, instance, os_instance, novadb_instance,
         'productCodesSet': None,
         'instanceState': _cloud_state_description(
                                 getattr(os_instance, 'OS-EXT-STS:vm_state')),
-        'rootDeviceName': _cloud_format_instance_root_device_name(
-                                                            novadb_instance),
     }
-    _cloud_format_instance_bdm(context, instance['os_id'],
-                               ec2_instance['rootDeviceName'], ec2_instance,
-                               volumes)
-    kernel_id = _cloud_format_kernel_id(context, novadb_instance, image_ids)
+    root_device_name = getattr(os_instance,
+                               'OS-EXT-SRV-ATTR:root_device_name', None)
+    if root_device_name:
+        ec2_instance['rootDeviceName'] = root_device_name
+    _cloud_format_instance_bdm(context, os_instance, ec2_instance,
+                               volumes, os_volumes)
+    kernel_id = _cloud_format_kernel_id(context, os_instance, image_ids)
     if kernel_id:
         ec2_instance['kernelId'] = kernel_id
-    ramdisk_id = _cloud_format_ramdisk_id(context, novadb_instance, image_ids)
+    ramdisk_id = _cloud_format_ramdisk_id(context, os_instance, image_ids)
     if ramdisk_id:
         ec2_instance['ramdiskId'] = ramdisk_id
 
@@ -514,7 +498,8 @@ def _format_instance(context, instance, os_instance, novadb_instance,
     ec2_instance.update({
         'privateIpAddress': fixed_ip,
         'privateDnsName': (fixed_ip if CONF.ec2_private_dns_show_ip else
-                           novadb_instance['hostname']),
+                           getattr(os_instance, 'OS-EXT-SRV-ATTR:hostname',
+                                   None)),
         'dnsName': dns_name,
     })
     if floating_ip is not None:
@@ -651,8 +636,9 @@ def _foreach_instance(context, instance_ids, valid_states, func):
     return True
 
 
-def _get_os_instances_by_instances(context, instances, exactly=False):
-    nova = clients.nova(context)
+def _get_os_instances_by_instances(context, instances, exactly=False,
+                                   nova=None):
+    nova = nova or clients.nova(context)
     os_instances = []
     obsolete_instances = []
     for instance in instances:
@@ -669,21 +655,35 @@ def _get_os_instances_by_instances(context, instances, exactly=False):
     return os_instances
 
 
-def _is_ebs_instance(context, os_instance):
-    novadb_instance = novadb.instance_get_by_uuid(context, os_instance.id)
-    root_device_name = _cloud_format_instance_root_device_name(novadb_instance)
+def _get_os_volumes(context):
+    search_opts = ({'all_tenants': True,
+                    'project_id': context.project_id}
+                   if context.is_os_admin else None)
+    os_volumes = collections.defaultdict(list)
+    cinder = clients.cinder(context)
+    for os_volume in cinder.volumes.list(search_opts=search_opts):
+        os_attachment = next(iter(os_volume.attachments), {})
+        os_instance_id = os_attachment.get('server_id')
+        if os_instance_id:
+            os_volumes[os_instance_id].append(os_volume)
+    return os_volumes
+
+
+def _is_ebs_instance(context, os_instance_id):
+    nova = clients.nova(ec2_context.get_os_admin_context())
+    os_instance = nova.servers.get(os_instance_id)
+    root_device_name = getattr(os_instance,
+                               'OS-EXT-SRV-ATTR:root_device_name', None)
+    if not root_device_name:
+        return False
     root_device_short_name = _block_device_strip_dev(root_device_name)
     if root_device_name == root_device_short_name:
         root_device_name = _block_device_prepend_dev(root_device_name)
-    for bdm in novadb.block_device_mapping_get_all_by_instance(context,
-                                                               os_instance.id):
-        volume_id = bdm['volume_id']
-        if (volume_id is None or bdm['no_device']):
-            continue
-
-        if ((bdm['snapshot_id'] or bdm['volume_id']) and
-                (bdm['device_name'] == root_device_name or
-                 bdm['device_name'] == root_device_short_name)):
+    for os_volume in _get_os_volumes(context)[os_instance_id]:
+        os_attachment = next(iter(os_volume.attachments), {})
+        device_name = os_attachment.get('device')
+        if (device_name == root_device_name or
+                device_name == root_device_short_name):
             return True
     return False
 
@@ -814,14 +814,16 @@ class InstanceEngineNeutron(object):
                         network_interface_api._detach_network_interface_item,
                         context, data['network_interface'])
 
-                novadb_instance = novadb.instance_get_by_uuid(context,
-                                                              os_instance.id)
-                instances_info.append((instance, os_instance, novadb_instance))
+                instances_info.append((instance, os_instance))
 
         # NOTE(ft): we don't reuse network interface objects received from
         # create_network_interfaces because they don't contain attachment info
         ec2_network_interfaces = (self.get_ec2_network_interfaces(
                                         context, instance_ids=instance_ids))
+        # NOTE(ft): since os_instance is created with regular Nova client,
+        # it doesn't contain enough info to get an instance in EC2 format
+        # completely, nevertheless we use it to get rid of additional requests
+        # and reduce code complexity
         return _format_reservation(context, ec2_reservation_id, instances_info,
                                    ec2_network_interfaces,
                                    image_ids={os_image.id: image_id})
@@ -1089,7 +1091,7 @@ class InstanceEngineNova(object):
                 os_instance = nova.servers.create(
                     '%s-%s' % (ec2_reservation_id, index),
                     os_image.id, os_flavor,
-                    min_count=min_count, max_count=max_count,
+                    min_count=1, max_count=1,
                     kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
                     availability_zone=(
                         placement or {}).get('availability_zone'),
@@ -1107,11 +1109,12 @@ class InstanceEngineNova(object):
                 cleaner.addCleanup(db_api.delete_item, context, instance['id'])
 
                 nova.servers.update(os_instance, name=instance['id'])
+                instances_info.append((instance, os_instance))
 
-                novadb_instance = novadb.instance_get_by_uuid(context,
-                                                              os_instance.id)
-                instances_info.append((instance, os_instance, novadb_instance))
-
+        # NOTE(ft): since os_instance is created with regular Nova client,
+        # it doesn't contain enough info to get an instance in EC2 format
+        # completely, nevertheless we use it to get rid of additional requests
+        # and reduce code complexity
         return _format_reservation(context, ec2_reservation_id, instances_info,
                                    {}, image_ids={os_image.id: image_id})
 
@@ -1122,16 +1125,23 @@ class InstanceEngineNova(object):
 instance_engine = get_instance_engine()
 
 
-def _auto_create_instance_extension(context, instance, novadb_instance=None):
-    if not novadb_instance:
-        novadb_instance = novadb.instance_get_by_uuid(context,
-                                                      instance['os_id'])
-    instance['reservation_id'] = novadb_instance['reservation_id']
-    instance['launch_index'] = novadb_instance['launch_index']
+def _auto_create_instance_extension(context, instance, os_instance=None):
+    if not os_instance:
+        nova = clients.nova(ec2_context.get_os_admin_context())
+        os_instance = nova.servers.get(instance['os_id'])
+    if hasattr(os_instance, 'OS-EXT-SRV-ATTR:reservation_id'):
+        instance['reservation_id'] = getattr(os_instance,
+                                             'OS-EXT-SRV-ATTR:reservation_id')
+        instance['launch_index'] = getattr(os_instance,
+                                           'OS-EXT-SRV-ATTR:launch_index')
+    else:
+        # NOTE(ft): partial compatibility with pre Kilo OS releases
+        instance['reservation_id'] = _generate_reservation_id()
+        instance['launch_index'] = 0
 
 
 ec2utils.register_auto_create_db_item_extension(
-        'i', _auto_create_instance_extension)
+    'i', _auto_create_instance_extension)
 
 
 # NOTE(ft): following functions are copied from various parts of Nova
@@ -1173,7 +1183,7 @@ def _cloud_get_image_state(image):
 
 
 def _cloud_format_kernel_id(context, os_instance, image_ids=None):
-    os_kernel_id = os_instance['kernel_id']
+    os_kernel_id = getattr(os_instance, 'OS-EXT-SRV-ATTR:kernel_id', None)
     if os_kernel_id is None or os_kernel_id == '':
         return
     return ec2utils.os_id_to_ec2_id(context, 'aki', os_kernel_id,
@@ -1181,7 +1191,7 @@ def _cloud_format_kernel_id(context, os_instance, image_ids=None):
 
 
 def _cloud_format_ramdisk_id(context, os_instance, image_ids=None):
-    os_ramdisk_id = os_instance['ramdisk_id']
+    os_ramdisk_id = getattr(os_instance, 'OS-EXT-SRV-ATTR:ramdisk_id', None)
     if os_ramdisk_id is None or os_ramdisk_id == '':
         return
     return ec2utils.os_id_to_ec2_id(context, 'ari', os_ramdisk_id,
@@ -1191,11 +1201,6 @@ def _cloud_format_ramdisk_id(context, os_instance, image_ids=None):
 def _cloud_format_instance_type(context, os_instance):
     # TODO(ft): cache flavors
     return clients.nova(context).flavors.get(os_instance.flavor['id']).name
-
-
-def _cloud_format_instance_root_device_name(novadb_instance):
-    return (novadb_instance.get('root_device_name') or
-            _block_device_DEFAULT_ROOT_DEV_NAME)
 
 
 def _cloud_state_description(vm_state):
@@ -1209,40 +1214,53 @@ def _cloud_state_description(vm_state):
             'name': name}
 
 
-def _cloud_format_instance_bdm(context, instance_uuid, root_device_name,
-                               result, volumes=None):
+def _cloud_format_instance_bdm(context, os_instance, result,
+                               volumes=None, os_volumes=None):
     """Format InstanceBlockDeviceMappingResponseItemType."""
-    root_device_type = 'instance-store'
-    root_device_short_name = _block_device_strip_dev(root_device_name)
-    if root_device_name == root_device_short_name:
-        root_device_name = _block_device_prepend_dev(root_device_name)
-    cinder = clients.cinder(context)
+    root_device_name = getattr(os_instance,
+                               'OS-EXT-SRV-ATTR:root_device_name', None)
+    if not root_device_name:
+        root_device_short_name = root_device_type = None
+    else:
+        root_device_type = 'instance-store'
+        root_device_short_name = _block_device_strip_dev(root_device_name)
+        if root_device_name == root_device_short_name:
+            root_device_name = _block_device_prepend_dev(root_device_name)
     mapping = []
-    for bdm in novadb.block_device_mapping_get_all_by_instance(context,
-                                                               instance_uuid):
-        volume_id = bdm['volume_id']
-        if (volume_id is None or bdm['no_device']):
+    if os_volumes is None:
+        os_volumes = _get_os_volumes(context)
+    # NOTE(ft): Attaching volumes are not reported, because Cinder
+    # volume doesn't yet contain attachment info at this stage, but Nova v2.3
+    # instance volumes_attached doesn't contain a device name.
+    # But a bdm must contain the last one.
+    volumes_attached = getattr(os_instance,
+                               'os-extended-volumes:volumes_attached', [])
+    for os_volume in os_volumes[os_instance.id]:
+        os_attachment = next(iter(os_volume.attachments), {})
+        device_name = os_attachment.get('device')
+        if not device_name:
             continue
-
-        if ((bdm['snapshot_id'] or bdm['volume_id']) and
-                (bdm['device_name'] == root_device_name or
-                 bdm['device_name'] == root_device_short_name)):
+        if (device_name == root_device_name or
+                device_name == root_device_short_name):
             root_device_type = 'ebs'
 
-        vol = cinder.volumes.get(volume_id)
-        volume = ec2utils.get_db_item_by_os_id(context, 'vol', volume_id,
+        volume = ec2utils.get_db_item_by_os_id(context, 'vol', os_volume.id,
                                                volumes)
         # TODO(yamahata): volume attach time
         ebs = {'volumeId': volume['id'],
-               'deleteOnTermination': bdm['delete_on_termination'],
-               'status': _cloud_get_volume_attach_status(vol), }
-        res = {'deviceName': bdm['device_name'],
-               'ebs': ebs, }
-        mapping.append(res)
+               'status': _cloud_get_volume_attach_status(os_volume)}
+        volume_attached = next((va for va in volumes_attached
+                                if va['id'] == os_volume.id), None)
+        if volume_attached:
+            ebs['deleteOnTermination'] = (
+                volume_attached['delete_on_termination'])
+        mapping.append({'deviceName': device_name,
+                        'ebs': ebs})
 
     if mapping:
         result['blockDeviceMapping'] = mapping
-    result['rootDeviceType'] = root_device_type
+    if root_device_type:
+        result['rootDeviceType'] = root_device_type
 
 
 def _cloud_get_volume_attach_status(volume):
@@ -1265,9 +1283,6 @@ def _block_device_strip_dev(device_name):
 def _block_device_prepend_dev(device_name):
     """Make sure there is a leading '/dev/'."""
     return device_name and '/dev/' + _block_device_strip_dev(device_name)
-
-
-_block_device_DEFAULT_ROOT_DEV_NAME = '/dev/sda1'
 
 
 def _utils_generate_uid(topic, size=8):

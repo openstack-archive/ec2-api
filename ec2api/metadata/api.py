@@ -22,7 +22,6 @@ from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
 from ec2api import exception
 from ec2api.i18n import _
-from ec2api.novadb import api as novadb
 
 LOG = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ def get_os_instance_and_project_id(context, fixed_ip):
         return next((os_instance.id, os_instance.tenant_id)
                     for os_instance in os_instances
                     if any((addr['addr'] == fixed_ip and
-                                addr['OS-EXT-IPS:type'] == 'fixed')
+                            addr['OS-EXT-IPS:type'] == 'fixed')
                            for addr in itertools.chain(
                                 *os_instance.addresses.itervalues())))
     except (nova_exception.NotFound, StopIteration):
@@ -132,7 +131,7 @@ def _get_ec2_instance_and_reservation(context, os_instance_id):
 
 
 def _build_metadata(context, ec2_instance, ec2_reservation,
-                             os_instance_id, remote_ip):
+                    os_instance_id, remote_ip):
     metadata = {
         'ami-id': ec2_instance['imageId'],
         'ami-launch-index': ec2_instance['amiLaunchIndex'],
@@ -180,10 +179,10 @@ def _build_metadata(context, ec2_instance, ec2_reservation,
     # meta-data/public-keys/0/ : 'openssh-key'
     # meta-data/public-keys/0/openssh-key : '%s' % publickey
     if ec2_instance['keyName']:
-        novadb_instance = novadb.instance_get_by_uuid(context, os_instance_id)
+        keypair = clients.nova(context).keypairs.get(ec2_instance['keyName'])
         metadata['public-keys'] = {
-            '0': {'_name': "0=" + ec2_instance['keyName'],
-                  'openssh-key': novadb_instance['key_data']}}
+            '0': {'_name': "0=" + keypair.name,
+                  'openssh-key': keypair.public_key}}
 
     full_metadata = {'meta-data': metadata}
 
@@ -210,21 +209,7 @@ def _build_block_device_mappings(context, ec2_instance, os_instance_id):
                            for num, ebs in enumerate(ebs_devices))
         mappings.update(ebs_devices)
 
-    bdms = novadb.block_device_mapping_get_all_by_instance(context,
-                                                           os_instance_id)
-    ephemerals = dict(('ephemeral%d' % num, eph['device_name'])
-                      for num, eph in enumerate(
-                            eph for eph in bdms
-                            if (eph['source_type'] == 'blank' and
-                                eph['guest_format'] != 'swap')))
-    mappings.update(ephemerals)
-
-    swap = next((swap['device_name'] for swap in bdms
-                 if (swap['source_type'] == 'blank' and
-                     swap['guest_format'] == 'swap')), None)
-    if swap:
-        mappings['swap'] = swap
-
+    # TODO(ft): extend Nova API to get ephemerals and swap
     return mappings
 
 

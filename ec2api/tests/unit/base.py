@@ -40,6 +40,7 @@ def skip_not_implemented(test_item):
 class ApiTestCase(test_base.BaseTestCase):
 
     ANY_EXECUTE_ERROR = object()
+    NOVACLIENT_SPEC_OBJ = novaclient.Client('2')
 
     def setUp(self):
         super(ApiTestCase, self).setUp()
@@ -50,8 +51,9 @@ class ApiTestCase(test_base.BaseTestCase):
         self.addCleanup(neutron_patcher.stop)
 
         nova_patcher = mock.patch('novaclient.client.Client')
-        self.nova = mock.create_autospec(novaclient.Client('2'))
-        nova_patcher.start().return_value = self.nova
+        self.nova = mock.create_autospec(self.NOVACLIENT_SPEC_OBJ)
+        self.novaclient_getter = nova_patcher.start()
+        self.novaclient_getter.return_value = self.nova
         self.addCleanup(nova_patcher.stop)
 
         glance_patcher = mock.patch('glanceclient.client.Client')
@@ -79,7 +81,8 @@ class ApiTestCase(test_base.BaseTestCase):
 
     def execute(self, action, args):
         status_code, response = self._execute(action, args)
-        self.assertEqual(200, status_code)
+        self.assertEqual(200, status_code,
+                         self._format_error_message(status_code, response))
         return response
 
     def assert_execution_error(self, error_code, action, args):
@@ -88,7 +91,8 @@ class ApiTestCase(test_base.BaseTestCase):
             self.assertLessEqual(400, status_code)
         else:
             self.assertEqual(400, status_code)
-            self.assertEqual(error_code, response['Error']['Code'])
+            self.assertEqual(error_code, response['Error']['Code'],
+                             self._format_error_message(status_code, response))
 
     def assert_any_call(self, func, *args, **kwargs):
         calls = func.mock_calls
@@ -181,9 +185,10 @@ class ApiTestCase(test_base.BaseTestCase):
               ('tag-value', 'fake_value'),
               ('tag:fake_key', 'fake_value')])
 
-    def _create_context(self):
+    def _create_context(self, auth_token=None):
         return ec2api.context.RequestContext(
             fakes.ID_OS_USER, fakes.ID_OS_PROJECT,
+            auth_token=auth_token,
             service_catalog=[{'type': 'network',
                               'endpoints': [{'publicUrl': 'fake_url'}]}])
 
@@ -218,3 +223,10 @@ class ApiTestCase(test_base.BaseTestCase):
             self.assertIn('Error', body)
             self.assertEqual(2, len(body['Error']))
         return body
+
+    def _format_error_message(self, status_code, response):
+        if status_code >= 400:
+            return '%s: %s' % (response['Error']['Code'],
+                               response['Error']['Message'])
+        else:
+            return ''

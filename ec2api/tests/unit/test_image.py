@@ -120,7 +120,7 @@ class ImageTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_INSTANCE_2)
         self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
-        is_ebs_instance.assert_called_once_with(mock.ANY, os_instance)
+        is_ebs_instance.assert_called_once_with(mock.ANY, os_instance.id)
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': os_image.id,
                               'is_public': False})

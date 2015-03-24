@@ -333,11 +333,10 @@ class ProxyTestCase(test_base.BaseTestCase):
         self.assertEqual(1, constant_time_compare.call_count)
 
     @mock.patch('keystoneclient.v2_0.client.Client')
-    @mock.patch('novaclient.v1_1.client.Client')
+    @mock.patch('novaclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     @mock.patch('ec2api.metadata.api.instance_api')
-    @mock.patch('ec2api.metadata.api.novadb')
-    def test_get_metadata(self, novadb, instance_api, db_api, nova, keystone):
+    def test_get_metadata(self, instance_api, db_api, nova, keystone):
         service_catalog = mock.MagicMock()
         service_catalog.get_data.return_value = []
         keystone.return_value = mock.Mock(auth_user_id='fake_user_id',
@@ -346,7 +345,11 @@ class ProxyTestCase(test_base.BaseTestCase):
                                           service_catalog=service_catalog)
         nova.return_value.fixed_ips.get.return_value = (
                 mock.Mock(hostname='fake_name'))
-        nova.return_value.servers.list.return_value = [fakes.OS_INSTANCE_1]
+        nova.return_value.servers.list.return_value = [
+            fakes.OSInstance(fakes.OS_INSTANCE_1)]
+        keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)
+        keypair.configure_mock(name=fakes.NAME_KEY_PAIR)
+        nova.return_value.keypairs.get.return_value = keypair
         db_api.get_item_ids.return_value = [
                 (fakes.ID_EC2_INSTANCE_1, fakes.ID_OS_INSTANCE_1)]
         instance_api.describe_instances.return_value = {
@@ -354,9 +357,6 @@ class ProxyTestCase(test_base.BaseTestCase):
         instance_api.describe_instance_attribute.return_value = {
                 'instanceId': fakes.ID_EC2_INSTANCE_1,
                 'userData': {'value': 'fake_user_data'}}
-        novadb.instance_get_by_uuid.return_value = fakes.NOVADB_INSTANCE_1
-        novadb.block_device_mapping_get_all_by_instance.return_value = []
-        novadb.instance_get_by_uuid.return_value = fakes.NOVADB_INSTANCE_1
 
         def _test_metadata_path(relpath):
             # recursively confirm a http 200 from all meta-data elements
@@ -364,6 +364,7 @@ class ProxyTestCase(test_base.BaseTestCase):
             request = webob.Request.blank(
                     relpath, remote_addr=fakes.IP_NETWORK_INTERFACE_2)
             response = request.get_response(self.handler)
+            self.assertEqual(200, response.status_int)
             for item in response.body.split('\n'):
                 if 'public-keys' in relpath:
                     # meta-data/public-keys/0=keyname refers to

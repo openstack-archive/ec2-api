@@ -256,15 +256,6 @@
 #use_tpool=false
 
 
-#
-# Options defined in ec2api.novadb.sqlalchemy.api
-#
-
-# The SQLAlchemy connection string used to connect to the nova
-# database (string value)
-#connection_nova=<None>
-
-
 [keystone_authtoken]
 
 #

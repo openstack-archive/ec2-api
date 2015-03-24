@@ -21,6 +21,7 @@ import mock
 from novaclient import exceptions as nova_exception
 from oslotest import base as test_base
 
+import ec2api.api.clients
 from ec2api.api import instance as instance_api
 from ec2api import exception
 from ec2api.tests.unit import base
@@ -47,9 +48,26 @@ class InstanceTestCase(base.ApiTestCase):
             mock.patch('ec2api.api.instance._utils_generate_uid'))
         self.utils_generate_uid = utils_generate_uid_patcher.start()
         self.addCleanup(utils_generate_uid_patcher.stop)
-        novadb_patcher = (mock.patch('ec2api.api.instance.novadb'))
-        self.novadb = novadb_patcher.start()
-        self.addCleanup(novadb_patcher.stop)
+        get_os_admin_context_patcher = (
+            mock.patch('ec2api.context.get_os_admin_context'))
+        self.get_os_admin_context = get_os_admin_context_patcher.start()
+        self.addCleanup(get_os_admin_context_patcher.stop)
+        self.get_os_admin_context.return_value = (
+            self._create_context(auth_token='admin_token'))
+
+        # NOTE(ft): create a special mock for Nova calls with admin account.
+        # Also make sure that an admin account is used only for this calls.
+        # The special mock is needed to validate tested function to retrieve
+        # appropriate data, as long as only calls with admin account return
+        # some specific data.
+        self.nova_admin = mock.create_autospec(self.NOVACLIENT_SPEC_OBJ)
+        self.novaclient_getter.side_effect = (
+            lambda *args, **kwargs: (
+                self.nova_admin
+                if (kwargs.get('auth_token') == 'admin_token') else
+                self.nova
+                if (kwargs.get('auth_token') != 'admin_token') else
+                None))
 
         format_security_groups_ids_names = (
             self.security_group_api.format_security_groups_ids_names)
@@ -78,11 +96,10 @@ class InstanceTestCase(base.ApiTestCase):
 
         self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
         self.nova.servers.create.return_value = (
-            fakes.OSInstance(
-                fakes.ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
-                image={'id': fakes.ID_OS_IMAGE_1}))
-        self.novadb.instance_get_by_uuid.return_value = fakes.NOVADB_INSTANCE_1
-        self.novadb.block_device_mapping_get_all_by_instance.return_value = []
+            fakes.OSInstance({
+                'id': fakes.ID_OS_INSTANCE_1,
+                'flavor': {'id': 'fakeFlavorId'},
+                'image': {'id': fakes.ID_OS_IMAGE_1}}))
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
 
         get_vpc_default_security_group_id.return_value = None
@@ -103,14 +120,15 @@ class InstanceTestCase(base.ApiTestCase):
                 delete_on_termination=delete_port_on_termination)
             expected_reservation = fakes.gen_ec2_reservation(
                 fakes.ID_EC2_RESERVATION_1,
-                [fakes.gen_ec2_instance(
-                    fakes.ID_EC2_INSTANCE_1,
-                    private_ip_address=fakes.IP_NETWORK_INTERFACE_1,
-                    ec2_network_interfaces=[eni],
-                    image_id=fakes.ID_EC2_IMAGE_1,
-                    kernel_id=fakes.ID_EC2_IMAGE_AKI_1,
-                    ramdisk_id=fakes.ID_EC2_IMAGE_ARI_1,
-                    reservation_id=fakes.ID_EC2_RESERVATION_1)])
+                [tools.patch_dict(
+                    fakes.gen_ec2_instance(
+                        fakes.ID_EC2_INSTANCE_1,
+                        private_ip_address=fakes.IP_NETWORK_INTERFACE_1,
+                        ec2_network_interfaces=[eni],
+                        image_id=fakes.ID_EC2_IMAGE_1,
+                        reservation_id=fakes.ID_EC2_RESERVATION_1),
+                    {'privateDnsName': None},
+                    ['rootDeviceType', 'rootDeviceName'])])
             get_ec2_network_interfaces.return_value = {
                     fakes.ID_EC2_INSTANCE_1: [eni]}
 
@@ -126,7 +144,7 @@ class InstanceTestCase(base.ApiTestCase):
                      mock.ANY, fakes.ID_EC2_SUBNET_1,
                      **create_network_interface_kwargs))
             self.nova.servers.create.assert_called_once_with(
-                '%s-%s' % (fakes.ID_EC2_RESERVATION_1, 0),
+                fakes.EC2_INSTANCE_1['privateDnsName'],
                 fakes.ID_OS_IMAGE_1, self.fake_flavor,
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
@@ -142,20 +160,12 @@ class InstanceTestCase(base.ApiTestCase):
                  mock.ANY, fakes.DB_NETWORK_INTERFACE_1,
                  fakes.ID_EC2_INSTANCE_1, 0,
                  delete_on_termination=delete_port_on_termination))
-            self.novadb.instance_get_by_uuid.assert_called_once_with(
-                mock.ANY, fakes.ID_OS_INSTANCE_1)
             get_ec2_network_interfaces.assert_called_once_with(
                 mock.ANY, instance_ids=[fakes.ID_EC2_INSTANCE_1])
-            self.assertEqual(2, self.db_api.get_item_ids.call_count)
-            self.db_api.get_item_ids.assert_any_call(
-                mock.ANY, 'aki', (fakes.ID_OS_IMAGE_AKI_1,))
-            self.db_api.get_item_ids.assert_any_call(
-                mock.ANY, 'ari', (fakes.ID_OS_IMAGE_ARI_1,))
 
             self.network_interface_api.reset_mock()
             self.nova.servers.reset_mock()
             self.db_api.reset_mock()
-            self.novadb.reset_mock()
             get_ec2_network_interfaces.reset_mock()
 
         do_check({'SubnetId': fakes.ID_EC2_SUBNET_1},
@@ -220,9 +230,13 @@ class InstanceTestCase(base.ApiTestCase):
                 self.IDS_EC2_INSTANCE,
                 zip(*[iter(self.EC2_ATTACHED_ENIS)] * 2)))
         ec2_instances = [
-            fakes.gen_ec2_instance(ec2_instance_id, launch_index=l_i,
-                                   ec2_network_interfaces=eni_pair,
-                                   reservation_id=fakes.ID_EC2_RESERVATION_1)
+            tools.patch_dict(
+                fakes.gen_ec2_instance(
+                    ec2_instance_id, launch_index=l_i,
+                    ec2_network_interfaces=eni_pair,
+                    reservation_id=fakes.ID_EC2_RESERVATION_1),
+                {'privateDnsName': None},
+                ['rootDeviceType', 'rootDeviceName'])
             for l_i, (ec2_instance_id, eni_pair) in enumerate(zip(
                 self.IDS_EC2_INSTANCE,
                 zip(*[iter(self.EC2_ATTACHED_ENIS)] * 2)))]
@@ -236,9 +250,10 @@ class InstanceTestCase(base.ApiTestCase):
             [{'networkInterface': eni}
              for eni in self.EC2_DETACHED_ENIS])
         self.nova.servers.create.side_effect = [
-            fakes.OSInstance(os_instance_id, {'id': 'fakeFlavorId'})
+            fakes.OSInstance({
+                'id': os_instance_id,
+                'flavor': {'id': 'fakeFlavorId'}})
             for os_instance_id in self.IDS_OS_INSTANCE]
-        self.novadb.instance_get_by_uuid.side_effect = self.NOVADB_INSTANCES
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
         self.db_api.add_item.side_effect = self.DB_INSTANCES
 
@@ -370,14 +385,13 @@ class InstanceTestCase(base.ApiTestCase):
                       'reservation_id': fakes.random_ec2_id('r'),
                       'client_token': 'client-token-%s' % ind}
                      for ind in range(3)]
-        os_instances = [fakes.OSInstance(inst['os_id'])
+        os_instances = [fakes.OSInstance_full({'id': inst['os_id']})
                         for inst in instances]
         format_reservation.return_value = {'key': 'value'}
 
         # NOTE(ft): check select corresponding instance by client_token
         self.set_mock_db_items(instances[0], instances[1])
         get_os_instances_by_instances.return_value = [os_instances[1]]
-        self.novadb.instance_get_by_uuid.return_value = 'novadb_instance'
         get_ec2_network_interfaces.return_value = 'ec2_network_interfaces'
 
         resp = self.execute('RunInstances',
@@ -388,12 +402,10 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertEqual({'key': 'value'}, resp)
         format_reservation.assert_called_once_with(
             mock.ANY, instances[1]['reservation_id'],
-            [(instances[1], os_instances[1], 'novadb_instance')],
+            [(instances[1], os_instances[1])],
             'ec2_network_interfaces')
         get_os_instances_by_instances.assert_called_once_with(
-            mock.ANY, instances[1:2])
-        self.novadb.instance_get_by_uuid.assert_called_once_with(
-            mock.ANY, os_instances[1].id)
+            mock.ANY, instances[1:2], nova=self.nova_admin)
         get_ec2_network_interfaces.assert_called_once_with(
             mock.ANY, [instances[1]['id']])
 
@@ -423,15 +435,12 @@ class InstanceTestCase(base.ApiTestCase):
         format_reservation.reset_mock()
         get_os_instances_by_instances.reset_mock()
         instance_engine.reset_mock()
-        self.novadb.reset_mock()
         for inst in instances:
             inst['reservation_id'] = instances[0]['reservation_id']
             inst['client_token'] = 'client-token'
         self.set_mock_db_items(*instances)
         get_os_instances_by_instances.return_value = [os_instances[0],
                                                       os_instances[2]]
-        self.novadb.instance_get_by_uuid.side_effect = ['novadb-instance-0',
-                                                        'novadb-instance-2']
         get_ec2_network_interfaces.return_value = 'ec2_network_interfaces'
 
         resp = self.execute('RunInstances',
@@ -442,14 +451,11 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertEqual({'key': 'value'}, resp)
         format_reservation.assert_called_once_with(
             mock.ANY, instances[0]['reservation_id'],
-            [(instances[0], os_instances[0], 'novadb-instance-0'),
-             (instances[2], os_instances[2], 'novadb-instance-2')],
+            [(instances[0], os_instances[0]),
+             (instances[2], os_instances[2])],
             'ec2_network_interfaces')
         self.assert_any_call(get_os_instances_by_instances, mock.ANY,
-                             instances)
-        self.assertEqual([mock.call(mock.ANY, os_instances[0].id),
-                          mock.call(mock.ANY, os_instances[2].id)],
-                         self.novadb.instance_get_by_uuid.mock_calls)
+                             instances, nova=self.nova_admin)
         get_ec2_network_interfaces.assert_called_once_with(
             mock.ANY, [instances[0]['id'], instances[2]['id']])
 
@@ -465,9 +471,11 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.add_item.return_value = fakes.DB_INSTANCE_1
         self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_1
         self.nova.servers.create.return_value = (
-            fakes.OSInstance(fakes.ID_OS_INSTANCE_1, {'id': 'fakeFlavorId'},
-                             image={'id': fakes.ID_OS_IMAGE_1}))
-        self.novadb.instance_get_by_uuid.side_effect = Exception()
+            fakes.OSInstance({'id': fakes.ID_OS_INSTANCE_1,
+                              'flavor': {'id': 'fakeFlavorId'},
+                              'image': {'id': fakes.ID_OS_IMAGE_1}}))
+        (self.network_interface_api.
+         _attach_network_interface_item.side_effect) = Exception()
 
         @tools.screen_unexpected_exception_logs
         def do_check(params, new_port=True, delete_on_termination=None):
@@ -484,9 +492,6 @@ class InstanceTestCase(base.ApiTestCase):
                 self.ANY_EXECUTE_ERROR, 'RunInstances', params)
 
             calls = []
-            calls.append(
-                mock.call.network_interface_api._detach_network_interface_item(
-                    mock.ANY, fakes.DB_NETWORK_INTERFACE_1))
             if not new_port:
                 calls.append(
                     mock.call.neutron.update_port(
@@ -532,8 +537,9 @@ class InstanceTestCase(base.ApiTestCase):
         instances = [{'id': fakes.random_ec2_id('i'),
                       'os_id': fakes.random_os_id()}
                      for dummy in range(3)]
-        os_instances = [fakes.OSInstance(inst['os_id'])
+        os_instances = [fakes.OSInstance({'id': inst['os_id']})
                         for inst in instances]
+        self.nova_admin.servers.list.return_value = os_instances[:2]
         network_interfaces = [{'id': fakes.random_ec2_id('eni'),
                                'os_id': fakes.random_os_id()}
                               for dummy in range(3)]
@@ -553,14 +559,12 @@ class InstanceTestCase(base.ApiTestCase):
                 for eni in network_interfaces]
             self.db_api.add_item.side_effect = instances
             self.nova.servers.create.side_effect = os_instances
-            self.novadb.instance_get_by_uuid.side_effect = [
-                {}, {}, Exception()]
             format_reservation.side_effect = (
                 lambda _context, r_id, instance_info, *args, **kwargs: (
                     {'reservationId': r_id,
                      'instancesSet': [
                           {'instanceId': inst['id']}
-                          for inst, _os_inst, _novadb_inst in instance_info]}))
+                          for inst, _os_inst in instance_info]}))
 
             resp = self.execute('RunInstances',
                                 {'ImageId': fakes.ID_EC2_IMAGE_1,
@@ -582,14 +586,16 @@ class InstanceTestCase(base.ApiTestCase):
             self.nova.servers.reset_mock()
             self.db_api.reset_mock()
 
+        (self.network_interface_api.
+         _attach_network_interface_item.side_effect) = [
+            None, None, Exception()]
         with tools.ScreeningLogger(log_name='ec2api.api'):
             do_check(instance_api.InstanceEngineNeutron())
-            (self.network_interface_api._detach_network_interface_item.
-             assert_called_once_with(mock.ANY, network_interfaces[2]))
             (self.network_interface_api.delete_network_interface.
              assert_called_once_with(
                  mock.ANY, network_interface_id=network_interfaces[2]['id']))
 
+        self.nova.servers.update.side_effect = [None, None, Exception()]
         with tools.ScreeningLogger(log_name='ec2api.api'):
             do_check(instance_api.InstanceEngineNova())
 
@@ -620,8 +626,9 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
             fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2)
-        self.nova.servers.get.side_effect = [fakes.OS_INSTANCE_1,
-                                             fakes.OS_INSTANCE_2]
+        os_instances = [fakes.OSInstance(fakes.OS_INSTANCE_1),
+                        fakes.OSInstance(fakes.OS_INSTANCE_2)]
+        self.nova.servers.get.side_effect = os_instances
 
         resp = self.execute('TerminateInstances',
                             {'InstanceId.1': fakes.ID_EC2_INSTANCE_1,
@@ -649,8 +656,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.assertFalse(self.db_api.delete_item.called)
         self.assertEqual(2, os_instance_delete.call_count)
         self.assertEqual(2, os_instance_get.call_count)
-        for call_num, inst_id in enumerate([fakes.OS_INSTANCE_1,
-                                            fakes.OS_INSTANCE_2]):
+        for call_num, inst_id in enumerate(os_instances):
             self.assertEqual(mock.call(inst_id),
                              os_instance_delete.call_args_list[call_num])
             self.assertEqual(mock.call(inst_id),
@@ -671,7 +677,8 @@ class InstanceTestCase(base.ApiTestCase):
                     tools.update_dict({'instanceId': fakes.ID_EC2_INSTANCE_2},
                                       fake_state_change)]}
         self.nova.servers.get.side_effect = (
-            lambda ec2_id: fakes.OSInstance(ec2_id, vm_state='active'))
+            lambda ec2_id: fakes.OSInstance({'id': ec2_id,
+                                             'vm_state': 'active'}))
 
         def do_check(mock_eni_list=[]):
             self.set_mock_db_items(self.DB_FAKE_ENI,
@@ -704,8 +711,8 @@ class InstanceTestCase(base.ApiTestCase):
     def _test_instances_operation(self, operation, os_instance_operation,
                                   valid_state, invalid_state,
                                   get_os_instances_by_instances):
-        os_instance_1 = copy.deepcopy(fakes.OS_INSTANCE_1)
-        os_instance_2 = copy.deepcopy(fakes.OS_INSTANCE_2)
+        os_instance_1 = fakes.OSInstance(fakes.OS_INSTANCE_1)
+        os_instance_2 = fakes.OSInstance(fakes.OS_INSTANCE_2)
         for inst in (os_instance_1, os_instance_2):
             setattr(inst, 'OS-EXT-STS:vm_state', valid_state)
 
@@ -752,7 +759,8 @@ class InstanceTestCase(base.ApiTestCase):
     @mock.patch('oslo_utils.timeutils.utcnow')
     def _test_instance_get_operation(self, operation, getter, key, utcnow):
         self.set_mock_db_items(fakes.DB_INSTANCE_2)
-        self.nova.servers.get.return_value = fakes.OS_INSTANCE_2
+        os_instance_2 = fakes.OSInstance(fakes.OS_INSTANCE_2)
+        self.nova.servers.get.return_value = os_instance_2
         getter.return_value = 'fake_data'
         utcnow.return_value = datetime.datetime(2015, 1, 19, 23, 34, 45, 123)
         resp = self.execute(operation,
@@ -764,7 +772,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_INSTANCE_2)
         self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
-        getter.assert_called_once_with(fakes.OS_INSTANCE_2)
+        getter.assert_called_once_with(os_instance_2)
 
     @mock.patch.object(fakes.OSInstance, 'get_password', autospec=True)
     def test_get_password_data(self, get_password):
@@ -786,16 +794,13 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
             fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
-        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_1,
-                                               fakes.OS_INSTANCE_2]
-        self.novadb.instance_get_by_uuid.side_effect = (
-            tools.get_by_2nd_arg_getter({
-                fakes.ID_OS_INSTANCE_1: fakes.NOVADB_INSTANCE_1,
-                fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2}))
-        self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            tools.get_by_2nd_arg_getter({
-                fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
-                fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
+        self.nova_admin.servers.list.return_value = [
+            fakes.OSInstance_full(fakes.OS_INSTANCE_1),
+            fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
+        self.cinder.volumes.list.return_value = [
+            fakes.OSVolume(fakes.OS_VOLUME_1),
+            fakes.OSVolume(fakes.OS_VOLUME_2),
+            fakes.OSVolume(fakes.OS_VOLUME_3)]
         self.network_interface_api.describe_network_interfaces.side_effect = (
             lambda *args, **kwargs: copy.deepcopy({
                 'networkInterfaceSet': [fakes.EC2_NETWORK_INTERFACE_1,
@@ -807,6 +812,10 @@ class InstanceTestCase(base.ApiTestCase):
             {'reservationSet': [fakes.EC2_RESERVATION_1,
                                 fakes.EC2_RESERVATION_2]},
             orderless_lists=True))
+        self.nova_admin.servers.list.assert_called_once_with(
+            search_opts={'all_tenants': True,
+                         'project_id': fakes.ID_OS_PROJECT})
+        self.cinder.volumes.list.assert_called_once_with(search_opts=None)
 
         self.db_api.get_items_by_ids = tools.CopyingMock(
             return_value=[fakes.DB_INSTANCE_1])
@@ -870,11 +879,12 @@ class InstanceTestCase(base.ApiTestCase):
         self.set_mock_db_items(
             fakes.DB_INSTANCE_2, fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
-        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_2]
-        self.novadb.instance_get_by_uuid.return_value = (
-            fakes.NOVADB_INSTANCE_2)
-        self.novadb.block_device_mapping_get_all_by_instance.return_value = (
-            fakes.NOVADB_BDM_INSTANCE_2)
+        self.nova_admin.servers.list.return_value = [
+            fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
+        self.cinder.volumes.list.return_value = [
+            fakes.OSVolume(fakes.OS_VOLUME_1),
+            fakes.OSVolume(fakes.OS_VOLUME_2),
+            fakes.OSVolume(fakes.OS_VOLUME_3)]
 
         resp = self.execute('DescribeInstances', {})
 
@@ -889,12 +899,6 @@ class InstanceTestCase(base.ApiTestCase):
         self._build_multiple_data_model()
 
         self.set_mock_db_items(*self.DB_INSTANCES)
-        self.novadb.instance_get_by_uuid.side_effect = (
-            tools.get_by_2nd_arg_getter(
-                dict((os_id, novadb_instance)
-                     for os_id, novadb_instance in zip(
-                        self.IDS_OS_INSTANCE,
-                        self.NOVADB_INSTANCES))))
         describe_network_interfaces = (
             self.network_interface_api.describe_network_interfaces)
 
@@ -903,17 +907,20 @@ class InstanceTestCase(base.ApiTestCase):
             describe_network_interfaces.return_value = copy.deepcopy(
                 {'networkInterfaceSet': list(
                                 itertools.chain(*ec2_enis_by_instance))})
-            self.nova.servers.list.return_value = [
-                fakes.OSInstance(
-                     os_id, {'id': 'fakeFlavorId'},
-                     addresses=dict((subnet_name,
-                                     [{'addr': addr,
-                                       'version': 4,
-                                       'OS-EXT-IPS:type': 'fixed'}])
-                                    for subnet_name, addr in ips))
-                for os_id, ips in zip(
+            self.nova_admin.servers.list.return_value = [
+                fakes.OSInstance_full({
+                     'id': os_id,
+                     'flavor': {'id': 'fakeFlavorId'},
+                     'addresses': dict((subnet_name,
+                                        [{'addr': addr,
+                                          'version': 4,
+                                          'OS-EXT-IPS:type': 'fixed'}])
+                                       for subnet_name, addr in ips),
+                     'root_device_name': '/dev/vda',
+                     'hostname': '%s-%s' % (fakes.ID_EC2_RESERVATION_1, l_i)})
+                for l_i, (os_id, ips) in enumerate(zip(
                     self.IDS_OS_INSTANCE,
-                    ips_by_instance)]
+                    ips_by_instance))]
 
             resp = self.execute('DescribeInstances', {})
 
@@ -959,11 +966,10 @@ class InstanceTestCase(base.ApiTestCase):
     def test_describe_instances_auto_remove(self, remove_instances):
         self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
                                fakes.DB_VOLUME_2)
-        self.nova.servers.list.return_value = [fakes.OS_INSTANCE_2]
-        self.novadb.instance_get_by_uuid.return_value = (
-            fakes.NOVADB_INSTANCE_2)
-        self.novadb.block_device_mapping_get_all_by_instance.return_value = (
-            fakes.NOVADB_BDM_INSTANCE_2)
+        self.nova_admin.servers.list.return_value = [
+            fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
+        self.cinder.volumes.list.return_value = [
+            fakes.OSVolume(fakes.OS_VOLUME_2)]
 
         resp = self.execute('DescribeInstances', {})
 
@@ -986,9 +992,9 @@ class InstanceTestCase(base.ApiTestCase):
         random.shuffle(db_instances)
         self.set_mock_db_items(*db_instances)
         os_instances = [
-            fakes.OSInstance(inst['os_id'])
+            fakes.OSInstance_full({'id': inst['os_id']})
             for inst in db_instances]
-        self.nova.servers.list.return_value = os_instances
+        self.nova_admin.servers.list.return_value = os_instances
         format_instance.side_effect = (
             lambda context, instance, *args: (
                 {'instanceId': instance['id'],
@@ -1015,20 +1021,14 @@ class InstanceTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
                                fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
                                fakes.DB_VOLUME_2)
-        self.nova.servers.get.side_effect = (
+        self.nova_admin.servers.get.side_effect = (
             tools.get_by_1st_arg_getter({
-                fakes.ID_OS_INSTANCE_1: fakes.OS_INSTANCE_1,
-                fakes.ID_OS_INSTANCE_2: fakes.OS_INSTANCE_2}))
-        self.novadb.instance_get_by_uuid.side_effect = (
-            tools.get_by_2nd_arg_getter({
-                fakes.ID_OS_INSTANCE_1: fakes.NOVADB_INSTANCE_1,
-                fakes.ID_OS_INSTANCE_2: fakes.NOVADB_INSTANCE_2}))
-        self.novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            tools.get_by_2nd_arg_getter({
-                fakes.ID_OS_INSTANCE_1: fakes.NOVADB_BDM_INSTANCE_1,
-                fakes.ID_OS_INSTANCE_2: fakes.NOVADB_BDM_INSTANCE_2}))
-        self.cinder.volumes.get.return_value = (
-            fakes.CinderVolume(fakes.OS_VOLUME_2))
+                fakes.ID_OS_INSTANCE_1: (
+                    fakes.OSInstance_full(fakes.OS_INSTANCE_1)),
+                fakes.ID_OS_INSTANCE_2: (
+                    fakes.OSInstance_full(fakes.OS_INSTANCE_2))}))
+        self.cinder.volumes.list.return_value = [
+            fakes.OSVolume(fakes.OS_VOLUME_2)]
 
         def do_check(instance_id, attribute, expected):
             resp = self.execute('DescribeInstanceAttribute',
@@ -1041,12 +1041,8 @@ class InstanceTestCase(base.ApiTestCase):
                  {'rootDeviceType': 'ebs',
                   'blockDeviceMapping': (
                         fakes.EC2_INSTANCE_2['blockDeviceMapping'])})
-        do_check(fakes.ID_EC2_INSTANCE_2, 'disableApiTermination',
-                 {'disableApiTermination': {'value': False}})
         do_check(fakes.ID_EC2_INSTANCE_2, 'groupSet',
                  {'groupSet': fakes.EC2_RESERVATION_2['groupSet']})
-        do_check(fakes.ID_EC2_INSTANCE_2, 'instanceInitiatedShutdownBehavior',
-                 {'instanceInitiatedShutdownBehavior': {'value': 'stop'}})
         do_check(fakes.ID_EC2_INSTANCE_2, 'instanceType',
                  {'instanceType': {'value': 'fake_flavor'}})
         do_check(fakes.ID_EC2_INSTANCE_1, 'kernel',
@@ -1144,12 +1140,6 @@ class InstanceTestCase(base.ApiTestCase):
             for l_i, (db_id, os_id) in enumerate(zip(
                 ids_ec2_instance,
                 ids_os_instance))]
-        novadb_instances = [
-            {'kernel_id': None,
-             'ramdisk_id': None,
-             'root_device_name': '/dev/vda',
-             'hostname': '%s-%s' % (fakes.ID_EC2_RESERVATION_1, l_i)}
-            for l_i, ec2_id in enumerate(ids_ec2_instance)]
 
         self.IDS_EC2_SUBNET = ids_ec2_subnet
         self.IDS_OS_PORT = ids_os_port
@@ -1161,7 +1151,6 @@ class InstanceTestCase(base.ApiTestCase):
         self.EC2_ATTACHED_ENIS = ec2_attached_enis
         self.EC2_DETACHED_ENIS = ec2_detached_enis
         self.DB_INSTANCES = db_instances
-        self.NOVADB_INSTANCES = novadb_instances
 
         # NOTE(ft): additional fake data to check filtering, etc
         self.DB_FAKE_ENI = fakes.gen_db_network_interface(
@@ -1514,10 +1503,10 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                  '/dev/sdb1': '::55:'},
                 orderless_lists=True))
 
-    @mock.patch('ec2api.api.instance.novadb')
-    @mock.patch('novaclient.v1_1.client.Client')
+    @mock.patch('cinderclient.client.Client')
+    @mock.patch('novaclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
-    def test_format_instance(self, db_api, nova, novadb):
+    def test_format_instance(self, db_api, nova, cinder):
         nova = nova.return_value
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
         fake_flavor = mock.Mock()
@@ -1527,112 +1516,76 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         instance = {'id': fakes.random_ec2_id('i'),
                     'os_id': fakes.random_os_id(),
                     'launch_index': 0}
-        os_instance = fakes.OSInstance(instance['os_id'],
-                                       flavor={'id': 'fakeFlavorId'})
-        novadb_instance = {'kernel_id': None,
-                           'ramdisk_id': None,
-                           'hostname': instance['id']}
+        os_instance = fakes.OSInstance_full({'id': instance['os_id'],
+                                             'flavor': {'id': 'fakeFlavorId'}})
 
         # NOTE(ft): check instance state formatting
         setattr(os_instance, 'OS-EXT-STS:vm_state', 'active')
         formatted_instance = instance_api._format_instance(
-            fake_context, instance, os_instance, novadb_instance, [], {})
+            fake_context, instance, os_instance, [], {})
         self.assertEqual({'name': 'running', 'code': 16},
                          formatted_instance['instanceState'])
 
         setattr(os_instance, 'OS-EXT-STS:vm_state', 'stopped')
         formatted_instance = instance_api._format_instance(
-            fake_context, instance, os_instance, novadb_instance, [], {})
+            fake_context, instance, os_instance, [], {})
         self.assertEqual({'name': 'stopped', 'code': 80},
                          formatted_instance['instanceState'])
 
         # NOTE(ft): check auto creating of DB item for unknown OS images
         os_instance.image = {'id': fakes.random_os_id()}
-        novadb_instance['kernel_id'] = fakes.random_os_id()
-        novadb_instance['ramdisk_id'] = fakes.random_os_id()
+        kernel_id = fakes.random_os_id()
+        ramdisk_id = fakes.random_os_id()
+        setattr(os_instance, 'OS-EXT-SRV-ATTR:kernel_id', kernel_id)
+        setattr(os_instance, 'OS-EXT-SRV-ATTR:ramdisk_id', ramdisk_id)
         formatted_instance = instance_api._format_instance(
-            fake_context, instance, os_instance, novadb_instance, [], {})
+            fake_context, instance, os_instance, [], {})
         db_api.add_item_id.assert_has_calls(
             [mock.call(mock.ANY, 'ami', os_instance.image['id']),
-             mock.call(mock.ANY, 'aki', novadb_instance['kernel_id']),
-             mock.call(mock.ANY, 'ari', novadb_instance['ramdisk_id'])],
+             mock.call(mock.ANY, 'aki', kernel_id),
+             mock.call(mock.ANY, 'ari', ramdisk_id)],
             any_order=True)
 
-    @mock.patch('cinderclient.v1.client.Client')
-    @mock.patch('ec2api.api.instance.novadb')
-    def test_format_instance_bdm(self, novadb, cinder):
-        cinder = cinder.return_value
-        cinder.volumes.get.return_value = (
-            mock.Mock(status='attached', attachments={'device': 'fake'}))
+    @mock.patch('cinderclient.client.Client')
+    def test_format_instance_bdm(self, cinder):
         id_os_instance_1 = fakes.random_os_id()
         id_os_instance_2 = fakes.random_os_id()
-        novadb.block_device_mapping_get_all_by_instance.side_effect = (
-            tools.get_by_2nd_arg_getter({
-                id_os_instance_1: [{'device_name': '/dev/sdb1',
-                                    'delete_on_termination': False,
-                                    'snapshot_id': '1',
-                                    'volume_id': '2',
-                                    'no_device': False},
-                                   {'device_name': '/dev/sdb2',
-                                    'delete_on_termination': False,
-                                    'snapshot_id': None,
-                                    'volume_id': '3',
-                                    'volume_size': 1,
-                                    'no_device': False},
-                                   {'device_name': '/dev/sdb3',
-                                    'delete_on_termination': True,
-                                    'snapshot_id': '4',
-                                    'volume_id': '5',
-                                    'no_device': False},
-                                   {'device_name': '/dev/sdb4',
-                                    'delete_on_termination': False,
-                                    'snapshot_id': '6',
-                                    'volume_id': '7',
-                                    'no_device': False},
-                                   {'device_name': '/dev/sdb5',
-                                    'delete_on_termination': False,
-                                    'snapshot_id': '8',
-                                    'volume_id': '9',
-                                    'volume_size': 0,
-                                    'no_device': False},
-                                   {'device_name': '/dev/sdb6',
-                                    'delete_on_termination': False,
-                                    'snapshot_id': '10',
-                                    'volume_id': '11',
-                                    'volume_size': 1,
-                                    'no_device': False},
-                                   {'device_name': '/dev/sdb7',
-                                    'snapshot_id': None,
-                                    'volume_id': None,
-                                    'no_device': True},
-                                   {'device_name': '/dev/sdb8',
-                                    'snapshot_id': None,
-                                    'volume_id': None,
-                                    'virtual_name': 'swap',
-                                    'no_device': False},
-                                   {'device_name': '/dev/sdb9',
-                                    'snapshot_id': None,
-                                    'volume_id': None,
-                                    'virtual_name': 'ephemeral3',
-                                    'no_device': False}],
-                id_os_instance_2: [{'device_name': 'vda',
-                                    'delete_on_termination': False,
-                                    'snapshot_id': '1',
-                                    'volume_id': '21',
-                                    'no_device': False}]}))
+        cinder = cinder.return_value
+        cinder.volumes.list.return_value = [
+            fakes.OSVolume({'id': '2',
+                            'status': 'attached',
+                            'attachments': [{'device': '/dev/sdb1',
+                                             'server_id': id_os_instance_1}]}),
+            fakes.OSVolume({'id': '5',
+                            'status': 'attached',
+                            'attachments': [{'device': '/dev/sdb3',
+                                             'server_id': id_os_instance_1}]}),
+            fakes.OSVolume({'id': '21',
+                            'status': 'attached',
+                            'attachments': [{'device': 'vda',
+                                             'server_id': id_os_instance_2}]}),
+        ]
+        os_instance_1 = fakes.OSInstance_full({
+            'id': id_os_instance_1,
+            'volumes_attached': [{'id': '2',
+                                  'delete_on_termination': False},
+                                 {'id': '5',
+                                  'delete_on_termination': True}],
+            'root_device_name': '/dev/sdb1'})
+        os_instance_2 = fakes.OSInstance_full({
+            'id': id_os_instance_2,
+            'volumes_attached': [{'id': '21',
+                                  'delete_on_termination': False}],
+            'root_device_name': '/dev/sdc1'})
 
         db_volumes_1 = {'2': {'id': 'vol-00000002'},
-                        '3': {'id': 'vol-00000003'},
-                        '5': {'id': 'vol-00000005'},
-                        '7': {'id': 'vol-00000007'},
-                        '9': {'id': 'vol-00000009'},
-                        '11': {'id': 'vol-0000000b'}}
+                        '5': {'id': 'vol-00000005'}}
 
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
 
         result = {}
         instance_api._cloud_format_instance_bdm(
-            fake_context, id_os_instance_1, '/dev/sdb1', result, db_volumes_1)
+            fake_context, os_instance_1, result, db_volumes_1)
         self.assertThat(
             result,
             matchers.DictMatches({
@@ -1643,39 +1596,19 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                  'deleteOnTermination': False,
                                  'volumeId': 'vol-00000002',
                                  }},
-                        {'deviceName': '/dev/sdb2',
-                         'ebs': {'status': 'attached',
-                                 'deleteOnTermination': False,
-                                 'volumeId': 'vol-00000003',
-                                 }},
                         {'deviceName': '/dev/sdb3',
                          'ebs': {'status': 'attached',
                                  'deleteOnTermination': True,
                                  'volumeId': 'vol-00000005',
-                                 }},
-                        {'deviceName': '/dev/sdb4',
-                         'ebs': {'status': 'attached',
-                                 'deleteOnTermination': False,
-                                 'volumeId': 'vol-00000007',
-                                 }},
-                        {'deviceName': '/dev/sdb5',
-                         'ebs': {'status': 'attached',
-                                 'deleteOnTermination': False,
-                                 'volumeId': 'vol-00000009',
-                                 }},
-                        {'deviceName': '/dev/sdb6',
-                         'ebs': {'status': 'attached',
-                                 'deleteOnTermination': False,
-                                 'volumeId': 'vol-0000000b',
                                  }}]},
-                orderless_lists=True))
+                orderless_lists=True), verbose=True)
 
         result = {}
         with mock.patch('ec2api.db.api.IMPL') as db_api:
             db_api.get_items.return_value = [{'id': 'vol-00000015',
                                               'os_id': '21'}]
             instance_api._cloud_format_instance_bdm(
-                fake_context, id_os_instance_2, '/dev/sdc1', result)
+                fake_context, os_instance_2, result)
         self.assertThat(
             result,
             matchers.DictMatches({
@@ -1687,24 +1620,25 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                  'volumeId': 'vol-00000015',
                                  }}]}))
 
-    @mock.patch('cinderclient.v1.client.Client')
-    @mock.patch('ec2api.api.instance.novadb')
-    def test_format_instance_bdm_while_attaching_volume(self, novadb, cinder):
-        cinder = cinder.return_value
-        cinder.volumes.get.return_value = (
-            mock.Mock(status='attaching'))
+    @mock.patch('cinderclient.client.Client')
+    def test_format_instance_bdm_while_attaching_volume(self, cinder):
         id_os_instance = fakes.random_os_id()
-        novadb.block_device_mapping_get_all_by_instance.return_value = (
-            [{'device_name': '/dev/sdb1',
-              'delete_on_termination': False,
-              'snapshot_id': '1',
-              'volume_id': '2',
-              'no_device': False}])
+        cinder = cinder.return_value
+        cinder.volumes.list.return_value = [
+            fakes.OSVolume({'id': '2',
+                            'status': 'attaching',
+                            'attachments': [{'device': '/dev/sdb1',
+                                             'server_id': id_os_instance}]})]
+        os_instance = fakes.OSInstance_full({
+            'id': id_os_instance,
+            'volumes_attached': [{'id': '2',
+                                  'delete_on_termination': False}],
+            'root_device_name': '/dev/vda'})
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
 
         result = {}
         instance_api._cloud_format_instance_bdm(
-            fake_context, id_os_instance, '/dev/vda', result,
+            fake_context, os_instance, result,
             {'2': {'id': 'vol-00000002'}})
         self.assertThat(
             result,
@@ -1717,36 +1651,65 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                  'volumeId': 'vol-00000002',
                                  }}]}))
 
+    def test_format_instance_bdm_no_bdm(self):
+        context = mock.Mock()
+        os_instance_id = fakes.random_os_id()
+        os_instance = fakes.OSInstance_full({'id': os_instance_id})
+
+        res = {}
+        setattr(os_instance, 'OS-EXT-SRV-ATTR:root_device_name', None)
+        instance_api._cloud_format_instance_bdm(
+            context, os_instance, res, {}, {os_instance_id: []})
+        self.assertEqual({}, res)
+
+        res = {}
+        setattr(os_instance, 'OS-EXT-SRV-ATTR:root_device_name', '')
+        instance_api._cloud_format_instance_bdm(
+            context, os_instance, res, {}, {os_instance_id: []})
+        self.assertEqual({}, res)
+
+        res = {}
+        setattr(os_instance, 'OS-EXT-SRV-ATTR:root_device_name', '/dev/vdd')
+        instance_api._cloud_format_instance_bdm(
+            context, os_instance, res, {}, {os_instance_id: []})
+        self.assertEqual({'rootDeviceType': 'instance-store'}, res)
+
     @mock.patch('ec2api.api.instance._remove_instances')
-    @mock.patch('novaclient.v1_1.client.Client')
+    @mock.patch('novaclient.client.Client')
     def test_get_os_instances_by_instances(self, nova, remove_instances):
         nova = nova.return_value
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        os_instance_1 = fakes.OSInstance(fakes.OS_INSTANCE_1)
+        os_instance_2 = fakes.OSInstance(fakes.OS_INSTANCE_2)
 
-        def do_check(exactly_flag):
-            nova.servers.get.side_effect = [fakes.OS_INSTANCE_1,
+        def do_check(exactly_flag=None, specify_nova_client=False):
+            nova.servers.get.side_effect = [os_instance_1,
                                             nova_exception.NotFound(404),
-                                            fakes.OS_INSTANCE_2]
+                                            os_instance_2]
             absent_instance = {'id': fakes.random_ec2_id('i'),
                                'os_id': fakes.random_os_id()}
 
             params = (fake_context, [fakes.DB_INSTANCE_1, absent_instance,
                                      fakes.DB_INSTANCE_2],
-                      exactly_flag)
+                      exactly_flag, nova if specify_nova_client else False)
             if exactly_flag:
                 self.assertRaises(exception.InvalidInstanceIDNotFound,
                                   instance_api._get_os_instances_by_instances,
                                   *params)
             else:
                 res = instance_api._get_os_instances_by_instances(*params)
-                self.assertEqual([fakes.OS_INSTANCE_1, fakes.OS_INSTANCE_2],
+                self.assertEqual([os_instance_1, os_instance_2],
                                  res)
             remove_instances.assert_called_once_with(fake_context,
                                                      [absent_instance])
             remove_instances.reset_mock()
 
-        do_check(True)
-        do_check(False)
+        do_check(exactly_flag=True)
+        # NOTE(ft): stop to return fake data by the mocked client and create
+        # a new one to pass it into the function
+        nova.servers.side_effect = None
+        nova = mock.Mock()
+        do_check(specify_nova_client=True)
 
     @mock.patch('ec2api.api.network_interface.delete_network_interface')
     @mock.patch('ec2api.api.network_interface._detach_network_interface_item')
@@ -1798,60 +1761,120 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         instance_api._remove_instances(fake_context, instances_to_remove)
         check_calls()
 
-    @mock.patch('ec2api.api.instance.novadb')
-    def test_is_ebs_instance(self, novadb):
-        context = mock.Mock(service_catalog=[{'type': 'fake'}])
-        os_instance = fakes.OSInstance(fakes.random_os_id())
+    @mock.patch('cinderclient.client.Client')
+    def test_get_os_volumes(self, cinder):
+        cinder = cinder.return_value
+        context = mock.Mock(service_catalog=[{'type': 'fake'}],
+                            is_os_admin=False)
+        os_volume_ids = [fakes.random_os_id() for _i in range(5)]
+        os_instance_ids = [fakes.random_os_id() for _i in range(2)]
+        os_volumes = [
+            fakes.OSVolume(
+                {'id': os_volume_ids[0],
+                 'status': 'attached',
+                 'attachments': [{'server_id': os_instance_ids[0]}]}),
+            fakes.OSVolume(
+                {'id': os_volume_ids[1],
+                 'status': 'attaching',
+                 'attachments': []}),
+            fakes.OSVolume(
+                {'id': os_volume_ids[2],
+                 'status': 'detaching',
+                 'attachments': [{'server_id': os_instance_ids[0]}]}),
+            fakes.OSVolume(
+                {'id': os_volume_ids[3],
+                 'status': 'attached',
+                 'attachments': [{'server_id': os_instance_ids[1]}]}),
+            fakes.OSVolume(
+                {'id': os_volume_ids[4],
+                 'status': 'available',
+                 'attachments': []}),
+        ]
+        cinder.volumes.list.return_value = os_volumes
+        res = instance_api._get_os_volumes(context)
+        self.assertIn(os_instance_ids[0], res)
+        self.assertIn(os_instance_ids[1], res)
+        self.assertEqual([os_volumes[0], os_volumes[2]],
+                         res[os_instance_ids[0]])
+        self.assertEqual([os_volumes[3]], res[os_instance_ids[1]])
+        cinder.volumes.list.assert_called_once_with(search_opts=None)
 
-        novadb.instance_get_by_uuid.return_value = {}
-        novadb.block_device_mapping_get_all_by_instance.return_value = []
-        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+        context.is_os_admin = True
+        instance_api._get_os_volumes(context)
+        cinder.volumes.list.assert_called_with(
+            search_opts={'all_tenants': True,
+                         'project_id': context.project_id})
 
-        novadb.instance_get_by_uuid.return_value = {
-            'root_device_name': '/dev/vda'}
-        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+    @mock.patch('ec2api.api.clients.nova', wraps=ec2api.api.clients.nova)
+    @mock.patch('ec2api.context.get_os_admin_context')
+    @mock.patch('cinderclient.client.Client')
+    @mock.patch('novaclient.client.Client')
+    def test_is_ebs_instance(self, nova, cinder, get_os_admin_context,
+                             nova_client_getter):
+        nova = nova.return_value
+        cinder = cinder.return_value
+        context = mock.Mock(service_catalog=[{'type': 'fake'}],
+                            is_os_admin=False)
+        os_instance = fakes.OSInstance_full({'id': fakes.random_os_id()})
 
-        novadb.block_device_mapping_get_all_by_instance.return_value = [
-            {'device_name': '/dev/vda',
-             'volume_id': None,
-             'snapshot_id': None,
-             'no_device': True}]
-        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+        nova.servers.get.return_value = os_instance
+        cinder.volumes.list.return_value = []
+        self.assertFalse(instance_api._is_ebs_instance(context,
+                                                       os_instance.id))
 
-        novadb.block_device_mapping_get_all_by_instance.return_value = [
-            {'device_name': '/dev/vda',
-             'volume_id': fakes.random_ec2_id('vol'),
-             'snapshot_id': None,
-             'no_device': True}]
-        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+        cinder.volumes.list.return_value = [
+            fakes.OSVolume(
+                {'id': fakes.random_os_id(),
+                 'status': 'attached',
+                 'attachments': [{'device': '/dev/vda',
+                                  'server_id': os_instance.id}]})]
+        setattr(os_instance, 'OS-EXT-SRV-ATTR:root_device_name', '')
+        self.assertFalse(instance_api._is_ebs_instance(context,
+                                                       os_instance.id))
 
-        novadb.block_device_mapping_get_all_by_instance.return_value = [
-            {'device_name': '/dev/vda',
-             'volume_id': '',
-             'snapshot_id': '',
-             'no_device': False}]
-        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+        setattr(os_instance, 'OS-EXT-SRV-ATTR:root_device_name', '/dev/vda')
+        cinder.volumes.list.return_value = []
+        self.assertFalse(instance_api._is_ebs_instance(context,
+                                                       os_instance.id))
 
-        novadb.block_device_mapping_get_all_by_instance.return_value = [
-            {'device_name': '/dev/vdb',
-             'volume_id': fakes.random_ec2_id('vol'),
-             'snapshot_id': '',
-             'no_device': False}]
-        self.assertFalse(instance_api._is_ebs_instance(context, os_instance))
+        cinder.volumes.list.return_value = [
+            fakes.OSVolume(
+                {'id': fakes.random_os_id(),
+                 'status': 'attached',
+                 'attachments': [{'device': '/dev/vda',
+                                  'server_id': fakes.random_os_id()}]})]
+        self.assertFalse(instance_api._is_ebs_instance(context,
+                                                       os_instance.id))
 
-        novadb.block_device_mapping_get_all_by_instance.return_value = [
-            {'device_name': '/dev/vda',
-             'volume_id': fakes.random_ec2_id('vol'),
-             'snapshot_id': '',
-             'no_device': False}]
-        self.assertTrue(instance_api._is_ebs_instance(context, os_instance))
+        cinder.volumes.list.return_value = [
+            fakes.OSVolume(
+                {'id': fakes.random_os_id(),
+                 'status': 'attached',
+                 'attachments': [{'device': '/dev/vdb',
+                                  'server_id': os_instance.id}]})]
+        self.assertFalse(instance_api._is_ebs_instance(context,
+                                                       os_instance.id))
 
-        novadb.block_device_mapping_get_all_by_instance.return_value = [
-            {'device_name': 'vda',
-             'volume_id': fakes.random_ec2_id('vol'),
-             'snapshot_id': '',
-             'no_device': False}]
-        self.assertTrue(instance_api._is_ebs_instance(context, os_instance))
+        cinder.volumes.list.return_value = [
+            fakes.OSVolume(
+                {'id': fakes.random_os_id(),
+                 'status': 'attached',
+                 'attachments': [{'device': '/dev/vda',
+                                  'server_id': os_instance.id}]})]
+        self.assertTrue(instance_api._is_ebs_instance(context,
+                                                      os_instance.id))
+        nova_client_getter.assert_called_with(
+            get_os_admin_context.return_value)
+        cinder.volumes.list.assert_called_with(search_opts=None)
+
+        cinder.volumes.list.return_value = [
+            fakes.OSVolume(
+                {'id': fakes.random_os_id(),
+                 'status': 'attached',
+                 'attachments': [{'device': 'vda',
+                                  'server_id': os_instance.id}]})]
+        self.assertTrue(instance_api._is_ebs_instance(context,
+                                                      os_instance.id))
 
     def test_block_device_strip_dev(self):
         self.assertEqual(
