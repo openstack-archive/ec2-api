@@ -35,7 +35,6 @@ from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
-from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
@@ -278,12 +277,9 @@ class ImageDescriber(common.TaggableItemsDescriber):
     def auto_update_db(self, image, os_image):
         if not image:
             kind = _get_os_image_kind(os_image)
-            ctx = (self.context if os_image.owner == self.context.project_id
-                   else ec2_context.get_admin_context(
-                            project_id=os_image.owner))
-            image = ec2utils.auto_create_db_item(ctx, kind, os_image.id,
-                                                 os_image=os_image)
-            self.items_dict[os_image.id] = image
+            image = ec2utils.get_db_item_by_os_id(
+                self.context, kind, os_image.id, self.items_dict,
+                os_image=os_image)
         elif (image['os_id'] in self.local_images_os_ids and
                 image['is_public'] != os_image.is_public):
             image['is_public'] = os_image.is_public

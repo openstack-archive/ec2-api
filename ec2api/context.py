@@ -136,15 +136,6 @@ class RequestContext(object):
         return self.user_id
 
 
-def get_admin_context(project_id=None, read_deleted="no"):
-    return RequestContext(user_id=None,
-                          project_id=project_id,
-                          access_key=None,
-                          is_admin=True,
-                          read_deleted=read_deleted,
-                          overwrite=False)
-
-
 def is_user_context(context):
     """Indicates if the request context is a normal user."""
     if not context:
