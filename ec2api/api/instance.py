@@ -1251,7 +1251,7 @@ def _cloud_format_instance_bdm(context, os_instance, result,
                'status': _cloud_get_volume_attach_status(os_volume)}
         volume_attached = next((va for va in volumes_attached
                                 if va['id'] == os_volume.id), None)
-        if volume_attached:
+        if volume_attached and 'delete_on_termination' in volume_attached:
             ebs['deleteOnTermination'] = (
                 volume_attached['delete_on_termination'])
         mapping.append({'deviceName': device_name,
