@@ -21,6 +21,7 @@ import re
 
 from novaclient import exceptions as nova_exception
 from oslo_config import cfg
+from oslo_log import log as logging
 from oslo_utils import timeutils
 
 from ec2api.api import clients
@@ -31,8 +32,9 @@ from ec2api.api import security_group as security_group_api
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _
+from ec2api.i18n import _, _LE
 
+LOG = logging.getLogger(__name__)
 
 ec2_opts = [
     cfg.BoolOpt('ec2_private_dns_show_ip',
@@ -72,24 +74,99 @@ def run_instances(context, image_id, min_count, max_count,
     _check_min_max_count(min_count, max_count)
 
     if client_token:
-        idempotent_run = _get_idempotent_run(context, client_token)
-        if idempotent_run:
-            return idempotent_run
+        reservations = describe_instances(context,
+                                          filter=[{'name': 'client-token',
+                                                   'value': [client_token]}])
+        if reservations['reservationSet']:
+            if len(reservations['reservationSet']) > 1:
+                LOG.error(_LE('describe_instances has returned %s '
+                              'reservations, but 1 is expected.') %
+                          len(reservations['reservationSet']))
+                LOG.error(_LE('Requested instances client token: %s') %
+                          client_token)
+                LOG.error(_LE('Result: %s') % reservations)
+            return reservations['reservationSet'][0]
 
+    os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
+            context, image_id, kernel_id, ramdisk_id)
+
+    nova = clients.nova(context)
+    try:
+        os_flavor = next(f for f in nova.flavors.list()
+                         if f.name == instance_type)
+    except StopIteration:
+        raise exception.InvalidParameterValue(value=instance_type,
+                                              parameter='InstanceType')
+
+    bdm = _parse_block_device_mapping(context, block_device_mapping)
+    availability_zone = (placement or {}).get('availability_zone')
     if user_data:
         user_data = base64.b64decode(user_data)
 
-    return instance_engine.run_instances(
-        context, image_id, min_count, max_count,
-        key_name, security_group_id,
-        security_group, user_data, instance_type,
-        placement, kernel_id, ramdisk_id,
-        block_device_mapping, monitoring,
-        subnet_id, disable_api_termination,
-        instance_initiated_shutdown_behavior,
-        private_ip_address, client_token,
-        network_interface, iam_instance_profile,
-        ebs_optimized)
+    vpc_id, launch_context = instance_engine.get_vpc_and_build_launch_context(
+        context, security_group,
+        subnet_id, private_ip_address, security_group_id, network_interface,
+        multiple_instances=max_count > 1)
+
+    ec2_reservation_id = _generate_reservation_id()
+    instance_ids = []
+    with common.OnCrashCleaner() as cleaner:
+        # NOTE(ft): create Neutron's ports manually and run instances one
+        # by one to have a chance to:
+        # process individual network interface options like security_group
+        # or private_ip_addresses (Nova's create_instances receives only
+        # one fixed_ip for subnet)
+        # set dhcp options to port
+        # add corresponding OS ids of network interfaces to our DB
+        # TODO(ft): we should lock created network interfaces to prevent
+        # their usage or deleting
+
+        # TODO(ft): do correct error messages on create failures. For
+        # example, overlimit, ip lack, ip overlapping, etc
+        for launch_index in range(max_count):
+            if launch_index >= min_count:
+                cleaner.approveChanges()
+
+            extra_params = (
+                instance_engine.get_launch_extra_parameters(
+                    context, cleaner, launch_context))
+
+            os_instance = nova.servers.create(
+                '%s-%s' % (ec2_reservation_id, launch_index),
+                os_image.id, os_flavor,
+                min_count=1, max_count=1,
+                kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
+                availability_zone=availability_zone,
+                block_device_mapping=bdm,
+                key_name=key_name, userdata=user_data,
+                **extra_params)
+            cleaner.addCleanup(nova.servers.delete, os_instance.id)
+
+            instance = {'os_id': os_instance.id,
+                        'vpc_id': vpc_id,
+                        'reservation_id': ec2_reservation_id,
+                        'launch_index': launch_index}
+            if client_token:
+                instance['client_token'] = client_token
+
+            instance = db_api.add_item(context, 'i', instance)
+            cleaner.addCleanup(db_api.delete_item, context, instance['id'])
+            instance_ids.append(instance['id'])
+
+            nova.servers.update(os_instance, name=instance['id'])
+
+            instance_engine.post_launch_action(
+                context, cleaner, launch_context, instance['id'])
+
+    ec2_reservations = describe_instances(context, instance_ids)
+    reservation_count = len(ec2_reservations['reservationSet'])
+    if reservation_count != 1:
+        LOG.error(_LE('describe_instances has returned %s reservations, '
+                      'but 1 is expected.') % reservation_count)
+        LOG.error(_LE('Requested instances IDs: %s') % instance_ids)
+        LOG.error(_LE('Result: %s') % ec2_reservations)
+    return (ec2_reservations['reservationSet'][0]
+            if reservation_count else None)
 
 
 def terminate_instances(context, instance_id):
@@ -229,9 +306,9 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
                                if i['instanceId'] in self.suitable_instances]
         if not formatted_instances:
             return None
-        return _format_reservation_body(self.context, reservation,
-                                        formatted_instances,
-                                        self.os_groups.get(reservation['id']))
+        return _format_reservation(self.context, reservation,
+                                   formatted_instances,
+                                   self.os_groups.get(reservation['id']))
 
     def get_db_items(self):
         return self.reservations
@@ -380,31 +457,7 @@ def describe_instance_attribute(context, instance_id, attribute):
     return result
 
 
-def _get_idempotent_run(context, client_token):
-    # TODO(ft): implement search in DB layer
-    instances = dict((i['os_id'], i) for i in db_api.get_items(context, 'i')
-                     if i.get('client_token') == client_token)
-    if not instances:
-        return
-    nova = clients.nova(ec2_context.get_os_admin_context())
-    os_instances = _get_os_instances_by_instances(context, instances.values(),
-                                                  nova=nova)
-    instances_info = []
-    instance_ids = []
-    for os_instance in os_instances:
-        instance = instances[os_instance.id]
-        instances_info.append((instance, os_instance,))
-        instance_ids.append(instance['id'])
-    if not instances_info:
-        return
-    ec2_network_interfaces = (
-        instance_engine.get_ec2_network_interfaces(context, instance_ids))
-    return _format_reservation(context, instance['reservation_id'],
-                               instances_info, ec2_network_interfaces)
-
-
-def _format_reservation_body(context, reservation, formatted_instances,
-                             os_groups):
+def _format_reservation(context, reservation, formatted_instances, os_groups):
     return {
         'reservationId': reservation['id'],
         'ownerId': reservation['owner_id'],
@@ -413,23 +466,6 @@ def _format_reservation_body(context, reservation, formatted_instances,
         'groupSet': (_format_group_set(context, os_groups)
                      if os_groups is not None else [])
     }
-
-
-def _format_reservation(context, reservation_id, instances_info,
-                        ec2_network_interfaces, image_ids={}):
-    formatted_instances = []
-    for (instance, os_instance) in instances_info:
-        ec2_instance = _format_instance(
-                context, instance, os_instance,
-                ec2_network_interfaces.get(instance['id']), image_ids)
-        formatted_instances.append(ec2_instance)
-
-    reservation = {'id': reservation_id,
-                   'owner_id': os_instance.tenant_id}
-    return _format_reservation_body(
-            context, reservation, formatted_instances,
-            (None if instance['vpc_id'] else
-             getattr(os_instance, 'security_groups', [])))
 
 
 def _format_instance(context, instance, os_instance, ec2_network_interfaces,
@@ -588,7 +624,7 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
     return os_image, os_kernel_id, os_ramdisk_id
 
 
-def _parse_block_device_mapping(context, block_device_mapping, os_image):
+def _parse_block_device_mapping(context, block_device_mapping):
     # TODO(ft): check block_device_mapping structure
     bdm = {}
     for args_bd in (block_device_mapping or []):
@@ -696,139 +732,64 @@ def _generate_reservation_id():
 
 class InstanceEngineNeutron(object):
 
-    def run_instances(self, context, image_id, min_count, max_count,
-                      key_name=None, security_group_id=None,
-                      security_group=None, user_data=None, instance_type=None,
-                      placement=None, kernel_id=None, ramdisk_id=None,
-                      block_device_mapping=None, monitoring=None,
-                      subnet_id=None, disable_api_termination=None,
-                      instance_initiated_shutdown_behavior=None,
-                      private_ip_address=None, client_token=None,
-                      network_interface=None, iam_instance_profile=None,
-                      ebs_optimized=None):
-        os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
-                context, image_id, kernel_id, ramdisk_id)
-
-        nova = clients.nova(context)
-        os_flavor = next((f for f in nova.flavors.list()
-                          if f.name == instance_type), None)
-        if not os_flavor:
-            raise exception.InvalidParameterValue(value=instance_type,
-                                                  parameter='InstanceType')
-
-        bdm = _parse_block_device_mapping(context, block_device_mapping,
-                                          os_image)
-
+    def get_vpc_and_build_launch_context(
+            self, context, security_group,
+            subnet_id, private_ip_address, security_group_id,
+            network_interface, multiple_instances):
         # TODO(ft): support auto_assign_floating_ip
 
-        (security_groups_names,
-         vpc_network_parameters) = self.merge_network_interface_parameters(
+        vpc_network_parameters = self.merge_network_interface_parameters(
             security_group,
             subnet_id, private_ip_address, security_group_id,
             network_interface)
 
         self.check_network_interface_parameters(vpc_network_parameters,
-                                                max_count > 1)
+                                                multiple_instances)
 
         (vpc_id, network_data) = self.parse_network_interface_parameters(
                 context, vpc_network_parameters)
+        launch_context = {'vpc_id': vpc_id,
+                          'network_data': network_data,
+                          'security_groups': security_group}
 
         # NOTE(ft): workaround for Launchpad Bug #1384347 in Icehouse
-        if not security_groups_names and vpc_network_parameters:
-            security_groups_names = self.get_vpc_default_security_group_id(
-                    context, vpc_id)
+        if not security_group and vpc_network_parameters:
+            launch_context['security_groups'] = (
+                self.get_vpc_default_security_group_id(context, vpc_id))
 
-        neutron = clients.neutron(context)
         if not vpc_id:
-            ec2_classic_nics = [
+            neutron = clients.neutron(context)
+            launch_context['ec2_classic_nics'] = [
                 {'net-id': self.get_ec2_classic_os_network(context,
                                                            neutron)['id']}]
 
-        instance_ids = []
-        instances_info = []
-        ec2_reservation_id = _generate_reservation_id()
+        return vpc_id, launch_context
 
-        with common.OnCrashCleaner() as cleaner:
-            # NOTE(ft): create Neutron's ports manually and run instances one
-            # by one to have a chance to:
-            # process individual network interface options like security_group
-            # or private_ip_addresses (Nova's create_instances receives only
-            # one fixed_ip for subnet)
-            # set dhcp options to port
-            # add corresponding OS ids of network interfaces to our DB
-            # TODO(ft): we should lock created network interfaces to prevent
-            # their usage or deleting
+    def get_launch_extra_parameters(self, context, cleaner, launch_context):
+        if 'ec2_classic_nics' in launch_context:
+            nics = launch_context['ec2_classic_nics']
+        else:
+            network_data = launch_context['network_data']
+            self.create_network_interfaces(context, cleaner, network_data)
+            nics = [{'port-id': data['network_interface']['os_id']}
+                    for data in network_data]
+        return {'security_groups': launch_context['security_groups'],
+                'nics': nics}
 
-            # TODO(ft): do correct error messages on create failures. For
-            # example, overlimit, ip lack, ip overlapping, etc
-            for launch_index in range(max_count):
-                if launch_index >= min_count:
-                    cleaner.approveChanges()
-
-                self.create_network_interfaces(context, cleaner, network_data)
-                nics = ([{'port-id': data['network_interface']['os_id']}
-                         for data in network_data]
-                        if vpc_id else
-                        ec2_classic_nics)
-
-                os_instance = nova.servers.create(
-                    '%s-%s' % (ec2_reservation_id, launch_index),
-                    os_image.id, os_flavor,
-                    min_count=1, max_count=1,
-                    kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
-                    availability_zone=(
-                        (placement or {}).get('availability_zone')),
-                    block_device_mapping=bdm,
-                    security_groups=security_groups_names,
-                    nics=nics,
-                    key_name=key_name, userdata=user_data)
-                cleaner.addCleanup(nova.servers.delete, os_instance.id)
-
-                for data in network_data:
-                    if data.get('detach_on_crash'):
-                        cleaner.addCleanup(neutron.update_port,
-                                           data['network_interface']['os_id'],
-                                           {'port': {'device_id': '',
-                                                     'device_owner': ''}})
-
-                instance = {'os_id': os_instance.id,
-                            'vpc_id': vpc_id,
-                            'reservation_id': ec2_reservation_id,
-                            'launch_index': launch_index}
-                if client_token:
-                    instance['client_token'] = client_token
-                instance = db_api.add_item(context, 'i', instance)
-                cleaner.addCleanup(db_api.delete_item, context, instance['id'])
-                instance_ids.append(instance['id'])
-
-                nova.servers.update(os_instance, name=instance['id'])
-
-                for data in network_data:
-                    # TODO(ft): implement update items in DB layer to prevent
-                    # record by record modification
-                    # Alternatively a create_network_interface sub-function can
-                    # set attach_time  at once
-                    network_interface_api._attach_network_interface_item(
-                        context, data['network_interface'], instance['id'],
-                        data['device_index'],
-                        delete_on_termination=data['delete_on_termination'])
-                    cleaner.addCleanup(
-                        network_interface_api._detach_network_interface_item,
-                        context, data['network_interface'])
-
-                instances_info.append((instance, os_instance))
-
-        # NOTE(ft): we don't reuse network interface objects received from
-        # create_network_interfaces because they don't contain attachment info
-        ec2_network_interfaces = (self.get_ec2_network_interfaces(
-                                        context, instance_ids=instance_ids))
-        # NOTE(ft): since os_instance is created with regular Nova client,
-        # it doesn't contain enough info to get an instance in EC2 format
-        # completely, nevertheless we use it to get rid of additional requests
-        # and reduce code complexity
-        return _format_reservation(context, ec2_reservation_id, instances_info,
-                                   ec2_network_interfaces,
-                                   image_ids={os_image.id: image_id})
+    def post_launch_action(self, context, cleaner, launch_context,
+                           instance_id):
+        for data in launch_context['network_data']:
+            # TODO(ft): implement update items in DB layer to prevent
+            # record by record modification
+            # Alternatively a create_network_interface sub-function can
+            # set attach_time  at once
+            network_interface_api._attach_network_interface_item(
+                context, data['network_interface'], instance_id,
+                data['device_index'],
+                delete_on_termination=data['delete_on_termination'])
+            cleaner.addCleanup(
+                network_interface_api._detach_network_interface_item,
+                context, data['network_interface'])
 
     def get_ec2_network_interfaces(self, context, instance_ids=None):
         # NOTE(ft): we would be glad to use filters with this describe
@@ -895,7 +856,7 @@ class InstanceEngineNeutron(object):
                 param['private_ip_address'] = private_ip_address
             if security_group_ids:
                 param['security_group_id'] = security_group_ids
-            return None, [param]
+            return [param]
         elif private_ip_address:
             msg = _('Specifying an IP address is only valid for VPC instances '
                     'and thus requires a subnet in which to launch')
@@ -905,7 +866,7 @@ class InstanceEngineNeutron(object):
             raise exception.InvalidParameterCombination(msg)
         else:
             # NOTE(ft): only one of this variables is not empty
-            return security_group_names, network_interfaces
+            return network_interfaces
 
     def check_network_interface_parameters(self, params, multiple_instances):
         # NOTE(ft): we ignore associate_public_ip_address
@@ -970,7 +931,6 @@ class InstanceEngineNeutron(object):
                 network_interface_ids.add(ec2_eni_id)
                 network_data.append({'device_index': param['device_index'],
                                      'network_interface': network_interface,
-                                     'detach_on_crash': True,
                                      'delete_on_termination': False})
             else:
                 subnet = ec2utils.get_db_item(context, param['subnet_id'],
@@ -1055,70 +1015,20 @@ class InstanceEngineNeutron(object):
 
 class InstanceEngineNova(object):
 
-    def run_instances(self, context, image_id, min_count, max_count,
-                      key_name=None, security_group_id=None,
-                      security_group=None, user_data=None, instance_type=None,
-                      placement=None, kernel_id=None, ramdisk_id=None,
-                      block_device_mapping=None, monitoring=None,
-                      subnet_id=None, disable_api_termination=None,
-                      instance_initiated_shutdown_behavior=None,
-                      private_ip_address=None, client_token=None,
-                      network_interface=None, iam_instance_profile=None,
-                      ebs_optimized=None):
-        os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
-                context, image_id, kernel_id, ramdisk_id)
+    def get_vpc_and_build_launch_context(
+            self, context, security_group,
+            subnet_id, private_ip_address, security_group_id,
+            network_interface, multiple_instances):
+        # TODO(ft): check emptiness of vpc related parameters
 
-        nova = clients.nova(context)
-        os_flavor = next((f for f in nova.flavors.list()
-                          if f.name == instance_type), None)
-        if not os_flavor:
-            raise exception.InvalidParameterValue(value=instance_type,
-                                                  parameter='InstanceType')
+        return None, {'security_groups': security_group}
 
-        bdm = _parse_block_device_mapping(context, block_device_mapping,
-                                          os_image)
+    def get_launch_extra_parameters(self, context, cleaner, launch_context):
+        return {'security_groups': launch_context['security_groups']}
 
-        # TODO(ft): support auto_assign_floating_ip
-
-        instances_info = []
-        ec2_reservation_id = _generate_reservation_id()
-
-        # TODO(ft): do correct error messages on create failures. For
-        # example, overlimit, ip lack, ip overlapping, etc
-        with common.OnCrashCleaner() as cleaner:
-            for index in range(max_count):
-                if index >= min_count:
-                    cleaner.approveChanges()
-
-                os_instance = nova.servers.create(
-                    '%s-%s' % (ec2_reservation_id, index),
-                    os_image.id, os_flavor,
-                    min_count=1, max_count=1,
-                    kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
-                    availability_zone=(
-                        placement or {}).get('availability_zone'),
-                    block_device_mapping=bdm,
-                    security_groups=security_group,
-                    key_name=key_name, userdata=user_data)
-                cleaner.addCleanup(nova.servers.delete, os_instance.id)
-
-                instance = {'os_id': os_instance.id,
-                            'reservation_id': ec2_reservation_id,
-                            'launch_index': index}
-                if client_token:
-                    instance['client_token'] = client_token
-                instance = db_api.add_item(context, 'i', instance)
-                cleaner.addCleanup(db_api.delete_item, context, instance['id'])
-
-                nova.servers.update(os_instance, name=instance['id'])
-                instances_info.append((instance, os_instance))
-
-        # NOTE(ft): since os_instance is created with regular Nova client,
-        # it doesn't contain enough info to get an instance in EC2 format
-        # completely, nevertheless we use it to get rid of additional requests
-        # and reduce code complexity
-        return _format_reservation(context, ec2_reservation_id, instances_info,
-                                   {}, image_ids={os_image.id: image_id})
+    def post_launch_action(self, context, cleaner, launch_context,
+                           instance_id):
+        pass
 
     def get_ec2_network_interfaces(self, context, instance_ids=None):
         return {}
