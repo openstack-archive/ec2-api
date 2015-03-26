@@ -210,11 +210,11 @@ Volume related:
 Network interface related:
 - deleteOnTermination (False value can be assigned but doesn't supported)
 
-All theese properties can be specified in RunInstance command though, they are
+All these properties can be specified in RunInstance command though, they are
 not reported in describe operations.
 
 EC2 API supports Nova client (>=2.16.0) with no microversion support.
-Additional limitations are the same, except network interfaces's
+Additional limitations are the same, except network interfaces'
 deleteOnTermination.
 
 References
