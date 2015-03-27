@@ -30,7 +30,7 @@ class ProxyTestCase(test_base.BaseTestCase):
     def setUp(self):
         super(ProxyTestCase, self).setUp()
         self.handler = metadata.MetadataRequestHandler()
-        conf = config_fixture.Config()
+        conf = self.useFixture(config_fixture.Config())
         conf.config(group='metadata',
                     nova_metadata_ip='9.9.9.9',
                     nova_metadata_port=8775,

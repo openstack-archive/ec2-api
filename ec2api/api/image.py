@@ -52,7 +52,7 @@ s3_opts = [
                help='Hostname or IP for OpenStack to use when accessing '
                     'the S3 api'),
     cfg.IntOpt('s3_port',
-               default=3333,
+               default=3334,
                help='Port used when accessing the S3 api'),
     cfg.BoolOpt('s3_use_ssl',
                 default=False,

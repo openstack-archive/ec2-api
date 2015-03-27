@@ -16,10 +16,12 @@
 """Utilities and helper functions."""
 
 import contextlib
+import hashlib
 import hmac
 import shutil
 import socket
 import tempfile
+from xml.sax import saxutils
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -71,6 +73,10 @@ def tempdir(**kwargs):
             LOG.error(_('Could not remove tmpdir: %s'), str(e))
 
 
+def get_hash_str(base_str):
+    """returns string that represents hash of base_str (in hex format)."""
+    return hashlib.md5(base_str).hexdigest()
+
 if hasattr(hmac, 'compare_digest'):
     constant_time_compare = hmac.compare_digest
 else:
@@ -87,3 +93,23 @@ else:
         for x, y in zip(first, second):
             result |= ord(x) ^ ord(y)
         return result == 0
+
+
+def xhtml_escape(value):
+    """Escapes a string so it is valid within XML or XHTML.
+
+    """
+    return saxutils.escape(value, {'"': '&quot;', "'": '&apos;'})
+
+
+def utf8(value):
+    """Try to turn a string into utf-8 if possible.
+
+    Code is directly from the utf8 function in
+    http://github.com/facebook/tornado/blob/master/tornado/escape.py
+
+    """
+    if isinstance(value, unicode):
+        return value.encode('utf-8')
+    assert isinstance(value, str)
+    return value

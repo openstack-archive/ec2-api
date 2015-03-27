@@ -25,6 +25,7 @@ The services afterwards can be started as binaries:
 
  /usr/bin/ec2-api
  /usr/bin/ec2-api-metadata
+ /usr/bin/ec2-api-s3
 
 or set up as Linux services.
 
@@ -52,6 +53,12 @@ for Neutron
   to /etc/neutron/metadata_agent.ini
 
   then restart neutron-metadata service.
+
+S3 server is intended only to support EC2 operations which require S3 server
+(e.g. CreateImage) in OpenStack deployments without regular object storage.
+It must not be used as a substitution for all-purposes object storage server.
+Do not start it if the deployment has its own object storage or uses a public
+one (e.g. AWS S3).
 
 Usage
 =====

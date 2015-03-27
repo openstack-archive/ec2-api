@@ -24,3 +24,8 @@
 # The code below enables nosetests to work with i18n _() blocks
 import __builtin__
 setattr(__builtin__, '_', lambda x: x)
+
+# NOTE(ft): this is required by test_s3.S3APITestCase to switch execution
+# between test and server threads
+import eventlet
+eventlet.monkey_patch(socket=True)
