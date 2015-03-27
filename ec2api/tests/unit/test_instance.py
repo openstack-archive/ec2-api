@@ -747,8 +747,7 @@ class InstanceTestCase(base.ApiTestCase):
              ('ip-address', fakes.IP_ADDRESS_2),
              ('kernel-id', fakes.ID_EC2_IMAGE_AKI_1),
              ('key-name', fakes.NAME_KEY_PAIR),
-             # TODO(ft): support filtering by a none/empty value
-             # ('launch-index', 0),
+             ('launch-index', 0),
              # TODO(ft): fill the field in fakes with correct value
              # ('launch-time', ),
              ('private-dns-name', '%s-%s' % (fakes.ID_EC2_RESERVATION_1, 0)),
@@ -765,15 +764,15 @@ class InstanceTestCase(base.ApiTestCase):
              ('network-interface.network-interface.id',
               fakes.ID_EC2_NETWORK_INTERFACE_2),
              ('network-interface.owner-id', fakes.ID_OS_PROJECT),
-             # TODO(ft): support filtering by a boolean value
-             # ('network-interface.requester-managed', False),
+             ('network-interface.requester-managed', False),
              ('network-interface.status', 'in-use'),
              # TODO(ft): declare a constant for the mac in fakes
              ('network-interface.mac-address', 'fb:10:2e:b2:ba:b7'),
-             # TODO(ft): support filtering by a boolean value
-             # ('network-interface.source-destination-check', True),
+             ('network-interface.source-destination-check', True),
              ('reservation-id', fakes.ID_EC2_RESERVATION_1),
-             ('owner-id', fakes.ID_OS_PROJECT)])
+             ('owner-id', fakes.ID_OS_PROJECT),
+             ('instance-state-code', 0),
+             ('instance-state-name', 'pending')])
         self.check_tag_support(
             'DescribeInstances', ['reservationSet', 'instancesSet'],
             fakes.ID_EC2_INSTANCE_1, 'instanceId')

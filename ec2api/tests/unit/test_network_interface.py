@@ -368,8 +368,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             'DescribeNetworkInterfaces', 'networkInterfaceSet',
             [('addresses.private-ip-address',
               fakes.IP_NETWORK_INTERFACE_2_EXT_1,),
-             # TODO(ft): support filtering by a boolean value
-             # ('addresses.primary', False),
+             ('addresses.primary', False),
              ('description', fakes.DESCRIPTION_NETWORK_INTERFACE_1),
              # TODO(ft): add security groups to fake data
              # ('group-id', ),
@@ -379,10 +378,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
              ('network-interface-id', fakes.ID_EC2_NETWORK_INTERFACE_1),
              ('owner-id', fakes.ID_OS_PROJECT),
              ('private-ip-address', fakes.IP_NETWORK_INTERFACE_1),
-             # TODO(ft): support filtering by a boolean value
-             # ('requester-managed', False),
-             # TODO(ft): support filtering by a boolean value
-             # ('source-dest-check', True),
+             ('requester-managed', False),
+             ('source-dest-check', True),
              ('status', 'available'),
              ('vpc-id', fakes.ID_EC2_VPC_1),
              ('subnet-id', fakes.ID_EC2_SUBNET_2)])

@@ -227,6 +227,8 @@ class InstanceDescriber(common.TaggableItemsDescriber):
                                           'macAddress'],
         'network-interface.source-destination-check': ['networkInterfaceSet',
                                                        'sourceDestCheck'],
+        'instance-state-code': ('instanceState', 'code'),
+        'instance-state-name': ('instanceState', 'name')
     }
 
     def __init__(self):

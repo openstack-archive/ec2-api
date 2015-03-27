@@ -50,7 +50,7 @@ class SnapshotTestCase(base.ApiTestCase):
         self.check_filtering(
             'DescribeSnapshots', 'snapshotSet',
             [
-             # NOTE(ft): declare a constant for the description in fakes
+             # TODO(ft): declare a constant for the description in fakes
              ('description', 'fake description'),
              ('owner-id', fakes.ID_OS_PROJECT),
              ('progress', '100%'),
@@ -58,9 +58,8 @@ class SnapshotTestCase(base.ApiTestCase):
              ('start-time', fakes.TIME_CREATE_SNAPSHOT_2),
              ('status', 'completed'),
              ('volume-id', fakes.ID_EC2_VOLUME_2),
-             # TODO(ft): support filtering by a number value
-             # NOTE(ft): declare a constant for the volume size in fakes
-             # ('volume-size', 1)
+             # TODO(ft): declare a constant for the volume size in fakes
+             ('volume-size', 1)
             ])
         self.check_tag_support(
             'DescribeSnapshots', 'snapshotSet',

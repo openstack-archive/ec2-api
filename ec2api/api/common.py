@@ -290,7 +290,7 @@ class UniversalDescriber(object):
         db_api.delete_item(self.context, item['id'])
 
     def is_filtering_value_found(self, filter_value, value):
-        if fnmatch.fnmatch(value, filter_value):
+        if fnmatch.fnmatch(str(value), str(filter_value)):
             return True
 
     def filtered_out(self, item, filters):
@@ -310,8 +310,11 @@ class UniversalDescriber(object):
                     if val is not None:
                         values.append(val)
             else:
-                value = item.get(filter_name)
-                values = [value] if value else []
+                if isinstance(filter_name, tuple):
+                    value = item.get(filter_name[0], {}).get(filter_name[1])
+                else:
+                    value = item.get(filter_name)
+                values = [value] if value is not None else []
             if not values:
                 return True
             filter_values = filter['value']

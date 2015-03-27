@@ -271,12 +271,10 @@ class ImageTestCase(base.ApiTestCase):
         self.check_filtering(
             'DescribeImages', 'imagesSet',
             [('architecture', 'x86_64'),
-             # TODO(ft): store a description in DB
-             # ('description', ''),
+             ('description', ''),
              ('image-id', fakes.ID_EC2_IMAGE_1),
              ('image-type', 'machine'),
-             # TODO(ft): support filtering by a boolean value
-             # ('is-public', True),
+             ('is-public', True),
              ('kernel_id', fakes.ID_EC2_IMAGE_AKI_1,),
              ('name', 'fake_name'),
              ('owner-id', fakes.ID_OS_PROJECT),

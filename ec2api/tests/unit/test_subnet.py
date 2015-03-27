@@ -258,9 +258,8 @@ class SubnetTestCase(base.ApiTestCase):
         self.check_filtering(
             'DescribeSubnets', 'subnetSet',
             [
-             # TODO(ft): support filtering by a number value # noqa
-             # NOTE(ft): declare a constant for the count in fakes
-             # ('available-ip-address-count', 253),
+             # TODO(ft): declare a constant for the count in fakes
+             ('available-ip-address-count', 253),
              ('cidr', fakes.CIDR_SUBNET_2),
              ('cidrBlock', fakes.CIDR_SUBNET_2),
              ('cidr-block', fakes.CIDR_SUBNET_2),

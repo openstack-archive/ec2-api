@@ -193,7 +193,7 @@ class NetworkInterfaceDescriber(common.TaggableItemsDescriber):
                   'network-interface-id': 'networkInterfaceId',
                   'owner-id': 'ownerId',
                   'private-ip-address': 'privateIpAddress',
-                  'requester-managed': 'requesterManage',
+                  'requester-managed': 'requesterManaged',
                   'source-dest-check': 'sourceDestCheck',
                   'status': 'status',
                   'vpc-id': 'vpcId',

@@ -134,6 +134,6 @@ def _format_vpc(vpc):
     return {'vpcId': vpc['id'],
             'state': "available",
             'cidrBlock': vpc['cidr_block'],
-            'isDefault': 'false',
+            'isDefault': False,
             'dhcpOptionsId': vpc.get('dhcp_options_id', 'default'),
             }

@@ -592,8 +592,7 @@ class RouteTableTestCase(base.ApiTestCase):
               fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_1),
              ('association.route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
              ('association.subnet-id', fakes.ID_EC2_SUBNET_2),
-             # TODO(ft): support filtering by a boolean value
-             # ('association.main', True),
+             ('association.main', True),
              ('route-table-id', fakes.ID_EC2_ROUTE_TABLE_1),
              ('route.destination-cidr-block', fakes.CIDR_EXTERNAL_NETWORK),
              ('route.gateway-id', 'local'),
