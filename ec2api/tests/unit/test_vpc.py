@@ -114,7 +114,8 @@ class VpcTestCase(base.ApiTestCase):
                                                 fakes.ID_EC2_ROUTE_TABLE_1)
 
     def test_delete_vpc(self):
-        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
+        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1,
+                               fakes.DB_SECURITY_GROUP_1)
 
         resp = self.execute('DeleteVpc', {'VpcId': fakes.ID_EC2_VPC_1})
 
@@ -127,6 +128,9 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.delete_item.assert_any_call(
             mock.ANY,
             fakes.ID_EC2_ROUTE_TABLE_1)
+        self.db_api.delete_item.assert_any_call(
+            mock.ANY,
+            fakes.ID_EC2_SECURITY_GROUP_1)
 
     def test_delete_vpc_not_found(self):
         self.set_mock_db_items()
@@ -151,6 +155,13 @@ class VpcTestCase(base.ApiTestCase):
 
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
                                fakes.DB_VPC_1)
+        do_check()
+
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2, fakes.DB_VPC_1)
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [fakes.OS_SECURITY_GROUP_1,
+                                 fakes.OS_SECURITY_GROUP_2]})
         do_check()
 
     def test_delete_vpc_not_conststent_os_vpc(self):

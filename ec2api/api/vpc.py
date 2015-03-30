@@ -75,7 +75,12 @@ def delete_vpc(context, vpc_id):
     route_tables = route_table_api.describe_route_tables(
         context,
         filter=[{'name': 'vpc-id', 'value': [vpc['id']]}])['routeTableSet']
-    if subnets or internet_gateways or len(route_tables) > 1:
+    security_groups = security_group_api.describe_security_groups(
+        context,
+        filter=[{'name': 'vpc-id',
+                 'value': [vpc['id']]}])['securityGroupInfo']
+    if (subnets or internet_gateways or len(route_tables) > 1 or
+            len(security_groups) > 1):
         msg = _("The vpc '%(vpc_id)s' has dependencies and "
                 "cannot be deleted.")
         msg = msg % {'vpc_id': vpc['id']}
@@ -87,15 +92,10 @@ def delete_vpc(context, vpc_id):
         cleaner.addCleanup(db_api.restore_item, context, 'vpc', vpc)
         route_table_api._delete_route_table(context, vpc['route_table_id'],
                                             cleaner=cleaner)
-        # TODO(Alex): Check that only the default security group is left
-        # in this VPC, otherwise DependencyViolation.
-        security_groups = security_group_api.describe_security_groups(
-            context,
-            filter=[{'name': 'vpc-id',
-                     'value': [vpc['id']]}])['securityGroupInfo']
-        for security_group in security_groups:
+        if len(security_groups) > 0:
             security_group_api.delete_security_group(
-                context, group_id=security_group['groupId'])
+                context, group_id=security_groups[0]['groupId'],
+                delete_default=True)
         try:
             neutron.delete_router(vpc['os_id'])
         except neutron_exception.Conflict as ex:
