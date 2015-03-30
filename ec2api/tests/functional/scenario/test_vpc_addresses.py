@@ -19,42 +19,25 @@ from oslo_log import log
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
+from ec2api.tests.functional.scenario import base as scenario_base
 
 CONF = config.CONF
 LOG = log.getLogger(__name__)
 
 
-class VpcAddressTest(base.EC2TestCase):
+class VpcAddressTest(scenario_base.BaseScenarioTest):
 
     @base.skip_without_vpc()
     def test_auto_diassociate_address(self):
         image_id = CONF.aws.image_id
-        aws_zone = CONF.aws.aws_zone
         if not image_id:
             raise self.skipException('aws image_id does not provided')
 
-        base_net = '10.3.0.0'
-        resp, data = self.client.CreateVpc(CidrBlock=base_net + '/20')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        vpc_id = data['Vpc']['VpcId']
-        clean_vpc = self.addResourceCleanUp(self.client.DeleteVpc,
-                                            VpcId=vpc_id)
-        self.get_vpc_waiter().wait_available(vpc_id)
-
-        cidr = base_net + '/24'
-        resp, data = self.client.CreateSubnet(VpcId=vpc_id, CidrBlock=cidr,
-                                              AvailabilityZone=aws_zone)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        subnet_id = data['Subnet']['SubnetId']
-        clean_subnet = self.addResourceCleanUp(self.client.DeleteSubnet,
-                                               SubnetId=subnet_id)
-
-        resp, data = self.client.CreateNetworkInterface(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        ni_id1 = data['NetworkInterface']['NetworkInterfaceId']
-        clean_ni1 = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id1)
-        self.get_network_interface_waiter().wait_available(ni_id1)
+        vpc_id, subnet_id = self.create_vpc_and_subnet('10.3.0.0/20')
+        ni_id1 = self.create_network_interface(subnet_id)
+        self.create_and_attach_internet_gateway(vpc_id)
+        alloc_id1, public_ip1 = self.allocate_address(True)
+        alloc_id2, _ = self.allocate_address(True)
 
         resp, data = self.client.CreateNetworkInterface(SubnetId=subnet_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
@@ -82,32 +65,6 @@ class VpcAddressTest(base.EC2TestCase):
             InstanceId=instance_id, NetworkInterfaceId=ni_id2)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         attachment_id = data['AttachmentId']
-
-        resp, data = self.client.AllocateAddress(Domain='vpc')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        alloc_id1 = data['AllocationId']
-        public_ip1 = data['PublicIp']
-        clean_a1 = self.addResourceCleanUp(self.client.ReleaseAddress,
-                                           AllocationId=alloc_id1)
-        resp, data = self.client.AllocateAddress(Domain='vpc')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        alloc_id2 = data['AllocationId']
-        clean_a2 = self.addResourceCleanUp(self.client.ReleaseAddress,
-                                           AllocationId=alloc_id2)
-
-        # Create internet gateway
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        gw_id = data['InternetGateway']['InternetGatewayId']
-        clean_ig = self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                           InternetGatewayId=gw_id)
-        resp, data = self.client.AttachInternetGateway(VpcId=vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        clean_aig = self.addResourceCleanUp(self.client.DetachInternetGateway,
-                                            VpcId=vpc_id,
-                                            InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
 
         # There are multiple interfaces attached to instance 'i-5310c5af'.
         # Please specify an interface ID for the operation instead.
@@ -207,35 +164,3 @@ class VpcAddressTest(base.EC2TestCase):
         resp, data = self.client.DisassociateAddress(AssociationId=assoc_id1)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(clean_aa1)
-
-        resp, data = self.client.DetachInternetGateway(VpcId=vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.cancelResourceCleanUp(clean_aig)
-
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.cancelResourceCleanUp(clean_ig)
-
-        resp, data = self.client.ReleaseAddress(AllocationId=alloc_id1)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.cancelResourceCleanUp(clean_a1)
-        resp, data = self.client.ReleaseAddress(AllocationId=alloc_id2)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.cancelResourceCleanUp(clean_a2)
-
-        resp, data = self.client.DeleteNetworkInterface(
-            NetworkInterfaceId=ni_id1)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.cancelResourceCleanUp(clean_ni1)
-        self.get_network_interface_waiter().wait_delete(ni_id1)
-
-        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.cancelResourceCleanUp(clean_subnet)
-        self.get_subnet_waiter().wait_delete(subnet_id)
-
-        resp, data = self.client.DeleteVpc(VpcId=vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.cancelResourceCleanUp(clean_vpc)
-        self.get_vpc_waiter().wait_delete(vpc_id)

@@ -35,7 +35,7 @@ class MetadataTest(scenario_base.BaseScenarioTest):
 
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)
-        sec_group_name = self.prepare_security_group()
+        sec_group_name = self.create_standard_security_group()
         user_data = data_utils.rand_uuid()
         instance_id = self.run_instance(KeyName=key_name, UserData=user_data,
                                         SecurityGroups=[sec_group_name])
