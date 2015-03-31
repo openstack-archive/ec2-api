@@ -114,7 +114,10 @@ class VolumeDescriber(common.TaggableItemsDescriber):
                   'size': 'size',
                   'snapshot-id': 'snapshotId',
                   'status': 'status',
-                  'volume-id': 'volumeId'}
+                  'volume-id': 'volumeId',
+                  'attachment.device': ['attachmentSet', 'device'],
+                  'attachment.instance-id': ['attachmentSet', 'instanceId'],
+                  'attachment.status': ['attachmentSet', 'status']}
 
     def format(self, volume, os_volume):
         return _format_volume(self.context, volume, os_volume,

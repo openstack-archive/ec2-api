@@ -60,7 +60,10 @@ class VolumeTestCase(base.ApiTestCase):
              ('size', 1),
              ('snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
              ('status', 'available'),
-             ('volume-id', fakes.ID_EC2_VOLUME_1)])
+             ('volume-id', fakes.ID_EC2_VOLUME_1),
+             ('attachment.device', fakes.ROOT_DEVICE_NAME_INSTANCE_2),
+             ('attachment.instance-id', fakes.ID_EC2_INSTANCE_2),
+             ('attachment.status', 'attached')])
         self.check_tag_support(
             'DescribeVolumes', 'volumeSet',
             fakes.ID_EC2_VOLUME_1, 'volumeId')

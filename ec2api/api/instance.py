@@ -194,13 +194,26 @@ class InstanceDescriber(common.TaggableItemsDescriber):
 
     KIND = 'i'
     FILTER_MAP = {
+        'availability-zone': ('placement', 'availabilityZone'),
+        'block-device-mapping.delete-on-termination': ['blockDeviceMapping',
+            ('ebs', 'deleteOnTermination')],
         'block-device-mapping.device-name': ['blockDeviceMapping',
                                              'deviceName'],
+        'block-device-mapping.status': ['blockDeviceMapping',
+                                        ('ebs', 'status')],
+        'block-device-mapping.volume-id': ['blockDeviceMapping',
+                                           ('ebs', 'volumeId')],
         'client-token': 'clientToken',
         'dns-name': 'dnsName',
+        'group-id': ['groupSet', 'groupId'],
+        'group-name': ['groupSet', 'groupName'],
         'image-id': 'imageId',
         'instance-id': 'instanceId',
+        'instance-state-code': ('instanceState', 'code'),
+        'instance-state-name': ('instanceState', 'name'),
         'instance-type': 'instanceType',
+        'instance.group-id': ['groupSet', 'groupId'],
+        'instance.group-name': ['groupSet', 'groupName'],
         'ip-address': 'ipAddress',
         'kernel-id': 'kernelId',
         'key-name': 'keyName',
@@ -227,9 +240,36 @@ class InstanceDescriber(common.TaggableItemsDescriber):
                                           'macAddress'],
         'network-interface.source-destination-check': ['networkInterfaceSet',
                                                        'sourceDestCheck'],
-        'instance-state-code': ('instanceState', 'code'),
-        'instance-state-name': ('instanceState', 'name')
-    }
+        'network-interface.group-id': ['networkInterfaceSet',
+                                       ['groupSet', 'groupId']],
+        'network-interface.group-name': ['networkInterfaceSet',
+                                         ['groupSet', 'groupName']],
+        'network-interface.attachment.attachment-id':
+            ['networkInterfaceSet', ('attachment', 'attachmentId')],
+        'network-interface.attachment.instance-id': 'instanceId',
+        'network-interface.addresses.private-ip-address':
+            ['networkInterfaceSet', ['privateIpAddressesSet',
+                                     'privateIpAddress']],
+        'network-interface.attachment.device-index':
+            ['networkInterfaceSet', ('attachment', 'deviceIndex')],
+        'network-interface.attachment.status':
+            ['networkInterfaceSet', ('attachment', 'status')],
+        'network-interface.attachment.attach-time':
+            ['networkInterfaceSet', ('attachment', 'attachTime')],
+        'network-interface.attachment.delete-on-termination':
+            ['networkInterfaceSet', ('attachment', 'deleteOnTermination')],
+        'network-interface.addresses.primary':
+            ['networkInterfaceSet', ['privateIpAddressesSet', 'primary']],
+        'network-interface.addresses.association.public-ip':
+            ['networkInterfaceSet', ['privateIpAddressesSet',
+                                     ('association', 'publicIp')]],
+        'network-interface.addresses.association.ip-owner-id':
+            ['networkInterfaceSet', ['privateIpAddressesSet',
+                                     ('association', 'ipOwnerId')]],
+        'association.public-ip': ['networkInterfaceSet',
+                                  ('association', 'publicIp')],
+        'association.ip-owner-id': ['networkInterfaceSet',
+                                    ('association', 'ipOwnerId')]}
 
     def __init__(self):
         super(InstanceDescriber, self).__init__()
@@ -301,6 +341,7 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
     FILTER_MAP = {
         'reservation-id': 'reservationId',
         'owner-id': 'ownerId',
+        'network-interface.attachment.instance-owner-id': 'ownerId',
     }
 
     def format(self, reservation):
@@ -521,6 +562,16 @@ def _format_instance(context, instance, os_instance, ec2_network_interfaces,
             ec2_network_interface['attachment'].pop('instanceId')
             ec2_network_interface['attachment'].pop('instanceOwnerId')
             ec2_network_interface.pop('tagSet')
+            ec2_addresses = ec2_network_interface['privateIpAddressesSet']
+            for ec2_address in ec2_addresses:
+                association = ec2_address.get('association')
+                if association:
+                    association.pop('associationId')
+                    association.pop('allocationId')
+            association = ec2_network_interface.get('association')
+            if association:
+                association.pop('associationId', None)
+                association.pop('allocationId', None)
             if ec2_network_interface['attachment']['deviceIndex'] == 0:
                 primary_ec2_network_interface = ec2_network_interface
         ec2_instance.update({'vpcId': ec2_network_interface['vpcId'],

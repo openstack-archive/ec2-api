@@ -271,6 +271,9 @@ class ImageTestCase(base.ApiTestCase):
         self.check_filtering(
             'DescribeImages', 'imagesSet',
             [('architecture', 'x86_64'),
+             ('block-device-mapping.device-name', '/dev/sdb2'),
+             ('block-device-mapping.snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
+             ('block-device-mapping.volume-size', 22),
              ('description', ''),
              ('image-id', fakes.ID_EC2_IMAGE_1),
              ('image-type', 'machine'),
@@ -279,6 +282,8 @@ class ImageTestCase(base.ApiTestCase):
              ('name', 'fake_name'),
              ('owner-id', fakes.ID_OS_PROJECT),
              ('ramdisk-id', fakes.ID_EC2_IMAGE_ARI_1),
+             ('root-device-name', fakes.ROOT_DEVICE_NAME_IMAGE_1),
+             ('root-device-type', 'instance-store'),
              ('state', 'available')])
         self.check_tag_support(
             'DescribeImages', 'imagesSet',

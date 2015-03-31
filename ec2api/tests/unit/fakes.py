@@ -48,7 +48,7 @@ def random_ec2_id(kind):
 ID_OS_USER = random_os_id()
 ID_OS_PROJECT = random_os_id()
 TIME_ATTACH_NETWORK_INTERFACE = timeutils.isotime(None, True)
-
+MAC_ADDRESS = 'fb:10:2e:b2:ba:b7'
 
 # vpc constants
 ID_EC2_VPC_1 = random_ec2_id('vpc')
@@ -361,7 +361,7 @@ EC2_NETWORK_INTERFACE_1 = {
     'vpcId': ID_EC2_VPC_1,
     'subnetId': ID_EC2_SUBNET_1,
     'description': DESCRIPTION_NETWORK_INTERFACE_1,
-    'macAddress': 'fb:10:2e:b2:ba:b7',
+    'macAddress': MAC_ADDRESS,
     'privateIpAddress': IP_NETWORK_INTERFACE_1,
     'privateIpAddressesSet': [{'privateIpAddress': IP_NETWORK_INTERFACE_1,
                                'primary': True}],
@@ -377,10 +377,11 @@ EC2_NETWORK_INTERFACE_2 = {
     'vpcId': ID_EC2_VPC_1,
     'subnetId': ID_EC2_SUBNET_2,
     'description': DESCRIPTION_NETWORK_INTERFACE_2,
-    'macAddress': 'fb:10:2e:b2:ba:b7',
+    'macAddress': MAC_ADDRESS,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
     'association': {
         'associationId': ID_EC2_ASSOCIATION_2,
+        'allocationId': ID_EC2_ADDRESS_2,
         'ipOwnerId': ID_OS_PROJECT,
         'publicDnsName': None,
         'publicIp': IP_ADDRESS_2,
@@ -390,6 +391,7 @@ EC2_NETWORK_INTERFACE_2 = {
          'primary': True,
          'association': {
              'associationId': ID_EC2_ASSOCIATION_2,
+             'allocationId': ID_EC2_ADDRESS_2,
              'ipOwnerId': ID_OS_PROJECT,
              'publicDnsName': None,
              'publicIp': IP_ADDRESS_2,
@@ -411,7 +413,8 @@ EC2_NETWORK_INTERFACE_2 = {
         'instanceOwnerId': ID_OS_PROJECT,
         'deviceIndex': 0,
     },
-    'groupSet': [],
+    'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+                  'groupId': ID_EC2_SECURITY_GROUP_1}],
     'tagSet': [],
 }
 
@@ -419,7 +422,7 @@ OS_PORT_1 = {'id': ID_OS_PORT_1,
              'network_id': ID_OS_SUBNET_1,
              'name': ID_EC2_NETWORK_INTERFACE_1,
              'status': 'DOWN',
-             'mac_address': 'fb:10:2e:b2:ba:b7',
+             'mac_address': MAC_ADDRESS,
              'fixed_ips': [{'ip_address': IP_NETWORK_INTERFACE_1,
                             'subnet_id': ID_OS_SUBNET_1}],
              'device_id': None,
@@ -429,7 +432,7 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
              'network_id': ID_OS_SUBNET_2,
              'name': ID_EC2_NETWORK_INTERFACE_2,
              'status': 'ACTIVE',
-             'mac_address': 'fb:10:2e:b2:ba:b7',
+             'mac_address': MAC_ADDRESS,
              'fixed_ips': [{'ip_address': IP_NETWORK_INTERFACE_2,
                             'subnet_id': ID_OS_SUBNET_2},
                            {'ip_address': IP_NETWORK_INTERFACE_2_EXT_1,
@@ -438,10 +441,13 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
                             'subnet_id': ID_OS_SUBNET_2}],
              'device_id': ID_OS_INSTANCE_1,
              'device_owner': '',
-             'security_groups': []}
+             'security_groups': [ID_OS_SECURITY_GROUP_1]}
 
 
 # instance objects
+TIME_CREATE_INSTANCE_1 = timeutils.isotime(None, True)
+TIME_CREATE_INSTANCE_2 = timeutils.isotime(None, True)
+
 DB_INSTANCE_1 = {
     'id': ID_EC2_INSTANCE_1,
     'os_id': ID_OS_INSTANCE_1,
@@ -463,17 +469,17 @@ EC2_INSTANCE_1 = {
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
     'vpcId': ID_EC2_VPC_1,
     'subnetId': ID_EC2_SUBNET_2,
-    'groupSet': [],
+    'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+                  'groupId': ID_EC2_SECURITY_GROUP_1}],
     'networkInterfaceSet': [
         {'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_2,
          'status': 'in-use',
          'vpcId': ID_EC2_VPC_1,
          'subnetId': ID_EC2_SUBNET_2,
          'description': DESCRIPTION_NETWORK_INTERFACE_2,
-         'macAddress': 'fb:10:2e:b2:ba:b7',
+         'macAddress': MAC_ADDRESS,
          'privateIpAddress': IP_NETWORK_INTERFACE_2,
          'association': {
-             'associationId': ID_EC2_ASSOCIATION_2,
              'ipOwnerId': ID_OS_PROJECT,
              'publicDnsName': None,
              'publicIp': IP_ADDRESS_2,
@@ -482,7 +488,6 @@ EC2_INSTANCE_1 = {
              {'privateIpAddress': IP_NETWORK_INTERFACE_2,
               'primary': True,
               'association': {
-                  'associationId': ID_EC2_ASSOCIATION_2,
                   'ipOwnerId': ID_OS_PROJECT,
                   'publicDnsName': None,
                   'publicIp': IP_ADDRESS_2}},
@@ -501,7 +506,8 @@ EC2_INSTANCE_1 = {
          'sourceDestCheck': True,
          'ownerId': ID_OS_PROJECT,
          'requesterManaged': False,
-         'groupSet': []},
+         'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+                       'groupId': ID_EC2_SECURITY_GROUP_1}]},
     ],
     'amiLaunchIndex': 0,
     'placement': {'availabilityZone': None},
@@ -513,7 +519,7 @@ EC2_INSTANCE_1 = {
     'productCodesSet': [],
     'privateDnsName': '%s-%s' % (ID_EC2_RESERVATION_1, 0),
     'keyName': NAME_KEY_PAIR,
-    'launchTime': None,
+    'launchTime': TIME_CREATE_INSTANCE_1,
     'rootDeviceType': 'instance-store',
     'instanceType': 'fake_flavor',
     'ipAddress': IP_ADDRESS_2,
@@ -531,7 +537,7 @@ EC2_INSTANCE_2 = {
     'productCodesSet': [],
     'privateDnsName': 'Server %s' % ID_OS_INSTANCE_2,
     'keyName': None,
-    'launchTime': None,
+    'launchTime': TIME_CREATE_INSTANCE_2,
     'rootDeviceType': 'ebs',
     'blockDeviceMapping': [
             {'deviceName': ROOT_DEVICE_NAME_INSTANCE_2,
@@ -620,7 +626,6 @@ class OSInstance_full(OSInstance):
         setattr(self, 'OS-EXT-SRV-ATTR:hostname',
                 instance_dict.get('hostname'))
 
-
 OS_INSTANCE_1 = {
     'id': ID_OS_INSTANCE_1,
     'flavor': {'id': 'fakeFlavorId'},
@@ -643,6 +648,7 @@ OS_INSTANCE_1 = {
     'kernel_id': ID_OS_IMAGE_AKI_1,
     'ramdisk_id': ID_OS_IMAGE_ARI_1,
     'hostname': '%s-%s' % (ID_EC2_RESERVATION_1, 0),
+    'created': TIME_CREATE_INSTANCE_1
 }
 OS_INSTANCE_2 = {
     'id': ID_OS_INSTANCE_2,
@@ -662,6 +668,7 @@ OS_INSTANCE_2 = {
                           'delete_on_termination': False}],
     'user_data': USER_DATA_INSTANCE_2,
     'hostname': 'Server %s' % ID_OS_INSTANCE_2,
+    'created': TIME_CREATE_INSTANCE_2
 }
 
 
@@ -910,7 +917,7 @@ EC2_SECURITY_GROUP_1 = {
     'vpcId': ID_EC2_VPC_1,
     'groupDescription': 'Group description',
     'ipPermissions': None,
-    'groupName': 'default',
+    'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
     'ipPermissionsEgress':
     [{'toPort': -1,
       'ipProtocol': -1,
@@ -935,7 +942,7 @@ EC2_SECURITY_GROUP_2 = {
       'fromPort': 10,
       'groups':
       [{'groupId': ID_EC2_SECURITY_GROUP_1,
-        'groupName': 'default',
+        'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
         'userId': ID_OS_PROJECT}]
       }],
     'ownerId': ID_OS_PROJECT,
@@ -1507,7 +1514,7 @@ def gen_ec2_network_interface(ec2_network_interface_id, ec2_subnet, ips,
         'vpcId': ec2_vpc_id if ec2_vpc_id else ec2_subnet['vpcId'],
         'subnetId': ec2_subnet_id if ec2_subnet_id else ec2_subnet['subnetId'],
         'description': description,
-        'macAddress': 'fb:10:2e:b2:ba:b7',
+        'macAddress': MAC_ADDRESS,
         'privateIpAddress': ips[0],
         'privateIpAddressesSet': [{'privateIpAddress': ip,
                                    'primary': ip == ips[0]}
@@ -1542,7 +1549,7 @@ def gen_os_port(os_id, ec2_network_interface, os_subnet_id, fixed_ips,
             'network_id': os_subnet_id,
             'name': ec2_network_interface['networkInterfaceId'],
             'status': 'ACTIVE' if os_instance_id else 'DOWN',
-            'mac_address': 'fb:10:2e:b2:ba:b7',
+            'mac_address': MAC_ADDRESS,
             'fixed_ips': [{'ip_address': ip, 'subnet_id': os_subnet_id}
                           for ip in fixed_ips],
             'device_id': os_instance_id,

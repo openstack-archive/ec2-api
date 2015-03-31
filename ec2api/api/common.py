@@ -302,19 +302,7 @@ class UniversalDescriber(object):
                 raise exception.InvalidParameterValue(
                     value=filter['name'], parameter='filter',
                     reason='invalid filter')
-            if isinstance(filter_name, list):
-                value_set = item.get(filter_name[0], [])
-                values = []
-                for value in value_set:
-                    val = value.get(filter_name[1])
-                    if val is not None:
-                        values.append(val)
-            else:
-                if isinstance(filter_name, tuple):
-                    value = item.get(filter_name[0], {}).get(filter_name[1])
-                else:
-                    value = item.get(filter_name)
-                values = [value] if value is not None else []
+            values = self.get_values_by_filter(filter_name, item)
             if not values:
                 return True
             filter_values = filter['value']
@@ -325,6 +313,22 @@ class UniversalDescriber(object):
             else:
                 return True
         return False
+
+    def get_values_by_filter(self, filter_name, item):
+        if isinstance(filter_name, list):
+            values = []
+            value_set = item.get(filter_name[0], [])
+            for value in value_set:
+                vals = self.get_values_by_filter(filter_name[1], value)
+                if vals:
+                    values += vals
+        else:
+            if isinstance(filter_name, tuple):
+                value = item.get(filter_name[0], {}).get(filter_name[1])
+            else:
+                value = item.get(filter_name)
+            values = [value] if value is not None else []
+        return values
 
     def describe(self, context, ids=None, names=None, filter=None):
         self.context = context

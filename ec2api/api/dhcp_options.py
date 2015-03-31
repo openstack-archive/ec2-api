@@ -110,7 +110,8 @@ class DhcpOptionsDescriber(common.TaggableItemsDescriber,
 
     KIND = 'dopt'
     FILTER_MAP = {'dhcp_options_id': 'dhcpOptionsId',
-                  'key': ['dhcpConfigurationSet', 'key']}
+                  'key': ['dhcpConfigurationSet', 'key'],
+                  'value': ['dhcpConfigurationSet', ['valueSet', 'value']]}
 
     def format(self, dhcp_options):
         return _format_dhcp_options(self.context, dhcp_options)

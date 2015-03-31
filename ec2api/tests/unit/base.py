@@ -127,7 +127,8 @@ class ApiTestCase(test_base.BaseTestCase):
             resp = self.execute(operation,
                                 {'Filter.1.Name': name,
                                  'Filter.1.Value.1': str(value)})
-            self.assertTrue(len(resp[resultset_key]) > 0,
+            self.assertTrue(resp[resultset_key] is not None and
+                            len(resp[resultset_key]) > 0,
                             'Filter by %s does not work' % name)
 
             resp = self.execute(operation,

@@ -97,9 +97,23 @@ def delete_security_group(context, group_name=None, group_id=None):
 class SecurityGroupDescriber(common.TaggableItemsDescriber):
 
     KIND = 'sg'
-    FILTER_MAP = {'vpc-id': 'vpcId',
+    FILTER_MAP = {'description': 'groupDescription',
+                  'group-id': 'groupId',
                   'group-name': 'groupName',
-                  'group-id': 'groupId'}
+                  'ip-permission.cidr': ['ipPermissions',
+                                         ['ipRanges', 'cidrIp']],
+                  'ip-permission.from-port': ['ipPermissions', 'fromPort'],
+                  'ip-permission.group-id': ['ipPermissions',
+                                             ['groups', 'groupId']],
+                  'ip-permission.group-name': ['ipPermissions',
+                                               ['groups', 'groupName']],
+                  'ip-permission.protocol': ['ipPermissions', 'ipProtocol'],
+                  'ip-permission.to-port': ['ipPermissions', 'toPort'],
+                  'ip-permission.user-id': ['ipPermissions',
+                                            ['groups', 'userId']],
+                  'owner-id': 'ownerId',
+                  'vpc-id': 'vpcId',
+    }
 
     def __init__(self):
         super(SecurityGroupDescriber, self).__init__()

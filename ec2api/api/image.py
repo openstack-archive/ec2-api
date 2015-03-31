@@ -229,6 +229,12 @@ class ImageDescriber(common.TaggableItemsDescriber):
 
     KIND = 'ami'
     FILTER_MAP = {'architecture': 'architecture',
+                  'block-device-mapping.device-name': ['blockDeviceMapping',
+                                                       'deviceName'],
+                  'block-device-mapping.snapshot-id': ['blockDeviceMapping',
+                                                       ('ebs', 'snapshotId')],
+                  'block-device-mapping.volume-size': ['blockDeviceMapping',
+                                                       ('ebs', 'volumeSize')],
                   'description': 'description',
                   'image-id': 'imageId',
                   'image-type': 'imageType',
@@ -237,6 +243,8 @@ class ImageDescriber(common.TaggableItemsDescriber):
                   'name': 'name',
                   'owner-id': 'imageOwnerId',
                   'ramdisk-id': 'ramdiskId',
+                  'root-device-name': 'rootDeviceName',
+                  'root-device-type': 'rootDeviceType',
                   'state': 'imageState',
                   }
 

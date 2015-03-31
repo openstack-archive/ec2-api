@@ -245,9 +245,18 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.check_filtering(
             'DescribeSecurityGroups', 'securityGroupInfo',
             [('vpc-id', fakes.ID_EC2_VPC_1),
-             # TODO(ft): declare a constant for the group name in fakes
-             ('group-name', 'default'),
-             ('group-id', fakes.ID_EC2_SECURITY_GROUP_1)])
+             ('group-name', fakes.NAME_DEFAULT_OS_SECURITY_GROUP),
+             ('group-id', fakes.ID_EC2_SECURITY_GROUP_1),
+             ('description', fakes.EC2_SECURITY_GROUP_1['groupDescription']),
+             ('ip-permission.protocol', 'tcp'),
+             ('ip-permission.to-port', 10),
+             ('ip-permission.from-port', 10),
+             ('ip-permission.cidr', '192.168.1.0/24'),
+             # TODO(andrey-mp): declare this data in fakes
+             # ('ip-permission.group-id', fakes.ID_EC2_SECURITY_GROUP_1),
+             # ('ip-permission.group-name', 'default'),
+             # ('ip-permission.user-id', fakes.ID_OS_PROJECT),
+             ('owner-id', fakes.ID_OS_PROJECT)])
         self.check_tag_support(
             'DescribeSecurityGroups', 'securityGroupInfo',
             fakes.ID_EC2_SECURITY_GROUP_2, 'groupId')

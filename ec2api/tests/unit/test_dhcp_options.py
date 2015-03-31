@@ -110,7 +110,8 @@ class DhcpOptionsTestCase(base.ApiTestCase):
         self.check_filtering(
             'DescribeDhcpOptions', 'dhcpOptionsSet',
             [('dhcp_options_id', fakes.ID_EC2_DHCP_OPTIONS_1),
-             ('key', 'netbios-node-type')])
+             ('key', 'netbios-node-type'),
+             ('value', '8.8.8.8')])
         self.check_tag_support(
             'DescribeDhcpOptions', 'dhcpOptionsSet',
             fakes.ID_EC2_DHCP_OPTIONS_1, 'dhcpOptionsId')

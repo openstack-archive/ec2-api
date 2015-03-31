@@ -97,10 +97,13 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         check_response(resp, True)
 
     def test_create_network_interface_multiple_ips(self):
-        self.set_mock_db_items(fakes.DB_SUBNET_2, fakes.DB_VPC_1)
+        self.set_mock_db_items(fakes.DB_SUBNET_2, fakes.DB_VPC_1,
+                               fakes.DB_SECURITY_GROUP_1)
         self.db_api.add_item.return_value = fakes.DB_NETWORK_INTERFACE_2
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_2}
         self.neutron.create_port.return_value = {'port': fakes.OS_PORT_2}
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [fakes.OS_SECURITY_GROUP_1]})
         created_ec2_network_interface = tools.patch_dict(
             fakes.EC2_NETWORK_INTERFACE_2,
             {'privateIpAddressesSet': [
@@ -137,7 +140,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                       'fixed_ips': [{'subnet_id': fakes.ID_OS_SUBNET_2},
                                     {'subnet_id': fakes.ID_OS_SUBNET_2},
                                     {'subnet_id': fakes.ID_OS_SUBNET_2}],
-                      'security_groups': []}})
+                      'security_groups': [fakes.ID_OS_SECURITY_GROUP_1]}})
         check_response(resp)
 
         resp = self.execute(
@@ -158,7 +161,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[2]}],
-              'security_groups': []}})
+              'security_groups': [fakes.ID_OS_SECURITY_GROUP_1]}})
         check_response(resp)
 
         resp = self.execute(
@@ -181,7 +184,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[2]}],
-              'security_groups': []}})
+              'security_groups': [fakes.ID_OS_SECURITY_GROUP_1]}})
         check_response(resp)
 
         resp = self.execute(
@@ -200,7 +203,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[0]},
                   {'ip_address': fakes.IPS_NETWORK_INTERFACE_2[1]},
                   {'subnet_id': fakes.ID_OS_SUBNET_2}],
-              'security_groups': []}})
+              'security_groups': [fakes.ID_OS_SECURITY_GROUP_1]}})
         check_response(resp)
 
     def test_create_network_interface_invalid_parameters(self):
@@ -338,12 +341,16 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.set_mock_db_items(
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
             fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2,
-            fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2)
+            fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+            fakes.DB_SECURITY_GROUP_1, fakes.DB_SECURITY_GROUP_2)
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.neutron.list_floatingips.return_value = (
             {'floatingips': [fakes.OS_FLOATING_IP_1,
                              fakes.OS_FLOATING_IP_2]})
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [fakes.OS_SECURITY_GROUP_1,
+                                 fakes.OS_SECURITY_GROUP_2]})
 
         resp = self.execute('DescribeNetworkInterfaces', {})
         self.assertThat(resp['networkInterfaceSet'],
@@ -369,12 +376,24 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             [('addresses.private-ip-address',
               fakes.IP_NETWORK_INTERFACE_2_EXT_1,),
              ('addresses.primary', False),
+             ('addresses.association.public-ip', fakes.IP_ADDRESS_2),
+             ('addresses.association.owner-id', fakes.ID_OS_PROJECT),
+             ('association.association-id', fakes.ID_EC2_ASSOCIATION_2),
+             ('association.allocation-id', fakes.ID_EC2_ADDRESS_2),
+             ('association.ip-owner-id', fakes.ID_OS_PROJECT),
+             ('association.public-ip', fakes.IP_ADDRESS_2),
+             ('attachment.attachment-id',
+              fakes.ID_EC2_NETWORK_INTERFACE_2_ATTACH),
+             ('attachment.instance-id', fakes.ID_EC2_INSTANCE_1),
+             ('attachment.instance-owner-id', fakes.ID_OS_PROJECT),
+             ('attachment.device-index', 0),
+             ('attachment.status', 'attached'),
+             ('attachment.attach.time', fakes.TIME_ATTACH_NETWORK_INTERFACE),
+             ('attachment.delete-on-termination', False),
              ('description', fakes.DESCRIPTION_NETWORK_INTERFACE_1),
-             # TODO(ft): add security groups to fake data
-             # ('group-id', ),
-             # ('group-name'),
-             # TODO(ft): declare a constant for the mac in fakes
-             ('mac-address', 'fb:10:2e:b2:ba:b7'),
+             ('group-id', fakes.ID_EC2_SECURITY_GROUP_1),
+             ('group-name', fakes.NAME_DEFAULT_OS_SECURITY_GROUP),
+             ('mac-address', fakes.MAC_ADDRESS),
              ('network-interface-id', fakes.ID_EC2_NETWORK_INTERFACE_1),
              ('owner-id', fakes.ID_OS_PROJECT),
              ('private-ip-address', fakes.IP_NETWORK_INTERFACE_1),
