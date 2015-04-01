@@ -215,7 +215,7 @@
 #s3_host=$my_ip
 
 # Port used when accessing the S3 api (integer value)
-#s3_port=3333
+#s3_port=3334
 
 # Whether to use SSL when talking to S3 (boolean value)
 #s3_use_ssl=false
@@ -242,6 +242,22 @@
 # to Internet and to allocate Elastic IPs (string value)
 #external_network=<None>
 
+
+#
+# Options defined in ec2api.s3.s3server
+#
+
+# Path to S3 buckets (string value)
+#buckets_path=$state_path/buckets
+
+# IP address for S3 API to listen (string value)
+#s3_listen=0.0.0.0
+
+# Port for S3 API to listen (integer value)
+#s3_listen_port=3334
+
+
+[None]
 
 #
 # Options defined in ec2api.openstack.common.eventlet_backdoor

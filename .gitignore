@@ -6,3 +6,4 @@ ec2_api.egg-info
 .tox
 .testrepository
 /functional_tests.conf
+/buckets

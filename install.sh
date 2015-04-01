@@ -282,14 +282,22 @@ iniset $CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
 iniset $CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT
 
 if [[ -f "$NOVA_CONF" ]]; then
-    copynovaopt s3_host
-    copynovaopt s3_port
-    copynovaopt s3_affix_tenant
-    copynovaopt s3_use_ssl
+    # NOTE(ft): use swift instead internal s3 server if enabled
+    if [[ -n $(keystone catalog --service object-store) ]] &&
+            [[ -n $(keystone catalog --service s3) ]]; then
+        copynovaopt s3_host
+        copynovaopt s3_port
+        copynovaopt s3_affix_tenant
+        copynovaopt s3_use_ssl
+    fi
     copynovaopt cert_topic
     copynovaopt rabbit_hosts
     copynovaopt rabbit_password
     # TODO(ft): it's necessary to support other available messaging implementations
+
+    nova_state_path=$(iniget $NOVA_CONF DEFAULT state_path)
+    root_state_path=$(dirname $nova_state_path)
+    iniset $CONF_FILE DEFAULT state_path ${root_state_path}/ec2api
 fi
 
 #init cache dir

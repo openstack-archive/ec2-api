@@ -25,10 +25,13 @@ EC2API_DIR=$DEST/ec2-api
 EC2API_CONF_DIR=${EC2API_CONF_DIR:-/etc/ec2api}
 EC2API_CONF_FILE=${EC2API_CONF_DIR}/ec2api.conf
 EC2API_DEBUG=${EC2API_DEBUG:-True}
+EC2API_STATE_PATH=${EC2API_STATE_PATH:=$DATA_DIR/ec2api}
 
 EC2API_SERVICE_HOST=${EC2API_SERVICE_HOST:-$SERVICE_HOST}
 EC2API_SERVICE_PORT=${EC2API_SERVICE_PORT:-8788}
 EC2API_SERVICE_PROTOCOL=${EC2API_SERVICE_PROTOCOL:-$SERVICE_PROTOCOL}
+EC2API_S3_SERVICE_HOST=${EC2API_S3_SERVICE_HOST:-$EC2API_SERVICE_HOST}
+EC2API_S3_SERVICE_PORT=${EC2API_S3_SERVICE_PORT:-3334}
 
 EC2API_RABBIT_VHOST=${EC2API_RABBIT_VHOST:-''}
 
@@ -160,6 +163,7 @@ function configure_ec2api {
 
     iniset $EC2API_CONF_FILE DEFAULT debug $EC2API_DEBUG
     iniset $EC2API_CONF_FILE DEFAULT use_syslog $SYSLOG
+    iniset $EC2API_CONF_FILE DEFAULT state_path EC2API_STATE_PATH
 
 
     # ec2api Api Configuration
@@ -183,8 +187,13 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE DEFAULT keystone_url "http://${KEYSTONE_AUTH_HOST}:35357/v2.0"
     iniset $EC2API_CONF_FILE DEFAULT region_list "$REGION_NAME"
 
-    iniset $EC2API_CONF_FILE DEFAULT s3_port "$S3_SERVICE_PORT"
-    iniset $EC2API_CONF_FILE DEFAULT s3_host "$SERVICE_HOST"
+    if is_service_enabled swift3; then
+        iniset $EC2API_CONF_FILE DEFAULT s3_port "$S3_SERVICE_PORT"
+        iniset $EC2API_CONF_FILE DEFAULT s3_host "$SERVICE_HOST"
+    else
+        iniset $EC2API_CONF_FILE DEFAULT s3_port "$EC2API_S3_SERVICE_PORT"
+        iniset $EC2API_CONF_FILE DEFAULT s3_host "$EC2API_S3_SERVICE_HOST"
+    fi
 
     configure_ec2api_rpc_backend
 
@@ -227,6 +236,7 @@ function install_ec2api() {
 function start_ec2api() {
     screen_it ec2-api "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api --config-file $EC2API_CONF_DIR/ec2api.conf"
     screen_it ec2-api-metadata "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api-metadata --config-file $EC2API_CONF_DIR/ec2api.conf"
+    screen_it ec2-api-s3 "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api-s3 --config-file $EC2API_CONF_DIR/ec2api.conf"
 }
 
 
@@ -235,6 +245,7 @@ function stop_ec2api() {
     # Kill the ec2api screen windows
     screen -S $SCREEN_NAME -p ec2-api -X kill
     screen -S $SCREEN_NAME -p ec2-api-metadata -X kill
+    screen -S $SCREEN_NAME -p ec2-api-s3 -X kill
 }
 
 function cleanup_ec2api() {
