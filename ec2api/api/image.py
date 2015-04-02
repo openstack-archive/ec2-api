@@ -512,7 +512,8 @@ def _cloud_format_mappings(context, properties, result, root_device_name=None,
                 context, bdm, root_device_name, snapshot_ids)
         # NOTE(yamahata): overwrite mappings with block_device_mapping
         for i in range(len(mappings)):
-            if formatted_bdm['deviceName'] == mappings[i]['deviceName']:
+            if (formatted_bdm.get('deviceName')
+                    == mappings[i].get('deviceName')):
                 del mappings[i]
                 break
         mappings.append(formatted_bdm)

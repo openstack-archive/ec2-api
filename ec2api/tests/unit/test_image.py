@@ -444,6 +444,24 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertThat(result,
                         matchers.DictMatches(expected, orderless_lists=True))
 
+        properties = {
+            'block_device_mapping':
+                [{'boot_index': 0,
+                  'snapshot_id': fakes.ID_OS_SNAPSHOT_1},
+                 {'boot_index': None,
+                  'snapshot_id': fakes.ID_OS_SNAPSHOT_2}],
+        }
+        result = {}
+        image_api._cloud_format_mappings('fake_context', properties, result,
+            root_device_name='vdx',
+            snapshot_ids={fakes.ID_OS_SNAPSHOT_1: fakes.ID_EC2_SNAPSHOT_1,
+                          fakes.ID_OS_SNAPSHOT_2: fakes.ID_EC2_SNAPSHOT_2})
+        expected = {'blockDeviceMapping':
+                    [{'deviceName': 'vdx',
+                      'ebs': {'snapshotId': fakes.ID_EC2_SNAPSHOT_1}},
+                     {'ebs': {'snapshotId': fakes.ID_EC2_SNAPSHOT_2}}]}
+        self.assertEqual(expected, result)
+
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_db_items(self, db_api):
         describer = image_api.ImageDescriber()
