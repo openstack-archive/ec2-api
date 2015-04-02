@@ -73,8 +73,8 @@ class FaultWrapper(wsgi.Middleware):
     def __call__(self, req):
         try:
             return req.get_response(self.application)
-        except Exception as ex:
-            LOG.exception(_("FaultWrapper: %s"), unicode(ex))
+        except Exception:
+            LOG.exception(_("FaultWrapper cathes error"))
             return faults.Fault(webob.exc.HTTPInternalServerError())
 
 
@@ -235,8 +235,8 @@ class EC2KeystoneAuth(wsgi.Middleware):
             project_name = result['access']['token']['tenant'].get('name')
             roles = [role['name'] for role
                      in result['access']['user']['roles']]
-        except (AttributeError, KeyError) as e:
-            LOG.exception(_("Keystone failure: %s") % e)
+        except (AttributeError, KeyError):
+            LOG.exception(_("Keystone failure"))
             msg = _("Failure communicating with keystone")
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=400)

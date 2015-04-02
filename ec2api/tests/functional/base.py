@@ -347,9 +347,9 @@ class EC2TestCase(base.BaseTestCase):
                                                           **kw_args),
                            str((tb[0], tb[1], tb[2]))))
                 cls.cleanUpItem(function, pos_args, kw_args)
-            except BaseException as exc:
+            except BaseException:
                 fail_count += 1
-                LOG.exception(exc)
+                LOG.exception('Failure in cleanup')
             finally:
                 del trash_bin[key]
         return fail_count

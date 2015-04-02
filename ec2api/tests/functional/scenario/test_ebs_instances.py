@@ -283,8 +283,8 @@ class EC2_EBSInstanceAttaching(base.EC2TestCase):
             try:
                 cls.cleanUpItem(cls.client.DeleteVolume, [],
                                 {'VolumeId': volume_id})
-            except BaseException as exc:
-                LOG.exception(exc)
+            except BaseException:
+                LOG.exception('EBSInstanceAttaching.tearDownClass failure')
 
     def _test_attaching(self, volume_id, device_name, device_prefix,
                         new_device_name_letter):
