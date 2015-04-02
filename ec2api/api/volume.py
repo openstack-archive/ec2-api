@@ -124,10 +124,10 @@ class VolumeDescriber(common.TaggableItemsDescriber):
                               self.instances, self.snapshots)
 
     def get_db_items(self):
-        self.instances = dict((i['os_id'], i)
-                              for i in db_api.get_items(self.context, 'i'))
-        self.snapshots = dict((s['os_id'], s)
-                              for s in db_api.get_items(self.context, 'snap'))
+        self.instances = {i['os_id']: i
+                          for i in db_api.get_items(self.context, 'i')}
+        self.snapshots = {s['os_id']: s
+                          for s in db_api.get_items(self.context, 'snap')}
         return super(VolumeDescriber, self).get_db_items()
 
     def get_os_items(self):

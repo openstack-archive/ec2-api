@@ -206,8 +206,8 @@ def _build_block_device_mappings(context, ec2_instance, os_instance_id):
         ebs_devices = [ebs['deviceName']
                        for ebs in ec2_instance['blockDeviceMapping']]
         ebs_devices.sort()
-        ebs_devices = dict(('ebs%d' % num, ebs)
-                           for num, ebs in enumerate(ebs_devices))
+        ebs_devices = {'ebs%d' % num: ebs
+                       for num, ebs in enumerate(ebs_devices)}
         mappings.update(ebs_devices)
 
     # TODO(ft): extend Nova API to get ephemerals and swap
@@ -218,11 +218,10 @@ def _cut_down_to_version(metadata, version):
     version_number = VERSIONS.index(version) + 1
     if version_number == len(VERSIONS):
         return metadata
-    return dict((attr, metadata[attr])
-                for attr in itertools.chain(
-                        *(VERSION_DATA[ver]
-                          for ver in VERSIONS[:version_number]))
-                if attr in metadata)
+    return {attr: metadata[attr]
+            for attr in itertools.chain(
+                *(VERSION_DATA[ver] for ver in VERSIONS[:version_number]))
+            if attr in metadata}
 
 
 def _format_metadata_item(data):

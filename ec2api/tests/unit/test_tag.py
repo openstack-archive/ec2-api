@@ -60,8 +60,8 @@ class TagTestCase(base.ApiTestCase):
                                     'vol', 'vpc']]
         self.assertEqual(len(resource_ids), len(tag_api.RESOURCE_TYPES))
 
-        params = dict(('ResourceId.%s' % num, r_id)
-                      for num, r_id in enumerate(resource_ids))
+        params = {'ResourceId.%s' % num: r_id
+                  for num, r_id in enumerate(resource_ids)}
         params.update({'Tag.1.Key': 'tag',
                        'Tag.1.Value': 'value'})
         resp = self.execute('CreateTags', params)

@@ -530,8 +530,7 @@ def _cloud_format_block_device_mapping(context, bdm, root_device_name=None,
     """Construct BlockDeviceMappingItemType."""
     keys = (('deviceName', 'device_name'),
             ('virtualName', 'virtual_name'))
-    item = dict((name, bdm[k]) for name, k in keys
-                if k in bdm)
+    item = {name: bdm[k] for name, k in keys if k in bdm}
     if bdm.get('no_device'):
         item['noDevice'] = True
     if bdm.get('boot_index') == 0 and root_device_name:
@@ -539,8 +538,7 @@ def _cloud_format_block_device_mapping(context, bdm, root_device_name=None,
     if ('snapshot_id' in bdm) or ('volume_id' in bdm):
         ebs_keys = (('volumeSize', 'volume_size'),
                     ('deleteOnTermination', 'delete_on_termination'))
-        ebs = dict((name, bdm[k]) for name, k in ebs_keys
-                   if bdm.get(k) is not None)
+        ebs = {name: bdm[k] for name, k in ebs_keys if bdm.get(k) is not None}
         if bdm.get('snapshot_id'):
             ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
                 context, 'snap', bdm['snapshot_id'], ids_by_os_id=snapshot_ids)

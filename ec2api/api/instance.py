@@ -305,13 +305,12 @@ class InstanceDescriber(common.TaggableItemsDescriber):
         self.ec2_network_interfaces = (
             instance_engine.get_ec2_network_interfaces(
                 self.context, self.ids))
-        self.volumes = dict((v['os_id'], v)
-                            for v in db_api.get_items(self.context, 'vol'))
-        self.image_ids = dict((i['os_id'], i['id'])
-                              for i in itertools.chain(
-                                  db_api.get_items(self.context, 'ami'),
-                                  db_api.get_public_items(self.context,
-                                                          'ami')))
+        self.volumes = {v['os_id']: v
+                        for v in db_api.get_items(self.context, 'vol')}
+        self.image_ids = {i['os_id']: i['id']
+                          for i in itertools.chain(
+                              db_api.get_items(self.context, 'ami'),
+                              db_api.get_public_items(self.context, 'ami'))}
         return instances
 
     def get_os_items(self):
@@ -1343,10 +1342,9 @@ _NAME_TO_CODE = {
     inst_state_SUSPEND: inst_state_STOPPED_CODE,
     inst_state_RESCUE: inst_state_RUNNING_CODE,
 }
-_CODE_TO_NAMES = dict([(code,
-                        [item[0] for item in _NAME_TO_CODE.iteritems()
-                         if item[1] == code])
-                       for code in set(_NAME_TO_CODE.itervalues())])
+_CODE_TO_NAMES = {code: [item[0] for item in _NAME_TO_CODE.iteritems()
+                         if item[1] == code]
+                  for code in set(_NAME_TO_CODE.itervalues())}
 
 
 def inst_state_name_to_code(name):

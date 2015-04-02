@@ -844,11 +844,11 @@ class InstanceTestCase(base.ApiTestCase):
                 fakes.OSInstance_full({
                      'id': os_id,
                      'flavor': {'id': 'fakeFlavorId'},
-                     'addresses': dict((subnet_name,
-                                        [{'addr': addr,
-                                          'version': 4,
-                                          'OS-EXT-IPS:type': 'fixed'}])
-                                       for subnet_name, addr in ips),
+                     'addresses': {subnet_name:
+                                   [{'addr': addr,
+                                     'version': 4,
+                                     'OS-EXT-IPS:type': 'fixed'}]
+                                   for subnet_name, addr in ips},
                      'root_device_name': '/dev/vda',
                      'hostname': '%s-%s' % (fakes.ID_EC2_RESERVATION_1, l_i)})
                 for l_i, (os_id, ips) in enumerate(zip(

@@ -235,14 +235,14 @@ class RouteTableDescriber(common.TaggableItemsDescriber,
                 associations[subnet['route_table_id']].append(subnet['id'])
         self.associations = associations
         vpcs = db_api.get_items(self.context, 'vpc')
-        self.vpcs = dict((vpc['id'], vpc) for vpc in vpcs)
+        self.vpcs = {vpc['id']: vpc for vpc in vpcs}
         gateways = db_api.get_items(self.context, 'igw')
-        self.gateways = dict((igw['id'], igw) for igw in gateways)
+        self.gateways = {igw['id']: igw for igw in gateways}
         # TODO(ft): scan route tables to get only used instances and
         # network interfaces to reduce DB and Nova throughput
         network_interfaces = db_api.get_items(self.context, 'eni')
-        self.network_interfaces = dict((eni['id'], eni)
-                                       for eni in network_interfaces)
+        self.network_interfaces = {eni['id']: eni
+                                   for eni in network_interfaces}
         return super(RouteTableDescriber, self).get_db_items()
 
 

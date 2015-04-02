@@ -83,8 +83,8 @@ class SnapshotDescriber(common.TaggableItemsDescriber):
                                 self.volumes)
 
     def get_db_items(self):
-        self.volumes = dict((vol['os_id'], vol)
-                            for vol in db_api.get_items(self.context, 'vol'))
+        self.volumes = {vol['os_id']: vol
+                        for vol in db_api.get_items(self.context, 'vol')}
         return super(SnapshotDescriber, self).get_db_items()
 
     def get_os_items(self):

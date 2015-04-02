@@ -339,7 +339,7 @@ class UniversalDescriber(object):
         self.os_items = self.get_os_items()
         formatted_items = []
 
-        self.items_dict = dict((i['os_id'], i) for i in (self.items or []))
+        self.items_dict = {i['os_id']: i for i in (self.items or [])}
         paired_items_ids = set()
         for os_item in self.os_items:
             os_item_name = self.get_name(os_item)
