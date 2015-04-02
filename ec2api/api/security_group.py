@@ -59,6 +59,15 @@ def get_security_group_engine():
 def create_security_group(context, group_name, group_description,
                           vpc_id=None):
     nova = clients.nova(context)
+    if vpc_id:
+        security_groups = describe_security_groups(
+            context,
+            filter=[{'name': 'vpc-id',
+                     'value': [vpc_id]},
+                    {'name': 'group-name',
+                     'value': [group_name]}])['securityGroupInfo']
+        if security_groups:
+            raise exception.InvalidGroupDuplicate(name=group_name)
     with common.OnCrashCleaner() as cleaner:
         try:
             # TODO(Alex): Shouldn't allow creation of groups with existing
@@ -87,10 +96,12 @@ def _create_default_security_group(context, vpc):
                                  'Default VPC security group', vpc['id'])
 
 
-def delete_security_group(context, group_name=None, group_id=None):
+def delete_security_group(context, group_name=None, group_id=None,
+                          delete_default=False):
     if group_name is None and group_id is None:
         raise exception.MissingParameter(param='group id or name')
-    security_group_engine.delete_group(context, group_name, group_id)
+    security_group_engine.delete_group(context, group_name, group_id,
+                                       delete_default)
     return True
 
 
@@ -305,7 +316,7 @@ def _translate_group_name(context, os_group, db_groups):
     # in all of the subsequent handling (filtering, using in parameters...)
     if (os_group['name'].startswith('vpc-') and db_groups and
             next((g for g in db_groups
-                  if g['os_id'] == os_group['id']))):
+                  if g['os_id'] == os_group['id']), None)):
         return 'default'
     return os_group['name']
 
@@ -393,7 +404,8 @@ def _format_security_group(security_group, os_security_group,
 
 class SecurityGroupEngineNeutron(object):
 
-    def delete_group(self, context, group_name=None, group_id=None):
+    def delete_group(self, context, group_name=None, group_id=None,
+                     delete_default=False):
         neutron = clients.neutron(context)
         if group_id is None or not group_id.startswith('sg-'):
             return SecurityGroupEngineNova().delete_group(context,
@@ -401,6 +413,13 @@ class SecurityGroupEngineNeutron(object):
                                                           group_id)
         security_group = ec2utils.get_db_item(context, group_id)
         try:
+            if not delete_default:
+                os_security_group = neutron.show_security_group(
+                    security_group['os_id'])
+                if (os_security_group and
+                    os_security_group['security_group']['name'] ==
+                        security_group['vpc_id']):
+                    raise exception.CannotDelete()
             neutron.delete_security_group(security_group['os_id'])
         except neutron_exception.Conflict as ex:
             # TODO(Alex): Instance ID is unknown here, report exception message
@@ -449,7 +468,8 @@ class SecurityGroupEngineNeutron(object):
 
 class SecurityGroupEngineNova(object):
 
-    def delete_group(self, context, group_name=None, group_id=None):
+    def delete_group(self, context, group_name=None, group_id=None,
+                     delete_default=False):
         nova = clients.nova(context)
         os_id = self.get_group_os_id(context, group_id, group_name)
         try:

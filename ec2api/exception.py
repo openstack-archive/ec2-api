@@ -243,6 +243,10 @@ class DependencyViolation(EC2IncorrectStateException):
     msg_fmt = _('Object %(obj1_id)s has dependent resource %(obj2_id)s')
 
 
+class CannotDelete(EC2IncorrectStateException):
+    msg_fmt = _('Cannot delete the default VPC security group')
+
+
 class ResourceAlreadyAssociated(EC2IncorrectStateException):
     ec2_code = 'Resource.AlreadyAssociated'
 
@@ -281,6 +285,11 @@ class InvalidKeyPairDuplicate(EC2DuplicateException):
 class InvalidPermissionDuplicate(EC2DuplicateException):
     ec2_code = 'InvalidPermission.Duplicate'
     msg_fmt = _('The specified rule already exists for that security group.')
+
+
+class InvalidGroupDuplicate(EC2DuplicateException):
+    ec2_code = 'InvalidGroup.Duplicate'
+    msg_fmt = _("Security group '%(name)s' already exists.")
 
 
 class RouteAlreadyExists(EC2DuplicateException):

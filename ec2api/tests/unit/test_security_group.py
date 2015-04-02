@@ -104,6 +104,14 @@ class SecurityGroupTestCase(base.ApiTestCase):
         do_check({'GroupDescription': 'description'},
                  'MissingParameter')
 
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_2, fakes.DB_VPC_1)
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [fakes.OS_SECURITY_GROUP_2]})
+        do_check({'VpcId': fakes.ID_EC2_VPC_1,
+                  'GroupName': fakes.OS_SECURITY_GROUP_2['name'],
+                  'GroupDescription': 'description'},
+                 'InvalidGroup.Duplicate')
+
     def test_create_security_group_over_quota(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
@@ -184,10 +192,15 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_delete_security_group_invalid(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())
-        self.set_mock_db_items()
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1, fakes.DB_VPC_1)
+        self.neutron.show_security_group.return_value = (
+            {'security_group': fakes.OS_SECURITY_GROUP_1})
+        self.assert_execution_error(
+            'CannotDelete', 'DeleteSecurityGroup',
+            {'GroupId': fakes.ID_EC2_SECURITY_GROUP_1})
         self.assert_execution_error(
             'InvalidGroup.NotFound', 'DeleteSecurityGroup',
-            {'GroupId': fakes.ID_EC2_SECURITY_GROUP_1})
+            {'GroupId': fakes.ID_EC2_SECURITY_GROUP_2})
         self.assertEqual(0, self.neutron.delete_port.call_count)
         self.assert_execution_error(
             'InvalidGroup.NotFound', 'DeleteSecurityGroup',
