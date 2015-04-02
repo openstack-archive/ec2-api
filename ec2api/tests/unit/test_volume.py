@@ -56,11 +56,14 @@ class VolumeTestCase(base.ApiTestCase):
             'DescribeVolumes', 'volumeSet',
             [('availability-zone', fakes.NAME_AVAILABILITY_ZONE),
              ('create-time', fakes.TIME_CREATE_VOLUME_2),
+             ('encrypted', False),
              # TODO(ft): declare a constant for the volume size in fakes
              ('size', 1),
              ('snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
              ('status', 'available'),
              ('volume-id', fakes.ID_EC2_VOLUME_1),
+             # TODO(ft): support filtering by none/empty value
+             # ('volume-type', ''),
              ('attachment.device', fakes.ROOT_DEVICE_NAME_INSTANCE_2),
              ('attachment.instance-id', fakes.ID_EC2_INSTANCE_2),
              ('attachment.status', 'attached')])

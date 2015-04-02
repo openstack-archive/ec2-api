@@ -111,10 +111,12 @@ class VolumeDescriber(common.TaggableItemsDescriber):
     KIND = 'vol'
     FILTER_MAP = {'availability-zone': 'availabilityZone',
                   'create-time': 'createTime',
+                  'encrypted': 'encrypted',
                   'size': 'size',
                   'snapshot-id': 'snapshotId',
                   'status': 'status',
                   'volume-id': 'volumeId',
+                  'volume-type': 'volumeType',
                   'attachment.device': ['attachmentSet', 'device'],
                   'attachment.instance-id': ['attachmentSet', 'instanceId'],
                   'attachment.status': ['attachmentSet', 'status']}
