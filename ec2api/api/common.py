@@ -335,8 +335,11 @@ class UniversalDescriber(object):
         selective_describe = ids is not None or names is not None
         self.ids = set(ids or [])
         self.names = set(names or [])
-        self.items = self.get_db_items()
+        # NOTE(Alex): OS items are retrieved here first to let specific
+        # describer a chance to recreate some default object and refresh
+        # the db items before their retrieval.
         self.os_items = self.get_os_items()
+        self.items = self.get_db_items()
         formatted_items = []
 
         self.items_dict = {i['os_id']: i for i in (self.items or [])}

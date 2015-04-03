@@ -155,7 +155,7 @@ class ApiTestCase(test_base.BaseTestCase):
             resp_items = resp[resultset_key]
             resultset_key = [resultset_key]
         for resp_item in resp_items:
-            if resp_item[id_key] == sample_item_id:
+            if resp_item.get(id_key) == sample_item_id:
                 self.assertIn('tagSet', resp_item)
                 self.assertThat(resp_item['tagSet'],
                                 matchers.ListMatches(ec2_tags))

@@ -13,6 +13,8 @@
 # limitations under the License.
 
 
+import copy
+
 import mock
 from neutronclient.common import exceptions as neutron_exception
 
@@ -150,17 +152,23 @@ class VpcTestCase(base.ApiTestCase):
             self.neutron.reset_mock()
             self.db_api.reset_mock()
 
-        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_IGW_1, fakes.DB_VPC_1, )
         do_check()
 
-        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
                                fakes.DB_VPC_1)
         do_check()
 
         self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
                                fakes.DB_SECURITY_GROUP_2, fakes.DB_VPC_1)
         self.neutron.list_security_groups.return_value = (
-            {'security_groups': [fakes.OS_SECURITY_GROUP_1,
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1),
                                  fakes.OS_SECURITY_GROUP_2]})
         do_check()
 

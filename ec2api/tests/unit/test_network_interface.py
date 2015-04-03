@@ -28,10 +28,13 @@ from ec2api.tests.unit import tools
 class NetworkInterfaceTestCase(base.ApiTestCase):
 
     def test_create_network_interface(self):
-        self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_VPC_1)
+        self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_VPC_1,
+                               fakes.DB_SECURITY_GROUP_1)
         self.db_api.add_item.return_value = fakes.DB_NETWORK_INTERFACE_1
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
         self.neutron.create_port.return_value = {'port': fakes.OS_PORT_1}
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
 
         def check_response(resp, auto_ips=False):
             self.assertThat(fakes.EC2_NETWORK_INTERFACE_1,
@@ -45,20 +48,23 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                         {'network_id': fakes.ID_OS_NETWORK_1,
                          'fixed_ips':
                             [{'subnet_id': fakes.ID_OS_SUBNET_1}],
-                         'security_groups': []}})
+                         'security_groups': [fakes.ID_OS_SECURITY_GROUP_1]}})
             else:
                 self.neutron.create_port.assert_called_once_with(
                     {'port':
                         {'network_id': fakes.ID_OS_NETWORK_1,
                          'fixed_ips':
                             [{'ip_address': fakes.IP_NETWORK_INTERFACE_1}],
-                         'security_groups': []}})
+                         'security_groups': [fakes.ID_OS_SECURITY_GROUP_1]}})
             self.neutron.update_port.assert_called_once_with(
                 fakes.ID_OS_PORT_1,
                 {'port': {'name':
                           fakes.ID_EC2_NETWORK_INTERFACE_1}})
             self.neutron.reset_mock()
             self.db_api.reset_mock()
+            self.neutron.list_security_groups.return_value = (
+                {'security_groups': [
+                    copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
 
         resp = self.execute(
             'CreateNetworkInterface',
@@ -103,7 +109,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_2}
         self.neutron.create_port.return_value = {'port': fakes.OS_PORT_2}
         self.neutron.list_security_groups.return_value = (
-            {'security_groups': [fakes.OS_SECURITY_GROUP_1]})
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
         created_ec2_network_interface = tools.patch_dict(
             fakes.EC2_NETWORK_INTERFACE_2,
             {'privateIpAddressesSet': [
@@ -129,6 +135,9 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                           fakes.ID_EC2_NETWORK_INTERFACE_2}})
             self.neutron.reset_mock()
             self.db_api.reset_mock()
+            self.neutron.list_security_groups.return_value = (
+                {'security_groups': [
+                    copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
 
         resp = self.execute(
             'CreateNetworkInterface',
@@ -342,15 +351,14 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
             fakes.DB_ADDRESS_1, fakes.DB_ADDRESS_2,
             fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
-            fakes.DB_SECURITY_GROUP_1, fakes.DB_SECURITY_GROUP_2)
+            fakes.DB_SECURITY_GROUP_1)
         self.neutron.list_ports.return_value = (
             {'ports': [fakes.OS_PORT_1, fakes.OS_PORT_2]})
         self.neutron.list_floatingips.return_value = (
             {'floatingips': [fakes.OS_FLOATING_IP_1,
                              fakes.OS_FLOATING_IP_2]})
         self.neutron.list_security_groups.return_value = (
-            {'security_groups': [fakes.OS_SECURITY_GROUP_1,
-                                 fakes.OS_SECURITY_GROUP_2]})
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
 
         resp = self.execute('DescribeNetworkInterfaces', {})
         self.assertThat(resp['networkInterfaceSet'],

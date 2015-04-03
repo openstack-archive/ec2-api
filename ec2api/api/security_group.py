@@ -59,7 +59,7 @@ def get_security_group_engine():
 def create_security_group(context, group_name, group_description,
                           vpc_id=None):
     nova = clients.nova(context)
-    if vpc_id:
+    if vpc_id and group_name != vpc_id:
         security_groups = describe_security_groups(
             context,
             filter=[{'name': 'vpc-id',
@@ -136,13 +136,31 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
 
     def get_os_items(self):
         if self.all_db_items is None:
-            self.all_db_items = ec2utils.get_db_items(self.context, 'sg', None)
+            self.all_db_items = db_api.get_items(self.context, 'sg')
         os_groups = security_group_engine.get_os_groups(self.context)
+        if self.check_and_repair_default_groups(os_groups, self.all_db_items):
+            self.all_db_items = db_api.get_items(self.context, 'sg')
+            os_groups = security_group_engine.get_os_groups(self.context)
         for os_group in os_groups:
             os_group['name'] = _translate_group_name(self.context,
                                                      os_group,
                                                      self.all_db_items)
         return os_groups
+
+    def check_and_repair_default_groups(self, os_groups, db_groups):
+        vpcs = ec2utils.get_db_items(self.context, 'vpc', None)
+        os_groups_dict = dict((g['name'], g['id']) for g in os_groups)
+        db_groups_dict = dict((g['os_id'], g['vpc_id']) for g in db_groups)
+        had_to_repair = False
+        for vpc in vpcs:
+            os_group = os_groups_dict.get(vpc['id'])
+            if os_group:
+                db_group = db_groups_dict.get(os_group)
+                if db_group and db_group == vpc['id']:
+                    continue
+            had_to_repair = True
+            _create_default_security_group(self.context, vpc)
+        return had_to_repair
 
 
 def describe_security_groups(context, group_name=None, group_id=None,

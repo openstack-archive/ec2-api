@@ -141,6 +141,7 @@ ID_EC2_SECURITY_GROUP_1 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
 ID_OS_SECURITY_GROUP_1 = random_os_id()
 ID_OS_SECURITY_GROUP_2 = random_os_id()
+ID_OS_SECURITY_GROUP_3 = random_os_id()
 
 NAME_DEFAULT_OS_SECURITY_GROUP = 'default'
 NAME_OTHER_OS_SECURITY_GROUP = 'other'
@@ -368,7 +369,8 @@ EC2_NETWORK_INTERFACE_1 = {
     'sourceDestCheck': True,
     'ownerId': ID_OS_PROJECT,
     'requesterManaged': False,
-    'groupSet': [],
+    'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+                  'groupId': ID_EC2_SECURITY_GROUP_1}],
     'tagSet': [],
 }
 EC2_NETWORK_INTERFACE_2 = {
@@ -427,7 +429,7 @@ OS_PORT_1 = {'id': ID_OS_PORT_1,
                             'subnet_id': ID_OS_SUBNET_1}],
              'device_id': None,
              'device_owner': '',
-             'security_groups': []}
+             'security_groups': [ID_OS_SECURITY_GROUP_1]}
 OS_PORT_2 = {'id': ID_OS_PORT_2,
              'network_id': ID_OS_SUBNET_2,
              'name': ID_EC2_NETWORK_INTERFACE_2,
@@ -871,6 +873,12 @@ OS_SECURITY_GROUP_2 = {
     'description': 'Group description',
     'tenant_id': ID_OS_PROJECT
 }
+OS_SECURITY_GROUP_3 = {
+    'id': ID_OS_SECURITY_GROUP_3,
+    'name': ID_EC2_VPC_2,
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
 NOVA_SECURITY_GROUP_RULE_1 = {
     'id': random_os_id(),
     'from_port': 10,
@@ -947,6 +955,12 @@ EC2_SECURITY_GROUP_2 = {
       }],
     'ownerId': ID_OS_PROJECT,
     'groupId': ID_EC2_SECURITY_GROUP_2
+}
+EC2_SECURITY_GROUP_3 = {
+    'groupDescription': 'Group description',
+    'ipPermissions': None,
+    'groupName': ID_EC2_VPC_2,
+    'ownerId': ID_OS_PROJECT,
 }
 EC2_NOVA_SECURITY_GROUP_1 = {
     'groupDescription': 'Group description',
