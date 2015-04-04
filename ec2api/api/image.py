@@ -689,9 +689,7 @@ def _s3_parse_manifest(context, manifest):
     if mappings:
         properties['mappings'] = mappings
 
-    image_format = 'ami'
-
-    def set_dependent_image_id(image_key, kind):
+    def set_dependent_image_id(image_key):
         try:
             image_key_path = ('machine_configuration/%(image_key)s' %
                               {'image_key': image_key})
@@ -699,13 +697,15 @@ def _s3_parse_manifest(context, manifest):
         except Exception:
             return
         if image_id == 'true':
-            image_format = kind
-        else:
-            os_image = ec2utils.get_os_image(context, image_id)
-            properties[image_key] = os_image.id
+            return True
+        os_image = ec2utils.get_os_image(context, image_id)
+        properties[image_key] = os_image.id
 
-    set_dependent_image_id('kernel_id', 'aki')
-    set_dependent_image_id('ramdisk_id', 'ari')
+    image_format = 'ami'
+    if set_dependent_image_id('kernel_id'):
+        image_format = 'aki'
+    if set_dependent_image_id('ramdisk_id'):
+        image_format = 'ari'
 
     metadata = {'disk_format': image_format,
                 'container_format': image_format,
