@@ -406,3 +406,67 @@ class AddressTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(clean_i)
         self.get_instance_waiter().wait_delete(instance_id)
+
+    @base.skip_without_vpc()
+    def test_disassociate_not_associated_vpc_addresses(self):
+        aws_zone = CONF.aws.aws_zone
+
+        base_net = '10.3.0.0'
+        resp, data = self.client.CreateVpc(CidrBlock=base_net + '/20')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        vpc_id = data['Vpc']['VpcId']
+        clean_vpc = self.addResourceCleanUp(self.client.DeleteVpc,
+                                            VpcId=vpc_id)
+        self.get_vpc_waiter().wait_available(vpc_id)
+
+        cidr = base_net + '/24'
+        resp, data = self.client.CreateSubnet(VpcId=vpc_id, CidrBlock=cidr,
+                                              AvailabilityZone=aws_zone)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        subnet_id = data['Subnet']['SubnetId']
+        clean_subnet = self.addResourceCleanUp(self.client.DeleteSubnet,
+                                               SubnetId=subnet_id)
+
+        resp, data = self.client.AllocateAddress(Domain='vpc')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        alloc_id = data['AllocationId']
+        ip = data['PublicIp']
+        clean_a = self.addResourceCleanUp(self.client.ReleaseAddress,
+                                          AllocationId=alloc_id)
+
+        assoc_id = 'eipassoc-00000001'
+        resp, data = self.client.DisassociateAddress(AssociationId=assoc_id)
+        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertEqual('InvalidAssociationID.NotFound',
+                         data['Error']['Code'])
+
+        resp, data = self.client.DisassociateAddress(PublicIp=ip)
+        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+
+        resp, data = self.client.ReleaseAddress(AllocationId=alloc_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_a)
+
+        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_subnet)
+        self.get_subnet_waiter().wait_delete(subnet_id)
+
+        resp, data = self.client.DeleteVpc(VpcId=vpc_id)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_vpc)
+        self.get_vpc_waiter().wait_delete(vpc_id)
+
+    def test_disassociate_not_associated_standard_addresses(self):
+        resp, data = self.client.AllocateAddress(Domain='standard')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        ip = data['PublicIp']
+        clean_a = self.addResourceCleanUp(self.client.ReleaseAddress,
+                                          PublicIp=ip)
+
+        resp, data = self.client.DisassociateAddress(PublicIp=ip)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+
+        resp, data = self.client.ReleaseAddress(PublicIp=ip)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(clean_a)
