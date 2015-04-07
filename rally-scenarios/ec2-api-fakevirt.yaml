@@ -1,23 +1,5 @@
 ---
-  EC2APIPlugin.describe_instances:
-    -
-      runner:
-        type: "constant"
-        times: 2
-        concurrency: 1
-      context:
-        users:
-          tenants: 1
-          users_per_tenant: 1
-        servers:
-          flavor:
-              name: "m1.nano"
-          image:
-              name: "^cirros.*uec$"
-          servers_per_tenant: 1
-        prepare_ec2_client:
-
-  EC2APIPlugin.describe_regions:
+  EC2APIPlugin.describe_addresses_and_instances:
     -
       runner:
         type: "constant"
@@ -28,19 +10,74 @@
           tenants: 1
           users_per_tenant: 1
         prepare_ec2_client:
-
-  EC2APIPlugin.describe_images:
+        ec2_servers:
+          flavor: "m1.nano"
+          image: "*cirros*"
+          servers_per_tenant: 200
+          run_in_vpc: False
+          assign_floating_ip: False
+          build_timeout: 150
     -
       runner:
         type: "constant"
-        times: 20
+        times: 10
         concurrency: 1
       context:
         users:
           tenants: 1
           users_per_tenant: 1
+        prepare_ec2_client:
+        ec2_servers:
+          flavor: "m1.nano"
+          image: "*cirros*"
+          servers_per_tenant: 200
+          run_in_vpc: False
+          assign_floating_ip: True
+          build_timeout: 150
+    -
+      runner:
+        type: "constant"
+        times: 10
+        concurrency: 1
+      context:
+        users:
+          tenants: 1
+          users_per_tenant: 1
+        prepare_ec2_client:
+        ec2_servers:
+          flavor: "m1.nano"
+          image: "*cirros*"
+          servers_per_tenant: 200
+          run_in_vpc: True
+          assign_floating_ip: True
+          build_timeout: 150
+
+
+  EC2APIPlugin.describe_regions:
+    -
+      runner:
+        type: "constant"
+        times: 100
+        concurrency: 1
+      context:
+        users:
+          tenants: 1
+          users_per_tenant: 1
+        prepare_ec2_client:
+
+
+  EC2APIPlugin.describe_images:
+    -
+      runner:
+        type: "constant"
+        times: 10
+        concurrency: 1
+      context:
+        users:
+          tenants: 1
+          users_per_tenant: 1
+        prepare_ec2_client:
         fake_images:
           disk_format: "ami"
           container_format: "ami"
-          images_per_tenant: 1000
-        prepare_ec2_client:
+          images_per_tenant: 2000

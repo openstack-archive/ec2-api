@@ -52,10 +52,16 @@ class BotocoreClientBase(object):
 
 class APIClientEC2(BotocoreClientBase):
 
+    url = None
+
     def __init__(self, url, region, access, secret, *args, **kwargs):
         super(APIClientEC2, self).__init__(region, access, secret,
                                            *args, **kwargs)
+        self.url = url
         self.service = self.session.get_service('ec2')
         self.endpoint = self.service.get_endpoint(
             region_name=self.region,
             endpoint_url=url)
+
+    def get_url(self):
+        return self.url

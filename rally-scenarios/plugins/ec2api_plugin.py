@@ -21,7 +21,6 @@ LOG = logging.getLogger(__name__)
 
 
 class EC2APIPlugin(base.Scenario):
-    """Plugin which lists instances."""
 
     def _get_client(self, is_nova):
         args = self.context['user']['ec2args']
@@ -31,11 +30,11 @@ class EC2APIPlugin(base.Scenario):
         return client
 
     def _run(self, base_name, func):
-        client = self._get_client(False)
-        with base.AtomicAction(self, base_name + '_ec2api'):
-            func(self, client)
         client = self._get_client(True)
         with base.AtomicAction(self, base_name + '_nova'):
+            func(self, client)
+        client = self._get_client(False)
+        with base.AtomicAction(self, base_name + '_ec2api'):
             func(self, client)
 
     def _both_api_runner():
@@ -54,6 +53,12 @@ class EC2APIPlugin(base.Scenario):
 
     @base.scenario()
     @_both_api_runner()
+    def describe_addresses(self, client):
+        resp, data = client.DescribeAddresses()
+        assert 200 == resp.status_code
+
+    @base.scenario()
+    @_both_api_runner()
     def describe_regions(self, client):
         resp, data = client.DescribeRegions()
         assert 200 == resp.status_code
@@ -63,3 +68,29 @@ class EC2APIPlugin(base.Scenario):
     def describe_images(self, client):
         resp, data = client.DescribeImages()
         assert 200 == resp.status_code
+
+    _instance_id_by_client = dict()
+
+    @base.scenario()
+    @_both_api_runner()
+    def describe_one_instance(self, client):
+        client_id = client.get_url()
+        instance_id = self._instance_id_by_client.get(client_id)
+        if not instance_id:
+            resp, data = client.DescribeInstances()
+            assert 200 == resp.status_code
+            instances = data['Reservations'][0]['Instances']
+            index = len(instances) / 3
+            instance_id = instances[index]['InstanceId']
+            self._instance_id_by_client[client_id] = instance_id
+            LOG.info("found instance = %s for client %s"
+                     % (instance_id, client_id))
+
+        resp, data = client.DescribeInstances(InstanceIds=[instance_id])
+        assert 200 == resp.status_code
+
+    @base.scenario()
+    def describe_addresses_and_instances(self):
+        self.describe_addresses()
+        self.describe_instances()
+        self.describe_one_instance()
