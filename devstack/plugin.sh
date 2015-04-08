@@ -27,10 +27,7 @@ EC2API_CONF_FILE=${EC2API_CONF_DIR}/ec2api.conf
 EC2API_DEBUG=${EC2API_DEBUG:-True}
 EC2API_STATE_PATH=${EC2API_STATE_PATH:=$DATA_DIR/ec2api}
 
-EC2API_SERVICE_HOST=${EC2API_SERVICE_HOST:-$SERVICE_HOST}
 EC2API_SERVICE_PORT=${EC2API_SERVICE_PORT:-8788}
-EC2API_SERVICE_PROTOCOL=${EC2API_SERVICE_PROTOCOL:-$SERVICE_PROTOCOL}
-EC2API_S3_SERVICE_HOST=${EC2API_S3_SERVICE_HOST:-$EC2API_SERVICE_HOST}
 EC2API_S3_SERVICE_PORT=${EC2API_S3_SERVICE_PORT:-3334}
 
 EC2API_RABBIT_VHOST=${EC2API_RABBIT_VHOST:-''}
@@ -45,6 +42,45 @@ if [[ -d $EC2API_DIR/bin ]]; then
 else
     EC2API_BIN_DIR=$(get_python_exec_prefix)
 fi
+
+
+function recreate_endpoint {
+    local endpoint=$1
+    local description=$2
+    local port=$3
+
+    if [[ "$KEYSTONE_CATALOG_BACKEND" = 'sql' ]]; then
+
+        # Remove nova's ec2 service/endpoint
+        local endpoint_id=$(openstack endpoint list \
+            --column "ID" \
+            --column "Region" \
+            --column "Service Name" \
+            | grep " $REGION_NAME " \
+            | grep " $endpoint " | get_field 1)
+        if [[ -n "$endpoint_id" ]]; then
+            openstack endpoint delete $endpoint_id
+        fi
+        local service_id=$(openstack service list \
+            -c "ID" -c "Name" \
+            | grep " $endpoint " | get_field 1)
+        if [[ -n "$service_id" ]]; then
+            openstack service delete $service_id
+        fi
+
+        local service_id=$(openstack service create \
+            $endpoint \
+            --name "$endpoint" \
+            --description="$description" \
+            -f value -c id)
+        openstack endpoint create \
+            $service_id \
+            --region "$REGION_NAME" \
+            --publicurl "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/" \
+            --adminurl "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/" \
+            --internalurl "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
+    fi
+}
 
 
 # create_ec2api_accounts() - Set up common required ec2api accounts
@@ -72,36 +108,9 @@ function create_ec2api_accounts() {
         --project $SERVICE_TENANT \
         --user $EC2API_USER
 
-    if [[ "$KEYSTONE_CATALOG_BACKEND" = 'sql' ]]; then
-
-        # Remove nova's ec2 service/endpoint
-        local endpoint_id=$(openstack endpoint list \
-            --column "ID" \
-            --column "Region" \
-            --column "Service Name" \
-            | grep " $REGION_NAME " \
-            | grep " ec2 " | get_field 1)
-        if [[ -n "$endpoint_id" ]]; then
-            openstack endpoint delete $endpoint_id
-        fi
-        local service_id=$(openstack service list \
-            -c "ID" -c "Name" \
-            | grep " ec2 " | get_field 1)
-        if [[ -n "$service_id" ]]; then
-            openstack service delete $service_id
-        fi
-
-        EC2API_SERVICE=$(openstack service create \
-            ec2 \
-            --type "ec2" \
-            --description="EC2 Compatibility Layer" \
-            -f value -c id)
-        openstack endpoint create \
-            $EC2API_SERVICE \
-            --region "$REGION_NAME" \
-            --publicurl "$EC2API_SERVICE_PROTOCOL://$EC2API_SERVICE_HOST:$EC2API_SERVICE_PORT/" \
-            --adminurl "$EC2API_SERVICE_PROTOCOL://$EC2API_SERVICE_HOST:$EC2API_SERVICE_PORT/" \
-            --internalurl "$EC2API_SERVICE_PROTOCOL://$EC2API_SERVICE_HOST:$EC2API_SERVICE_PORT/"
+    recreate_endpoint "ec2" "EC2 Compatibility Layer" $EC2API_SERVICE_PORT
+    if ! is_service_enabled swift3; then
+        recreate_endpoint "s3" "S3" $EC2API_S3_SERVICE_PORT
     fi
 }
 
@@ -189,11 +198,10 @@ function configure_ec2api {
 
     if is_service_enabled swift3; then
         iniset $EC2API_CONF_FILE DEFAULT s3_port "$S3_SERVICE_PORT"
-        iniset $EC2API_CONF_FILE DEFAULT s3_host "$SERVICE_HOST"
     else
         iniset $EC2API_CONF_FILE DEFAULT s3_port "$EC2API_S3_SERVICE_PORT"
-        iniset $EC2API_CONF_FILE DEFAULT s3_host "$EC2API_S3_SERVICE_HOST"
     fi
+    iniset $EC2API_CONF_FILE DEFAULT s3_host "$SERVICE_HOST"
 
     configure_ec2api_rpc_backend
 
