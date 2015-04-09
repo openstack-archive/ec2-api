@@ -693,7 +693,7 @@ class CloudController(object):
             Information about one or more account attributes.
         """
 
-    @module_and_param_types(instance, 'i_id')
+    @module_and_param_types(instance, 'i_id_or_ids')
     def get_password_data(self, context, instance_id):
         """Retrieves the encrypted administrator password for Windows instance.
 
@@ -708,7 +708,7 @@ class CloudController(object):
         you launched the instance.
         """
 
-    @module_and_param_types(instance, 'i_id')
+    @module_and_param_types(instance, 'i_id_or_ids')
     def get_console_output(self, context, instance_id):
         """Gets the console output for the specified instance.
 

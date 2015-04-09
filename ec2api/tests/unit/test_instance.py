@@ -673,9 +673,10 @@ class InstanceTestCase(base.ApiTestCase):
         utcnow.return_value = datetime.datetime(2015, 1, 19, 23, 34, 45, 123)
         resp = self.execute(operation,
                             {'InstanceId': fakes.ID_EC2_INSTANCE_2})
+        expected_data = base64.b64encode(getter.return_value)
         self.assertEqual({'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'timestamp': '2015-01-19T23:34:45.000Z',
-                          key: 'fake_data'},
+                          key: expected_data},
                          resp)
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_INSTANCE_2)

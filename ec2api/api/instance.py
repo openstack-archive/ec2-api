@@ -53,7 +53,21 @@ CONF.register_opts(ec2_opts)
 """
 
 
-Validator = common.Validator
+class Validator(common.Validator):
+
+    def i_id_or_ids(self, value):
+        # NOTE(ft): boto specifies an instance id to GetConsoleOutput as
+        # a list with the id. This is an AWS undocumented feature for all (?)
+        # parameters, but ec2api will support it in certain operations only.
+        if type(value) is list:
+            if len(value) != 1:
+                msg = (
+                    _("The parameter 'InstanceId' may only be specified once.")
+                    if len(value) else
+                    _('No instanceId specified'))
+                raise exception.InvalidParameterCombination(msg)
+            value = value[0]
+        self.i_id(value)
 
 
 def get_instance_engine():
@@ -200,8 +214,8 @@ class InstanceDescriber(common.TaggableItemsDescriber):
     KIND = 'i'
     FILTER_MAP = {
         'availability-zone': ('placement', 'availabilityZone'),
-        'block-device-mapping.delete-on-termination': ['blockDeviceMapping',
-            ('ebs', 'deleteOnTermination')],
+        'block-device-mapping.delete-on-termination': [
+            'blockDeviceMapping', ('ebs', 'deleteOnTermination')],
         'block-device-mapping.device-name': ['blockDeviceMapping',
                                              'deviceName'],
         'block-device-mapping.status': ['blockDeviceMapping',
@@ -430,6 +444,8 @@ def start_instances(context, instance_id):
 
 
 def get_password_data(context, instance_id):
+    if type(instance_id) is list:
+        instance_id = instance_id[0]
     instance = ec2utils.get_db_item(context, instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
@@ -439,10 +455,12 @@ def get_password_data(context, instance_id):
     now = timeutils.utcnow()
     return {"instanceId": instance_id,
             "timestamp": now,
-            "passwordData": password}
+            "passwordData": base64.b64encode(password)}
 
 
 def get_console_output(context, instance_id):
+    if type(instance_id) is list:
+        instance_id = instance_id[0]
     instance = ec2utils.get_db_item(context, instance_id)
     nova = clients.nova(context)
     os_instance = nova.servers.get(instance['os_id'])
@@ -450,7 +468,7 @@ def get_console_output(context, instance_id):
     now = timeutils.utcnow()
     return {"instanceId": instance_id,
             "timestamp": now,
-            "output": console_output}
+            "output": base64.b64encode(console_output)}
 
 
 def describe_instance_attribute(context, instance_id, attribute):
