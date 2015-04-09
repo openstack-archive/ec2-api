@@ -91,8 +91,9 @@ class S3Application(wsgi.Router):
                 '/{bucket}/{object_name}',
                 controller=lambda *a, **kw: ObjectHandler(self)(*a, **kw))
         mapper.connect(
-                '/{bucket_name}/',
-                controller=lambda *a, **kw: BucketHandler(self)(*a, **kw))
+                '/{bucket_name}',
+                controller=lambda *a, **kw: BucketHandler(self)(*a, **kw),
+                requirements={'bucket_name': '[^/]+/?'})
         self.directory = os.path.abspath(root_directory)
         fileutils.ensure_tree(self.directory)
         self.bucket_depth = bucket_depth
@@ -174,7 +175,7 @@ class BaseRequestHandler(object):
         name = value.keys()[0]
         parts = []
         parts.append('<' + utils.utf8(name) +
-                     ' xmlns="http://doc.s3.amazonaws.com/2006-03-01">')
+                     ' xmlns="http://s3.amazonaws.com/doc/2006-03-01/">')
         self._render_parts(value.values()[0], parts)
         parts.append('</' + utils.utf8(name) + '>')
         self.finish('<?xml version="1.0" encoding="UTF-8"?>\n' +
