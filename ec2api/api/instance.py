@@ -612,9 +612,9 @@ def _format_state_change(instance, os_instance):
             curr_state = _cloud_state_description(
                 getattr(os_instance, 'OS-EXT-STS:vm_state'))
         except nova_exception.NotFound:
-            curr_state = _cloud_state_description(vm_states_DELETED)
+            curr_state = _cloud_state_description(vm_states_WIPED_OUT)
     else:
-        prev_state = curr_state = _cloud_state_description(vm_states_DELETED)
+        prev_state = curr_state = _cloud_state_description(vm_states_WIPED_OUT)
     return {
         'instanceId': instance['id'],
         'previousState': prev_state,
@@ -1293,6 +1293,9 @@ vm_states_SHELVED = 'shelved'  # VM is powered off, resources still on
 vm_states_SHELVED_OFFLOADED = 'shelved_offloaded'  # VM and associated
 # resources are not on hypervisor
 
+vm_states_WIPED_OUT = 'wiped_out'  # Artificial state, added for state
+# of VM which was just deleted and is not reported by OpenStack anymore.
+
 vm_states_ALLOW_SOFT_REBOOT = [vm_states_ACTIVE]  # states we can soft reboot
 # from
 vm_states_ALLOW_HARD_REBOOT = (
@@ -1362,11 +1365,12 @@ _STATE_DESCRIPTION_MAP = {
     None: inst_state_PENDING,
     vm_states_ACTIVE: inst_state_RUNNING,
     vm_states_BUILDING: inst_state_PENDING,
-    vm_states_DELETED: inst_state_TERMINATED,
-    vm_states_SOFT_DELETED: inst_state_TERMINATED,
+    vm_states_DELETED: inst_state_SHUTTING_DOWN,
+    vm_states_SOFT_DELETED: inst_state_SHUTTING_DOWN,
     vm_states_STOPPED: inst_state_STOPPED,
     vm_states_PAUSED: inst_state_PAUSE,
     vm_states_SUSPENDED: inst_state_SUSPEND,
     vm_states_RESCUED: inst_state_RESCUE,
     vm_states_RESIZED: inst_state_RESIZE,
+    vm_states_WIPED_OUT: inst_state_TERMINATED
 }
