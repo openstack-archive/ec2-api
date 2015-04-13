@@ -110,8 +110,8 @@ class ApiTestCase(test_base.BaseTestCase):
             tools.get_db_api_get_item_by_id(*self._db_items))
         self.db_api.get_items_by_ids.side_effect = (
             tools.get_db_api_get_items_by_ids(*self._db_items))
-        self.db_api.get_item_ids.side_effect = (
-            tools.get_db_api_get_item_ids(*self._db_items))
+        self.db_api.get_items_ids.side_effect = (
+            tools.get_db_api_get_items_ids(*self._db_items))
 
     def add_mock_db_items(self, *items):
         merged_items = items + tuple(item for item in self._db_items

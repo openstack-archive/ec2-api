@@ -219,11 +219,11 @@ def get_public_items(context, kind, item_ids=None):
 
 
 @require_context
-def get_item_ids(context, kind, os_ids):
+def get_items_ids(context, kind, os_ids):
     query = (model_query(context, models.Item).
              filter(models.Item.id.like('%s-%%' % kind)))
     if os_ids:
-        query = query.filter(models.Item.id.in_(os_ids))
+        query = query.filter(models.Item.os_id.in_(os_ids))
     return [(item['id'], item['os_id'])
             for item in query.all()]
 

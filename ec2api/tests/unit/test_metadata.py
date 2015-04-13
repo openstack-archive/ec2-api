@@ -350,7 +350,7 @@ class ProxyTestCase(test_base.BaseTestCase):
         keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)
         keypair.configure_mock(name=fakes.NAME_KEY_PAIR)
         nova.return_value.keypairs.get.return_value = keypair
-        db_api.get_item_ids.return_value = [
+        db_api.get_items_ids.return_value = [
                 (fakes.ID_EC2_INSTANCE_1, fakes.ID_OS_INSTANCE_1)]
         instance_api.describe_instances.return_value = {
                'reservationSet': [fakes.EC2_RESERVATION_1]}

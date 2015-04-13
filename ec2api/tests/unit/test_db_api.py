@@ -187,12 +187,13 @@ class DbApiTestCase(test_base.BaseTestCase):
     def _setup_items(self):
         db_api.add_item(self.context, 'fake', {})
         db_api.add_item(self.context, 'fake', {'is_public': True})
-        db_api.add_item(self.context, 'fake1', {})
+        db_api.add_item(self.context, 'fake1', {'os_id': fakes.random_os_id()})
         db_api.add_item(self.other_context, 'fake', {})
         db_api.add_item(self.other_context, 'fake', {'is_public': False})
         db_api.add_item(self.other_context, 'fake', {'is_public': True})
-        db_api.add_item_id(self.other_context, 'fake', fakes.random_os_id())
-        db_api.add_item(self.other_context, 'fake1', {'is_public': True})
+        db_api.add_item(self.other_context, 'fake1',
+                        {'is_public': False,
+                         'os_id': fakes.random_os_id()})
 
     def test_get_items(self):
         self._setup_items()
@@ -248,6 +249,20 @@ class DbApiTestCase(test_base.BaseTestCase):
         items = db_api.get_items_by_ids(self.context,
                                         (item_id, fakes.random_ec2_id('fake')))
         self.assertEqual(1, len(items))
+
+    def test_get_items_ids(self):
+        self._setup_items()
+        item = db_api.get_items(self.context, 'fake1')[0]
+        other_item = db_api.get_items(self.other_context, 'fake1')[0]
+        items_ids = db_api.get_items_ids(self.context, 'fake1',
+                                         [item['os_id'], other_item['os_id']])
+        self.assertThat(items_ids,
+                        matchers.ListMatches(
+                            [(item['id'], item['os_id']),
+                             (other_item['id'], other_item['os_id'])],
+                            orderless_lists=True))
+        items_ids = db_api.get_items_ids(self.context, 'fake', [item['os_id']])
+        self.assertEqual(0, len(items_ids))
 
     def test_get_public_items(self):
         self._setup_items()

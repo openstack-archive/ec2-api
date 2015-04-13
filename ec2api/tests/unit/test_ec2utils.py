@@ -149,6 +149,80 @@ class EC2UtilsTestCase(testtools.TestCase):
         self.assertEqual(conv('remove'), 'remove')
         self.assertEqual(conv(''), '')
 
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_os_id_to_ec2_id(self, db_api):
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_id = fakes.random_ec2_id('fake')
+        fake_os_id = fakes.random_os_id()
+
+        # no cache, item is found
+        db_api.get_items_ids.return_value = [(fake_id, fake_os_id)]
+        item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id)
+        self.assertEqual(fake_id, item_id)
+        db_api.get_items_ids.assert_called_once_with(
+            fake_context, 'fake', (fake_os_id,))
+        self.assertFalse(db_api.add_item_id.called)
+
+        # no cache, item isn't found
+        db_api.get_items_ids.return_value = []
+        db_api.add_item_id.return_value = fake_id
+        item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id)
+        self.assertEqual(fake_id, item_id)
+        db_api.add_item_id.assert_called_once_with(
+            fake_context, 'fake', fake_os_id)
+
+        # no item in cache, item isn't found
+        db_api.reset_mock()
+        ids_cache = {fakes.random_os_id(): fakes.random_ec2_id('fake')}
+        item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id,
+                                           ids_by_os_id=ids_cache)
+        self.assertEqual(fake_id, item_id)
+        self.assertIn(fake_os_id, ids_cache)
+        self.assertEqual(fake_id, ids_cache[fake_os_id])
+        db_api.add_item_id.assert_called_once_with(
+            fake_context, 'fake', fake_os_id)
+
+        # no item in cache, item is found
+        db_api.reset_mock()
+        db_api.get_items_ids.return_value = [(fake_id, fake_os_id)]
+        ids_cache = {}
+        item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id,
+                                           ids_by_os_id=ids_cache)
+        self.assertEqual(fake_id, item_id)
+        self.assertEqual({fake_os_id: fake_id}, ids_cache)
+        self.assertFalse(db_api.add_item_id.called)
+
+        # item in cache
+        db_api.reset_mock()
+        ids_cache = {fake_os_id: fake_id}
+        item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id,
+                                           ids_by_os_id=ids_cache)
+        self.assertEqual(fake_id, item_id)
+        self.assertEqual({fake_os_id: fake_id}, ids_cache)
+        self.assertFalse(db_api.get_items_ids.called)
+        self.assertFalse(db_api.add_item_id.called)
+
+        # item in items dict
+        items_dict = {fake_os_id: {'id': fake_id,
+                                   'os_id': fake_os_id}}
+        ids_cache = {}
+        item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id,
+                                           items_by_os_id=items_dict,
+                                           ids_by_os_id=ids_cache)
+        self.assertEqual(fake_id, item_id)
+        self.assertFalse(db_api.get_items_ids.called)
+        self.assertFalse(db_api.add_item_id.called)
+        self.assertEqual({}, ids_cache)
+
+        # item not in items dict, item is found
+        items_dict = {fake_os_id: {'id': fake_id,
+                                   'os_id': fake_os_id}}
+        db_api.get_items_ids.return_value = [(fake_id, fake_os_id)]
+        item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id,
+                                           items_by_os_id=items_dict)
+        self.assertEqual(fake_id, item_id)
+        self.assertFalse(db_api.add_item_id.called)
+
     @mock.patch('glanceclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_os_image(self, db_api, glance):

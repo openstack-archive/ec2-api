@@ -115,8 +115,8 @@ def get_public_items(context, kind, item_ids=None):
     return IMPL.get_public_items(context, kind, item_ids)
 
 
-def get_item_ids(context, kind, os_ids):
-    return IMPL.get_item_ids(context, kind, os_ids)
+def get_items_ids(context, kind, os_ids):
+    return IMPL.get_items_ids(context, kind, os_ids)
 
 
 def add_tags(context, tags):

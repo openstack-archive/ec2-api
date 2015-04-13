@@ -92,15 +92,15 @@ def get_db_api_get_items_by_ids(*items):
     return db_api_get_items_by_ids
 
 
-def get_db_api_get_item_ids(*items):
-    """Generate db_api.get_item_ids mock function."""
+def get_db_api_get_items_ids(*items):
+    """Generate db_api.get_items_ids mock function."""
 
-    def db_api_get_item_ids(context, kind, item_os_ids):
+    def db_api_get_items_ids(context, kind, item_os_ids):
         return [(item['id'], item['os_id'])
                 for item in items
                 if (item['os_id'] in item_os_ids and
                     ec2utils.get_ec2_id_kind(item['id']) == kind)]
-    return db_api_get_item_ids
+    return db_api_get_items_ids
 
 
 def get_neutron_create(kind, os_id, addon={}):
