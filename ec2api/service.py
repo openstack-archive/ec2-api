@@ -97,6 +97,14 @@ class WSGIService(object):
         # Pull back actual port used
         self.port = self.server.port
 
+    def reset(self):
+        """Reset server greenpool size to default.
+
+        :returns: None
+
+        """
+        self.server.reset()
+
     def cpu_count(self):
         try:
             return multiprocessing.cpu_count()
