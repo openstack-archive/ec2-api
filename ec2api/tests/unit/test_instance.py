@@ -75,7 +75,8 @@ class InstanceTestCase(base.ApiTestCase):
         format_security_groups_ids_names.return_value = {}
 
         self.fake_flavor = mock.Mock()
-        self.fake_flavor.configure_mock(name='fake_flavor')
+        self.fake_flavor.configure_mock(name='fake_flavor',
+                                        id='fakeFlavorId')
         self.nova.flavors.get.return_value = self.fake_flavor
         self.nova.flavors.list.return_value = [self.fake_flavor]
 
@@ -1424,9 +1425,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     def test_format_instance(self, db_api, nova, cinder):
         nova = nova.return_value
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
-        fake_flavor = mock.Mock()
-        fake_flavor.configure_mock(name='fake_flavor')
-        nova.flavors.get.return_value = fake_flavor
+        fake_flavors = {'fakeFlavorId': 'fake_flavor'}
 
         instance = {'id': fakes.random_ec2_id('i'),
                     'os_id': fakes.random_os_id(),
@@ -1437,13 +1436,15 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         # NOTE(ft): check instance state formatting
         setattr(os_instance, 'OS-EXT-STS:vm_state', 'active')
         formatted_instance = instance_api._format_instance(
-            fake_context, instance, os_instance, [], {})
+            fake_context, instance, os_instance, [], {},
+            os_flavors=fake_flavors)
         self.assertEqual({'name': 'running', 'code': 16},
                          formatted_instance['instanceState'])
 
         setattr(os_instance, 'OS-EXT-STS:vm_state', 'stopped')
         formatted_instance = instance_api._format_instance(
-            fake_context, instance, os_instance, [], {})
+            fake_context, instance, os_instance, [], {},
+            os_flavors=fake_flavors)
         self.assertEqual({'name': 'stopped', 'code': 80},
                          formatted_instance['instanceState'])
 
@@ -1454,7 +1455,8 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         setattr(os_instance, 'OS-EXT-SRV-ATTR:kernel_id', kernel_id)
         setattr(os_instance, 'OS-EXT-SRV-ATTR:ramdisk_id', ramdisk_id)
         formatted_instance = instance_api._format_instance(
-            fake_context, instance, os_instance, [], {})
+            fake_context, instance, os_instance, [], {},
+            os_flavors=fake_flavors)
         db_api.add_item_id.assert_has_calls(
             [mock.call(mock.ANY, 'ami', os_instance.image['id']),
              mock.call(mock.ANY, 'aki', kernel_id),

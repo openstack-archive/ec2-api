@@ -41,6 +41,9 @@ ec2_opts = [
                 default=False,
                 help='Return the IP address as private dns hostname in '
                      'describe instances'),
+    cfg.StrOpt('default_flavor',
+           default='m1.small',
+           help='A flavor to use as a default instance type'),
 ]
 
 CONF = cfg.CONF
@@ -92,6 +95,8 @@ def run_instances(context, image_id, min_count, max_count,
 
     nova = clients.nova(context)
     try:
+        if instance_type is None:
+            instance_type = CONF.default_flavor
         os_flavor = next(f for f in nova.flavors.list()
                          if f.name == instance_type)
     except StopIteration:
@@ -282,7 +287,8 @@ class InstanceDescriber(common.TaggableItemsDescriber):
         formatted_instance = _format_instance(
                 self.context, instance, os_instance,
                 self.ec2_network_interfaces.get(instance['id']),
-                self.image_ids, self.volumes, self.os_volumes)
+                self.image_ids, self.volumes, self.os_volumes,
+                self.os_flavors)
 
         reservation_id = instance['reservation_id']
         if reservation_id in self.reservations:
@@ -315,6 +321,7 @@ class InstanceDescriber(common.TaggableItemsDescriber):
 
     def get_os_items(self):
         self.os_volumes = _get_os_volumes(self.context)
+        self.os_flavors = _get_os_flavors(self.context)
         nova = clients.nova(ec2_context.get_os_admin_context())
         return nova.servers.list(
                 search_opts={'all_tenants': True,
@@ -511,7 +518,8 @@ def _format_reservation(context, reservation, formatted_instances, os_groups):
 
 
 def _format_instance(context, instance, os_instance, ec2_network_interfaces,
-                     image_ids, volumes=None, os_volumes=None):
+                     image_ids, volumes=None, os_volumes=None,
+                     os_flavors=None):
     ec2_instance = {
         'amiLaunchIndex': instance['launch_index'],
         'imageId': (ec2utils.os_id_to_ec2_id(context, 'ami',
@@ -519,7 +527,7 @@ def _format_instance(context, instance, os_instance, ec2_network_interfaces,
                                              ids_by_os_id=image_ids)
                     if os_instance.image else None),
         'instanceId': instance['id'],
-        'instanceType': _cloud_format_instance_type(context, os_instance),
+        'instanceType': os_flavors.get(os_instance.flavor['id'], 'unknown'),
         'keyName': os_instance.key_name,
         'launchTime': os_instance.created,
         'placement': {
@@ -743,6 +751,11 @@ def _get_os_instances_by_instances(context, instances, exactly=False,
                                 id=obsolete_instances[0]['id'])
 
     return os_instances
+
+
+def _get_os_flavors(context):
+    os_flavors = clients.nova(context).flavors.list()
+    return dict((f.id, f.name) for f in os_flavors)
 
 
 def _get_os_volumes(context):
@@ -1163,7 +1176,6 @@ def _cloud_format_ramdisk_id(context, os_instance, image_ids=None):
 
 
 def _cloud_format_instance_type(context, os_instance):
-    # TODO(ft): cache flavors
     return clients.nova(context).flavors.get(os_instance.flavor['id']).name
 
 
