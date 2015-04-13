@@ -82,7 +82,7 @@ def create_subnet(context, vpc_id, cidr_block,
                                {'network': {'name': subnet['id']}})
         neutron.update_subnet(os_subnet['id'],
                               {'subnet': {'name': subnet['id']}})
-    os_ports = neutron.list_ports()['ports']
+    os_ports = neutron.list_ports(tenant_id=context.project_id)['ports']
     return {'subnet': _format_subnet(context, subnet, os_subnet,
                                      os_network, os_ports)}
 
@@ -155,9 +155,12 @@ class SubnetDescriber(common.TaggableItemsDescriber):
 
     def get_os_items(self):
         neutron = clients.neutron(self.context)
-        self.os_networks = neutron.list_networks()['networks']
-        self.os_ports = neutron.list_ports()['ports']
-        return neutron.list_subnets()['subnets']
+        self.os_networks = neutron.list_networks(
+            tenant_id=self.context.project_id)['networks']
+        self.os_ports = neutron.list_ports(
+            tenant_id=self.context.project_id)['ports']
+        return neutron.list_subnets(
+            tenant_id=self.context.project_id)['subnets']
 
 
 def describe_subnets(context, subnet_id=None, filter=None):

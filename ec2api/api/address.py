@@ -385,11 +385,12 @@ class AddressEngineNeutron(object):
 
     def get_os_floating_ips(self, context):
         neutron = clients.neutron(context)
-        return neutron.list_floatingips()['floatingips']
+        return neutron.list_floatingips(
+            tenant_id=context.project_id)['floatingips']
 
     def get_os_ports(self, context):
         neutron = clients.neutron(context)
-        return neutron.list_ports()['ports']
+        return neutron.list_ports(tenant_id=context.project_id)['ports']
 
 
 class AddressEngineNova(object):

@@ -134,7 +134,7 @@ def associate_dhcp_options(context, dhcp_options_id, vpc_id):
         dhcp_options = ec2utils.get_db_item(context, dhcp_options_id)
         dhcp_options_id = dhcp_options['id']
     neutron = clients.neutron(context)
-    os_ports = neutron.list_ports()['ports']
+    os_ports = neutron.list_ports(tenant_id=context.project_id)['ports']
     network_interfaces = db_api.get_items(context, 'eni')
     rollback_dhcp_options_object = (
             db_api.get_item_by_id(context, rollback_dhcp_options_id)

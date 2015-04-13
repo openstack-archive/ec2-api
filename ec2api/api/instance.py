@@ -1059,12 +1059,12 @@ class InstanceEngineNeutron(object):
                          for eni in db_api.get_items(context, 'subnet')]
         if os_subnet_ids:
             os_subnets = neutron.list_subnets(id=os_subnet_ids,
-                                              fields=['network_id'])['subnets']
+                fields=['network_id'], tenant_id=context.project_id)['subnets']
             vpc_os_network_ids = set(sn['network_id'] for sn in os_subnets)
         else:
             vpc_os_network_ids = []
         os_networks = neutron.list_networks(**{'router:external': False,
-                                               'fields': ['id']})['networks']
+            'fields': ['id'], 'tenant_id': context.project_id})['networks']
         ec2_classic_os_networks = [n for n in os_networks
                                    if n['id'] not in vpc_os_network_ids]
         if len(ec2_classic_os_networks) == 0:

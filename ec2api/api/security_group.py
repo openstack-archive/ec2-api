@@ -341,7 +341,8 @@ def _translate_group_name(context, os_group, db_groups):
 
 def _format_security_groups_ids_names(context):
     neutron = clients.neutron(context)
-    os_security_groups = neutron.list_security_groups()['security_groups']
+    os_security_groups = neutron.list_security_groups(
+        tenant_id=context.project_id)['security_groups']
     security_groups = db_api.get_items(context, 'sg')
     ec2_security_groups = {}
     for os_security_group in os_security_groups:
@@ -454,7 +455,8 @@ class SecurityGroupEngineNeutron(object):
 
     def get_os_groups(self, context):
         neutron = clients.neutron(context)
-        return neutron.list_security_groups()['security_groups']
+        return neutron.list_security_groups(
+            tenant_id=context.project_id)['security_groups']
 
     def authorize_security_group(self, context, rule_body):
         neutron = clients.neutron(context)

@@ -496,8 +496,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_attach_network_interface(self):
         self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1,
                                fakes.DB_INSTANCE_1)
-        self.neutron.list_ports.return_value = (
-            {'ports': [fakes.OS_PORT_1]})
+        self.neutron.show_port.return_value = (
+            {'port': fakes.OS_PORT_1})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
         self.execute(
             'AttachNetworkInterface',
@@ -538,8 +538,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
     def test_attach_network_interface_rollback(self):
         self.set_mock_db_items(fakes.DB_NETWORK_INTERFACE_1,
                                fakes.DB_INSTANCE_1)
-        self.neutron.list_ports.return_value = (
-            {'ports': [fakes.OS_PORT_2]})
+        self.neutron.show_port.return_value = (
+            {'port': fakes.OS_PORT_2})
         self.isotime.return_value = fakes.TIME_ATTACH_NETWORK_INTERFACE
         self.nova.servers.interface_attach.side_effect = Exception()
 
@@ -556,8 +556,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
                                               {'device_index': 1})
         self.set_mock_db_items(network_interface)
-        self.neutron.list_ports.return_value = (
-            {'ports': [fakes.OS_PORT_2]})
+        self.neutron.show_port.return_value = (
+            {'port': fakes.OS_PORT_2})
         self.execute(
             'DetachNetworkInterface',
             {'AttachmentId': ec2utils.change_ec2_id_kind(
@@ -595,8 +595,8 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
         network_interface = tools.update_dict(fakes.DB_NETWORK_INTERFACE_2,
                                               {'device_index': 1})
         self.set_mock_db_items(network_interface)
-        self.neutron.list_ports.return_value = (
-            {'ports': [fakes.OS_PORT_2]})
+        self.neutron.show_port.return_value = (
+            {'port': fakes.OS_PORT_2})
         self.neutron.update_port.side_effect = Exception()
 
         self.assert_execution_error(
