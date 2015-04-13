@@ -100,7 +100,8 @@ class Server(object):
         self.app = app
         self._server = None
         self._protocol = protocol
-        self._pool = eventlet.GreenPool(pool_size or self.default_pool_size)
+        self.pool_size = pool_size or self.default_pool_size
+        self._pool = eventlet.GreenPool(self.pool_size)
         self._logger = logging.getLogger("ec2api.wsgi.server")
         self._wsgi_logger = loggers.WritableLogger(self._logger)
         self._use_ssl = use_ssl
@@ -139,6 +140,24 @@ class Server(object):
 
         :returns: None
         """
+        # The server socket object will be closed after server exits,
+        # but the underlying file descriptor will remain open, and will
+        # give bad file descriptor error. So duplicating the socket object,
+        # to keep file descriptor usable.
+
+        dup_socket = self._socket.dup()
+        dup_socket.setsockopt(socket.SOL_SOCKET,
+                              socket.SO_REUSEADDR, 1)
+        # sockets can hang around forever without keepalive
+        dup_socket.setsockopt(socket.SOL_SOCKET,
+                              socket.SO_KEEPALIVE, 1)
+
+        # This option isn't available in the OS X version of eventlet
+        if hasattr(socket, 'TCP_KEEPIDLE'):
+            dup_socket.setsockopt(socket.IPPROTO_TCP,
+                                  socket.TCP_KEEPIDLE,
+                                  CONF.tcp_keepidle)
+
         if self._use_ssl:
             try:
                 ca_file = CONF.ssl_ca_file
@@ -173,21 +192,8 @@ class Server(object):
                     ssl_kwargs['ca_certs'] = ca_file
                     ssl_kwargs['cert_reqs'] = ssl.CERT_REQUIRED
 
-                self._socket = eventlet.wrap_ssl(self._socket,
-                                                 **ssl_kwargs)
-
-                self._socket.setsockopt(socket.SOL_SOCKET,
-                                        socket.SO_REUSEADDR, 1)
-                # sockets can hang around forever without keepalive
-                self._socket.setsockopt(socket.SOL_SOCKET,
-                                        socket.SO_KEEPALIVE, 1)
-
-                # This option isn't available in the OS X version of eventlet
-                if hasattr(socket, 'TCP_KEEPIDLE'):
-                    self._socket.setsockopt(socket.IPPROTO_TCP,
-                                            socket.TCP_KEEPIDLE,
-                                            CONF.tcp_keepidle)
-
+                dup_socket = eventlet.wrap_ssl(dup_socket,
+                                               **ssl_kwargs)
             except Exception:
                 with excutils.save_and_reraise_exception():
                     LOG.error(_("Failed to start %(name)s on %(host)s"
@@ -195,7 +201,7 @@ class Server(object):
 
         wsgi_kwargs = {
             'func': eventlet.wsgi.server,
-            'sock': self._socket,
+            'sock': dup_socket,
             'site': self.app,
             'protocol': self._protocol,
             'custom_pool': self._pool,
@@ -208,6 +214,14 @@ class Server(object):
             wsgi_kwargs['url_length_limit'] = self._max_url_len
 
         self._server = eventlet.spawn(**wsgi_kwargs)
+
+    def reset(self):
+        """Reset server greenpool size to default.
+
+        :returns: None
+
+        """
+        self._pool.resize(self.pool_size)
 
     def stop(self):
         """Stop this server.
