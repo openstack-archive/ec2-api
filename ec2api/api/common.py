@@ -332,14 +332,11 @@ class UniversalDescriber(object):
 
     def describe(self, context, ids=None, names=None, filter=None):
         self.context = context
-        selective_describe = ids is not None or names is not None
+        self.selective_describe = ids is not None or names is not None
         self.ids = set(ids or [])
         self.names = set(names or [])
-        # NOTE(Alex): OS items are retrieved here first to let specific
-        # describer a chance to recreate some default object and refresh
-        # the db items before their retrieval.
-        self.os_items = self.get_os_items()
         self.items = self.get_db_items()
+        self.os_items = self.get_os_items()
         formatted_items = []
 
         self.items_dict = {i['os_id']: i for i in (self.items or [])}
@@ -349,7 +346,7 @@ class UniversalDescriber(object):
             os_item_id = self.get_id(os_item)
             item = self.items_dict.get(os_item_id, None)
             # NOTE(Alex): Filter out items not requested in names or ids
-            if (selective_describe and
+            if (self.selective_describe and
                     not (os_item_name in self.names or
                          (item and item['id'] in self.ids))):
                 continue
