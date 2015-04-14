@@ -115,11 +115,13 @@ class AddressDescriber(common.UniversalDescriber):
                   'private-ip-address': 'privateIpAddress',
                   'public-ip': 'publicIp'}
 
-    def __init__(self, os_ports):
+    def __init__(self, os_ports, db_instances):
         self.os_ports = os_ports
+        self.db_instances_dict = {i['os_id']: i for i in (db_instances or [])}
 
     def format(self, item=None, os_item=None):
-        return _format_address(self.context, item, os_item, self.os_ports)
+        return _format_address(self.context, item, os_item, self.os_ports,
+                               self.db_instances_dict)
 
     def get_os_items(self):
         return address_engine.get_os_floating_ips(self.context)
@@ -139,12 +141,14 @@ class AddressDescriber(common.UniversalDescriber):
 def describe_addresses(context, public_ip=None, allocation_id=None,
                        filter=None):
     formatted_addresses = AddressDescriber(
-        address_engine.get_os_ports(context)).describe(
+        address_engine.get_os_ports(context),
+        db_api.get_items(context, 'i')).describe(
             context, allocation_id, public_ip, filter)
     return {'addressesSet': formatted_addresses}
 
 
-def _format_address(context, address, os_floating_ip, os_ports=[]):
+def _format_address(context, address, os_floating_ip, os_ports=[],
+                    db_instances_dict=None):
     ec2_address = {'publicIp': os_floating_ip['floating_ip_address']}
     fixed_ip_address = os_floating_ip.get('fixed_ip_address')
     if fixed_ip_address:
@@ -156,10 +160,12 @@ def _format_address(context, address, os_floating_ip, os_ports=[]):
                          if port['id'] == port_id), None)
             if port and port.get('device_id'):
                 ec2_address['instanceId'] = (
-                    _get_instance_ec2_id_by_os_id(context, port['device_id']))
+                    _get_instance_ec2_id_by_os_id(context, port['device_id'],
+                                                  db_instances_dict))
         elif os_fip:
             ec2_address['instanceId'] = (
-                _get_instance_ec2_id_by_os_id(context, os_fip))
+                _get_instance_ec2_id_by_os_id(context, os_fip,
+                                              db_instances_dict))
     if not address:
         ec2_address['domain'] = 'standard'
     else:
@@ -174,8 +180,9 @@ def _format_address(context, address, os_floating_ip, os_ports=[]):
     return ec2_address
 
 
-def _get_instance_ec2_id_by_os_id(context, os_instance_id):
-    db_item = ec2utils.get_db_item_by_os_id(context, 'i', os_instance_id)
+def _get_instance_ec2_id_by_os_id(context, os_instance_id, db_instances_dict):
+    db_item = ec2utils.get_db_item_by_os_id(context, 'i', os_instance_id,
+                                            db_instances_dict)
     return db_item['id']
 
 
