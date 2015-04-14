@@ -237,7 +237,7 @@ class NetworkInterfaceDescriber(common.TaggableItemsDescriber):
         self.security_groups = (
             security_group_api._format_security_groups_ids_names(self.context))
         neutron = clients.neutron(self.context)
-        return neutron.list_ports()['ports']
+        return neutron.list_ports(tenant_id=self.context.project_id)['ports']
 
     def get_name(self, os_item):
         return ''
@@ -406,7 +406,7 @@ def attach_network_interface(context, network_interface_id,
               "device index '%(index)s'.") % {'id': instance_id,
                                               'index': device_index})
     neutron = clients.neutron(context)
-    os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
+    os_port = neutron.show_port(network_interface['os_id'])['port']
     nova = clients.nova(context)
     with common.OnCrashCleaner() as cleaner:
         # TODO(Alex) nova inserts compute:%availability_zone into device_owner
@@ -430,7 +430,7 @@ def detach_network_interface(context, attachment_id, force=None):
         raise exception.OperationNotPermitted(
             _('The network interface at device index 0 cannot be detached.'))
     neutron = clients.neutron(context)
-    os_port = neutron.list_ports(id=network_interface['os_id'])['ports'][0]
+    os_port = neutron.show_port(network_interface['os_id'])['port']
     with common.OnCrashCleaner() as cleaner:
         instance_id = network_interface['instance_id']
         device_index = network_interface['device_index']

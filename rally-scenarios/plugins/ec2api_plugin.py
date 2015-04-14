@@ -94,3 +94,43 @@ class EC2APIPlugin(base.Scenario):
         self.describe_addresses()
         self.describe_instances()
         self.describe_one_instance()
+
+        nova = self.clients("nova")
+        with base.AtomicAction(self, 'servers_list'):
+            data = nova.servers.list()
+            id = data[0].id if len(data) else None
+        if id:
+            with base.AtomicAction(self, 'server_get'):
+                data = nova.servers.get(id)
+        with base.AtomicAction(self, 'flavors_list'):
+            data = nova.flavors.list()
+            id = data[0].id if len(data) else None
+        if id:
+            with base.AtomicAction(self, 'flavor_get'):
+                data = nova.flavors.get(id)
+
+        neutron = self.clients("neutron")
+        with base.AtomicAction(self, 'floatingip_list'):
+            data = neutron.list_floatingips()["floatingips"]
+            id = data[0]["id"] if len(data) else None
+        if id:
+            with base.AtomicAction(self, 'floatingip_get'):
+                data = neutron.show_floatingip(id)
+        with base.AtomicAction(self, 'ports_list'):
+            data = neutron.list_ports()["ports"]
+            id = data[0]["id"] if len(data) else None
+        if id:
+            with base.AtomicAction(self, 'port_get'):
+                data = neutron.show_port(id)
+        with base.AtomicAction(self, 'sg_list'):
+            data = neutron.list_security_groups()["security_groups"]
+            id = data[0]["id"] if len(data) else None
+        if id:
+            with base.AtomicAction(self, 'sg_get'):
+                data = neutron.show_security_group(id)
+        with base.AtomicAction(self, 'subnet_list'):
+            data = neutron.list_subnets()["subnets"]
+            id = data[0]["id"] if len(data) else None
+        if id:
+            with base.AtomicAction(self, 'subnet_get'):
+                data = neutron.show_subnet(id)
