@@ -140,6 +140,7 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
         os_groups = security_group_engine.get_os_groups(self.context)
         if self.check_and_repair_default_groups(os_groups, self.all_db_items):
             self.all_db_items = db_api.get_items(self.context, 'sg')
+            self.items = self.get_db_items()
             os_groups = security_group_engine.get_os_groups(self.context)
         for os_group in os_groups:
             os_group['name'] = _translate_group_name(self.context,

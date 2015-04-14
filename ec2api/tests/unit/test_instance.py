@@ -703,6 +703,8 @@ class InstanceTestCase(base.ApiTestCase):
         self.nova_admin.servers.list.return_value = [
             fakes.OSInstance_full(fakes.OS_INSTANCE_1),
             fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
+        self.nova_admin.servers.get.return_value = (
+            fakes.OSInstance_full(fakes.OS_INSTANCE_1))
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2),

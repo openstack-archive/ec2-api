@@ -43,7 +43,7 @@ ec2_opts = [
                      'describe instances'),
     cfg.StrOpt('default_flavor',
            default='m1.small',
-           help='A flavor to use as a default instance type'),
+           help='A flavor to use as a default instance type')
 ]
 
 CONF = cfg.CONF
@@ -323,7 +323,13 @@ class InstanceDescriber(common.TaggableItemsDescriber):
         self.os_volumes = _get_os_volumes(self.context)
         self.os_flavors = _get_os_flavors(self.context)
         nova = clients.nova(ec2_context.get_os_admin_context())
-        return nova.servers.list(
+        if self.ids == 1 and len(self.items) == 1:
+            try:
+                return [nova.servers.get(self.items[0]['os_id'])]
+            except nova_exception.NotFound:
+                return []
+        else:
+            return nova.servers.list(
                 search_opts={'all_tenants': True,
                              'project_id': self.context.project_id})
 
