@@ -1,9 +1,9 @@
 ---
-  EC2APIPlugin.describe_addresses_and_instances:
+  EC2APIPlugin.describe_all_in_one:
     -
       runner:
         type: "constant"
-        times: 10
+        times: 20
         concurrency: 1
       context:
         users:
@@ -20,24 +20,7 @@
     -
       runner:
         type: "constant"
-        times: 10
-        concurrency: 1
-      context:
-        users:
-          tenants: 1
-          users_per_tenant: 1
-        prepare_ec2_client:
-        ec2_servers:
-          flavor: "m1.nano"
-          image: "*cirros*"
-          servers_per_tenant: 200
-          run_in_vpc: False
-          assign_floating_ip: True
-          build_timeout: 150
-    -
-      runner:
-        type: "constant"
-        times: 10
+        times: 20
         concurrency: 1
       context:
         users:

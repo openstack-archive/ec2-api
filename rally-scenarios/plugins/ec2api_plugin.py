@@ -20,6 +20,21 @@ from ec2api.tests.functional import botocoreclient
 LOG = logging.getLogger(__name__)
 
 
+class AtomicActionWithoutFirst(base.AtomicAction):
+
+    def __init__(self, scenario_instance, name):
+        super(AtomicActionWithoutFirst, self).__init__(scenario_instance, name)
+        self.scenario_instance = scenario_instance
+        self.name = name
+
+    def __exit__(self, type, value, tb):
+        args = self.scenario_instance.context['user']['ec2args']
+        if self.name in args:
+            super(AtomicActionWithoutFirst, self).__exit__(type, value, tb)
+        else:
+            args[self.name] = True
+
+
 class EC2APIPlugin(base.Scenario):
 
     def _get_client(self, is_nova):
@@ -29,50 +44,79 @@ class EC2APIPlugin(base.Scenario):
             url, args['region'], args['access'], args['secret'])
         return client
 
-    def _run(self, base_name, func):
+    def _run_both(self, base_name, func):
         client = self._get_client(True)
-        with base.AtomicAction(self, base_name + '_nova'):
+        with AtomicActionWithoutFirst(self, base_name + '_nova'):
             func(self, client)
         client = self._get_client(False)
-        with base.AtomicAction(self, base_name + '_ec2api'):
+        with AtomicActionWithoutFirst(self, base_name + '_ec2api'):
             func(self, client)
 
-    def _both_api_runner():
+    def _run_ec2(self, base_name, func):
+        client = self._get_client(False)
+        with AtomicActionWithoutFirst(self, base_name + '_ec2api'):
+            func(self, client)
+
+    def _runner(run_func):
         def wrap(func):
             @functools.wraps(func)
             def runner(self, *args, **kwargs):
-                self._run(func.__name__, func)
+                run_func(self, func.__name__, func)
             return runner
         return wrap
 
     @base.scenario()
-    @_both_api_runner()
+    @_runner(_run_both)
     def describe_instances(self, client):
         resp, data = client.DescribeInstances()
         assert 200 == resp.status_code
 
     @base.scenario()
-    @_both_api_runner()
+    @_runner(_run_both)
     def describe_addresses(self, client):
         resp, data = client.DescribeAddresses()
         assert 200 == resp.status_code
 
     @base.scenario()
-    @_both_api_runner()
+    @_runner(_run_both)
+    def describe_security_groups(self, client):
+        resp, data = client.DescribeSecurityGroups()
+        assert 200 == resp.status_code
+
+    @base.scenario()
+    @_runner(_run_both)
     def describe_regions(self, client):
         resp, data = client.DescribeRegions()
         assert 200 == resp.status_code
 
     @base.scenario()
-    @_both_api_runner()
+    @_runner(_run_both)
     def describe_images(self, client):
         resp, data = client.DescribeImages()
+        assert 200 == resp.status_code
+
+    @base.scenario()
+    @_runner(_run_ec2)
+    def describe_vpcs(self, client):
+        resp, data = client.DescribeVpcs()
+        assert 200 == resp.status_code
+
+    @base.scenario()
+    @_runner(_run_ec2)
+    def describe_subnets(self, client):
+        resp, data = client.DescribeSubnets()
+        assert 200 == resp.status_code
+
+    @base.scenario()
+    @_runner(_run_ec2)
+    def describe_network_interfaces(self, client):
+        resp, data = client.DescribeNetworkInterfaces()
         assert 200 == resp.status_code
 
     _instance_id_by_client = dict()
 
     @base.scenario()
-    @_both_api_runner()
+    @_runner(_run_both)
     def describe_one_instance(self, client):
         client_id = client.get_url()
         instance_id = self._instance_id_by_client.get(client_id)
@@ -90,47 +134,11 @@ class EC2APIPlugin(base.Scenario):
         assert 200 == resp.status_code
 
     @base.scenario()
-    def describe_addresses_and_instances(self):
+    def describe_all_in_one(self):
         self.describe_addresses()
         self.describe_instances()
+        self.describe_security_groups()
         self.describe_one_instance()
-
-        nova = self.clients("nova")
-        with base.AtomicAction(self, 'servers_list'):
-            data = nova.servers.list()
-            id = data[0].id if len(data) else None
-        if id:
-            with base.AtomicAction(self, 'server_get'):
-                data = nova.servers.get(id)
-        with base.AtomicAction(self, 'flavors_list'):
-            data = nova.flavors.list()
-            id = data[0].id if len(data) else None
-        if id:
-            with base.AtomicAction(self, 'flavor_get'):
-                data = nova.flavors.get(id)
-
-        neutron = self.clients("neutron")
-        with base.AtomicAction(self, 'floatingip_list'):
-            data = neutron.list_floatingips()["floatingips"]
-            id = data[0]["id"] if len(data) else None
-        if id:
-            with base.AtomicAction(self, 'floatingip_get'):
-                data = neutron.show_floatingip(id)
-        with base.AtomicAction(self, 'ports_list'):
-            data = neutron.list_ports()["ports"]
-            id = data[0]["id"] if len(data) else None
-        if id:
-            with base.AtomicAction(self, 'port_get'):
-                data = neutron.show_port(id)
-        with base.AtomicAction(self, 'sg_list'):
-            data = neutron.list_security_groups()["security_groups"]
-            id = data[0]["id"] if len(data) else None
-        if id:
-            with base.AtomicAction(self, 'sg_get'):
-                data = neutron.show_security_group(id)
-        with base.AtomicAction(self, 'subnet_list'):
-            data = neutron.list_subnets()["subnets"]
-            id = data[0]["id"] if len(data) else None
-        if id:
-            with base.AtomicAction(self, 'subnet_get'):
-                data = neutron.show_subnet(id)
+        self.describe_vpcs()
+        self.describe_subnets()
+        self.describe_network_interfaces()
