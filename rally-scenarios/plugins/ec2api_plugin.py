@@ -113,6 +113,12 @@ class EC2APIPlugin(base.Scenario):
         resp, data = client.DescribeNetworkInterfaces()
         assert 200 == resp.status_code
 
+    @base.scenario()
+    @_runner(_run_ec2)
+    def describe_route_tables(self, client):
+        resp, data = client.DescribeRouteTables()
+        assert 200 == resp.status_code
+
     _instance_id_by_client = dict()
 
     @base.scenario()
@@ -142,3 +148,11 @@ class EC2APIPlugin(base.Scenario):
         self.describe_vpcs()
         self.describe_subnets()
         self.describe_network_interfaces()
+        self.describe_route_tables()
+
+    @base.scenario()
+    def describe_networks(self):
+        self.describe_vpcs()
+        self.describe_subnets()
+        self.describe_network_interfaces()
+        self.describe_route_tables()

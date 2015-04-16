@@ -31,9 +31,27 @@
           flavor: "m1.nano"
           image: "*cirros*"
           servers_per_tenant: 200
+          servers_per_run: 4
           run_in_vpc: True
           assign_floating_ip: True
           build_timeout: 150
+
+
+# This context creates objects very long.
+#  EC2APIPlugin.describe_networks:
+#    -
+#      runner:
+#        type: "constant"
+#        times: 20
+#        concurrency: 1
+#      context:
+#        users:
+#          tenants: 1
+#          users_per_tenant: 1
+#        prepare_ec2_client:
+#        ec2_networks:
+#          subnets_per_tenant: 50
+#          nis_per_subnet: 10
 
 
   EC2APIPlugin.describe_regions:
