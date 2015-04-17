@@ -92,6 +92,15 @@ FILE_MANIFEST_XML = """<?xml version="1.0" ?>
 
 class ImageTestCase(base.ApiTestCase):
 
+    def setUp(self):
+        super(ImageTestCase, self).setUp()
+        get_os_admin_context_patcher = (
+            mock.patch('ec2api.context.get_os_admin_context'))
+        self.get_os_admin_context = get_os_admin_context_patcher.start()
+        self.addCleanup(get_os_admin_context_patcher.stop)
+        self.get_os_admin_context.return_value = (
+            self._create_context(auth_token='admin_token'))
+
     @mock.patch('ec2api.api.instance._is_ebs_instance')
     def _test_create_image(self, instance_status, no_reboot, is_ebs_instance):
         self.set_mock_db_items(fakes.DB_INSTANCE_2)
@@ -103,17 +112,16 @@ class ImageTestCase(base.ApiTestCase):
         os_instance.get.side_effect = lambda: (setattr(os_instance, 'status',
                                                        'SHUTOFF')
                                                if next(stop_called) else None)
-        os_image = mock.MagicMock()
-        os_image.configure_mock(id=fakes.random_os_id())
-        os_instance.create_image.return_value = os_image
+        image_id = fakes.random_ec2_id('ami')
+        os_instance.create_image.return_value = image_id
         self.nova.servers.get.return_value = os_instance
         is_ebs_instance.return_value = True
-        image_id = fakes.random_ec2_id('ami')
         self.db_api.add_item.side_effect = tools.get_db_api_add_item(image_id)
 
         resp = self.execute('CreateImage',
                             {'InstanceId': fakes.ID_EC2_INSTANCE_2,
                              'Name': 'fake_name',
+                             'Description': 'fake desc',
                              'NoReboot': str(no_reboot)})
         self.assertEqual({'imageId': image_id},
                          resp)
@@ -122,8 +130,9 @@ class ImageTestCase(base.ApiTestCase):
         self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
         is_ebs_instance.assert_called_once_with(mock.ANY, os_instance.id)
         self.db_api.add_item.assert_called_once_with(
-            mock.ANY, 'ami', {'os_id': os_image.id,
-                              'is_public': False})
+            mock.ANY, 'ami', {'os_id': image_id,
+                              'is_public': False,
+                              'description': 'fake desc'})
         if not no_reboot:
             os_instance.stop.assert_called_once_with()
             os_instance.get.assert_called_once_with()
@@ -198,7 +207,8 @@ class ImageTestCase(base.ApiTestCase):
             {'imageId': fakes.ID_EC2_IMAGE_2}))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': fakes.ID_OS_IMAGE_2,
-                              'is_public': False})
+                              'is_public': False,
+                              'description': None})
         self.assertEqual(1, self.glance.images.create.call_count)
         self.assertEqual((), self.glance.images.create.call_args[0])
         self.assertIn('properties', self.glance.images.create.call_args[1])
@@ -274,7 +284,7 @@ class ImageTestCase(base.ApiTestCase):
              ('block-device-mapping.device-name', '/dev/sdb2'),
              ('block-device-mapping.snapshot-id', fakes.ID_EC2_SNAPSHOT_1),
              ('block-device-mapping.volume-size', 22),
-             ('description', ''),
+             ('description', 'fake desc'),
              ('image-id', fakes.ID_EC2_IMAGE_1),
              ('image-type', 'machine'),
              ('is-public', True),

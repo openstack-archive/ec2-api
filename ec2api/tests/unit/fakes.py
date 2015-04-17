@@ -1105,7 +1105,6 @@ EC2_IMAGE_1 = {
     'imageState': 'available',
     'imageType': 'machine',
     'name': 'fake_name',
-    'description': None,
     'imageLocation': LOCATION_IMAGE_1,
     'kernelId': ID_EC2_IMAGE_AKI_1,
     'ramdiskId': ID_EC2_IMAGE_ARI_1,
@@ -1138,7 +1137,7 @@ EC2_IMAGE_2 = {
     'imageState': 'available',
     'imageType': 'machine',
     'name': None,
-    'description': None,
+    'description': 'fake desc',
     'imageLocation': 'None (None)',
     'architecture': None,
     'rootDeviceType': 'ebs',
@@ -1159,6 +1158,7 @@ DB_IMAGE_2 = {
     'id': ID_EC2_IMAGE_2,
     'os_id': ID_OS_IMAGE_2,
     'is_public': True,
+    'description': 'fake desc'
 }
 DB_IMAGE_AKI_1 = {
     'id': ID_EC2_IMAGE_AKI_1,

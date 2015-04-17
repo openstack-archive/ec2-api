@@ -107,11 +107,9 @@ Availability zone related:
 
 Image related:
 - CopyImage
-- ResetImageAttribute
-- creationDate  Image property
+- creationDate Image property
 - platform Image property
 - productCodes Image property
-- description Image property
 - hypervisor Image property
 - imageOwnerAlias Image property
 - sriovNetSupport Image property

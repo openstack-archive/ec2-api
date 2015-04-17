@@ -270,8 +270,10 @@ def get_db_item_by_os_id(context, kind, os_id, items_by_os_id=None,
     return item
 
 
+# TODO(andrey-mp): project_id is a temporary workaround which should be
+# reworked asap. (c) by ftersin.
 def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
-                    ids_by_os_id=None):
+                    ids_by_os_id=None, project_id=None):
     if os_id is None:
         return None
     if ids_by_os_id is not None:
@@ -286,7 +288,8 @@ def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
     if len(ids):
         item_id, _os_id = ids[0]
     else:
-        item_id = db_api.add_item_id(context, kind, os_id)
+        item_id = db_api.add_item_id(context, kind, os_id,
+                                     project_id=project_id)
     if ids_by_os_id is not None:
         ids_by_os_id[os_id] = item_id
     return item_id

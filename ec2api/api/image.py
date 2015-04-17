@@ -36,6 +36,7 @@ from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
+from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _, _LE, _LI
@@ -104,8 +105,7 @@ def create_image(context, instance_id, name=None, description=None,
     instance = ec2utils.get_db_item(context, instance_id)
 
     if not instance_api._is_ebs_instance(context, instance['os_id']):
-        # TODO(ft): Change the error code and message with the real AWS ones
-        msg = _('The instance is not an EBS-backed instance.')
+        msg = _('Instance does not have a volume attached at root (null).')
         raise exception.InvalidParameterValue(value=instance_id,
                                               parameter='InstanceId',
                                               reason=msg)
@@ -140,12 +140,17 @@ def create_image(context, instance_id, name=None, description=None,
     name_map = dict(instance=instance['os_id'], now=timeutils.isotime())
     name = name or _('image of %(instance)s at %(now)s') % name_map
 
+    glance = clients.glance(context)
     with common.OnCrashCleaner() as cleaner:
-        os_image = os_instance.create_image(name)
-        cleaner.addCleanup(os_image.delete)
+        os_image_id = os_instance.create_image(name)
+        cleaner.addCleanup(glance.images.delete, os_image_id)
+        # TODO(andrey-mp): snapshot and volume also must be deleted in case
+        # of error
+        os_image = glance.images.get(os_image_id)
         image = db_api.add_item(context, _get_os_image_kind(os_image),
-                                {'os_id': os_image.id,
-                                 'is_public': False})
+                                {'os_id': os_image_id,
+                                 'is_public': False,
+                                 'description': description})
 
     if restart_instance:
         os_instance.start()
@@ -208,7 +213,8 @@ def register_image(context, name=None, image_location=None,
         cleaner.addCleanup(os_image.delete)
         kind = _get_os_image_kind(os_image)
         image = db_api.add_item(context, kind, {'os_id': os_image.id,
-                                                'is_public': False})
+                                                'is_public': False,
+                                                'description': description})
     return {'imageId': image['id']}
 
 
@@ -285,6 +291,7 @@ class ImageDescriber(common.TaggableItemsDescriber):
     def get_os_items(self):
         return clients.glance(self.context).images.list()
 
+    # TODO(andrey-mp): project_id will be invalid for new public images
     def auto_update_db(self, image, os_image):
         if not image:
             kind = _get_os_image_kind(os_image)
@@ -316,22 +323,34 @@ def describe_images(context, executable_by=None, image_id=None,
 
 
 def describe_image_attribute(context, image_id, attribute):
-    def _block_device_mapping_attribute(os_image, result):
+    image = ec2utils.get_db_item(context, image_id)
+    try:
+        glance = clients.glance(ec2_context.get_os_admin_context())
+        glance.images.get(image['os_id'])
+    except glance_exception.HTTPNotFound:
+        raise exception.InvalidAMIIDNotFound(id=image_id)
+    os_image = _get_owned_os_image(context, image_id, image['os_id'])
+    _prepare_mappings(os_image)
+
+    def _block_device_mapping_attribute(result):
         _cloud_format_mappings(context, os_image.properties, result)
 
-    def _launch_permission_attribute(os_image, result):
+    def _description_attribute(result):
+        result['description'] = {'value': image.get('description')}
+
+    def _launch_permission_attribute(result):
         result['launchPermission'] = []
         if os_image.is_public:
             result['launchPermission'].append({'group': 'all'})
 
-    def _kernel_attribute(os_image, result):
+    def _kernel_attribute(result):
         kernel_id = os_image.properties.get('kernel_id')
         if kernel_id:
             result['kernel'] = {
                 'value': ec2utils.os_id_to_ec2_id(context, 'aki', kernel_id)
             }
 
-    def _ramdisk_attribute(image, result):
+    def _ramdisk_attribute(result):
         ramdisk_id = os_image.properties.get('ramdisk_id')
         if ramdisk_id:
             result['ramdisk'] = {
@@ -339,12 +358,13 @@ def describe_image_attribute(context, image_id, attribute):
             }
 
     # NOTE(ft): Openstack extension, AWS-incompability
-    def _root_device_name_attribute(os_image, result):
+    def _root_device_name_attribute(result):
         result['rootDeviceName'] = (
             _block_device_properties_root_device_name(os_image.properties))
 
     supported_attributes = {
         'blockDeviceMapping': _block_device_mapping_attribute,
+        'description': _description_attribute,
         'launchPermission': _launch_permission_attribute,
         'kernel': _kernel_attribute,
         'ramdisk': _ramdisk_attribute,
@@ -352,65 +372,131 @@ def describe_image_attribute(context, image_id, attribute):
         'rootDeviceName': _root_device_name_attribute,
     }
 
-    # TODO(ft): AWS returns AuthFailure for not own public images,
-    # but we return NotFound for this case because we search for local images
-    # only
-    image = ec2utils.get_db_item(context, image_id)
     fn = supported_attributes.get(attribute)
     if fn is None:
         # TODO(ft): Change the error code and message with the real AWS ones
         raise exception.InvalidAttribute(attr=attribute)
-    glance = clients.glance(context)
-    os_image = glance.images.get(image['os_id'])
-    _prepare_mappings(os_image)
 
     result = {'imageId': image_id}
-    fn(os_image, result)
+    fn(result)
     return result
 
 
-def modify_image_attribute(context, image_id, attribute,
-                           user_group, operation_type,
+def modify_image_attribute(context, image_id, attribute=None,
+                           user_group=None, operation_type=None,
                            description=None, launch_permission=None,
                            product_code=None, user_id=None, value=None):
-    if attribute != 'launchPermission':
-        # TODO(ft): Change the error code and message with the real AWS ones
-        raise exception.InvalidAttribute(attr=attribute)
-    if not user_group:
-        msg = _('user or group not specified')
-        # TODO(ft): Change the error code and message with the real AWS ones
-        raise exception.MissingParameter(msg)
-    if len(user_group) != 1 and user_group[0] != 'all':
-        msg = _('only group "all" is supported')
-        raise exception.InvalidParameterValue(parameter='UserGroup',
-                                              value=user_group,
-                                              reason=msg)
-    if operation_type not in ['add', 'remove']:
-        msg = _('operation_type must be add or remove')
-        raise exception.InvalidParameterValue(parameter='OperationType',
-                                              value='operation_type',
-                                              reason=msg)
-
-    # TODO(ft): AWS returns AuthFailure for public images,
-    # but we return NotFound due searching for local images only
     image = ec2utils.get_db_item(context, image_id)
-    glance = clients.glance(context)
-    image = glance.images.get(image['os_id'])
 
-    image.update(is_public=(operation_type == 'add'))
+    try:
+        glance = clients.glance(ec2_context.get_os_admin_context())
+        os_image = glance.images.get(image['os_id'])
+    except glance_exception.HTTPNotFound:
+        raise exception.InvalidAMIIDNotFound(id=image_id)
+
+    attributes = set()
+
+    # NOTE(andrey-mp): launchPermission structure is converted here
+    # to plain parameters: attribute, user_group, operation_type, user_id
+    if launch_permission is not None:
+        attributes.add('launchPermission')
+        user_group = list()
+        user_id = list()
+        if len(launch_permission) == 0:
+            msg = _('No operation specified for launchPermission attribute.')
+            raise exception.InvalidParameterCombination(msg)
+        if len(launch_permission) > 1:
+            msg = _('Only one operation can be specified.')
+            raise exception.InvalidParameterCombination(msg)
+        operation_type, permissions = launch_permission.popitem()
+        for index_key in permissions:
+            permission = permissions[index_key]
+            if 'group' in permission:
+                user_group.append(permission['group'])
+            if 'user_id' in permission:
+                user_id.append(permission['user_id'])
+    if attribute == 'launchPermission':
+        attributes.add('launchPermission')
+
+    if description is not None:
+        attributes.add('description')
+        value = description
+    if attribute == 'description':
+        attributes.add('description')
+
+    # check attributes count
+    if len(attributes) == 0:
+        raise exception.InvalidParameterCombination('No attributes specified.')
+    if len(attributes) > 1:
+        raise exception.InvalidParameterCombination(
+            _('Fields for multiple attribute types specified: %s')
+            % str(attributes))
+
+    if 'launchPermission' in attributes:
+        if not user_group:
+            msg = _('No operation specified for launchPermission attribute.')
+            raise exception.InvalidParameterCombination(msg)
+        if len(user_group) != 1 and user_group[0] != 'all':
+            msg = _('only group "all" is supported')
+            raise exception.InvalidParameterValue(parameter='UserGroup',
+                                                  value=user_group,
+                                                  reason=msg)
+        if operation_type not in ['add', 'remove']:
+            msg = _('operation_type must be add or remove')
+            raise exception.InvalidParameterValue(parameter='OperationType',
+                                                  value='operation_type',
+                                                  reason=msg)
+
+        os_image = _get_owned_os_image(context, image_id, image['os_id'])
+        os_image.update(is_public=(operation_type == 'add'))
+        return True
+
+    if 'description' in attributes:
+        if not value:
+            raise exception.MissingParameter(
+                'The request must contain the parameter description')
+
+        # Just check image accessibility
+        _get_owned_os_image(context, image_id, image['os_id'])
+
+        image['description'] = value
+        db_api.update_item(context, image)
+        return True
+
+
+def reset_image_attribute(context, image_id, attribute):
+    if attribute != 'launchPermission':
+        raise exception.InvalidRequest()
+
+    image = ec2utils.get_db_item(context, image_id)
+    os_image = _get_owned_os_image(context, image_id, image['os_id'])
+    os_image.update(is_public=False)
     return True
+
+
+def _get_owned_os_image(context, image_id, os_image_id):
+    glance = clients.glance(context)
+    try:
+        os_image = glance.images.get(os_image_id)
+    except glance_exception.HTTPNotFound:
+        os_image = None
+    if os_image is None or os_image.owner != context.project_id:
+        raise exception.AuthFailure(_('Not authorized for image:%s')
+                                    % image_id)
+    return os_image
 
 
 def _format_image(context, image, os_image, images_dict, ids_dict,
                   snapshot_ids=None):
     ec2_image = {'imageId': image['id'],
                  'imageOwnerId': os_image.owner,
-                 'description': '',
                  'imageType': IMAGE_TYPES[
                                    ec2utils.get_ec2_id_kind(image['id'])],
                  'isPublic': image['is_public'],
                  'architecture': os_image.properties.get('architecture'),
                  }
+    if 'description' in image:
+        ec2_image['description'] = image['description']
     state = os_image.status
     # NOTE(vish): fallback status if image_state isn't set
     if state == 'active':
@@ -462,7 +548,7 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
         ec2_image['rootDeviceType'] = root_device_type
 
     _cloud_format_mappings(context, properties, ec2_image,
-                           root_device_name, snapshot_ids)
+                           root_device_name, snapshot_ids, os_image.owner)
 
     return ec2_image
 
@@ -498,7 +584,7 @@ _ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
 
 
 def _cloud_format_mappings(context, properties, result, root_device_name=None,
-                           snapshot_ids=None):
+                           snapshot_ids=None, project_id=None):
     """Format multiple BlockDeviceMappingItemType."""
     mappings = [
         {'virtualName': m['virtual'],
@@ -509,7 +595,7 @@ def _cloud_format_mappings(context, properties, result, root_device_name=None,
 
     for bdm in properties.get('block_device_mapping', []):
         formatted_bdm = _cloud_format_block_device_mapping(
-                context, bdm, root_device_name, snapshot_ids)
+                context, bdm, root_device_name, snapshot_ids, project_id)
         # NOTE(yamahata): overwrite mappings with block_device_mapping
         for i in range(len(mappings)):
             if (formatted_bdm.get('deviceName')
@@ -526,7 +612,7 @@ def _cloud_format_mappings(context, properties, result, root_device_name=None,
 
 
 def _cloud_format_block_device_mapping(context, bdm, root_device_name=None,
-                                       snapshot_ids=None):
+                                       snapshot_ids=None, project_id=None):
     """Construct BlockDeviceMappingItemType."""
     keys = (('deviceName', 'device_name'),
             ('virtualName', 'virtual_name'))
@@ -541,11 +627,12 @@ def _cloud_format_block_device_mapping(context, bdm, root_device_name=None,
         ebs = {name: bdm[k] for name, k in ebs_keys if bdm.get(k) is not None}
         if bdm.get('snapshot_id'):
             ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
-                context, 'snap', bdm['snapshot_id'], ids_by_os_id=snapshot_ids)
+                context, 'snap', bdm['snapshot_id'], ids_by_os_id=snapshot_ids,
+                project_id=project_id)
         # NOTE(ft): Openstack extension, AWS-incompability
         elif bdm.get('volume_id'):
             ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
-                context, 'vol', bdm['volume_id'])
+                context, 'vol', bdm['volume_id'], project_id=project_id)
         assert 'snapshotId' in ebs
         item['ebs'] = ebs
     return item

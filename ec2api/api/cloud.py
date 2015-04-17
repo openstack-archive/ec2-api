@@ -1017,10 +1017,10 @@ class CloudController(object):
 
     @module_and_param_types(image, 'amiariaki_id', 'str',
                             'strs', 'str',
-                            'dummy', 'dummy',
-                            'dummy', 'dummy', 'dummy')
-    def modify_image_attribute(self, context, image_id, attribute,
-                               user_group, operation_type,
+                            'str', 'dummy',
+                            'dummy', 'dummy', 'str')
+    def modify_image_attribute(self, context, image_id, attribute=None,
+                               user_group=None, operation_type=None,
                                description=None, launch_permission=None,
                                product_code=None, user_id=None, value=None):
         """Modifies the specified attribute of the specified AMI.
@@ -1029,19 +1029,31 @@ class CloudController(object):
             context (RequestContext): The request context.
             image_id (str): The ID of the image.
             attribute (str): The name of the attribute to modify.
-                It's optional for AWS but required for legacy Nova EC2 API.
-                Only 'launchPermission' is supported now.
             user_group (list of str): One or more user groups.
-                It's optional for AWS but required for legacy Nova EC2 API.
                 Only 'all' group is supported now.
             operation_type (str): The operation type.
-                It's optional for AWS but required for legacy Nova EC2 API.
                 Only 'add' and 'remove' operation types are supported now.
-            description: Not supported now.
-            launch_permission: : Not supported now.
+            description: A description for the AMI.
+            launch_permission: : A launch permission modification.
             product_code: : Not supported now.
             user_id: : Not supported now.
-            value: : Not supported now.
+            value: : The value of the attribute being modified.
+                This is only valid when modifying the description attribute.
+
+        Returns:
+            true if the request succeeds.
+        """
+
+    @module_and_param_types(image, 'amiariaki_id', 'str')
+    def reset_image_attribute(self, context, image_id, attribute):
+        """Resets an attribute of an AMI to its default value.
+
+        Args:
+            context (RequestContext): The request context.
+            image_id (str): The ID of the image.
+            attribute (str): The attribute to reset (currently you can only
+                reset the launch permission attribute).
+
         Returns:
             true if the request succeeds.
         """

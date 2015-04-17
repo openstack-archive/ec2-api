@@ -1460,9 +1460,9 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             fake_context, instance, os_instance, [], {},
             os_flavors=fake_flavors)
         db_api.add_item_id.assert_has_calls(
-            [mock.call(mock.ANY, 'ami', os_instance.image['id']),
-             mock.call(mock.ANY, 'aki', kernel_id),
-             mock.call(mock.ANY, 'ari', ramdisk_id)],
+            [mock.call(mock.ANY, 'ami', os_instance.image['id'], None),
+             mock.call(mock.ANY, 'aki', kernel_id, None),
+             mock.call(mock.ANY, 'ari', ramdisk_id, None)],
             any_order=True)
 
     @mock.patch('cinderclient.client.Client')

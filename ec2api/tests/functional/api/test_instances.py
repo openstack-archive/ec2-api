@@ -256,7 +256,7 @@ class InstanceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
-    def test_instance_attributes(self):
+    def test_describe_instance_attributes(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id
         resp, data = self.client.RunInstances(

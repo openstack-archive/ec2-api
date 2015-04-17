@@ -83,8 +83,8 @@ def add_item(context, kind, data):
     return IMPL.add_item(context, kind, data)
 
 
-def add_item_id(context, kind, os_id):
-    return IMPL.add_item_id(context, kind, os_id)
+def add_item_id(context, kind, os_id, project_id=None):
+    return IMPL.add_item_id(context, kind, os_id, project_id)
 
 
 def update_item(context, item):

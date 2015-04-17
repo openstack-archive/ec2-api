@@ -118,12 +118,14 @@ def add_item(context, kind, data):
 
 
 @require_context
-def add_item_id(context, kind, os_id):
+def add_item_id(context, kind, os_id, project_id=None):
     item_ref = models.Item()
     item_ref.update({
         "id": _new_id(kind, os_id),
         "os_id": os_id,
     })
+    if project_id:
+        item_ref.project_id = project_id
     try:
         item_ref.save()
     except db_exception.DBDuplicateEntry as ex:

@@ -525,6 +525,8 @@ class EC2TestCase(base.BaseTestCase):
     def _image_get_state(cls, image_id):
         resp, data = cls.client.DescribeImages(ImageIds=[image_id])
         if resp.status_code == 200:
+            if not data['Images']:
+                raise exceptions.NotFound()
             return data['Images'][0]['State']
 
         if resp.status_code == 400:
