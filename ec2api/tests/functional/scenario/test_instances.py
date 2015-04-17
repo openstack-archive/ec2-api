@@ -27,9 +27,9 @@ CONF = config.CONF
 LOG = log.getLogger(__name__)
 
 
-class MetadataTest(scenario_base.BaseScenarioTest):
+class InstancesTest(scenario_base.BaseScenarioTest):
 
-    def test_metadata(self):
+    def test_userdata(self):
         if not CONF.aws.image_id:
             raise self.skipException('aws image_id does not provided')
 

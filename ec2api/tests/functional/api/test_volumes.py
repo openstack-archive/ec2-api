@@ -211,6 +211,15 @@ class VolumeTest(base.EC2TestCase):
         self.assertEqual(instance_id, attachment['InstanceId'])
         self.assertEqual(volume_id, attachment['VolumeId'])
 
+        resp, data = self.client.DescribeInstances(InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(1, len(data.get('Reservations', [])))
+        self.assertEqual(1, len(data['Reservations'][0].get('Instances', [])))
+        bdms = data['Reservations'][0]['Instances'][0]['BlockDeviceMappings']
+        self.assertNotEmpty(bdms)
+        self.assertIn('DeviceName', bdms[0])
+        self.assertIn('Ebs', bdms[0])
+
         resp, data = self.client.DetachVolume(VolumeId=volume_id)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(clean_vi)

@@ -105,7 +105,7 @@ fi
 
 sudo pip install -r test-requirements.txt
 # botocore not in openstack requirements now, so install it manually
-sudo pip install botocore
+sudo pip install botocore==0.103
 sudo OS_STDOUT_CAPTURE=-1 OS_STDERR_CAPTURE=-1 OS_TEST_TIMEOUT=500 OS_TEST_LOCK_PATH=${TMPDIR:-'/tmp'} \
   python -m subunit.run discover -t ./ ./ec2api/tests/functional | subunit-2to1 | tools/colorizer.py
 RETVAL=$?

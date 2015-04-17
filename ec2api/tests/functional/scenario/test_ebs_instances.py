@@ -63,7 +63,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
     @testtools.skipUnless(
         CONF.aws.run_incompatible_tests,
         "Error from nova: "
-        "Block Device Mapping is Invalid: Unrecognized legacy format.")
+        "Invalid input for field/attribute 0. ...")
     def test_launch_ebs_instance_with_persistent_root_device(self):
         """
 
@@ -110,7 +110,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
     @testtools.skipUnless(
         CONF.aws.run_incompatible_tests,
         "Error from nova: "
-        "Block Device Mapping is Invalid: Unrecognized legacy format.")
+        "Invalid input for field/attribute 0. ...")
     def test_launch_ebs_instance_with_resized_root_device(self):
         """Launch EBS-backed instance with resizing root device."""
         new_size = int(math.ceil(self.root_device_size * 1.1))
@@ -148,7 +148,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
     @testtools.skipUnless(
         CONF.aws.run_incompatible_tests,
         "Error from nova: "
-        "Block Device Mapping is Invalid: Unrecognized legacy format.")
+        "Invalid input for field/attribute 0. ...")
     def test_launch_ebs_instance_with_creating_blank_volume(self):
         """Launch instance with creating blank volume."""
         device_name_prefix = _get_device_name_prefix(self.root_device_name)

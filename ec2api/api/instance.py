@@ -492,8 +492,12 @@ def describe_instance_attribute(context, instance_id, attribute):
         if user_data:
             result['userData'] = {'value': user_data}
 
+    def _format_attr_disable_api_termination(result):
+        result['disableApiTermination'] = {'value': False}
+
     attribute_formatter = {
         'blockDeviceMapping': _format_attr_block_device_mapping,
+        'disableApiTermination': _format_attr_disable_api_termination,
         'groupSet': _format_attr_group_set,
         'instanceType': _format_attr_instance_type,
         'kernel': _format_attr_kernel,

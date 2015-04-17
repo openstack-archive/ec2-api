@@ -255,3 +255,110 @@ class InstanceTest(base.EC2TestCase):
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
+
+    def test_instance_attributes(self):
+        instance_type = CONF.aws.instance_type
+        image_id = CONF.aws.image_id
+        resp, data = self.client.RunInstances(
+            ImageId=image_id, InstanceType=instance_type,
+            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        instance_id = data['Instances'][0]['InstanceId']
+        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+                                            InstanceIds=[instance_id])
+        self.assertEqual(1, len(data['Instances']))
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        if CONF.aws.run_incompatible_tests:
+            resp, data = self.client.DescribeInstanceAttribute(
+                InstanceId=instance_id, Attribute='blockDeviceMapping')
+            self.assertEqual(200, resp.status_code,
+                             base.EC2ErrorConverter(data))
+            bdms = data.get('BlockDeviceMappings', [])
+            self.assertNotEmpty(bdms)
+            self.assertEqual(1, len(bdms))
+            self.assertIn('DeviceName', bdms[0])
+            self.assertIn('Ebs', bdms[0])
+
+        resp, data = self.client.DescribeInstanceAttribute(
+            InstanceId=instance_id, Attribute='disableApiTermination')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertIn('DisableApiTermination', data)
+        self.assertIn('Value', data['DisableApiTermination'])
+        self.assertFalse(data['DisableApiTermination']['Value'])
+
+        resp, data = self.client.DescribeInstanceAttribute(
+            InstanceId=instance_id, Attribute='groupSet')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertIn('Groups', data)
+        self.assertNotEmpty(data['Groups'], data)
+        self.assertTrue('GroupId' in data['Groups'][0]
+                        or 'GroupName' in data['Groups'][0])
+        self.assertTrue(data['Groups'][0].get('GroupId')
+                        or data['Groups'][0].get('GroupName'))
+
+        resp, data = self.client.DescribeInstanceAttribute(
+            InstanceId=instance_id, Attribute='instanceType')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertIn('InstanceType', data)
+        self.assertIn('Value', data['InstanceType'])
+        self.assertEqual(instance_type, data['InstanceType']['Value'])
+
+        resp, data = self.client.DescribeInstanceAttribute(
+            InstanceId=instance_id, Attribute='kernel')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertIn('KernelId', data)
+
+        resp, data = self.client.DescribeInstanceAttribute(
+            InstanceId=instance_id, Attribute='ramdisk')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertIn('RamdiskId', data)
+
+        resp, data = self.client.DescribeInstanceAttribute(
+            InstanceId=instance_id, Attribute='rootDeviceName')
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertIn('RootDeviceName', data)
+        self.assertIn('Value', data['RootDeviceName'])
+        self.assertTrue(data['RootDeviceName']['Value'])
+
+        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(res_clean)
+        self.get_instance_waiter().wait_delete(instance_id)
+
+    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+        "Error from nova: "
+        "Invalid input for field/attribute 0. ...")
+    def test_launch_instance_with_creating_blank_volume(self):
+        """Launch instance with creating blank volume."""
+        device_name = '/dev/xvdh'
+        instance_type = CONF.aws.instance_type
+        resp, data = self.client.RunInstances(
+            ImageId=CONF.aws.image_id, InstanceType=instance_type,
+            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1,
+            BlockDeviceMappings=[{'DeviceName': device_name,
+                                  'Ebs': {'VolumeSize': 1}}])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        instance_id = data['Instances'][0]['InstanceId']
+        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+                                            InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        bdt = self.get_instance_bdm(instance_id, device_name)
+        self.assertIsNotNone(bdt)
+        volume_id = bdt['Ebs'].get('VolumeId')
+        self.assertIsNotNone(volume_id)
+        self.assertTrue(bdt['Ebs']['DeleteOnTermination'])
+
+        resp, data = self.client.DescribeVolumes(VolumeIds=[volume_id])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.assertEqual(1, len(data['Volumes']))
+        volume = data['Volumes'][0]
+        self.assertEqual(1, volume['Size'])
+
+        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
+        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.cancelResourceCleanUp(res_clean)
+        self.get_instance_waiter().wait_delete(instance_id)
