@@ -77,6 +77,9 @@ class AddressTestCase(base.ApiTestCase):
     def test_allocate_address_overlimit(self):
         address.address_engine = (
             address.AddressEngineNeutron())
+        self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
+        self.neutron.list_networks.return_value = (
+            {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
         self.neutron.create_floatingip.side_effect = (
             neutron_exception.OverQuotaClient())
         self.assert_execution_error('AddressLimitExceeded', 'AllocateAddress',

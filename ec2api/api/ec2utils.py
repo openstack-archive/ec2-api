@@ -15,16 +15,26 @@
 import re
 
 from glanceclient.common import exceptions as glance_exception
+from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import timeutils
 
 from ec2api.api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _
+from ec2api.i18n import _, _LE
 
 LOG = logging.getLogger(__name__)
 
+ec2_opts = [
+    cfg.StrOpt('external_network',
+               default=None,
+               help='Name of the external network, which is used to connect'
+                    'VPCs to Internet and to allocate Elastic IPs.'),
+]
+
+CONF = cfg.CONF
+CONF.register_opts(ec2_opts)
 
 _c2u = re.compile('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))')
 
@@ -302,3 +312,25 @@ def get_os_image(context, ec2_image_id):
         return glance.images.get(image['os_id'])
     except glance_exception.HTTPNotFound:
         raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
+
+
+def get_os_public_network(context):
+    neutron = clients.neutron(context)
+    search_opts = {'router:external': True, 'name': CONF.external_network}
+    os_networks = neutron.list_networks(**search_opts)['networks']
+    if len(os_networks) != 1:
+        if CONF.external_network:
+            if len(os_networks) == 0:
+                msg = _LE("No external network with name '%s' is found")
+            else:
+                msg = _LE("More than one external network with name '%s' "
+                          "is found")
+            LOG.error(msg, CONF.external_network)
+        else:
+            if len(os_networks) == 0:
+                msg = _LE('No external network is found')
+            else:
+                msg = _LE('More than one external network is found')
+            LOG.error(msg)
+        raise exception.Unsupported(_('Feature is restricted by OS admin'))
+    return os_networks[0]
