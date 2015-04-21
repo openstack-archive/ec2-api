@@ -92,15 +92,6 @@ FILE_MANIFEST_XML = """<?xml version="1.0" ?>
 
 class ImageTestCase(base.ApiTestCase):
 
-    def setUp(self):
-        super(ImageTestCase, self).setUp()
-        get_os_admin_context_patcher = (
-            mock.patch('ec2api.context.get_os_admin_context'))
-        self.get_os_admin_context = get_os_admin_context_patcher.start()
-        self.addCleanup(get_os_admin_context_patcher.stop)
-        self.get_os_admin_context.return_value = (
-            self._create_context(auth_token='admin_token'))
-
     @mock.patch('ec2api.api.instance._is_ebs_instance')
     def _test_create_image(self, instance_status, no_reboot, is_ebs_instance):
         self.set_mock_db_items(fakes.DB_INSTANCE_2)
@@ -132,7 +123,8 @@ class ImageTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': image_id,
                               'is_public': False,
-                              'description': 'fake desc'})
+                              'description': 'fake desc'},
+            project_id=None)
         if not no_reboot:
             os_instance.stop.assert_called_once_with()
             os_instance.get.assert_called_once_with()
@@ -208,7 +200,8 @@ class ImageTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': fakes.ID_OS_IMAGE_2,
                               'is_public': False,
-                              'description': None})
+                              'description': None},
+            project_id=None)
         self.assertEqual(1, self.glance.images.create.call_count)
         self.assertEqual((), self.glance.images.create.call_args[0])
         self.assertIn('properties', self.glance.images.create.call_args[1])

@@ -112,7 +112,7 @@ image_id = $image_id
 ebs_image_id = $ebs_image_id
 EOF"
 
-  # local workaround for LP#1439819. its doesn't work in gating because glance check isatty property.
+  # local workaround for LP#1439819. it doesn't work in gating because glance check isatty property.
   #glance image-update $image_name --container-format ami --disk-format ami
 fi
 

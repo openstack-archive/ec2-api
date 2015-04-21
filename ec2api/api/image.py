@@ -36,7 +36,6 @@ from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
-from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _, _LE, _LI
@@ -219,15 +218,15 @@ def register_image(context, name=None, image_location=None,
 
 
 def deregister_image(context, image_id):
-    # TODO(ft): AWS returns AuthFailure for public images,
-    # but we return NotFound due searching for local images only
-    image = ec2utils.get_db_item(context, image_id)
+    os_image = ec2utils.get_os_image(context, image_id)
+    _check_owner(context, os_image)
+
     glance = clients.glance(context)
     try:
-        glance.images.delete(image['os_id'])
+        glance.images.delete(os_image.id)
     except glance_exception.HTTPNotFound:
         pass
-    db_api.delete_item(context, image['id'])
+    db_api.delete_item(context, image_id)
     return True
 
 
@@ -291,13 +290,12 @@ class ImageDescriber(common.TaggableItemsDescriber):
     def get_os_items(self):
         return clients.glance(self.context).images.list()
 
-    # TODO(andrey-mp): project_id will be invalid for new public images
     def auto_update_db(self, image, os_image):
         if not image:
             kind = _get_os_image_kind(os_image)
             image = ec2utils.get_db_item_by_os_id(
                 self.context, kind, os_image.id, self.items_dict,
-                os_image=os_image)
+                os_image=os_image, project_id=os_image.owner)
         elif (image['os_id'] in self.local_images_os_ids and
                 image['is_public'] != os_image.is_public):
             image['is_public'] = os_image.is_public
@@ -323,14 +321,10 @@ def describe_images(context, executable_by=None, image_id=None,
 
 
 def describe_image_attribute(context, image_id, attribute):
-    image = ec2utils.get_db_item(context, image_id)
-    try:
-        glance = clients.glance(ec2_context.get_os_admin_context())
-        glance.images.get(image['os_id'])
-    except glance_exception.HTTPNotFound:
-        raise exception.InvalidAMIIDNotFound(id=image_id)
-    os_image = _get_owned_os_image(context, image_id, image['os_id'])
+    os_image = ec2utils.get_os_image(context, image_id)
+    _check_owner(context, os_image)
     _prepare_mappings(os_image)
+    image = ec2utils.get_db_item(context, image_id)
 
     def _block_device_mapping_attribute(result):
         _cloud_format_mappings(context, os_image.properties, result)
@@ -386,13 +380,7 @@ def modify_image_attribute(context, image_id, attribute=None,
                            user_group=None, operation_type=None,
                            description=None, launch_permission=None,
                            product_code=None, user_id=None, value=None):
-    image = ec2utils.get_db_item(context, image_id)
-
-    try:
-        glance = clients.glance(ec2_context.get_os_admin_context())
-        os_image = glance.images.get(image['os_id'])
-    except glance_exception.HTTPNotFound:
-        raise exception.InvalidAMIIDNotFound(id=image_id)
+    os_image = ec2utils.get_os_image(context, image_id)
 
     attributes = set()
 
@@ -447,7 +435,7 @@ def modify_image_attribute(context, image_id, attribute=None,
                                                   value='operation_type',
                                                   reason=msg)
 
-        os_image = _get_owned_os_image(context, image_id, image['os_id'])
+        _check_owner(context, os_image)
         os_image.update(is_public=(operation_type == 'add'))
         return True
 
@@ -456,9 +444,8 @@ def modify_image_attribute(context, image_id, attribute=None,
             raise exception.MissingParameter(
                 'The request must contain the parameter description')
 
-        # Just check image accessibility
-        _get_owned_os_image(context, image_id, image['os_id'])
-
+        _check_owner(context, os_image)
+        image = ec2utils.get_db_item(context, image_id)
         image['description'] = value
         db_api.update_item(context, image)
         return True
@@ -468,22 +455,17 @@ def reset_image_attribute(context, image_id, attribute):
     if attribute != 'launchPermission':
         raise exception.InvalidRequest()
 
-    image = ec2utils.get_db_item(context, image_id)
-    os_image = _get_owned_os_image(context, image_id, image['os_id'])
+    os_image = ec2utils.get_os_image(context, image_id)
+    _check_owner(context, os_image)
+
     os_image.update(is_public=False)
     return True
 
 
-def _get_owned_os_image(context, image_id, os_image_id):
-    glance = clients.glance(context)
-    try:
-        os_image = glance.images.get(os_image_id)
-    except glance_exception.HTTPNotFound:
-        os_image = None
-    if os_image is None or os_image.owner != context.project_id:
+def _check_owner(context, os_image):
+    if os_image.owner != context.project_id:
         raise exception.AuthFailure(_('Not authorized for image:%s')
-                                    % image_id)
-    return os_image
+                                    % os_image.id)
 
 
 def _format_image(context, image, os_image, images_dict, ids_dict,
@@ -507,12 +489,14 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
     if kernel_id:
         ec2_image['kernelId'] = ec2utils.os_id_to_ec2_id(
                 context, 'aki', kernel_id,
-                items_by_os_id=images_dict, ids_by_os_id=ids_dict)
+                items_by_os_id=images_dict, ids_by_os_id=ids_dict,
+                project_id=os_image.owner)
     ramdisk_id = os_image.properties.get('ramdisk_id')
     if ramdisk_id:
         ec2_image['ramdiskId'] = ec2utils.os_id_to_ec2_id(
                 context, 'ari', ramdisk_id,
-                items_by_os_id=images_dict, ids_by_os_id=ids_dict)
+                items_by_os_id=images_dict, ids_by_os_id=ids_dict,
+                project_id=os_image.owner)
 
     name = os_image.name
     img_loc = os_image.properties.get('image_location')

@@ -49,11 +49,13 @@ class VpcTestCase(base.ApiTestCase):
             self.db_api.add_item.assert_any_call(
                 mock.ANY, 'vpc',
                 tools.purge_dict(fakes.DB_VPC_1,
-                                 ('id', 'vpc_id', 'route_table_id')))
+                                 ('id', 'vpc_id', 'route_table_id')),
+                project_id=None)
             self.db_api.add_item.assert_any_call(
                 mock.ANY, 'rtb',
                 tools.purge_dict(fakes.DB_ROUTE_TABLE_1,
-                                 ('id',)))
+                                 ('id',)),
+                project_id=None)
             self.db_api.update_item.assert_called_once_with(
                 mock.ANY,
                 fakes.DB_VPC_1)

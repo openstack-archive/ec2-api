@@ -110,7 +110,8 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertThat(fakes.EC2_VOLUME_1, matchers.DictMatches(resp))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vol',
-            tools.purge_dict(fakes.DB_VOLUME_1, ('id',)))
+            tools.purge_dict(fakes.DB_VOLUME_1, ('id',)),
+            project_id=None)
 
         self.cinder.volumes.create.assert_called_once_with(
             None, snapshot_id=None, volume_type=None,
@@ -130,7 +131,8 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertThat(fakes.EC2_VOLUME_3, matchers.DictMatches(resp))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vol',
-            tools.purge_dict(fakes.DB_VOLUME_3, ('id',)))
+            tools.purge_dict(fakes.DB_VOLUME_3, ('id',)),
+            project_id=None)
 
         self.cinder.volumes.create.assert_called_once_with(
             None, snapshot_id=fakes.ID_OS_SNAPSHOT_1, volume_type=None,

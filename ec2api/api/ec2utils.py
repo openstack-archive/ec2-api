@@ -225,16 +225,21 @@ def register_auto_create_db_item_extension(kind, extension):
     _auto_create_db_item_extensions[kind] = extension
 
 
-def auto_create_db_item(context, kind, os_id, **extension_kwargs):
+# TODO(Alex): The project_id passing mechanism can be potentially
+# reconsidered in future.
+def auto_create_db_item(context, kind, os_id, project_id=None,
+                        **extension_kwargs):
     item = {'os_id': os_id}
     extension = _auto_create_db_item_extensions.get(kind)
     if extension:
         extension(context, item, **extension_kwargs)
-    return db_api.add_item(context, kind, item)
+    return db_api.add_item(context, kind, item, project_id=project_id)
 
 
+# TODO(Alex): The project_id passing mechanism can be potentially
+# reconsidered in future.
 def get_db_item_by_os_id(context, kind, os_id, items_by_os_id=None,
-                         **extension_kwargs):
+                         project_id=None, **extension_kwargs):
     """Get DB item by OS id (create if it doesn't exist).
 
         Args:
@@ -264,14 +269,15 @@ def get_db_item_by_os_id(context, kind, os_id, items_by_os_id=None,
         item = next((i for i in db_api.get_items(context, kind)
                      if i['os_id'] == os_id), None)
     if not item:
-        item = auto_create_db_item(context, kind, os_id, **extension_kwargs)
+        item = auto_create_db_item(context, kind, os_id, project_id=project_id,
+                                   **extension_kwargs)
     if items_by_os_id is not None:
         items_by_os_id[os_id] = item
     return item
 
 
-# TODO(andrey-mp): project_id is a temporary workaround which should be
-# reworked asap. (c) by ftersin.
+# TODO(Alex): The project_id passing mechanism can be potentially
+# reconsidered in future.
 def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
                     ids_by_os_id=None, project_id=None):
     if os_id is None:

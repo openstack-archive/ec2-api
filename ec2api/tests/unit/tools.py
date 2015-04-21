@@ -49,12 +49,14 @@ def patch_dict(dict1, dict2, trash_iter):
 def get_db_api_add_item(item_id_dict):
     """Generate db_api.add_item mock function."""
 
-    def db_api_add_item(context, kind, data):
+    def db_api_add_item(context, kind, data, project_id=None):
         if isinstance(item_id_dict, dict):
             item_id = item_id_dict[kind]
         else:
             item_id = item_id_dict
         data = update_dict(data, {'id': item_id})
+        if project_id:
+            data = update_dict(data, {'project_id': project_id})
         data.setdefault('os_id')
         data.setdefault('vpc_id')
         return data

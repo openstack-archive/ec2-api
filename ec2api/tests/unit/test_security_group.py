@@ -63,7 +63,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.assertEqual(fakes.ID_EC2_SECURITY_GROUP_2, resp['groupId'])
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'sg',
-            tools.purge_dict(fakes.DB_SECURITY_GROUP_2, ('id',)))
+            tools.purge_dict(fakes.DB_SECURITY_GROUP_2, ('id',)),
+            project_id=None)
         self.nova.security_groups.create.assert_called_once_with(
             'groupname', 'Group description')
 
@@ -319,7 +320,8 @@ class SecurityGroupTestCase(base.ApiTestCase):
         resp = self.execute('DescribeSecurityGroups', {})
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'sg',
-            tools.purge_dict(fakes.DB_SECURITY_GROUP_1, ('id',)))
+            tools.purge_dict(fakes.DB_SECURITY_GROUP_1, ('id',)),
+            project_id=None)
         self.nova.security_groups.create.assert_called_once_with(
             fakes.ID_EC2_VPC_1, 'Default VPC security group')
 

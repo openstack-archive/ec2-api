@@ -169,7 +169,7 @@ class EC2UtilsTestCase(testtools.TestCase):
         item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id)
         self.assertEqual(fake_id, item_id)
         db_api.add_item_id.assert_called_once_with(
-            fake_context, 'fake', fake_os_id, None)
+            fake_context, 'fake', fake_os_id, project_id=None)
 
         # no item in cache, item isn't found
         db_api.reset_mock()
@@ -180,7 +180,7 @@ class EC2UtilsTestCase(testtools.TestCase):
         self.assertIn(fake_os_id, ids_cache)
         self.assertEqual(fake_id, ids_cache[fake_os_id])
         db_api.add_item_id.assert_called_once_with(
-            fake_context, 'fake', fake_os_id, None)
+            fake_context, 'fake', fake_os_id, project_id=None)
 
         # no item in cache, item is found
         db_api.reset_mock()

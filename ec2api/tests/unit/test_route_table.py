@@ -42,7 +42,8 @@ class RouteTableTestCase(base.ApiTestCase):
             'rtb',
             {'vpc_id': fakes.ID_EC2_VPC_1,
              'routes': [{'destination_cidr_block': fakes.CIDR_VPC_1,
-                         'gateway_id': None}]})
+                         'gateway_id': None}]},
+            project_id=None)
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_VPC_1)
 

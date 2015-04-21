@@ -39,7 +39,7 @@ class IgwTestCase(base.ApiTestCase):
         igw = resp['internetGateway']
         self.assertThat(fakes.EC2_IGW_2, matchers.DictMatches(igw))
         self.db_api.add_item.assert_called_with(
-                mock.ANY, 'igw', {})
+                mock.ANY, 'igw', {}, project_id=None)
 
     def test_attach_igw(self):
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
