@@ -77,7 +77,7 @@ class ImageTest(base.EC2TestCase):
         self.assertEqual(1, len(data['Images']))
         self.assertEqual(image_id, data['Images'][0]['ImageId'])
 
-    def test_check_image_attributes_negative(self):
+    def test_check_image_operations_negative(self):
         # NOTE(andrey-mp): image_id is a public image created by admin
         image_id = CONF.aws.image_id
 
@@ -118,6 +118,10 @@ class ImageTest(base.EC2TestCase):
 
         resp, data = self.client.ResetImageAttribute(
             ImageId=image_id, Attribute='launchPermission')
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('AuthFailure', data['Error']['Code'])
+
+        resp, data = self.client.DeregisterImage(ImageId=image_id)
         self.assertEqual(400, resp.status_code)
         self.assertEqual('AuthFailure', data['Error']['Code'])
 

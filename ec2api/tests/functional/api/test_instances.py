@@ -13,8 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import base64
-
 from oslo_log import log
 from tempest_lib.common.utils import data_utils
 import testtools
@@ -166,9 +164,8 @@ class InstanceTest(base.EC2TestCase):
     def test_get_password_data_and_console_output(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id
-        user_data = base64.b64encode('password_test=password')
         resp, data = self.client.RunInstances(
-            ImageId=image_id, InstanceType=instance_type, UserData=user_data,
+            ImageId=image_id, InstanceType=instance_type,
             Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
         self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         instance_id = data['Instances'][0]['InstanceId']

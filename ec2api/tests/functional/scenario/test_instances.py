@@ -29,10 +29,15 @@ LOG = log.getLogger(__name__)
 
 class InstancesTest(scenario_base.BaseScenarioTest):
 
-    def test_userdata(self):
+    @classmethod
+    @base.safe_setup
+    def setUpClass(cls):
+        super(InstancesTest, cls).setUpClass()
         if not CONF.aws.image_id:
-            raise self.skipException('aws image_id does not provided')
+            raise cls.skipException('aws image_id does not provided')
+        cls.zone = CONF.aws.aws_zone
 
+    def test_userdata(self):
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)
         sec_group_name = self.create_standard_security_group()
@@ -56,3 +61,31 @@ class InstancesTest(scenario_base.BaseScenarioTest):
 
         data = ssh_client.exec_command('curl %s/latest/meta-data/ami-id' % url)
         self.assertEqual(CONF.aws.image_id, data)
+
+    def test_compare_console_output(self):
+        key_name = data_utils.rand_name('testkey')
+        pkey = self.create_key_pair(key_name)
+        sec_group_name = self.create_standard_security_group()
+        instance_id = self.run_instance(KeyName=key_name,
+                                        SecurityGroups=[sec_group_name])
+
+        data_to_check = data_utils.rand_uuid()
+        ip_address = self.get_instance_ip(instance_id)
+        ssh_client = ssh.Client(ip_address, CONF.aws.image_user, pkey=pkey)
+        cmd = 'sudo sh -c "echo \\"%s\\" >/dev/console"' % data_to_check
+        ssh_client.exec_command(cmd)
+
+        waiter = base.EC2Waiter(self.client.GetConsoleOutput)
+        waiter.wait_no_exception(InstanceId=instance_id)
+
+        def _compare_console_output():
+            resp, data = self.client.GetConsoleOutput(InstanceId=instance_id)
+            self.assertEqual(200, resp.status_code,
+                             base.EC2ErrorConverter(data))
+            self.assertEqual(instance_id, data['InstanceId'])
+            self.assertIsNotNone(data['Timestamp'])
+            self.assertIn('Output', data)
+            self.assertIn(data_to_check, data['Output'])
+
+        waiter = base.EC2Waiter(_compare_console_output)
+        waiter.wait_no_exception()
