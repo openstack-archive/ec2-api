@@ -161,7 +161,7 @@ class OperationNotPermitted(EC2Exception):
 
 
 class InvalidRequest(EC2InvalidException):
-    msg_fmt = _('The request is invalid.')
+    msg_fmt = _('The request received was invalid.')
 
 
 class InvalidAttribute(EC2InvalidException):
