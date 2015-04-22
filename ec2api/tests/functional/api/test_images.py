@@ -81,10 +81,25 @@ class ImageTest(base.EC2TestCase):
         # NOTE(andrey-mp): image_id is a public image created by admin
         image_id = CONF.aws.image_id
 
+        resp, data = self.client.DescribeImageAttribute(
+            ImageId=CONF.aws.image_id, Attribute='unsupported')
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('InvalidRequest', data['Error']['Code'])
+
+        resp, data = self.client.DescribeImageAttribute(
+            ImageId=CONF.aws.image_id, Attribute='description')
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('AuthFailure', data['Error']['Code'])
+
         resp, data = self.client.ModifyImageAttribute(
             ImageId=CONF.aws.image_id, Attribute='unsupported')
         self.assertEqual(400, resp.status_code)
         self.assertEqual('InvalidParameterCombination', data['Error']['Code'])
+
+        resp, data = self.client.ModifyImageAttribute(
+            ImageId=CONF.aws.image_id, Attribute='blockDeviceMapping')
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual('InvalidParameter', data['Error']['Code'])
 
         resp, data = self.client.ModifyImageAttribute(
             ImageId=CONF.aws.image_id)

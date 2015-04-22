@@ -321,30 +321,25 @@ def describe_images(context, executable_by=None, image_id=None,
 
 
 def describe_image_attribute(context, image_id, attribute):
-    os_image = ec2utils.get_os_image(context, image_id)
-    _check_owner(context, os_image)
-    _prepare_mappings(os_image)
-    image = ec2utils.get_db_item(context, image_id)
-
-    def _block_device_mapping_attribute(result):
+    def _block_device_mapping_attribute(os_image, image, result):
         _cloud_format_mappings(context, os_image.properties, result)
 
-    def _description_attribute(result):
+    def _description_attribute(os_image, image, result):
         result['description'] = {'value': image.get('description')}
 
-    def _launch_permission_attribute(result):
+    def _launch_permission_attribute(os_image, image, result):
         result['launchPermission'] = []
         if os_image.is_public:
             result['launchPermission'].append({'group': 'all'})
 
-    def _kernel_attribute(result):
+    def _kernel_attribute(os_image, image, result):
         kernel_id = os_image.properties.get('kernel_id')
         if kernel_id:
             result['kernel'] = {
                 'value': ec2utils.os_id_to_ec2_id(context, 'aki', kernel_id)
             }
 
-    def _ramdisk_attribute(result):
+    def _ramdisk_attribute(os_image, image, result):
         ramdisk_id = os_image.properties.get('ramdisk_id')
         if ramdisk_id:
             result['ramdisk'] = {
@@ -352,7 +347,7 @@ def describe_image_attribute(context, image_id, attribute):
             }
 
     # NOTE(ft): Openstack extension, AWS-incompability
-    def _root_device_name_attribute(result):
+    def _root_device_name_attribute(os_image, image, result):
         result['rootDeviceName'] = (
             _block_device_properties_root_device_name(os_image.properties))
 
@@ -368,11 +363,15 @@ def describe_image_attribute(context, image_id, attribute):
 
     fn = supported_attributes.get(attribute)
     if fn is None:
-        # TODO(ft): Change the error code and message with the real AWS ones
-        raise exception.InvalidAttribute(attr=attribute)
+        raise exception.InvalidRequest()
+
+    os_image = ec2utils.get_os_image(context, image_id)
+    _check_owner(context, os_image)
+    _prepare_mappings(os_image)
+    image = ec2utils.get_db_item(context, image_id)
 
     result = {'imageId': image_id}
-    fn(result)
+    fn(os_image, image, result)
     return result
 
 
@@ -412,8 +411,14 @@ def modify_image_attribute(context, image_id, attribute=None,
     if attribute == 'description':
         attributes.add('description')
 
-    # check attributes count
+    # check attributes
     if len(attributes) == 0:
+        if product_code is not None:
+            attribute = 'productCodes'
+        if attribute in ['kernel', 'ramdisk', 'productCodes',
+                         'blockDeviceMapping']:
+            raise exception.InvalidParameter(_('Parameter %s is invalid. '
+                'The attribute is not supported.') % attribute)
         raise exception.InvalidParameterCombination('No attributes specified.')
     if len(attributes) > 1:
         raise exception.InvalidParameterCombination(
