@@ -19,7 +19,6 @@ datastore.
 """
 
 from neutronclient.common import exceptions as neutron_exception
-from oslo_config import cfg
 from oslo_log import log as logging
 
 from ec2api.api import clients
@@ -29,18 +28,7 @@ from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
 
-
 LOG = logging.getLogger(__name__)
-
-ec2_opts = [
-    cfg.StrOpt('external_network',
-               default=None,
-               help='Name of the external network, which is used to connect'
-                    'VPCs to Internet and to allocate Elastic IPs'),
-]
-
-CONF = cfg.CONF
-CONF.register_opts(ec2_opts)
 
 """Internet gateway related API implementation
 """
@@ -70,11 +58,8 @@ def attach_internet_gateway(context, internet_gateway_id, vpc_id):
                     "attached") % {'vpc_id': vpc['id']}
             raise exception.InvalidParameterValue(msg)
 
+    os_public_network = ec2utils.get_os_public_network(context)
     neutron = clients.neutron(context)
-    # TODO(ft): check no public network exists
-    search_opts = {'router:external': True, 'name': CONF.external_network}
-    os_networks = neutron.list_networks(**search_opts)['networks']
-    os_public_network = os_networks[0]
 
     # TODO(ft): set attaching state into db
     with common.OnCrashCleaner() as cleaner:

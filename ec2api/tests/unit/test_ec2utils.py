@@ -13,8 +13,10 @@
 # limitations under the License.
 
 
+import fixtures
 from glanceclient.common import exceptions as glance_exception
 import mock
+from oslo_config import fixture as config_fixture
 import testtools
 
 from ec2api.api import ec2utils
@@ -265,3 +267,44 @@ class EC2UtilsTestCase(testtools.TestCase):
             exception.InvalidAMIIDNotFound,
             ec2utils.get_os_image,
             fake_context, fakes.random_ec2_id('ami'))
+
+    @mock.patch('neutronclient.v2_0.client.Client')
+    def test_get_os_public_network(self, neutron):
+        neutron = neutron.return_value
+        context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        conf = self.useFixture(config_fixture.Config())
+
+        conf.config(external_network='fake_public_network')
+        neutron.list_networks.return_value = {'networks': ['network_object']}
+        net = ec2utils.get_os_public_network(context)
+        self.assertEqual('network_object', net)
+        neutron.list_networks.assert_called_once_with(
+            **{'router:external': True, 'name': 'fake_public_network'})
+
+        neutron.list_networks.return_value = {'networks': []}
+        with fixtures.FakeLogger() as log:
+            self.assertRaises(exception.Unsupported,
+                              ec2utils.get_os_public_network, context)
+        self.assertNotEqual(0, len(log.output))
+        self.assertIn('fake_public_network', log.output)
+
+        neutron.list_networks.return_value = {'networks': ['obj1', 'obj2']}
+        with fixtures.FakeLogger() as log:
+            self.assertRaises(exception.Unsupported,
+                              ec2utils.get_os_public_network, context)
+        self.assertNotEqual(0, len(log.output))
+        self.assertIn('fake_public_network', log.output)
+
+        conf.config(external_network=None)
+        with fixtures.FakeLogger() as log:
+            self.assertRaises(exception.Unsupported,
+                              ec2utils.get_os_public_network, context)
+        self.assertNotEqual(0, len(log.output))
+        self.assertNotIn('None', log.output)
+
+        neutron.list_networks.return_value = {'networks': []}
+        with fixtures.FakeLogger() as log:
+            self.assertRaises(exception.Unsupported,
+                              ec2utils.get_os_public_network, context)
+        self.assertNotEqual(0, len(log.output))
+        self.assertNotIn('None', log.output)

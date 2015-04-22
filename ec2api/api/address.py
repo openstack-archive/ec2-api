@@ -27,10 +27,7 @@ from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
 
-
 CONF = cfg.CONF
-CONF.import_opt('external_network', 'ec2api.api.internet_gateway')
-
 
 """Address related API implementation
 """
@@ -213,11 +210,8 @@ class AddressEngineNeutron(object):
     def allocate_address(self, context, domain=None):
         if not domain or domain == 'standard':
             return AddressEngineNova().allocate_address(context)
+        os_public_network = ec2utils.get_os_public_network(context)
         neutron = clients.neutron(context)
-        # TODO(ft): check no public network exists
-        search_opts = {'router:external': True, 'name': CONF.external_network}
-        os_networks = neutron.list_networks(**search_opts)['networks']
-        os_public_network = os_networks[0]
 
         with common.OnCrashCleaner() as cleaner:
             os_floating_ip = {'floating_network_id': os_public_network['id']}
