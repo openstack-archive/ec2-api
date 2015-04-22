@@ -29,6 +29,15 @@ The services afterwards can be started as binaries:
 
 or set up as Linux services.
 
+Installation in devstack:
+
+In order to install ec2-api with devstack the following should be added to
+the local.conf or localrc the following line:
+
+::
+
+ enable_plugin ec2-api https://github.com/stackforge/ec2-api 
+
 To configure OpenStack for EC2 API metadata service:
 
 for Nova-network
