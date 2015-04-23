@@ -42,8 +42,8 @@ ec2_opts = [
                 help='Return the IP address as private dns hostname in '
                      'describe instances'),
     cfg.StrOpt('default_flavor',
-           default='m1.small',
-           help='A flavor to use as a default instance type')
+               default='m1.small',
+               help='A flavor to use as a default instance type')
 ]
 
 CONF = cfg.CONF
@@ -681,10 +681,6 @@ def _remove_instances(context, instances):
 
 
 def _check_min_max_count(min_count, max_count):
-    # TODO(ft): figure out appropriate aws message and use them
-    min_count = int(min_count)
-    max_count = int(max_count)
-
     if min_count < 1:
         msg = _('Minimum instance count must be greater than zero')
         raise exception.InvalidParameterValue(msg)
@@ -729,9 +725,8 @@ def _parse_block_device_mapping(context, block_device_mapping):
 def _format_group_set(context, os_security_groups):
     if not os_security_groups:
         return None
-    # TODO(ft): Euca tools uses 2010-08-31 AWS protocol version which doesn't
-    # contain groupId in groupSet of an instance structure
-    # Euca crashes if groupId is present here
+    # TODO(ft): euca2ools require groupId for an instance security group.
+    # But ec2-api doesn't store IDs for EC2 Classic groups.
     return [{'groupName': sg['name']} for sg in os_security_groups]
 
 
@@ -1086,13 +1081,15 @@ class InstanceEngineNeutron(object):
         os_subnet_ids = [eni['os_id']
                          for eni in db_api.get_items(context, 'subnet')]
         if os_subnet_ids:
-            os_subnets = neutron.list_subnets(id=os_subnet_ids,
-                fields=['network_id'], tenant_id=context.project_id)['subnets']
+            os_subnets = neutron.list_subnets(
+                id=os_subnet_ids, fields=['network_id'],
+                tenant_id=context.project_id)['subnets']
             vpc_os_network_ids = set(sn['network_id'] for sn in os_subnets)
         else:
             vpc_os_network_ids = []
-        os_networks = neutron.list_networks(**{'router:external': False,
-            'fields': ['id'], 'tenant_id': context.project_id})['networks']
+        os_networks = neutron.list_networks(
+            **{'router:external': False, 'fields': ['id'],
+               'tenant_id': context.project_id})['networks']
         ec2_classic_os_networks = [n for n in os_networks
                                    if n['id'] not in vpc_os_network_ids]
         if len(ec2_classic_os_networks) == 0:
