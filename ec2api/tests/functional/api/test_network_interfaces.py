@@ -15,6 +15,7 @@
 
 import time
 
+import botocore.exceptions
 from oslo_log import log
 from tempest_lib.common.utils import data_utils
 
@@ -40,33 +41,30 @@ class NetworkInterfaceTest(base.EC2TestCase):
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
-        resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)
-        cls.assertResultStatic(resp, data)
+        data = cls.client.create_vpc(CidrBlock=cls.VPC_CIDR)
         cls.vpc_id = data['Vpc']['VpcId']
-        cls.addResourceCleanUpStatic(cls.client.DeleteVpc, VpcId=cls.vpc_id)
+        cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
         aws_zone = CONF.aws.aws_zone
-        resp, data = cls.client.CreateSubnet(VpcId=cls.vpc_id,
+        data = cls.client.create_subnet(VpcId=cls.vpc_id,
                                              CidrBlock=cls.SUBNET_CIDR,
                                              AvailabilityZone=aws_zone)
-        cls.assertResultStatic(resp, data)
         cls.subnet_id = data['Subnet']['SubnetId']
-        cls.addResourceCleanUpStatic(cls.client.DeleteSubnet,
+        cls.addResourceCleanUpStatic(cls.client.delete_subnet,
                                      SubnetId=cls.subnet_id)
         cls.get_subnet_waiter().wait_available(cls.subnet_id)
 
-    def _wait_assignment(self, ni_id, resp, data):
+    def _wait_assignment(self, ni_id, data):
         # NOTE(andrey-mp): Amazon don't do it quickly and there is no way
         # to wait this request
         time.sleep(5)
 
     def test_delete_subnet_with_network_interface(self):
-        resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
+        data = self.client.create_subnet(VpcId=self.vpc_id,
                                               CidrBlock='10.7.1.0/28')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         subnet_id = data['Subnet']['SubnetId']
-        res_clean_subnet = self.addResourceCleanUp(self.client.DeleteSubnet,
+        res_clean_subnet = self.addResourceCleanUp(self.client.delete_subnet,
                                                    SubnetId=subnet_id)
         self.get_subnet_waiter().wait_available(subnet_id)
 
@@ -74,25 +72,22 @@ class NetworkInterfaceTest(base.EC2TestCase):
             'SubnetId': subnet_id,
             'Description': data_utils.rand_name('ni')
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
         res_clean_ni = self.addResourceCleanUp(
-            self.client.DeleteNetworkInterface, NetworkInterfaceId=ni_id)
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id)
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('DependencyViolation', data['Error']['Code'])
+        self.assertRaises('DependencyViolation',
+                          self.client.delete_subnet,
+                          SubnetId=subnet_id)
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean_ni)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
-        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_subnet(SubnetId=subnet_id)
         self.cancelResourceCleanUp(res_clean_subnet)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
@@ -101,11 +96,10 @@ class NetworkInterfaceTest(base.EC2TestCase):
             'SubnetId': self.subnet_id,
             'Description': data_utils.rand_name('ni')
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id)
         ni = data['NetworkInterface']
         self.assertEqual(self.vpc_id, ni['VpcId'])
         self.assertEqual(self.subnet_id, ni['SubnetId'])
@@ -129,17 +123,14 @@ class NetworkInterfaceTest(base.EC2TestCase):
 
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
-        resp, data = self.client.DescribeNetworkInterfaces(
-            NetworkInterfaceIds=[ni_id])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidNetworkInterfaceID.NotFound',
-                         data['Error']['Code'])
+        self.assertRaises('InvalidNetworkInterfaceID.NotFound',
+                          self.client.describe_network_interfaces,
+                          NetworkInterfaceIds=[ni_id])
 
     # TODO(andrey-mp): add creation with addresses
 
@@ -148,28 +139,26 @@ class NetworkInterfaceTest(base.EC2TestCase):
         # for this subnet(that are deleting after previous test)
         time.sleep(5)
 
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count_before = data['Subnets'][0]['AvailableIpAddressCount']
         kwargs = {
             'SubnetId': self.subnet_id,
         }
         addresses = []
         while True:
-            resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-            if resp.status_code != 200:
+            try:
+                data = self.client.create_network_interface(*[], **kwargs)
+            except botocore.exceptions.ClientError as e:
+                error_code = e.response['Error']['Code']
+                self.assertEqual('NetworkInterfaceLimitExceeded', error_code)
                 break
             ni_id = data['NetworkInterface']['NetworkInterfaceId']
             res_clean = self.addResourceCleanUp(
-                self.client.DeleteNetworkInterface,
+                self.client.delete_network_interface,
                 NetworkInterfaceId=ni_id)
             addresses.append((ni_id, res_clean))
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('NetworkInterfaceLimitExceeded',
-                         data['Error']['Code'])
 
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count_after = data['Subnets'][0]['AvailableIpAddressCount']
         # NOTE(andrey-mp): This is strange but Amazon can't create last NI
         # and Openstack can
@@ -180,9 +169,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
             kwargs = {
                 'NetworkInterfaceId': addr[0],
             }
-            resp, data = self.client.DeleteNetworkInterface(*[], **kwargs)
-            self.assertEqual(200, resp.status_code,
-                             base.EC2ErrorConverter(data))
+            data = self.client.delete_network_interface(*[], **kwargs)
             self.cancelResourceCleanUp(addr[1])
             self.get_network_interface_waiter().wait_delete(addr[0])
 
@@ -190,54 +177,46 @@ class NetworkInterfaceTest(base.EC2TestCase):
         kwargs = {
             'SubnetId': self.subnet_id,
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id)
         primary_address = data['NetworkInterface'].get('PrivateIpAddress')
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        resp, data = self.client.UnassignPrivateIpAddresses(
-            NetworkInterfaceId=ni_id,
-            PrivateIpAddresses=[primary_address])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.unassign_private_ip_addresses,
+                          NetworkInterfaceId=ni_id,
+                          PrivateIpAddresses=[primary_address])
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
     def test_assign_unassign_private_addresses_by_count(self):
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count = data['Subnets'][0]['AvailableIpAddressCount']
         kwargs = {
             'SubnetId': self.subnet_id,
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id)
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        resp, data = self.client.AssignPrivateIpAddresses(
+        data = self.client.assign_private_ip_addresses(
             NetworkInterfaceId=ni_id,
             SecondaryPrivateIpAddressCount=2)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self._wait_assignment(ni_id, resp, data)
+        self._wait_assignment(ni_id, data)
 
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count_after = data['Subnets'][0]['AvailableIpAddressCount']
         self.assertEqual(count - 3, count_after)
 
-        resp, data = self.client.DescribeNetworkInterfaces(
+        data = self.client.describe_network_interfaces(
             NetworkInterfaceIds=[ni_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
 
         addresses = []
         for addr in data['NetworkInterfaces'][0]['PrivateIpAddresses']:
@@ -245,53 +224,45 @@ class NetworkInterfaceTest(base.EC2TestCase):
                 addresses.append(addr['PrivateIpAddress'])
         self.assertEqual(2, len(addresses))
 
-        resp, data = self.client.UnassignPrivateIpAddresses(
+        data = self.client.unassign_private_ip_addresses(
             NetworkInterfaceId=ni_id,
             PrivateIpAddresses=addresses)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self._wait_assignment(ni_id, resp, data)
+        self._wait_assignment(ni_id, data)
 
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count_after = data['Subnets'][0]['AvailableIpAddressCount']
         self.assertEqual(count - 1, count_after)
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
     def test_assign_unassign_private_addresses_by_addresses(self):
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count = data['Subnets'][0]['AvailableIpAddressCount']
         kwargs = {
             'SubnetId': self.subnet_id,
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id)
         self.get_network_interface_waiter().wait_available(ni_id)
 
         addresses = ['10.7.0.10', '10.7.0.11']
-        resp, data = self.client.AssignPrivateIpAddresses(
+        data = self.client.assign_private_ip_addresses(
             NetworkInterfaceId=ni_id,
             PrivateIpAddresses=addresses)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self._wait_assignment(ni_id, resp, data)
+        self._wait_assignment(ni_id, data)
 
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count_after = data['Subnets'][0]['AvailableIpAddressCount']
         # NOTE(Alex): Amazon misses 1 IP address by some reason.
         self.assertIn(count_after, [count - 3, count - 4])
 
-        resp, data = self.client.DescribeNetworkInterfaces(
+        data = self.client.describe_network_interfaces(
             NetworkInterfaceIds=[ni_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
 
         assigned_addresses = []
         for addr in data['NetworkInterfaces'][0]['PrivateIpAddresses']:
@@ -300,20 +271,17 @@ class NetworkInterfaceTest(base.EC2TestCase):
                 assigned_addresses.append(addr['PrivateIpAddress'])
         self.assertEqual(2, len(assigned_addresses))
 
-        resp, data = self.client.UnassignPrivateIpAddresses(
+        data = self.client.unassign_private_ip_addresses(
             NetworkInterfaceId=ni_id,
             PrivateIpAddresses=addresses)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self._wait_assignment(ni_id, resp, data)
+        self._wait_assignment(ni_id, data)
 
-        resp, data = self.client.DescribeSubnets(SubnetIds=[self.subnet_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count_after = data['Subnets'][0]['AvailableIpAddressCount']
         self.assertIn(count_after, [count - 1, count - 2])
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
@@ -323,17 +291,15 @@ class NetworkInterfaceTest(base.EC2TestCase):
             'SubnetId': self.subnet_id,
             'Description': desc
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id)
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        resp, data = self.client.DescribeNetworkInterfaceAttribute(
+        data = self.client.describe_network_interface_attribute(
             NetworkInterfaceId=ni_id,
-            attribute='description')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+            Attribute='description')
         self.assertEqual(desc, data['Description']['Value'])
 
         new_desc = data_utils.rand_name('new-ni')
@@ -341,42 +307,36 @@ class NetworkInterfaceTest(base.EC2TestCase):
             'NetworkInterfaceId': ni_id,
             'Description': {'Value': new_desc}
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.modify_network_interface_attribute(*[], **kwargs)
 
-        resp, data = self.client.DescribeNetworkInterfaceAttribute(
+        data = self.client.describe_network_interface_attribute(
             NetworkInterfaceId=ni_id,
-            attribute='description')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+            Attribute='description')
         self.assertEqual(new_desc, data['Description']['Value'])
 
         kwargs = {
             'NetworkInterfaceId': ni_id,
             'SourceDestCheck': {'Value': False}
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.modify_network_interface_attribute(*[], **kwargs)
 
-        resp, data = self.client.DescribeNetworkInterfaceAttribute(
+        data = self.client.describe_network_interface_attribute(
             NetworkInterfaceId=ni_id,
-            attribute='sourceDestCheck')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+            Attribute='sourceDestCheck')
         self.assertEqual(False, data['SourceDestCheck']['Value'])
 
-        # NOTE(andrey-mp): ResetNetworkInterfaceAttribute has inadequate json
+        # NOTE(andrey-mp): ResetNetworkInterfaceAttribute had inadequate json
         # scheme in botocore.
 
         kwargs = {
             'NetworkInterfaceId': ni_id,
             'SourceDestCheck': {'Value': True}
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.modify_network_interface_attribute(*[], **kwargs)
 
-        resp, data = self.client.DescribeNetworkInterfaceAttribute(
+        data = self.client.describe_network_interface_attribute(
             NetworkInterfaceId=ni_id,
-            attribute='sourceDestCheck')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+            Attribute='sourceDestCheck')
         self.assertEqual(True, data['SourceDestCheck']['Value'])
 
         kwargs = {
@@ -385,9 +345,9 @@ class NetworkInterfaceTest(base.EC2TestCase):
                 'AttachmentId': 'fake'
             }
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('MissingParameter', data['Error']['Code'])
+        self.assertRaises('MissingParameter',
+                          self.client.modify_network_interface_attribute,
+                          **kwargs)
 
         kwargs = {
             'NetworkInterfaceId': ni_id,
@@ -396,13 +356,12 @@ class NetworkInterfaceTest(base.EC2TestCase):
                 'DeleteOnTermination': True
             }
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidAttachmentID.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidAttachmentID.NotFound',
+                          self.client.modify_network_interface_attribute,
+                          **kwargs)
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
@@ -415,22 +374,20 @@ class NetworkInterfaceTest(base.EC2TestCase):
         kwargs = {
             'SubnetId': self.subnet_id,
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
-        self.addResourceCleanUp(self.client.DeleteNetworkInterface,
+        self.addResourceCleanUp(self.client.delete_network_interface,
                                 NetworkInterfaceId=ni_id)
         ni = data['NetworkInterface']
         address = ni.get('PrivateIpAddress')
         self.assertIsNotNone(address)
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        resp, data = self.client.RunInstances(
+        data = self.client.run_instances(
             ImageId=image_id, InstanceType=instance_type, MinCount=1,
             MaxCount=1, SubnetId=self.subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
                                             InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
@@ -441,17 +398,16 @@ class NetworkInterfaceTest(base.EC2TestCase):
             'InstanceId': instance_id,
             'NetworkInterfaceId': ni_id
         }
-        resp, data = self.client.AttachNetworkInterface(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.attach_network_interface,
+                          **kwargs)
 
         kwargs = {
             'DeviceIndex': 2,
             'InstanceId': instance_id,
             'NetworkInterfaceId': ni_id
         }
-        resp, data = self.client.AttachNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.attach_network_interface(*[], **kwargs)
         attachment_id = data['AttachmentId']
 
         instance = self.get_instance(instance_id)
@@ -461,19 +417,16 @@ class NetworkInterfaceTest(base.EC2TestCase):
                nis[1]['Attachment']['AttachmentId']]
         self.assertIn(attachment_id, ids)
 
-        resp, data = self.client.DeleteNetworkInterface(
-            NetworkInterfaceId=ni_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.delete_network_interface,
+                          NetworkInterfaceId=ni_id)
 
         kwargs = {
             'AttachmentId': attachment_id,
         }
-        resp, data = self.client.DetachNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.detach_network_interface(*[], **kwargs)
 
-        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
@@ -483,12 +436,11 @@ class NetworkInterfaceTest(base.EC2TestCase):
         if not image_id:
             raise self.skipException('aws image_id does not provided')
 
-        resp, data = self.client.RunInstances(
+        data = self.client.run_instances(
             ImageId=image_id, InstanceType=instance_type, MinCount=1,
             MaxCount=1, SubnetId=self.subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
                                             InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
@@ -507,27 +459,24 @@ class NetworkInterfaceTest(base.EC2TestCase):
                 'DeleteOnTermination': False,
             }
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        clean_ni = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                           NetworkInterfaceId=ni_id)
+        data = self.client.modify_network_interface_attribute(*[], **kwargs)
+        clean_ni = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id)
 
         kwargs = {
             'SubnetId': self.subnet_id,
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id2 = data['NetworkInterface']['NetworkInterfaceId']
-        clean_ni2 = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id2)
+        clean_ni2 = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id2)
         self.get_network_interface_waiter().wait_available(ni_id2)
         kwargs = {
             'DeviceIndex': 2,
             'InstanceId': instance_id,
             'NetworkInterfaceId': ni_id2
         }
-        resp, data = self.client.AttachNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.attach_network_interface(*[], **kwargs)
         attachment_id = data['AttachmentId']
 
         instance = self.get_instance(instance_id)
@@ -539,23 +488,20 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.assertEqual(attachment_id, ni['Attachment']['AttachmentId'])
         self.assertFalse(ni['Attachment']['DeleteOnTermination'])
 
-        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.get_network_interface_waiter().wait_available(ni_id)
         self.get_network_interface_waiter().wait_available(ni_id2)
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(clean_ni)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id2)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(clean_ni2)
         self.get_network_interface_waiter().wait_delete(ni_id2)
 
@@ -565,12 +511,11 @@ class NetworkInterfaceTest(base.EC2TestCase):
         if not image_id:
             raise self.skipException('aws image_id does not provided')
 
-        resp, data = self.client.RunInstances(
+        data = self.client.run_instances(
             ImageId=image_id, InstanceType=instance_type, MinCount=1,
             MaxCount=1, SubnetId=self.subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
                                             InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
@@ -584,10 +529,9 @@ class NetworkInterfaceTest(base.EC2TestCase):
         kwargs = {
             'SubnetId': self.subnet_id,
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id2 = data['NetworkInterface']['NetworkInterfaceId']
-        self.addResourceCleanUp(self.client.DeleteNetworkInterface,
+        self.addResourceCleanUp(self.client.delete_network_interface,
                                 NetworkInterfaceId=ni_id2)
         self.get_network_interface_waiter().wait_available(ni_id2)
         kwargs = {
@@ -595,8 +539,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
             'InstanceId': instance_id,
             'NetworkInterfaceId': ni_id2
         }
-        resp, data = self.client.AttachNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.attach_network_interface(*[], **kwargs)
         attachment_id = data['AttachmentId']
 
         kwargs = {
@@ -606,11 +549,9 @@ class NetworkInterfaceTest(base.EC2TestCase):
                 'DeleteOnTermination': True,
             }
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.modify_network_interface_attribute(*[], **kwargs)
 
-        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 

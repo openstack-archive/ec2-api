@@ -25,9 +25,8 @@ class KeyPairTest(base.EC2TestCase):
 
     def test_create_delete_key_pair(self):
         keyName = 'Test key'
-        resp, data = self.client.CreateKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        res_clean = self.addResourceCleanUp(self.client.DeleteKeyPair,
+        data = self.client.create_key_pair(KeyName=keyName)
+        res_clean = self.addResourceCleanUp(self.client.delete_key_pair,
                                             KeyName=keyName)
 
         self.assertEqual(keyName, data['KeyName'])
@@ -35,37 +34,32 @@ class KeyPairTest(base.EC2TestCase):
         self.assertGreater(len(data['KeyFingerprint']), 0)
         self.assertGreater(len(data.get('KeyMaterial')), 0)
 
-        resp, data = self.client.DeleteKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_key_pair(KeyName=keyName)
         self.cancelResourceCleanUp(res_clean)
 
     def test_create_duplicate_key_pair(self):
         keyName = 'Test key'
-        resp, data = self.client.CreateKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        res_clean = self.addResourceCleanUp(self.client.DeleteKeyPair,
+        self.client.create_key_pair(KeyName=keyName)
+        res_clean = self.addResourceCleanUp(self.client.delete_key_pair,
                                             KeyName=keyName)
 
-        resp, data = self.client.CreateKeyPair(KeyName=keyName)
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidKeyPair.Duplicate', data['Error']['Code'])
+        self.assertRaises('InvalidKeyPair.Duplicate',
+                          self.client.create_key_pair,
+                          KeyName=keyName)
 
-        resp, data = self.client.DeleteKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.delete_key_pair(KeyName=keyName)
         self.cancelResourceCleanUp(res_clean)
 
     def test_describe_key_pairs(self):
         keyName = 'Test key'
-        resp, data = self.client.CreateKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        res_clean = self.addResourceCleanUp(self.client.DeleteKeyPair,
+        data = self.client.create_key_pair(KeyName=keyName)
+        res_clean = self.addResourceCleanUp(self.client.delete_key_pair,
                                             KeyName=keyName)
         self.assertIsNotNone(data.get('KeyFingerprint'))
         self.assertGreater(len(data['KeyFingerprint']), 0)
         fingerprint = data.get('KeyFingerprint')
 
-        resp, data = self.client.DescribeKeyPairs(KeyNames=[keyName])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_key_pairs(KeyNames=[keyName])
         self.assertEqual(1, len(data.get('KeyPairs')))
         data = data['KeyPairs'][0]
         self.assertEqual(keyName, data['KeyName'])
@@ -73,55 +67,55 @@ class KeyPairTest(base.EC2TestCase):
         self.assertGreater(len(data['KeyFingerprint']), 0)
         self.assertIsNone(data.get('KeyMaterial'))
 
-        resp, data = self.client.DescribeKeyPairs(
+        data = self.client.describe_key_pairs(
             Filters=[{'Name': 'key-name', 'Values': [keyName]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data.get('KeyPairs')))
         self.assertEqual(keyName, data['KeyPairs'][0]['KeyName'])
 
-        resp, data = self.client.DescribeKeyPairs(
+        data = self.client.describe_key_pairs(
             Filters=[{'Name': 'fingerprint', 'Values': [fingerprint]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data.get('KeyPairs')))
         self.assertEqual(keyName, data['KeyPairs'][0]['KeyName'])
 
-        resp, data = self.client.DescribeKeyPairs(KeyNames=['fake key'])
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidKeyPair.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidKeyPair.NotFound',
+                          self.client.describe_key_pairs,
+                          KeyNames=['fake key'])
 
-        resp, data = self.client.DeleteKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_key_pair(KeyName=keyName)
         self.cancelResourceCleanUp(res_clean)
 
-        resp, data = self.client.DescribeKeyPairs(KeyNames=[keyName])
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidKeyPair.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidKeyPair.NotFound',
+                          self.client.describe_key_pairs,
+                          KeyNames=[keyName])
 
         # NOTE(andrey-mp): Amazon allows to delete absent key and returns 200
-        resp, data = self.client.DeleteKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.delete_key_pair(KeyName=keyName)
 
     def test_import_empty_key_pair(self):
         keyName = 'Test key'
         publicKey = ''
-        resp, data = self.client.ImportKeyPair(KeyName=keyName,
-                                               PublicKeyMaterial=publicKey)
-        if resp.status_code == 200:
-            self.addResourceCleanUp(self.client.DeleteKeyPair, KeyName=keyName)
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('MissingParameter', data['Error']['Code'])
+
+        def _rollback(fn_data):
+            self.client.delete_key_pair(KeyName=keyName)
+
+        self.assertRaises('MissingParameter',
+                          self.client.import_key_pair,
+                          rollback_fn=_rollback,
+                          KeyName=keyName, PublicKeyMaterial=publicKey)
 
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "Different error code")
     def test_import_invalid_key_pair(self):
         keyName = 'Test key'
         publicKey = 'ssh-rsa JUNK test@ubuntu'
-        resp, data = self.client.ImportKeyPair(KeyName=keyName,
-                                               PublicKeyMaterial=publicKey)
-        if resp.status_code == 200:
-            self.addResourceCleanUp(self.client.DeleteKeyPair, KeyName=keyName)
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidKey.Format', data['Error']['Code'])
+
+        def _rollback():
+            self.client.delete_key_pair(KeyName=keyName)
+
+        self.assertRaises('InvalidKey.Format',
+                          self.client.import_key_pair,
+                          rollback_fn=_rollback,
+                          KeyName=keyName, PublicKeyMaterial=publicKey)
 
     def test_import_key_pair(self):
         keyName = 'Test key'
@@ -134,10 +128,9 @@ class KeyPairTest(base.EC2TestCase):
                      "LOeB1kYMOBaiUPLQTWXR3JpckqFIQwhIH0zoHlJvZE8hh90"
                      "XcPojYN56tI0OlrGqojbediJYD0rUsJu4weZpbn8vilb3JuDY+jws"
                      "snSA8wzBx3A/8y9Pp1B test@ubuntu")
-        resp, data = self.client.ImportKeyPair(KeyName=keyName,
-                                               PublicKeyMaterial=publicKey)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        res_clean = self.addResourceCleanUp(self.client.DeleteKeyPair,
+        data = self.client.import_key_pair(KeyName=keyName,
+                                                 PublicKeyMaterial=publicKey)
+        res_clean = self.addResourceCleanUp(self.client.delete_key_pair,
                                             KeyName=keyName)
 
         self.assertEqual(keyName, data['KeyName'])
@@ -145,6 +138,5 @@ class KeyPairTest(base.EC2TestCase):
         self.assertGreater(len(data['KeyFingerprint']), 0)
         self.assertIsNone(data.get('KeyMaterial'))
 
-        resp, data = self.client.DeleteKeyPair(KeyName=keyName)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.delete_key_pair(KeyName=keyName)
         self.cancelResourceCleanUp(res_clean)

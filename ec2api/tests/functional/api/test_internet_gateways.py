@@ -39,218 +39,177 @@ class InternetGatewayTest(base.EC2TestCase):
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
-        resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)
-        cls.assertResultStatic(resp, data)
+        data = cls.client.create_vpc(CidrBlock=cls.VPC_CIDR)
         cls.vpc_id = data['Vpc']['VpcId']
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
-        cls.addResourceCleanUpStatic(cls.client.DeleteVpc, VpcId=cls.vpc_id)
+        cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
 
-        resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR_ALT)
-        cls.assertResultStatic(resp, data)
+        data = cls.client.create_vpc(CidrBlock=cls.VPC_CIDR_ALT)
         cls.vpc_id_alt = data['Vpc']['VpcId']
         cls.get_vpc_waiter().wait_available(cls.vpc_id_alt)
-        cls.addResourceCleanUpStatic(cls.client.DeleteVpc,
+        cls.addResourceCleanUpStatic(cls.client.delete_vpc,
                                      VpcId=cls.vpc_id_alt)
 
     def test_create_attach_internet_gateway(self):
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                            InternetGatewayId=gw_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_internet_gateway, InternetGatewayId=gw_id)
         self.assertEmpty(data['InternetGateway'].get('Attachments', []))
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.attach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.DetachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.detach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
-        resp, data = self.client.DescribeInternetGateways(
-            InternetGatewayIds=[gw_id])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidInternetGatewayID.NotFound',
-                         data['Error']['Code'])
+        self.assertRaises('InvalidInternetGatewayID.NotFound',
+                          self.client.describe_internet_gateways,
+                          InternetGatewayIds=[gw_id])
 
     def test_delete_attached_internet_gateway(self):
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                            InternetGatewayId=gw_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_internet_gateway, InternetGatewayId=gw_id)
         self.assertEmpty(data['InternetGateway'].get('Attachments', []))
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.attach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('DependencyViolation', data['Error']['Code'])
+        self.assertRaises('DependencyViolation',
+                          self.client.delete_internet_gateway,
+                          InternetGatewayId=gw_id)
 
-        resp, data = self.client.DetachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.detach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "Another error code returned - InvalidParameterValue")
     def test_attach_detach_invalid_internet_gateway(self):
         gw_id = "gw-1"
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidInternetGatewayID.NotFound',
-                         data['Error']['Code'])
+        self.assertRaises('InvalidInternetGatewayID.NotFound',
+                          self.client.attach_internet_gateway,
+                          VpcId=self.vpc_id, InternetGatewayId=gw_id)
 
-        resp, data = self.client.DetachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidInternetGatewayID.NotFound',
-                         data['Error']['Code'])
+        self.assertRaises('InvalidInternetGatewayID.NotFound',
+                          self.client.detach_internet_gateway,
+                          VpcId=self.vpc_id, InternetGatewayId=gw_id)
 
     def test_double_attach_internet_gateway(self):
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                            InternetGatewayId=gw_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_internet_gateway, InternetGatewayId=gw_id)
         self.assertEmpty(data['InternetGateway'].get('Attachments', []))
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.attach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('Resource.AlreadyAssociated', data['Error']['Code'])
+        self.assertRaises('Resource.AlreadyAssociated',
+                          self.client.attach_internet_gateway,
+                          VpcId=self.vpc_id, InternetGatewayId=gw_id)
 
-        resp, data = self.client.DetachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.detach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
     def test_attach_one_internet_gateway_to_two_vpcs(self):
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                            InternetGatewayId=gw_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_internet_gateway, InternetGatewayId=gw_id)
         self.assertEmpty(data['InternetGateway'].get('Attachments', []))
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.attach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id_alt,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('Resource.AlreadyAssociated', data['Error']['Code'])
+        self.assertRaises('Resource.AlreadyAssociated',
+                          self.client.attach_internet_gateway,
+                          VpcId=self.vpc_id_alt, InternetGatewayId=gw_id)
 
-        resp, data = self.client.DetachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.detach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
     def test_describe_internet_gateways_base(self):
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                            InternetGatewayId=gw_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_internet_gateway, InternetGatewayId=gw_id)
         self.assertEmpty(data['InternetGateway'].get('Attachments', []))
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.addResourceCleanUp(self.client.DetachInternetGateway,
+        data = self.client.attach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
+        self.addResourceCleanUp(self.client.detach_internet_gateway,
                                 VpcId=self.vpc_id,
                                 InternetGatewayId=gw_id)
 
         time.sleep(2)
         # NOTE(andrey-mp): by real id
-        resp, data = self.client.DescribeInternetGateways(
+        data = self.client.describe_internet_gateways(
             InternetGatewayIds=[gw_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['InternetGateways']))
 
         # NOTE(andrey-mp): by fake id
-        resp, data = self.client.DescribeInternetGateways(
-            InternetGatewayIds=['igw-0'])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidInternetGatewayID.NotFound',
-                         data['Error']['Code'])
+        self.assertRaises('InvalidInternetGatewayID.NotFound',
+                          self.client.describe_internet_gateways,
+                          InternetGatewayIds=['igw-0'])
 
-        resp, data = self.client.DetachInternetGateway(VpcId=self.vpc_id,
+        data = self.client.detach_internet_gateway(VpcId=self.vpc_id,
                                                        InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
 
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
     def test_describe_internet_gateways_filters(self):
         # NOTE(andrey-mp): by filter real vpc-id before creation
-        resp, data = self.client.DescribeInternetGateways(
+        data = self.client.describe_internet_gateways(
             Filters=[{'Name': 'attachment.vpc-id', 'Values': [self.vpc_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(0, len(data['InternetGateways']))
 
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteInternetGateway,
-                                            InternetGatewayId=gw_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.delete_internet_gateway, InternetGatewayId=gw_id)
         self.assertEmpty(data['InternetGateway'].get('Attachments', []))
 
-        resp, data = self.client.AttachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.addResourceCleanUp(self.client.DetachInternetGateway,
+        data = self.client.attach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
+        self.addResourceCleanUp(self.client.detach_internet_gateway,
                                 VpcId=self.vpc_id,
                                 InternetGatewayId=gw_id)
 
         time.sleep(2)
         # NOTE(andrey-mp): by filter real vpc-id
-        resp, data = self.client.DescribeInternetGateways(
+        data = self.client.describe_internet_gateways(
             Filters=[{'Name': 'attachment.vpc-id', 'Values': [self.vpc_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['InternetGateways']))
         self.assertEqual(gw_id,
                          data['InternetGateways'][0]['InternetGatewayId'])
 
         # NOTE(andrey-mp): by filter fake vpc-id
-        resp, data = self.client.DescribeInternetGateways(
+        data = self.client.describe_internet_gateways(
             Filters=[{'Name': 'attachment.vpc-id', 'Values': ['vpc-0']}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(0, len(data['InternetGateways']))
 
         # NOTE(andrey-mp): by fake filter
-        resp, data = self.client.DescribeInternetGateways(
-            Filters=[{'Name': 'fake', 'Values': ['fake']}])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.describe_internet_gateways,
+                          Filters=[{'Name': 'fake', 'Values': ['fake']}])
 
-        resp, data = self.client.DetachInternetGateway(VpcId=self.vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.detach_internet_gateway(VpcId=self.vpc_id,
+                                                   InternetGatewayId=gw_id)
 
-        resp, data = self.client.DeleteInternetGateway(InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)

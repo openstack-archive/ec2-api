@@ -48,11 +48,10 @@ class DhcpOptionsTest(base.EC2TestCase):
                  'Values': ['2']},
             ],
         }
-        resp, data = self.client.CreateDhcpOptions(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_dhcp_options(*[], **kwargs)
         options = data['DhcpOptions']
         id = options['DhcpOptionsId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteDhcpOptions,
+        res_clean = self.addResourceCleanUp(self.client.delete_dhcp_options,
                                             DhcpOptionsId=id)
         self.assertEqual(5, len(options['DhcpConfigurations']))
         for cfg in options['DhcpConfigurations']:
@@ -79,38 +78,35 @@ class DhcpOptionsTest(base.EC2TestCase):
             else:
                 self.fail('Unknown key name in result - %s' % cfg['Key'])
 
-        resp, data = self.client.DeleteDhcpOptions(DhcpOptionsId=id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_dhcp_options(DhcpOptionsId=id)
         self.cancelResourceCleanUp(res_clean)
 
     def test_invalid_create_delete(self):
+        def _rollback(fn_data):
+            self.client.delete_dhcp_options(
+                DhcpOptionsId=fn_data['DhcpOptions']['DhcpOptionsId'])
+
         kwargs = {
             'DhcpConfigurations': [
             ],
         }
-        resp, data = self.client.CreateDhcpOptions(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('MissingParameter', data['Error']['Code'])
+        self.assertRaises('MissingParameter',
+                          self.client.create_dhcp_options,
+                          **kwargs)
 
         kwargs = {
             'DhcpConfigurations': [{'Key': 'aaa', 'Values': []}],
         }
-        resp, data = self.client.CreateDhcpOptions(*[], **kwargs)
-        if resp.status_code == 200:
-            self.addResourceCleanUp(self.client.DeleteDhcpOptions,
-                DhcpOptionsId=data['DhcpOptions']['DhcpOptionsId'])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+            self.client.create_dhcp_options, rollback_fn=_rollback,
+            **kwargs)
 
         kwargs = {
             'DhcpConfigurations': [{'Key': 'domain-name', 'Values': []}],
         }
-        resp, data = self.client.CreateDhcpOptions(*[], **kwargs)
-        if resp.status_code == 200:
-            self.addResourceCleanUp(self.client.DeleteDhcpOptions,
-                DhcpOptionsId=data['DhcpOptions']['DhcpOptionsId'])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+            self.client.create_dhcp_options, rollback_fn=_rollback,
+            **kwargs)
 
     def test_describe_dhcp_options(self):
         kwargs = {
@@ -119,11 +115,10 @@ class DhcpOptionsTest(base.EC2TestCase):
                  'Values': ['my.com']},
             ],
         }
-        resp, data = self.client.CreateDhcpOptions(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_dhcp_options(*[], **kwargs)
         options = data['DhcpOptions']
         id = options['DhcpOptionsId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteDhcpOptions,
+        res_clean = self.addResourceCleanUp(self.client.delete_dhcp_options,
                                             DhcpOptionsId=id)
 
         time.sleep(10)
@@ -131,8 +126,7 @@ class DhcpOptionsTest(base.EC2TestCase):
         kwargs = {
             'DhcpOptionsIds': [id],
         }
-        resp, data = self.client.DescribeDhcpOptions(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_dhcp_options(*[], **kwargs)
         self.assertEqual(1, len(data['DhcpOptions']))
         options = data['DhcpOptions'][0]
         self.assertEqual(id, options['DhcpOptionsId'])
@@ -143,8 +137,7 @@ class DhcpOptionsTest(base.EC2TestCase):
         self.assertEqual(1, len(cfg['Values']))
         self.assertIn('my.com', cfg['Values'][0]['Value'])
 
-        resp, data = self.client.DeleteDhcpOptions(DhcpOptionsId=id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_dhcp_options(DhcpOptionsId=id)
         self.cancelResourceCleanUp(res_clean)
 
     def test_associate_dhcp_options(self):
@@ -154,35 +147,31 @@ class DhcpOptionsTest(base.EC2TestCase):
                  'Values': ['my.com']},
             ],
         }
-        resp, data = self.client.CreateDhcpOptions(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_dhcp_options(*[], **kwargs)
         options = data['DhcpOptions']
         id = options['DhcpOptionsId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteDhcpOptions,
+        res_clean = self.addResourceCleanUp(self.client.delete_dhcp_options,
                                             DhcpOptionsId=id)
 
         cidr = '10.0.0.0/24'
-        resp, data = self.client.CreateVpc(CidrBlock=cidr)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_vpc(CidrBlock=cidr)
         vpc_id = data['Vpc']['VpcId']
-        dv_clean = self.addResourceCleanUp(self.client.DeleteVpc, VpcId=vpc_id)
+        dv_clean = self.addResourceCleanUp(self.client.delete_vpc,
+                                           VpcId=vpc_id)
 
         kwargs = {
             'DhcpOptionsId': id,
             'VpcId': vpc_id,
         }
-        resp, data = self.client.AssociateDhcpOptions(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.associate_dhcp_options(*[], **kwargs)
 
-        resp, data = self.client.DeleteDhcpOptions(DhcpOptionsId=id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('DependencyViolation', data['Error']['Code'])
+        self.assertRaises('DependencyViolation',
+                          self.client.delete_dhcp_options,
+                          DhcpOptionsId=id)
 
-        resp, data = self.client.DeleteVpc(VpcId=vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
-        resp, data = self.client.DeleteDhcpOptions(DhcpOptionsId=id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_dhcp_options(DhcpOptionsId=id)
         self.cancelResourceCleanUp(res_clean)

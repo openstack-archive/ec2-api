@@ -35,17 +35,15 @@ class RouteTest(base.EC2TestCase):
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
-        resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)
-        cls.assertResultStatic(resp, data)
+        data = cls.client.create_vpc(CidrBlock=cls.VPC_CIDR)
         cls.vpc_id = data['Vpc']['VpcId']
-        cls.addResourceCleanUpStatic(cls.client.DeleteVpc, VpcId=cls.vpc_id)
+        cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
     def test_create_delete_route_table(self):
-        resp, data = self.client.CreateRouteTable(VpcId=self.vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteRouteTable,
+        res_clean = self.addResourceCleanUp(self.client.delete_route_table,
                                             RouteTableId=rt_id)
         rt = data['RouteTable']
         self.assertEqual(self.vpc_id, rt['VpcId'])
@@ -54,148 +52,127 @@ class RouteTest(base.EC2TestCase):
         self.assertEqual(self.VPC_CIDR, route['DestinationCidrBlock'])
         self.assertEqual('active', route['State'])
 
-        resp, data = self.client.DeleteRouteTable(RouteTableId=rt_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean)
 
-        resp, data = self.client.DescribeRouteTables(RouteTableIds=[rt_id])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidRouteTableID.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidRouteTableID.NotFound',
+                          self.client.describe_route_tables,
+                          RouteTableIds=[rt_id])
 
-        resp, data = self.client.DeleteRouteTable(RouteTableId=rt_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidRouteTableID.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidRouteTableID.NotFound',
+                          self.client.delete_route_table,
+                          RouteTableId=rt_id)
 
     def test_describe_route_tables_base(self):
-        resp, data = self.client.CreateRouteTable(VpcId=self.vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteRouteTable,
+        res_clean = self.addResourceCleanUp(self.client.delete_route_table,
                                             RouteTableId=rt_id)
 
         # NOTE(andrey-mp): by real id
-        resp, data = self.client.DescribeRouteTables(RouteTableIds=[rt_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_route_tables(RouteTableIds=[rt_id])
         self.assertEqual(1, len(data['RouteTables']))
 
         # NOTE(andrey-mp): by fake id
-        resp, data = self.client.DescribeRouteTables(RouteTableIds=['rtb-0'])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidRouteTableID.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidRouteTableID.NotFound',
+                          self.client.describe_route_tables,
+                          RouteTableIds=['rtb-0'])
 
-        resp, data = self.client.DeleteRouteTable(RouteTableId=rt_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean)
 
     def test_describe_route_tables_filters(self):
-        resp, data = self.client.CreateRouteTable(VpcId=self.vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
-        self.addResourceCleanUp(self.client.DeleteRouteTable,
+        self.addResourceCleanUp(self.client.delete_route_table,
                                 RouteTableId=rt_id)
 
-        resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
+        data = self.client.create_subnet(VpcId=self.vpc_id,
                                               CidrBlock=self.SUBNET_CIDR)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         subnet_id = data['Subnet']['SubnetId']
-        self.addResourceCleanUp(self.client.DeleteSubnet,
+        self.addResourceCleanUp(self.client.delete_subnet,
                                 SubnetId=subnet_id)
         self.get_subnet_waiter().wait_available(subnet_id)
 
-        resp, data = self.client.AssociateRouteTable(RouteTableId=rt_id,
+        data = self.client.associate_route_table(RouteTableId=rt_id,
                                                      SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         assoc_id = data['AssociationId']
-        self.addResourceCleanUp(self.client.DisassociateRouteTable,
+        self.addResourceCleanUp(self.client.disassociate_route_table,
                                 AssociationId=assoc_id)
 
         # NOTE(andrey-mp): by association_id
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'association.route-table-association-id',
                       'Values': [assoc_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['RouteTables']))
 
         # NOTE(andrey-mp): by route table id
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'association.route-table-id',
                       'Values': [rt_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['RouteTables']))
 
         # NOTE(andrey-mp): by subnet id
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'association.subnet-id',
                       'Values': [subnet_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['RouteTables']))
 
         # NOTE(andrey-mp): by filter real vpc
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'vpc-id', 'Values': [self.vpc_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertLess(0, len(data['RouteTables']))
 
         # NOTE(andrey-mp): by filter fake vpc
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'vpc-id', 'Values': ['vpc-0']}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(0, len(data['RouteTables']))
 
         # NOTE(andrey-mp): by fake filter
-        resp, data = self.client.DescribeRouteTables(
-            Filters=[{'Name': 'fake', 'Values': ['fake']}])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.describe_route_tables,
+                          Filters=[{'Name': 'fake', 'Values': ['fake']}])
 
     def test_associate_disassociate_route_table(self):
-        resp, data = self.client.CreateRouteTable(VpcId=self.vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
-        res_clean_rt = self.addResourceCleanUp(self.client.DeleteRouteTable,
+        res_clean_rt = self.addResourceCleanUp(self.client.delete_route_table,
                                                RouteTableId=rt_id)
 
-        resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
-                                              CidrBlock=self.SUBNET_CIDR)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_subnet(VpcId=self.vpc_id,
+                                         CidrBlock=self.SUBNET_CIDR)
         subnet_id = data['Subnet']['SubnetId']
-        res_clean_subnet = self.addResourceCleanUp(self.client.DeleteSubnet,
+        res_clean_subnet = self.addResourceCleanUp(self.client.delete_subnet,
                                                    SubnetId=subnet_id)
         self.get_subnet_waiter().wait_available(subnet_id)
 
-        resp, data = self.client.AssociateRouteTable(RouteTableId=rt_id,
-                                                     SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.associate_route_table(RouteTableId=rt_id,
+                                                 SubnetId=subnet_id)
         assoc_id = data['AssociationId']
-        res_clean = self.addResourceCleanUp(self.client.DisassociateRouteTable,
-                                            AssociationId=assoc_id)
+        res_clean = self.addResourceCleanUp(
+            self.client.disassociate_route_table, AssociationId=assoc_id)
 
-        resp, data = self.client.DisassociateRouteTable(AssociationId=assoc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.disassociate_route_table(AssociationId=assoc_id)
         self.cancelResourceCleanUp(res_clean)
 
-        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_subnet(SubnetId=subnet_id)
         self.cancelResourceCleanUp(res_clean_subnet)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
-        resp, data = self.client.DeleteRouteTable(RouteTableId=rt_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean_rt)
 
     def test_replace_route_table(self):
-        resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
-                                              CidrBlock=self.SUBNET_CIDR)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_subnet(VpcId=self.vpc_id,
+                                         CidrBlock=self.SUBNET_CIDR)
         subnet_id = data['Subnet']['SubnetId']
-        res_clean_subnet = self.addResourceCleanUp(self.client.DeleteSubnet,
+        res_clean_subnet = self.addResourceCleanUp(self.client.delete_subnet,
                                                    SubnetId=subnet_id)
         self.get_subnet_waiter().wait_available(subnet_id)
 
         # NOTE(andrey-mp): by vpc id
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'vpc-id', 'Values': [self.vpc_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['RouteTables']))
         self.assertEqual(1, len(data['RouteTables'][0]['Associations']))
         default_rt_id = data['RouteTables'][0]['RouteTableId']
@@ -203,25 +180,22 @@ class RouteTest(base.EC2TestCase):
         self.assertTrue(main_assoc['Main'])
         main_assoc_id = main_assoc['RouteTableAssociationId']
 
-        resp, data = self.client.CreateRouteTable(VpcId=self.vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
-        res_clean_rt = self.addResourceCleanUp(self.client.DeleteRouteTable,
+        res_clean_rt = self.addResourceCleanUp(self.client.delete_route_table,
                                                RouteTableId=rt_id)
 
-        resp, data = self.client.ReplaceRouteTableAssociation(
+        data = self.client.replace_route_table_association(
             RouteTableId=rt_id, AssociationId=main_assoc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         assoc_id = data['NewAssociationId']
         res_clean = self.addResourceCleanUp(
-            self.client.ReplaceRouteTableAssociation,
+            self.client.replace_route_table_association,
             RouteTableId=default_rt_id,
             AssociationId=assoc_id)
 
         # NOTE(andrey-mp): by vpc id
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'vpc-id', 'Values': [self.vpc_id]}])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(2, len(data['RouteTables']))
         for rt in data['RouteTables']:
             if rt['RouteTableId'] == rt_id:
@@ -230,52 +204,46 @@ class RouteTest(base.EC2TestCase):
             else:
                 self.assertEmpty(rt.get('Associations', []))
 
-        resp, data = self.client.DeleteRouteTable(RouteTableId=rt_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('DependencyViolation', data['Error']['Code'])
+        self.assertRaises('DependencyViolation',
+                          self.client.delete_route_table,
+                          RouteTableId=rt_id)
 
-        resp, data = self.client.DisassociateRouteTable(AssociationId=assoc_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.disassociate_route_table,
+                          AssociationId=assoc_id)
 
-        resp, data = self.client.ReplaceRouteTableAssociation(
+        data = self.client.replace_route_table_association(
             RouteTableId=default_rt_id,
             AssociationId=assoc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean)
 
-        resp, data = self.client.DeleteRouteTable(RouteTableId=rt_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean_rt)
 
-        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_subnet(SubnetId=subnet_id)
         self.cancelResourceCleanUp(res_clean_subnet)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
     def test_create_delete_route(self):
-        resp, data = self.client.CreateSubnet(VpcId=self.vpc_id,
-                                              CidrBlock=self.SUBNET_CIDR)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_subnet(VpcId=self.vpc_id,
+                                         CidrBlock=self.SUBNET_CIDR)
         subnet_id = data['Subnet']['SubnetId']
-        res_clean_subnet = self.addResourceCleanUp(self.client.DeleteSubnet,
+        res_clean_subnet = self.addResourceCleanUp(self.client.delete_subnet,
                                                    SubnetId=subnet_id)
         self.get_subnet_waiter().wait_available(subnet_id)
 
         kwargs = {
             'SubnetId': subnet_id,
         }
-        resp, data = self.client.CreateNetworkInterface(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(*[], **kwargs)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
         res_clean_ni = self.addResourceCleanUp(
-            self.client.DeleteNetworkInterface,
+            self.client.delete_network_interface,
             NetworkInterfaceId=ni_id)
 
-        resp, data = self.client.CreateRouteTable(VpcId=self.vpc_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
-        res_clean_rt = self.addResourceCleanUp(self.client.DeleteRouteTable,
+        res_clean_rt = self.addResourceCleanUp(self.client.delete_route_table,
                                                RouteTableId=rt_id)
 
         kwargs = {
@@ -283,9 +251,9 @@ class RouteTest(base.EC2TestCase):
             'RouteTableId': rt_id,
             'NetworkInterfaceId': ni_id
         }
-        resp, data = self.client.CreateRoute(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.create_route,
+                          **kwargs)
 
         # can create wider route
         kwargs = {
@@ -293,19 +261,16 @@ class RouteTest(base.EC2TestCase):
             'RouteTableId': rt_id,
             'NetworkInterfaceId': ni_id
         }
-        resp, data = self.client.CreateRoute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route(*[], **kwargs)
         # can create to another vpc
         kwargs = {
             'DestinationCidrBlock': '10.15.0.0/20',
             'RouteTableId': rt_id,
             'NetworkInterfaceId': ni_id
         }
-        resp, data = self.client.CreateRoute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_route(*[], **kwargs)
 
-        resp, data = self.client.DescribeRouteTables(RouteTableIds=[rt_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_route_tables(RouteTableIds=[rt_id])
         self.assertEqual(1, len(data['RouteTables']))
         self.assertEqual(3, len(data['RouteTables'][0]['Routes']))
 
@@ -313,59 +278,54 @@ class RouteTest(base.EC2TestCase):
             'DestinationCidrBlock': '10.15.0.0/24',
             'RouteTableId': rt_id,
         }
-        resp, data = self.client.DeleteRoute(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidRoute.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidRoute.NotFound',
+                          self.client.delete_route,
+                          **kwargs)
 
         kwargs = {
             'DestinationCidrBlock': self.VPC_CIDR,
             'RouteTableId': rt_id,
         }
-        resp, data = self.client.DeleteRoute(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                         self.client.delete_route,
+                         **kwargs)
 
         kwargs = {
             'DestinationCidrBlock': self.SUBNET_CIDR,
             'RouteTableId': rt_id,
         }
-        resp, data = self.client.DeleteRoute(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidRoute.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidRoute.NotFound',
+                          self.client.delete_route,
+                          **kwargs)
 
         kwargs = {
             'DestinationCidrBlock': '10.16.0.0/24',
             'RouteTableId': rt_id,
         }
-        resp, data = self.client.DeleteRoute(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidRoute.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidRoute.NotFound',
+                          self.client.delete_route,
+                          **kwargs)
 
         kwargs = {
             'DestinationCidrBlock': '10.15.0.0/20',
             'RouteTableId': rt_id,
         }
-        resp, data = self.client.DeleteRoute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_route(*[], **kwargs)
 
         kwargs = {
             'DestinationCidrBlock': '10.14.0.0/19',
             'RouteTableId': rt_id,
         }
-        resp, data = self.client.DeleteRoute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_route(*[], **kwargs)
 
-        resp, data = self.client.DeleteRouteTable(RouteTableId=rt_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean_rt)
 
-        resp, data = self.client.DeleteNetworkInterface(
+        data = self.client.delete_network_interface(
             NetworkInterfaceId=ni_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.cancelResourceCleanUp(res_clean_ni)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
-        resp, data = self.client.DeleteSubnet(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_subnet(SubnetId=subnet_id)
         self.cancelResourceCleanUp(res_clean_subnet)
         self.get_subnet_waiter().wait_delete(subnet_id)

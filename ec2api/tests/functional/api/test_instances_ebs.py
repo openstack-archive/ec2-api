@@ -34,13 +34,12 @@ class InstanceWithEBSTest(base.EC2TestCase):
 
     def test_create_get_delete_ebs_instance(self):
         """Launch EBS-backed instance, check results, and terminate it."""
-        resp, data = self.client.RunInstances(
+        data = self.client.run_instances(
             ImageId=self.image_id, InstanceType=CONF.aws.instance_type,
             Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['Instances']))
         instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
                                             InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
@@ -63,24 +62,21 @@ class InstanceWithEBSTest(base.EC2TestCase):
             self.assertTrue(ebs.get('AttachTime'))
             self.assertTrue(ebs.get('DeleteOnTermination'))
 
-        resp, data = self.client.DescribeVolumes(VolumeIds=[volume_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_volumes(VolumeIds=[volume_id])
         self.assertEqual(1, len(data['Volumes']))
 
-        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
     def test_create_root_volume_snapshot(self):
         """Create snapshot of root volume of EBS-backed instance."""
-        resp, data = self.client.RunInstances(
+        data = self.client.run_instances(
             ImageId=self.image_id, InstanceType=CONF.aws.instance_type,
             Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['Instances']))
         instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.TerminateInstances,
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
                                             InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
@@ -90,33 +86,28 @@ class InstanceWithEBSTest(base.EC2TestCase):
         volume_id = bdt['Ebs'].get('VolumeId')
         self.assertIsNotNone(volume_id)
 
-        resp, data = self.client.StopInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.stop_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('stopped'))
 
-        resp, data = self.client.DescribeVolumes(VolumeIds=[volume_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_volumes(VolumeIds=[volume_id])
         self.assertEqual(1, len(data['Volumes']))
 
         kwargs = {
             'VolumeId': data['Volumes'][0]['VolumeId'],
             'Description': 'Description'
         }
-        resp, data = self.client.CreateSnapshot(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_snapshot(*[], **kwargs)
         snapshot_id = data['SnapshotId']
-        res_clean_s = self.addResourceCleanUp(self.client.DeleteSnapshot,
+        res_clean_s = self.addResourceCleanUp(self.client.delete_snapshot,
                                               SnapshotId=snapshot_id)
         self.get_snapshot_waiter().wait_available(snapshot_id,
                                                   final_set=('completed'))
 
-        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
-        resp, data = self.client.DeleteSnapshot(SnapshotId=snapshot_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_snapshot(SnapshotId=snapshot_id)
         self.cancelResourceCleanUp(res_clean_s)
         self.get_snapshot_waiter().wait_delete(snapshot_id)

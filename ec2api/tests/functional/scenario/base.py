@@ -33,10 +33,9 @@ class BaseScenarioTest(base.EC2TestCase):
         kwargs.setdefault('Placement', {'AvailabilityZone': CONF.aws.aws_zone})
         kwargs['MinCount'] = 1
         kwargs['MaxCount'] = 1
-        resp, data = self.client.RunInstances(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.run_instances(*[], **kwargs)
         instance_id = data['Instances'][0]['InstanceId']
-        self.addResourceCleanUp(self.client.TerminateInstances,
+        self.addResourceCleanUp(self.client.terminate_instances,
                                 InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
@@ -55,13 +54,12 @@ class BaseScenarioTest(base.EC2TestCase):
             kwargs['AllocationId'] = alloc_id
         else:
             kwargs['PublicIp'] = public_ip
-        resp, data = self.client.AssociateAddress(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.associate_address(*[], **kwargs)
         if 'VpcId' in instance:
-            self.addResourceCleanUp(self.client.DisassociateAddress,
+            self.addResourceCleanUp(self.client.disassociate_address,
                                     AssociationId=data['AssociationId'])
         else:
-            self.addResourceCleanUp(self.client.DisassociateAddress,
+            self.addResourceCleanUp(self.client.disassociate_address,
                                     PublicIp=public_ip)
 
         return public_ip
@@ -70,32 +68,29 @@ class BaseScenarioTest(base.EC2TestCase):
         kwargs = dict()
         if is_vpc:
             kwargs['Domain'] = 'vpc'
-        resp, data = self.client.AllocateAddress(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.allocate_address(*[], **kwargs)
         alloc_id = data.get('AllocationId')
         public_ip = data['PublicIp']
         if is_vpc:
-            self.addResourceCleanUp(self.client.ReleaseAddress,
+            self.addResourceCleanUp(self.client.release_address,
                                     AllocationId=alloc_id)
         else:
-            self.addResourceCleanUp(self.client.ReleaseAddress,
+            self.addResourceCleanUp(self.client.release_address,
                                     PublicIp=public_ip)
 
         return alloc_id, public_ip
 
     def create_key_pair(self, key_name):
-        resp, data = self.client.CreateKeyPair(KeyName=key_name)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.addResourceCleanUp(self.client.DeleteKeyPair, KeyName=key_name)
+        data = self.client.create_key_pair(KeyName=key_name)
+        self.addResourceCleanUp(self.client.delete_key_pair, KeyName=key_name)
         return data.get('KeyMaterial')
 
     def create_standard_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
         kwargs = {'GroupName': name, 'Description': desc}
-        resp, data = self.client.CreateSecurityGroup(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.addResourceCleanUp(self.client.DeleteSecurityGroup,
+        self.client.create_security_group(*[], **kwargs)
+        self.addResourceCleanUp(self.client.delete_security_group,
                                 GroupName=name)
         time.sleep(2)
 
@@ -117,15 +112,13 @@ class BaseScenarioTest(base.EC2TestCase):
                 }],
             }]
         }
-        resp, data = self.client.AuthorizeSecurityGroupIngress(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.authorize_security_group_ingress(*[], **kwargs)
 
         return name
 
     def prepare_vpc_default_security_group(self, vpc_id):
-        resp, data = self.client.DescribeSecurityGroups(
+        data = self.client.describe_security_groups(
             Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])
-        self.assertEqual(200, resp.status_code)
         self.assertEqual(1, len(data['SecurityGroups']))
         group_id = data['SecurityGroups'][0]['GroupId']
         kwargs = {
@@ -139,13 +132,11 @@ class BaseScenarioTest(base.EC2TestCase):
                 }],
             }]
         }
-        resp, data = self.client.AuthorizeSecurityGroupIngress(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.authorize_security_group_ingress(*[], **kwargs)
 
     def prepare_route(self, vpc_id, gw_id):
-        resp, data = self.client.DescribeRouteTables(
+        data = self.client.describe_route_tables(
             Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])
-        self.assertEqual(200, resp.status_code)
         self.assertEqual(1, len(data['RouteTables']))
 
         kwargs = {
@@ -153,44 +144,38 @@ class BaseScenarioTest(base.EC2TestCase):
             'RouteTableId': data['RouteTables'][0]['RouteTableId'],
             'GatewayId': gw_id
         }
-        resp, data = self.client.CreateRoute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.create_route(*[], **kwargs)
 
     def create_vpc_and_subnet(self, cidr):
-        resp, data = self.client.CreateVpc(CidrBlock=cidr)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_vpc(CidrBlock=cidr)
         vpc_id = data['Vpc']['VpcId']
-        self.addResourceCleanUp(self.client.DeleteVpc, VpcId=vpc_id)
+        self.addResourceCleanUp(self.client.delete_vpc, VpcId=vpc_id)
         self.get_vpc_waiter().wait_available(vpc_id)
 
-        resp, data = self.client.CreateSubnet(VpcId=vpc_id, CidrBlock=cidr,
+        data = self.client.create_subnet(VpcId=vpc_id, CidrBlock=cidr,
             AvailabilityZone=CONF.aws.aws_zone)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         subnet_id = data['Subnet']['SubnetId']
-        self.addResourceCleanUp(self.client.DeleteSubnet, SubnetId=subnet_id)
+        self.addResourceCleanUp(self.client.delete_subnet, SubnetId=subnet_id)
 
         return vpc_id, subnet_id
 
     def create_network_interface(self, subnet_id):
-        resp, data = self.client.CreateNetworkInterface(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(SubnetId=subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
-        self.addResourceCleanUp(self.client.DeleteNetworkInterface,
+        self.addResourceCleanUp(self.client.delete_network_interface,
                                 NetworkInterfaceId=ni_id)
         self.get_network_interface_waiter().wait_available(ni_id)
 
         return ni_id
 
     def create_and_attach_internet_gateway(self, vpc_id):
-        resp, data = self.client.CreateInternetGateway()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
-        self.addResourceCleanUp(self.client.DeleteInternetGateway,
+        self.addResourceCleanUp(self.client.delete_internet_gateway,
                                 InternetGatewayId=gw_id)
-        resp, data = self.client.AttachInternetGateway(VpcId=vpc_id,
-                                                       InternetGatewayId=gw_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
-        self.addResourceCleanUp(self.client.DetachInternetGateway,
+        data = self.client.attach_internet_gateway(VpcId=vpc_id,
+                                                   InternetGatewayId=gw_id)
+        self.addResourceCleanUp(self.client.detach_internet_gateway,
                                 VpcId=vpc_id,
                                 InternetGatewayId=gw_id)
 

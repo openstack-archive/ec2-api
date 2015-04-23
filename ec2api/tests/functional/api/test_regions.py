@@ -22,8 +22,7 @@ CONF = config.CONF
 class RegionTest(base.EC2TestCase):
 
     def test_describe_regions(self):
-        resp, data = self.client.DescribeRegions()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_regions()
         self.assertNotEmpty(data['Regions'])
 
         region = CONF.aws.aws_region
@@ -34,8 +33,7 @@ class RegionTest(base.EC2TestCase):
         self.assertIn(region, regions)
 
     def test_describe_zones(self):
-        resp, data = self.client.DescribeAvailabilityZones()
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_availability_zones()
         self.assertNotEmpty(data['AvailabilityZones'])
 
         region = CONF.aws.aws_region

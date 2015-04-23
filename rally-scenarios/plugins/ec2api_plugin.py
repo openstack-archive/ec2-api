@@ -40,7 +40,7 @@ class EC2APIPlugin(base.Scenario):
     def _get_client(self, is_nova):
         args = self.context['user']['ec2args']
         url = args['nova_url'] if is_nova else args['url']
-        client = botocoreclient.APIClientEC2(
+        client = botocoreclient._get_ec2_client(
             url, args['region'], args['access'], args['secret'])
         return client
 
@@ -68,67 +68,57 @@ class EC2APIPlugin(base.Scenario):
     @base.scenario()
     @_runner(_run_both)
     def describe_instances(self, client):
-        resp, data = client.DescribeInstances()
-        assert 200 == resp.status_code
+        data = client.describe_instances()
 
     @base.scenario()
     @_runner(_run_both)
     def describe_addresses(self, client):
-        resp, data = client.DescribeAddresses()
-        assert 200 == resp.status_code
+        data = client.describe_addresses()
 
     @base.scenario()
     @_runner(_run_both)
     def describe_security_groups(self, client):
-        resp, data = client.DescribeSecurityGroups()
-        assert 200 == resp.status_code
+        data = client.describe_security_groups()
 
     @base.scenario()
     @_runner(_run_both)
     def describe_regions(self, client):
-        resp, data = client.DescribeRegions()
-        assert 200 == resp.status_code
+        data = client.describe_regions()
 
     @base.scenario()
     @_runner(_run_both)
     def describe_images(self, client):
-        resp, data = client.DescribeImages()
-        assert 200 == resp.status_code
+        data = client.describe_images()
 
     @base.scenario()
     @_runner(_run_ec2)
     def describe_vpcs(self, client):
-        resp, data = client.DescribeVpcs()
-        assert 200 == resp.status_code
+        data = client.describe_vpcs()
 
     @base.scenario()
     @_runner(_run_ec2)
     def describe_subnets(self, client):
-        resp, data = client.DescribeSubnets()
-        assert 200 == resp.status_code
+        data = client.describe_subnets()
 
     @base.scenario()
     @_runner(_run_ec2)
     def describe_network_interfaces(self, client):
-        resp, data = client.DescribeNetworkInterfaces()
-        assert 200 == resp.status_code
+        data = client.describe_network_interfaces()
 
     @base.scenario()
     @_runner(_run_ec2)
     def describe_route_tables(self, client):
-        resp, data = client.DescribeRouteTables()
-        assert 200 == resp.status_code
+        data = client.describe_route_tables()
 
     _instance_id_by_client = dict()
 
     @base.scenario()
     @_runner(_run_both)
     def describe_one_instance(self, client):
-        client_id = client.get_url()
+        client_id = client._endpoint
         instance_id = self._instance_id_by_client.get(client_id)
         if not instance_id:
-            resp, data = client.DescribeInstances()
-            assert 200 == resp.status_code
+            data = client.describe_instances()
             instances = data['Reservations'][0]['Instances']
             index = len(instances) / 3
             instance_id = instances[index]['InstanceId']
@@ -136,8 +126,7 @@ class EC2APIPlugin(base.Scenario):
             LOG.info("found instance = %s for client %s"
                      % (instance_id, client_id))
 
-        resp, data = client.DescribeInstances(InstanceIds=[instance_id])
-        assert 200 == resp.status_code
+        data = client.describe_instances(InstanceIds=[instance_id])
 
     @base.scenario()
     def describe_all_in_one(self):

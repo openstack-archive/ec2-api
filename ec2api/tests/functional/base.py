@@ -19,8 +19,8 @@ import sys
 import time
 import traceback
 
+import botocore.exceptions
 from oslo_log import log
-import six
 from tempest_lib import base
 from tempest_lib import exceptions
 import testtools
@@ -35,35 +35,6 @@ logging.getLogger('botocore').setLevel(logging.INFO)
 logging.getLogger(
     'botocore.vendored.requests.packages.urllib3.connectionpool'
 ).setLevel(logging.WARNING)
-
-
-class EC2ErrorConverter(object):
-
-    _data = ''
-
-    def __init__(self, data, *args, **kwargs):
-        self._data = data
-
-    def __str__(self):
-        if isinstance(self._data, six.string_types):
-            return self._data
-        if isinstance(self._data, dict) and 'Error' in self._data:
-            result = ''
-            if 'Message' in self._data['Error']:
-                result = self._data['Error']['Message']
-            if 'Code' in self._data['Error']:
-                result += ' (' + self._data['Error']['Code'] + ')'
-            return result
-        return str(self._data)
-
-
-class EC2ResponceException(Exception):
-    def __init__(self, resp, data):
-        self.resp = resp
-        self.data = data
-
-    def __str__(self):
-        return str(self.data)
 
 
 class EC2Waiter(object):
@@ -167,16 +138,13 @@ def safe_setup(f):
         try:
             f(cls)
         except Exception as se:
-            etype, value, trace = sys.exc_info()
+            exc_info = sys.exc_info()
             LOG.exception("setUpClass failed: %s" % se)
             try:
                 cls.tearDownClass()
             except Exception as te:
                 LOG.exception("tearDownClass failed: %s" % te)
-            try:
-                raise etype(value), None, trace
-            finally:
-                del trace  # for avoiding circular refs
+            raise exc_info[1], None, exc_info[2]
 
     return decorator
 
@@ -199,13 +167,12 @@ class TesterStateHolder(object):
             return self._vpc_enabled
 
         self._vpc_enabled = False
-        resp, data = self.ec2_client.DescribeAccountAttributes()
-        if resp.status_code == 200:
-            for item in data.get('AccountAttributes', []):
-                if item['AttributeName'] == 'supported-platforms':
-                    for value in item['AttributeValues']:
-                        if value['AttributeValue'] == 'VPC':
-                            self._vpc_enabled = True
+        data = self.ec2_client.describe_account_attributes()
+        for item in data.get('AccountAttributes', []):
+            if item['AttributeName'] == 'supported-platforms':
+                for value in item['AttributeValues']:
+                    if value['AttributeValue'] == 'VPC':
+                        self._vpc_enabled = True
 
         return self._vpc_enabled
 
@@ -235,16 +202,10 @@ class EC2TestCase(base.BaseTestCase):
     @safe_setup
     def setUpClass(cls):
         super(EC2TestCase, cls).setUpClass()
-        cls.client = botocoreclient.APIClientEC2(
+        cls.client = botocoreclient._get_ec2_client(
             CONF.aws.ec2_url, CONF.aws.aws_region,
             CONF.aws.aws_access, CONF.aws.aws_secret)
         TesterStateHolder().ec2_client = cls.client
-
-    @classmethod
-    def assertResultStatic(cls, resp, data):
-        if resp.status_code != 200:
-            LOG.error(EC2ErrorConverter(data))
-        assert 200 == resp.status_code
 
     @classmethod
     def addResourceCleanUpStatic(cls, function, *args, **kwargs):
@@ -297,28 +258,28 @@ class EC2TestCase(base.BaseTestCase):
     ]
 
     _CLEANUP_WAITERS = {
-        'DeleteVpc': (
+        'delete_vpc': (
             'get_vpc_waiter',
             lambda kwargs: kwargs['VpcId']),
-        'DeleteSubnet': (
+        'delete_subnet': (
             'get_subnet_waiter',
             lambda kwargs: kwargs['SubnetId']),
-        'DeleteNetworkInterface': (
+        'delete_network_interface': (
             'get_network_interface_waiter',
             lambda kwargs: kwargs['NetworkInterfaceId']),
-        'TerminateInstances': (
+        'terminate_instances': (
             'get_instance_waiter',
             lambda kwargs: kwargs['InstanceIds'][0]),
-        'DeleteVolume': (
+        'delete_volume': (
             'get_volume_waiter',
             lambda kwargs: kwargs['VolumeId']),
-        'DetachVolume': (
+        'detach_volume': (
             'get_volume_attachment_waiter',
             lambda kwargs: kwargs['VolumeId']),
-        'DeleteSnapshot': (
+        'delete_snapshot': (
             'get_snapshot_waiter',
             lambda kwargs: kwargs['SnapshotId']),
-        'DeregisterImage': (
+        'deregister_image': (
             'get_image_waiter',
             lambda kwargs: kwargs['ImageId']),
     }
@@ -356,25 +317,20 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def cleanUpItem(cls, function, pos_args, kw_args):
-        resp, data = function(*pos_args, **kw_args)
-        if resp.status_code != 200:
-            error = data.get('Error', {})
-            error_code = error.get('Code')
+        try:
+            function(*pos_args, **kw_args)
+            if function.__name__ in cls._CLEANUP_WAITERS:
+                (waiter, obj_id) = cls._CLEANUP_WAITERS[function.__name__]
+                waiter = getattr(cls, waiter)
+                obj_id = obj_id(kw_args)
+                waiter().wait_delete(obj_id)
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response['Error']['Code']
             for err in cls._VALID_CLEANUP_ERRORS:
                 if err in error_code:
                     break
             else:
-                err_msg = (error if isinstance(error, basestring)
-                           else error.get('Message'))
-                msg = ("Cleanup failed with status %d and message"
-                       " '%s'(Code = %s)"
-                       % (resp.status_code, err_msg, error_code))
-                LOG.error(msg)
-        elif function.__name__ in cls._CLEANUP_WAITERS:
-            (waiter, obj_id) = cls._CLEANUP_WAITERS[function.__name__]
-            waiter = getattr(cls, waiter)
-            obj_id = obj_id(kw_args)
-            waiter().wait_delete(obj_id)
+                LOG.error("Cleanup failed: %s", e, exc_info=True)
 
     @classmethod
     def friendly_function_name_simple(cls, call_able):
@@ -397,16 +353,16 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _vpc_get_state(cls, vpc_id):
-        resp, data = cls.client.DescribeVpcs(VpcIds=[vpc_id])
-        if resp.status_code == 200:
-            return data['Vpcs'][0]['State']
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidVpcID.NotFound':
+        try:
+            data = cls.client.describe_vpcs(VpcIds=[vpc_id])
+            if not data['Vpcs']:
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            return data['Vpcs'][0]['State']
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidVpcID.NotFound':
+                raise exceptions.NotFound()
+            raise
 
     @classmethod
     def get_vpc_waiter(cls):
@@ -414,16 +370,16 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _subnet_get_state(cls, subnet_id):
-        resp, data = cls.client.DescribeSubnets(SubnetIds=[subnet_id])
-        if resp.status_code == 200:
-            return data['Subnets'][0]['State']
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidSubnetID.NotFound':
+        try:
+            data = cls.client.describe_subnets(SubnetIds=[subnet_id])
+            if not data['Subnets']:
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            return data['Subnets'][0]['State']
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidSubnetID.NotFound':
+                raise exceptions.NotFound()
+            raise
 
     @classmethod
     def get_subnet_waiter(cls):
@@ -431,19 +387,21 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _instance_get_state(cls, instance_id):
-        resp, data = cls.client.DescribeInstances(InstanceIds=[instance_id])
-        if resp.status_code == 200:
+        try:
+            data = cls.client.describe_instances(InstanceIds=[instance_id])
+            if not data['Reservations']:
+                raise exceptions.NotFound()
+            if not data['Reservations'][0]['Instances']:
+                raise exceptions.NotFound()
             state = data['Reservations'][0]['Instances'][0]['State']['Name']
             if state != 'terminated':
                 return state
             raise exceptions.NotFound()
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidInstanceID.NotFound':
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidInstanceID.NotFound':
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            raise
 
     @classmethod
     def get_instance_waiter(cls):
@@ -451,17 +409,17 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _network_interface_get_state(cls, ni_id):
-        resp, data = cls.client.DescribeNetworkInterfaces(
-            NetworkInterfaceIds=[ni_id])
-        if resp.status_code == 200:
-            return data['NetworkInterfaces'][0]['Status']
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidNetworkInterfaceID.NotFound':
+        try:
+            data = cls.client.describe_network_interfaces(
+                NetworkInterfaceIds=[ni_id])
+            if not data['NetworkInterfaces']:
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            return data['NetworkInterfaces'][0]['Status']
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidNetworkInterfaceID.NotFound':
+                raise exceptions.NotFound()
+            raise
 
     @classmethod
     def get_network_interface_waiter(cls):
@@ -469,16 +427,16 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _volume_get_state(cls, volume_id):
-        resp, data = cls.client.DescribeVolumes(VolumeIds=[volume_id])
-        if resp.status_code == 200:
-            return data['Volumes'][0]['State']
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidVolume.NotFound':
+        try:
+            data = cls.client.describe_volumes(VolumeIds=[volume_id])
+            if not data['Volumes']:
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            return data['Volumes'][0]['State']
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidVolume.NotFound':
+                raise exceptions.NotFound()
+            raise
 
     @classmethod
     def get_volume_waiter(cls):
@@ -486,19 +444,17 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _volume_attachment_get_state(cls, volume_id):
-        resp, data = cls.client.DescribeVolumes(VolumeIds=[volume_id])
-        if resp.status_code == 200:
+        try:
+            data = cls.client.describe_volumes(VolumeIds=[volume_id])
             volume = data['Volumes'][0]
             if 'Attachments' in volume and len(volume['Attachments']) > 0:
                 return volume['Attachments'][0]['State']
             raise exceptions.NotFound()
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidVolume.NotFound':
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidVolume.NotFound':
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            raise
 
     @classmethod
     def get_volume_attachment_waiter(cls):
@@ -506,16 +462,16 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _snapshot_get_state(cls, volume_id):
-        resp, data = cls.client.DescribeSnapshots(SnapshotIds=[volume_id])
-        if resp.status_code == 200:
-            return data['Snapshots'][0]['State']
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidSnapshot.NotFound':
+        try:
+            data = cls.client.describe_snapshots(SnapshotIds=[volume_id])
+            if not data['Snapshots']:
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            return data['Snapshots'][0]['State']
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidSnapshot.NotFound':
+                raise exceptions.NotFound()
+            raise
 
     @classmethod
     def get_snapshot_waiter(cls):
@@ -523,18 +479,16 @@ class EC2TestCase(base.BaseTestCase):
 
     @classmethod
     def _image_get_state(cls, image_id):
-        resp, data = cls.client.DescribeImages(ImageIds=[image_id])
-        if resp.status_code == 200:
+        try:
+            data = cls.client.describe_images(ImageIds=[image_id])
             if not data['Images']:
                 raise exceptions.NotFound()
             return data['Images'][0]['State']
-
-        if resp.status_code == 400:
-            error = data['Error']
-            if error['Code'] == 'InvalidAMIID.NotFound':
+        except botocore.exceptions.ClientError:
+            error_code = sys.exc_info()[1].response['Error']['Code']
+            if error_code == 'InvalidAMIID.NotFound':
                 raise exceptions.NotFound()
-
-        raise EC2ResponceException(resp, data)
+            raise
 
     @classmethod
     def get_image_waiter(cls):
@@ -546,12 +500,20 @@ class EC2TestCase(base.BaseTestCase):
     def assertNotEmpty(self, list_obj, msg=None):
         self.assertTrue(len(list_obj) > 0, msg)
 
+    def assertRaises(self, error_code, fn, rollback_fn=None, **kwargs):
+        try:
+            fn_data = fn(**kwargs)
+            try:
+                rollback_fn(fn_data)
+            except Exception:
+                LOG.exception()
+        except botocore.exceptions.ClientError as e:
+            self.assertEqual(error_code, e.response['Error']['Code'])
+
     # NOTE(andrey-mp): Helpers zone
 
     def get_instance(self, instance_id):
-        resp, data = self.client.DescribeInstances(
-            InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, EC2ErrorConverter(data))
+        data = self.client.describe_instances(InstanceIds=[instance_id])
         self.assertEqual(1, len(data.get('Reservations', [])))
         instances = data['Reservations'][0].get('Instances', [])
         self.assertEqual(1, len(instances))

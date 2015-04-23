@@ -20,7 +20,6 @@ from rally.common import log as logging
 from rally.common import utils as rutils
 from rally import consts
 
-from ec2api.tests.functional import base as ec2_tests_base
 from ec2api.tests.functional import botocoreclient
 
 
@@ -48,10 +47,7 @@ class EC2Objects(base.Context):
             if self.config.get("run_in_vpc", False):
                 subnet_id = self.prepare_network(tenant_id, client)
                 kwargs["SubnetId"] = subnet_id
-            resp, data = client.RunInstances(*[], **kwargs)
-            if resp.status_code != 200:
-                LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-                assert 200 == resp.status_code
+            data = client.run_instances(*[], **kwargs)
             ids = [s['InstanceId'] for s in data['Instances']]
             self.context["tenants"][tenant_id]["servers"] += ids
             servers_per_tenant -= servers_per_run
@@ -61,10 +57,7 @@ class EC2Objects(base.Context):
         ids = self.context["tenants"][tenant_id]["servers"]
         start_time = time.time()
         while True:
-            resp, data = client.DescribeInstances(InstanceIds=ids)
-            if resp.status_code != 200:
-                LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-                assert 200 == resp.status_code
+            data = client.describe_instances(InstanceIds=ids)
             for instance in data['Reservations'][0]['Instances']:
                 assert 'error' != instance['State']['Name']
                 if instance['State']['Name'] != 'running':
@@ -80,42 +73,27 @@ class EC2Objects(base.Context):
         result = dict()
         self.context["tenants"][tenant_id]["networks"].append(result)
 
-        resp, data = client.CreateVpc(CidrBlock=self.CIDR)
-        if resp.status_code != 200:
-            LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-            assert 200 == resp.status_code
+        data = client.create_vpc(CidrBlock=self.CIDR)
         vpc_id = data['Vpc']['VpcId']
         result["vpc_id"] = vpc_id
-        resp, data = client.CreateSubnet(VpcId=vpc_id,
+        data = client.create_subnet(VpcId=vpc_id,
             CidrBlock=self.CIDR, AvailabilityZone=self.AWS_ZONE)
-        if resp.status_code != 200:
-            LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-            assert 200 == resp.status_code
         subnet_id = data['Subnet']['SubnetId']
         result["subnet_id"] = subnet_id
 
         result["ni_ids"] = list()
         for dummy in xrange(0, ni_count):
-            resp, data = client.CreateNetworkInterface(SubnetId=subnet_id)
-            if resp.status_code != 200:
-                LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-                assert 200 == resp.status_code
+            data = client.create_network_interface(SubnetId=subnet_id)
             ni_id = data['NetworkInterface']['NetworkInterfaceId']
             result["ni_ids"].append(ni_id)
             time.sleep(1)
 
         if self.config.get('assign_floating_ip', False):
-            resp, data = client.CreateInternetGateway()
-            if resp.status_code != 200:
-                LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-                assert 200 == resp.status_code
+            data = client.create_internet_gateway()
             gw_id = data['InternetGateway']['InternetGatewayId']
             result["gw_id"] = gw_id
-            resp, data = client.AttachInternetGateway(VpcId=vpc_id,
-                                                      InternetGatewayId=gw_id)
-            if resp.status_code != 200:
-                LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-                assert 200 == resp.status_code
+            data = client.attach_internet_gateway(VpcId=vpc_id,
+                                                  InternetGatewayId=gw_id)
 
         return subnet_id
 
@@ -134,10 +112,7 @@ class EC2Objects(base.Context):
         kwargs = dict()
         if is_vpc:
             kwargs['Domain'] = 'vpc'
-        resp, data = client.AllocateAddress(*[], **kwargs)
-        if resp.status_code != 200:
-            LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
-            return
+        data = client.allocate_address(*[], **kwargs)
         alloc_id = data.get('AllocationId')
         public_ip = data['PublicIp']
         if is_vpc:
@@ -152,15 +127,14 @@ class EC2Objects(base.Context):
             kwargs['AllocationId'] = alloc_id
         else:
             kwargs['PublicIp'] = public_ip
-        resp, data = client.AssociateAddress(*[], **kwargs)
-        if resp.status_code != 200:
-            LOG.error(ec2_tests_base.EC2ErrorConverter(data))
+        try:
+            data = client.associate_address(*[], **kwargs)
+        except Exception:
+            LOG.exception()
             if is_vpc:
-                resp, data = client.ReleaseAddress(AllocationId=alloc_id)
+                data = client.release_address(AllocationId=alloc_id)
             else:
-                resp, data = client.ReleaseAddress(PublicIp=public_ip)
-            if resp.status_code != 200:
-                LOG.error(ec2_tests_base.EC2ErrorConverter(data))
+                data = client.release_address(PublicIp=public_ip)
 
     def terminate_instances_and_wait(self, tenant_id, client):
         ids = self.context["tenants"][tenant_id].get("servers", [])
@@ -168,20 +142,18 @@ class EC2Objects(base.Context):
         mod = len(ids) / servers_per_run
         for i in xrange(0, mod):
             part_ids = ids[i * servers_per_run:(i + 1) * servers_per_run]
-            resp, data = client.TerminateInstances(InstanceIds=part_ids)
-            if resp.status_code != 200:
-                LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+            data = client.terminate_instances(InstanceIds=part_ids)
         part_ids = ids[mod * servers_per_run:]
         if part_ids:
-            resp, data = client.TerminateInstances(InstanceIds=part_ids)
-            if resp.status_code != 200:
-                LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+            data = client.terminate_instances(InstanceIds=part_ids)
 
         start_time = time.time()
         while True:
-            resp, data = client.DescribeInstances(InstanceIds=ids)
-            if (resp.status_code == 400
-                    or len(data['Reservations']) == 0
+            try:
+                data = client.describe_instances(InstanceIds=ids)
+            except Exception:
+                break
+            if (len(data['Reservations']) == 0
                     or len(data['Reservations'][0]['Instances']) == 0):
                 break
             for instance in data['Reservations'][0]['Instances']:
@@ -198,9 +170,7 @@ class EC2Objects(base.Context):
         LOG.info("Cleanup addresses")
         kwargss = self.context["tenants"][tenant_id].get("addresses", [])
         for kwargs in kwargss:
-            resp, data = client.ReleaseAddress(*[], **kwargs)
-            if resp.status_code != 200:
-                LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+            data = client.release_address(*[], **kwargs)
 
     def cleanup_networks(self, tenant_id, client):
         LOG.info("Cleanup networks")
@@ -209,34 +179,39 @@ class EC2Objects(base.Context):
             vpc_id = network.get("vpc_id")
             gw_id = network.get("gw_id")
             if gw_id:
-                resp, data = client.DetachInternetGateway(
-                    VpcId=vpc_id, InternetGatewayId=gw_id)
-                if resp.status_code != 200:
-                    LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+                try:
+                    data = client.detach_internet_gateway(
+                        VpcId=vpc_id, InternetGatewayId=gw_id)
+                except Exception:
+                    LOG.exception()
                 time.sleep(1)
-                resp, data = client.DeleteInternetGateway(
-                    InternetGatewayId=gw_id)
-                if resp.status_code != 200:
-                    LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+                try:
+                    data = client.delete_internet_gateway(
+                        InternetGatewayId=gw_id)
+                except Exception:
+                    LOG.exception()
                 time.sleep(1)
             ni_ids = network.get("ni_ids")
             if ni_ids:
                 for ni_id in ni_ids:
-                    resp, data = client.DeleteNetworkInterface(
-                        NetworkInterfaceId=ni_id)
-                    if resp.status_code != 200:
-                        LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+                    try:
+                        data = client.delete_network_interface(
+                            NetworkInterfaceId=ni_id)
+                    except Exception:
+                        LOG.exception()
                 time.sleep(1)
             subnet_id = network.get("subnet_id")
             if subnet_id:
-                resp, data = client.DeleteSubnet(SubnetId=subnet_id)
-                if resp.status_code != 200:
-                    LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+                try:
+                    data = client.delete_subnet(SubnetId=subnet_id)
+                except Exception:
+                    LOG.exception()
                 time.sleep(1)
             if vpc_id:
-                resp, data = client.DeleteVpc(VpcId=vpc_id)
-                if resp.status_code != 200:
-                    LOG.warning(ec2_tests_base.EC2ErrorConverter(data))
+                try:
+                    data = client.delete_vpc(VpcId=vpc_id)
+                except Exception:
+                    LOG.exception()
 
 
 @base.context(name="ec2_networks", order=451)
@@ -275,7 +250,7 @@ class FakeNetworkGenerator(EC2Objects):
                      % (user["tenant_id"]))
 
             args = user['ec2args']
-            client = botocoreclient.APIClientEC2(
+            client = botocoreclient._get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
 
             self.context["tenants"][tenant_id]["networks"] = list()
@@ -289,10 +264,8 @@ class FakeNetworkGenerator(EC2Objects):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
             args = user['ec2args']
-            client = botocoreclient.APIClientEC2(
+            client = botocoreclient._get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
-            ids = self.context["tenants"][tenant_id].get("servers", [])
-
             self.cleanup_networks(tenant_id, client)
 
 
@@ -353,16 +326,13 @@ class FakeServerGenerator(EC2Objects):
                      % (user["tenant_id"]))
 
             args = user['ec2args']
-            client = botocoreclient.APIClientEC2(
+            client = botocoreclient._get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
 
             if image_id is None:
-                resp, data = client.DescribeImages(
+                data = client.describe_images(
                     Filters=[{'Name': 'name', 'Values': [image]},
                              {'Name': 'image-type', 'Values': ['machine']}])
-                if resp.status_code != 200:
-                    LOG.error(ec2_tests_base.EC2ErrorConverter(data))
-                    assert 200 == resp.status_code
                 image_id = data['Images'][0]['ImageId']
 
             self.context["tenants"][tenant_id]["servers"] = list()
@@ -376,9 +346,8 @@ class FakeServerGenerator(EC2Objects):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
             args = user['ec2args']
-            client = botocoreclient.APIClientEC2(
+            client = botocoreclient._get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
-            ids = self.context["tenants"][tenant_id].get("servers", [])
 
             self.terminate_instances_and_wait(tenant_id, client)
             self.release_addresses(tenant_id, client)

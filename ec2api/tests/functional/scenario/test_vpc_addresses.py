@@ -39,11 +39,10 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
         alloc_id1, public_ip1 = self.allocate_address(True)
         alloc_id2, _ = self.allocate_address(True)
 
-        resp, data = self.client.CreateNetworkInterface(SubnetId=subnet_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.create_network_interface(SubnetId=subnet_id)
         ni_id2 = data['NetworkInterface']['NetworkInterfaceId']
-        clean_ni2 = self.addResourceCleanUp(self.client.DeleteNetworkInterface,
-                                            NetworkInterfaceId=ni_id2)
+        clean_ni2 = self.addResourceCleanUp(
+            self.client.delete_network_interface, NetworkInterfaceId=ni_id2)
         self.get_network_interface_waiter().wait_available(ni_id2)
 
         kwargs = {
@@ -54,40 +53,34 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
             'NetworkInterfaces': [
                 {'NetworkInterfaceId': ni_id1, 'DeviceIndex': 0}]
         }
-        resp, data = self.client.RunInstances(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.run_instances(*[], **kwargs)
         instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.TerminateInstances,
+        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
                                           InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
-        resp, data = self.client.AttachNetworkInterface(DeviceIndex=1,
+        data = self.client.attach_network_interface(DeviceIndex=1,
             InstanceId=instance_id, NetworkInterfaceId=ni_id2)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         attachment_id = data['AttachmentId']
 
         # There are multiple interfaces attached to instance 'i-5310c5af'.
         # Please specify an interface ID for the operation instead.
-        resp, data = self.client.AssociateAddress(InstanceId=instance_id,
-                                                  AllocationId=alloc_id1)
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidInstanceID', data['Error']['Code'])
+        self.assertRaises('InvalidInstanceID',
+            self.client.associate_address,
+            InstanceId=instance_id, AllocationId=alloc_id1)
 
         # The networkInterface ID 'eni-ffffffff' does not exist
-        resp, data = self.client.AssociateAddress(
+        self.assertRaises('InvalidNetworkInterfaceID.NotFound',
+            self.client.associate_address,
             AllocationId=alloc_id1, NetworkInterfaceId='eni-ffffffff')
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidNetworkInterfaceID.NotFound',
-                         data['Error']['Code'])
 
         # NOTE(andrey-mp): Amazon needs only network interface if several
         # present in instance. Error will be there if instance is passed.
-        resp, data = self.client.AssociateAddress(
+        data = self.client.associate_address(
             AllocationId=alloc_id1, NetworkInterfaceId=ni_id1)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         assoc_id1 = data['AssociationId']
-        clean_aa1 = self.addResourceCleanUp(self.client.DisassociateAddress,
-                                           AssociationId=assoc_id1)
+        clean_aa1 = self.addResourceCleanUp(self.client.disassociate_address,
+                                            AssociationId=assoc_id1)
 
         instance = self.get_instance(instance_id)
         nis = instance.get('NetworkInterfaces', [])
@@ -101,20 +94,18 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
             else:
                 self.assertTrue(False, 'Unknown interface found: ' + str(ni))
 
-        resp, data = self.client.DescribeNetworkInterfaces(
+        data = self.client.describe_network_interfaces(
             NetworkInterfaceIds=[ni_id1, ni_id2])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(2, len(data['NetworkInterfaces']))
         self.assertEqual('in-use', data['NetworkInterfaces'][0]['Status'])
         self.assertEqual('in-use', data['NetworkInterfaces'][1]['Status'])
 
         # NOTE(andrery-mp): associate second address and set delete on
         # termination to True for interface
-        resp, data = self.client.AssociateAddress(
+        data = self.client.associate_address(
             AllocationId=alloc_id2, NetworkInterfaceId=ni_id2)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         assoc_id2 = data['AssociationId']
-        clean_aa2 = self.addResourceCleanUp(self.client.DisassociateAddress,
+        clean_aa2 = self.addResourceCleanUp(self.client.disassociate_address,
                                             AssociationId=assoc_id2)
 
         kwargs = {
@@ -124,43 +115,36 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
                 'DeleteOnTermination': True,
             }
         }
-        resp, data = self.client.ModifyNetworkInterfaceAttribute(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.modify_network_interface_attribute(*[], **kwargs)
 
         # NOTE(andrey-mp): cleanup
         time.sleep(3)
 
-        resp, data = self.client.TerminateInstances(InstanceIds=[instance_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(clean_i)
         self.get_instance_waiter().wait_delete(instance_id)
 
-        resp, data = self.client.DescribeNetworkInterfaces(
+        self.assertRaises('InvalidNetworkInterfaceID.NotFound',
+            self.client.describe_network_interfaces,
             NetworkInterfaceIds=[ni_id2])
-        self.assertEqual(400, resp.status_code, base.EC2ErrorConverter(data))
-        self.assertEqual('InvalidNetworkInterfaceID.NotFound',
-                         data['Error']['Code'])
         self.cancelResourceCleanUp(clean_ni2)
         self.cancelResourceCleanUp(clean_aa2)
 
-        resp, data = self.client.DescribeNetworkInterfaces(
+        data = self.client.describe_network_interfaces(
             NetworkInterfaceIds=[ni_id1])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(1, len(data['NetworkInterfaces']))
         self.assertEqual('available', data['NetworkInterfaces'][0]['Status'])
         ni = data['NetworkInterfaces'][0]
         self.assertIsNotNone(ni.get('Association'))
         self.assertEqual(public_ip1, ni['Association']['PublicIp'])
 
-        resp, data = self.client.DescribeAddresses(AllocationIds=[alloc_id1,
-                                                                  alloc_id2])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_addresses(AllocationIds=[alloc_id1,
+                                                             alloc_id2])
         for address in data['Addresses']:
             if address['AllocationId'] == alloc_id1:
                 self.assertIsNotNone(address.get('AssociationId'))
             elif address['AllocationId'] == alloc_id2:
                 self.assertIsNone(address.get('AssociationId'))
 
-        resp, data = self.client.DisassociateAddress(AssociationId=assoc_id1)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        self.client.disassociate_address(AssociationId=assoc_id1)
         self.cancelResourceCleanUp(clean_aa1)

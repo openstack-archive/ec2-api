@@ -45,9 +45,8 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         instance_id = self.run_instance(KeyName=key_name, UserData=user_data,
                                         SecurityGroups=[sec_group_name])
 
-        resp, data = self.client.DescribeInstanceAttribute(
+        data = self.client.describe_instance_attribute(
             InstanceId=instance_id, Attribute='userData')
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         self.assertEqual(data['UserData']['Value'],
                          base64.b64encode(user_data))
 
@@ -75,13 +74,11 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         cmd = 'sudo sh -c "echo \\"%s\\" >/dev/console"' % data_to_check
         ssh_client.exec_command(cmd)
 
-        waiter = base.EC2Waiter(self.client.GetConsoleOutput)
+        waiter = base.EC2Waiter(self.client.get_console_output)
         waiter.wait_no_exception(InstanceId=instance_id)
 
         def _compare_console_output():
-            resp, data = self.client.GetConsoleOutput(InstanceId=instance_id)
-            self.assertEqual(200, resp.status_code,
-                             base.EC2ErrorConverter(data))
+            data = self.client.get_console_output(InstanceId=instance_id)
             self.assertEqual(instance_id, data['InstanceId'])
             self.assertIsNotNone(data['Timestamp'])
             self.assertIn('Output', data)

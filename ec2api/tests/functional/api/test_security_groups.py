@@ -39,86 +39,77 @@ class SecurityGroupTest(base.EC2TestCase):
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
-        resp, data = cls.client.CreateVpc(CidrBlock=cls.VPC_CIDR)
-        cls.assertResultStatic(resp, data)
+        data = cls.client.create_vpc(CidrBlock=cls.VPC_CIDR)
         cls.vpc_id = data['Vpc']['VpcId']
-        cls.addResourceCleanUpStatic(cls.client.DeleteVpc, VpcId=cls.vpc_id)
+        cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
     def test_create_delete_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
-        resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
+        data = self.client.create_security_group(VpcId=self.vpc_id,
                                                      GroupName=name,
                                                      Description=desc)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         group_id = data['GroupId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteSecurityGroup,
+        res_clean = self.addResourceCleanUp(self.client.delete_security_group,
                                             GroupId=group_id)
         time.sleep(2)
 
-        resp, data = self.client.DeleteSecurityGroup(GroupId=group_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_security_group(GroupId=group_id)
         self.cancelResourceCleanUp(res_clean)
 
-        resp, data = self.client.DescribeSecurityGroups(GroupIds=[group_id])
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidGroup.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidGroup.NotFound',
+                          self.client.describe_security_groups,
+                          GroupIds=[group_id])
 
-        resp, data = self.client.DeleteSecurityGroup(GroupId=group_id)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidGroup.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidGroup.NotFound',
+                          self.client.delete_security_group,
+                          GroupId=group_id)
 
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "MismatchError: 'InvalidParameterValue' != 'ValidationError'")
     def test_create_invalid_name_desc(self):
         valid = data_utils.rand_name('sgName')
         invalid = 'name%"'
-        resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
-                                                     GroupName=invalid,
-                                                     Description=valid)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.create_security_group,
+                          VpcId=self.vpc_id, GroupName=invalid,
+                          Description=valid)
 
-        resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
-                                                     GroupName=valid,
-                                                     Description=invalid)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidParameterValue', data['Error']['Code'])
+        self.assertRaises('InvalidParameterValue',
+                          self.client.create_security_group,
+                          VpcId=self.vpc_id, GroupName=valid,
+                          Description=invalid)
 
-        resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
-                                                     GroupName=valid)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('MissingParameter', data['Error']['Code'])
+        self.assertRaises('MissingParameter',
+                          self.client.create_security_group,
+                          VpcId=self.vpc_id, GroupName=valid, Description='')
 
-        resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
-                                                     Description=valid)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('MissingParameter', data['Error']['Code'])
+        self.assertRaises('MissingParameter',
+                          self.client.create_security_group,
+                          VpcId=self.vpc_id, GroupName='', Description=valid)
 
     def test_ingress_rules(self):
-        self._test_rules(self.client.AuthorizeSecurityGroupIngress,
-                         self.client.RevokeSecurityGroupIngress,
+        self._test_rules(self.client.authorize_security_group_ingress,
+                         self.client.revoke_security_group_ingress,
                          'IpPermissions')
 
     def test_egress_rules(self):
-        self._test_rules(self.client.AuthorizeSecurityGroupEgress,
-                         self.client.RevokeSecurityGroupEgress,
+        self._test_rules(self.client.authorize_security_group_egress,
+                         self.client.revoke_security_group_egress,
                          'IpPermissionsEgress')
 
     def _test_rules(self, add_func, del_func, field):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
-        resp, data = self.client.CreateSecurityGroup(VpcId=self.vpc_id,
+        data = self.client.create_security_group(VpcId=self.vpc_id,
                                                      GroupName=name,
                                                      Description=desc)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
         group_id = data['GroupId']
-        res_clean = self.addResourceCleanUp(self.client.DeleteSecurityGroup,
+        res_clean = self.addResourceCleanUp(self.client.delete_security_group,
                                             GroupId=group_id)
         time.sleep(2)
-        resp, data = self.client.DescribeSecurityGroups(GroupIds=[group_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_security_groups(GroupIds=[group_id])
         count = len(data['SecurityGroups'][0][field])
 
         kwargs = {
@@ -132,11 +123,9 @@ class SecurityGroupTest(base.EC2TestCase):
                 }],
             }]
         }
-        resp, data = add_func(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = add_func(*[], **kwargs)
 
-        resp, data = self.client.DescribeSecurityGroups(GroupIds=[group_id])
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.describe_security_groups(GroupIds=[group_id])
         self.assertEqual(1, len(data['SecurityGroups']))
         self.assertEqual(count + 1, len(data['SecurityGroups'][0][field]))
         found = False
@@ -150,13 +139,9 @@ class SecurityGroupTest(base.EC2TestCase):
                 found = True
         self.assertTrue(found)
 
-        resp, data = del_func(*[], **kwargs)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = del_func(*[], **kwargs)
 
-        resp, data = del_func(*[], **kwargs)
-        self.assertEqual(400, resp.status_code)
-        self.assertEqual('InvalidPermission.NotFound', data['Error']['Code'])
+        self.assertRaises('InvalidPermission.NotFound', del_func, **kwargs)
 
-        resp, data = self.client.DeleteSecurityGroup(GroupId=group_id)
-        self.assertEqual(200, resp.status_code, base.EC2ErrorConverter(data))
+        data = self.client.delete_security_group(GroupId=group_id)
         self.cancelResourceCleanUp(res_clean)
