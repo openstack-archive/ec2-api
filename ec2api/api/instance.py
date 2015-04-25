@@ -212,6 +212,7 @@ def terminate_instances(context, instance_id):
 class InstanceDescriber(common.TaggableItemsDescriber):
 
     KIND = 'i'
+    SORT_KEY = 'instanceId'
     FILTER_MAP = {
         'availability-zone': ('placement', 'availabilityZone'),
         'block-device-mapping.delete-on-termination': [
@@ -382,7 +383,8 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
     def get_db_items(self):
         return self.reservations
 
-    def describe(self, context, ids=None, names=None, filter=None):
+    def describe(self, context, ids=None, names=None, filter=None,
+                 max_results=None, next_token=None):
         reservation_filters = []
         instance_filters = []
         for f in filter or []:
@@ -400,7 +402,8 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
         try:
             instance_describer = InstanceDescriber()
             formatted_instances = instance_describer.describe(
-                    context, ids=ids, filter=instance_filters)
+                context, ids=ids, filter=instance_filters,
+                max_results=max_results, next_token=next_token)
         except exception.InvalidInstanceIDNotFound:
             _remove_instances(context, instance_describer.obsolete_instances)
             raise
@@ -413,15 +416,28 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
         self.suitable_instances = set(i['instanceId']
                                       for i in formatted_instances)
 
-        return super(ReservationDescriber, self).describe(
-                context, filter=reservation_filters)
+        result = super(ReservationDescriber, self).describe(
+            context, filter=reservation_filters)
+        self.next_token = instance_describer.next_token
+        return result
 
 
 def describe_instances(context, instance_id=None, filter=None,
                        max_results=None, next_token=None):
-    formatted_reservations = ReservationDescriber().describe(
-            context, ids=instance_id, filter=filter)
-    return {'reservationSet': formatted_reservations}
+    if instance_id and max_results:
+        msg = _('The parameter instancesSet cannot be used with the parameter '
+                'maxResults')
+        raise exception.InvalidParameterCombination(msg)
+
+    reservation_describer = ReservationDescriber()
+    formatted_reservations = reservation_describer.describe(
+            context, ids=instance_id, filter=filter,
+            max_results=max_results, next_token=next_token)
+
+    result = {'reservationSet': formatted_reservations}
+    if reservation_describer.next_token:
+        result['nextToken'] = reservation_describer.next_token
+    return result
 
 
 def reboot_instances(context, instance_id):

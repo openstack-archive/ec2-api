@@ -69,6 +69,7 @@ def delete_snapshot(context, snapshot_id):
 class SnapshotDescriber(common.TaggableItemsDescriber):
 
     KIND = 'snap'
+    SORT_KEY = 'snapshotId'
     FILTER_MAP = {'description': 'description',
                   'owner-id': 'ownerId',
                   'progress': 'progress',
@@ -95,10 +96,21 @@ class SnapshotDescriber(common.TaggableItemsDescriber):
 
 
 def describe_snapshots(context, snapshot_id=None, owner=None,
-                       restorable_by=None, filter=None):
-    formatted_snapshots = SnapshotDescriber().describe(
-        context, ids=snapshot_id, filter=filter)
-    return {'snapshotSet': formatted_snapshots}
+                       restorable_by=None, filter=None,
+                       max_results=None, next_token=None):
+    if snapshot_id and max_results:
+        msg = _('The parameter snapshotSet cannot be used with the parameter '
+                'maxResults')
+        raise exception.InvalidParameterCombination(msg)
+
+    snapshot_describer = SnapshotDescriber()
+    formatted_snapshots = snapshot_describer.describe(
+        context, ids=snapshot_id, filter=filter,
+        max_results=max_results, next_token=next_token)
+    result = {'snapshotSet': formatted_snapshots}
+    if snapshot_describer.next_token:
+        result['nextToken'] = snapshot_describer.next_token
+    return result
 
 
 def _format_snapshot(context, snapshot, os_snapshot, volumes={},

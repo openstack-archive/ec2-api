@@ -201,6 +201,7 @@ Additions to the legacy nova's EC2 API include:
 1. VPC API
 2. Filtering
 3. Tags
+4. Paging
 
 Legacy OpenStack release notice
 ===============================

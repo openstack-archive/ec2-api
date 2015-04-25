@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import collections
 import fnmatch
 import inspect
+import operator
 
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -23,7 +25,7 @@ from ec2api.api import ec2utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _LW
+from ec2api.i18n import _, _LW
 
 
 ec2_opts = [
@@ -260,6 +262,7 @@ class UniversalDescriber(object):
     """Abstract Describer class for various Describe implementations."""
 
     KIND = ''
+    SORT_KEY = ''
     FILTER_MAP = {}
 
     def format(self, item=None, os_item=None):
@@ -330,7 +333,34 @@ class UniversalDescriber(object):
             values = [value] if value is not None else []
         return values
 
-    def describe(self, context, ids=None, names=None, filter=None):
+    def get_paged(self, formatted_items, max_results, next_token):
+        self.next_token = None
+        if not max_results and not next_token:
+            return formatted_items
+
+        if max_results and max_results > 1000:
+            max_results = 1000
+        formatted_items = sorted(formatted_items,
+                                 key=operator.itemgetter(self.SORT_KEY))
+
+        next_item = 0
+        if next_token:
+            next_item = int(base64.b64decode(next_token))
+        if next_item:
+            formatted_items = formatted_items[next_item:]
+        if max_results and max_results < len(formatted_items):
+            self.next_token = base64.b64encode(str(next_item + max_results))
+            formatted_items = formatted_items[:max_results]
+
+        return formatted_items
+
+    def describe(self, context, ids=None, names=None, filter=None,
+                 max_results=None, next_token=None):
+        if max_results and max_results < 5:
+            msg = (_('Value ( %s ) for parameter maxResults is invalid. '
+                     'Expecting a value greater than 5.') % max_results)
+            raise exception.InvalidParameterValue(msg)
+
         self.context = context
         self.selective_describe = ids is not None or names is not None
         self.ids = set(ids or [])
@@ -371,7 +401,8 @@ class UniversalDescriber(object):
         if self.ids or self.names:
             params = {'id': next(iter(self.ids or self.names))}
             raise ec2utils.NOT_FOUND_EXCEPTION_MAP[self.KIND](**params)
-        return formatted_items
+
+        return self.get_paged(formatted_items, max_results, next_token)
 
 
 class TaggableItemsDescriber(UniversalDescriber):
@@ -406,7 +437,8 @@ class TaggableItemsDescriber(UniversalDescriber):
             # errors in AWS docs)
             formatted_item['tagSet'] = formatted_tags
 
-    def describe(self, context, ids=None, names=None, filter=None):
+    def describe(self, context, ids=None, names=None, filter=None,
+                 max_results=None, next_token=None):
         if filter:
             for f in filter:
                 if f['name'].startswith('tag:'):
@@ -416,7 +448,8 @@ class TaggableItemsDescriber(UniversalDescriber):
                     f['value'] = [{'key': tag_key,
                                    'value': tag_values}]
         return super(TaggableItemsDescriber, self).describe(
-            context, ids, names, filter)
+            context, ids=ids, names=names, filter=filter,
+            max_results=max_results, next_token=next_token)
 
     def is_filtering_value_found(self, filter_value, value):
         if isinstance(filter_value, dict):
@@ -438,7 +471,13 @@ class TaggableItemsDescriber(UniversalDescriber):
 class NonOpenstackItemsDescriber(UniversalDescriber):
     """Describer class for non-Openstack items Describe implementations."""
 
-    def describe(self, context, ids=None, names=None, filter=None):
+    def describe(self, context, ids=None, names=None, filter=None,
+                 max_results=None, next_token=None):
+        if max_results and max_results < 5:
+            msg = (_('Value ( %s ) for parameter maxResults is invalid. '
+                     'Expecting a value greater than 5.') % max_results)
+            raise exception.InvalidParameterValue(msg)
+
         self.context = context
         self.ids = ids
         self.items = self.get_db_items()
@@ -450,4 +489,5 @@ class NonOpenstackItemsDescriber(UniversalDescriber):
             if (formatted_item and
                     not self.filtered_out(formatted_item, filter)):
                 formatted_items.append(formatted_item)
-        return formatted_items
+
+        return self.get_paged(formatted_items, max_results, next_token)

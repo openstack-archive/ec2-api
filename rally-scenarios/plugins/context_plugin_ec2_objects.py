@@ -130,7 +130,7 @@ class EC2Objects(base.Context):
         try:
             data = client.associate_address(*[], **kwargs)
         except Exception:
-            LOG.exception()
+            LOG.exception('')
             if is_vpc:
                 data = client.release_address(AllocationId=alloc_id)
             else:
@@ -183,13 +183,13 @@ class EC2Objects(base.Context):
                     data = client.detach_internet_gateway(
                         VpcId=vpc_id, InternetGatewayId=gw_id)
                 except Exception:
-                    LOG.exception()
+                    LOG.exception('')
                 time.sleep(1)
                 try:
                     data = client.delete_internet_gateway(
                         InternetGatewayId=gw_id)
                 except Exception:
-                    LOG.exception()
+                    LOG.exception('')
                 time.sleep(1)
             ni_ids = network.get("ni_ids")
             if ni_ids:
@@ -198,20 +198,20 @@ class EC2Objects(base.Context):
                         data = client.delete_network_interface(
                             NetworkInterfaceId=ni_id)
                     except Exception:
-                        LOG.exception()
+                        LOG.exception('')
                 time.sleep(1)
             subnet_id = network.get("subnet_id")
             if subnet_id:
                 try:
                     data = client.delete_subnet(SubnetId=subnet_id)
                 except Exception:
-                    LOG.exception()
+                    LOG.exception('')
                 time.sleep(1)
             if vpc_id:
                 try:
                     data = client.delete_vpc(VpcId=vpc_id)
                 except Exception:
-                    LOG.exception()
+                    LOG.exception('')
 
 
 @base.context(name="ec2_networks", order=451)

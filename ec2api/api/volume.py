@@ -109,6 +109,7 @@ def delete_volume(context, volume_id):
 class VolumeDescriber(common.TaggableItemsDescriber):
 
     KIND = 'vol'
+    SORT_KEY = 'volumeId'
     FILTER_MAP = {'availability-zone': 'availabilityZone',
                   'create-time': 'createTime',
                   'encrypted': 'encrypted',
@@ -141,9 +142,19 @@ class VolumeDescriber(common.TaggableItemsDescriber):
 
 def describe_volumes(context, volume_id=None, filter=None,
                      max_results=None, next_token=None):
-    formatted_volumes = VolumeDescriber().describe(
-        context, ids=volume_id, filter=filter)
-    return {'volumeSet': formatted_volumes}
+    if volume_id and max_results:
+        msg = _('The parameter volumeSet cannot be used with the parameter '
+                'maxResults')
+        raise exception.InvalidParameterCombination(msg)
+
+    volume_describer = VolumeDescriber()
+    formatted_volumes = volume_describer.describe(
+        context, ids=volume_id, filter=filter,
+        max_results=max_results, next_token=next_token)
+    result = {'volumeSet': formatted_volumes}
+    if volume_describer.next_token:
+        result['nextToken'] = volume_describer.next_token
+    return result
 
 
 def _format_volume(context, volume, os_volume, instances={},

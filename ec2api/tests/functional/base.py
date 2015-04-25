@@ -503,10 +503,14 @@ class EC2TestCase(base.BaseTestCase):
     def assertRaises(self, error_code, fn, rollback_fn=None, **kwargs):
         try:
             fn_data = fn(**kwargs)
-            try:
-                rollback_fn(fn_data)
-            except Exception:
-                LOG.exception()
+            if rollback_fn:
+                try:
+                    rollback_fn(fn_data)
+                except Exception:
+                    LOG.exception('Rollback failed')
+            msg = ("%s hasn't returned exception for params %s"
+                   % (str(fn.__name__), str(kwargs)))
+            raise self.failureException(msg)
         except botocore.exceptions.ClientError as e:
             self.assertEqual(error_code, e.response['Error']['Code'])
 

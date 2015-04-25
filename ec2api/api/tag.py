@@ -88,10 +88,13 @@ def delete_tags(context, resource_id, tag=None):
 
 class TagDescriber(common.NonOpenstackItemsDescriber):
 
+    SORT_KEY = 'key'
     FILTER_MAP = {'key': 'key',
+                  'tag-key': 'key',
                   'resource-id': 'resourceId',
                   'resource-type': 'resourceType',
-                  'value': 'value'}
+                  'value': 'value',
+                  'tag-value': 'value'}
 
     def get_db_items(self):
         return db_api.get_tags(self.context)
@@ -101,8 +104,13 @@ class TagDescriber(common.NonOpenstackItemsDescriber):
 
 
 def describe_tags(context, filter=None, max_results=None, next_token=None):
-    formatted_tags = TagDescriber().describe(context, filter=filter)
-    return {'tagSet': formatted_tags}
+    tag_describer = TagDescriber()
+    formatted_tags = tag_describer.describe(
+        context, filter=filter, max_results=max_results, next_token=next_token)
+    result = {'tagSet': formatted_tags}
+    if tag_describer.next_token:
+        result['nextToken'] = tag_describer.next_token
+    return result
 
 
 def _format_tag(tag):

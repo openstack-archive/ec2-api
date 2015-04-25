@@ -103,8 +103,8 @@ class SecurityGroupTest(base.EC2TestCase):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
         data = self.client.create_security_group(VpcId=self.vpc_id,
-                                                     GroupName=name,
-                                                     Description=desc)
+                                                 GroupName=name,
+                                                 Description=desc)
         group_id = data['GroupId']
         res_clean = self.addResourceCleanUp(self.client.delete_security_group,
                                             GroupId=group_id)

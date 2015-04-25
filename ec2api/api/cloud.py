@@ -525,9 +525,7 @@ class CloudController(object):
             filter (list of filter dict): You can specify filters so that the
                 response includes information for only certain instances.
             max_results (int): The maximum number of items to return.
-                Not used now.
             next_token (str): The token for the next set of items to return.
-                Not used now.
 
         Returns:
             A list of reservations.
@@ -818,9 +816,7 @@ class CloudController(object):
             filter (list of filter dict): You can specify filters so that the
                 response includes information for only certain volumes.
             max_results (int): The maximum number of items to return.
-                Not used now.
             next_token (str): The token for the next set of items to return.
-                Not used now.
 
         Returns:
             A list of volumes.
@@ -852,9 +848,11 @@ class CloudController(object):
         """
 
     @module_and_param_types(snapshot, 'snap_ids', 'strs',
-                            'strs', 'filter')
+                            'strs', 'filter',
+                            'int', 'str')
     def describe_snapshots(self, context, snapshot_id=None, owner=None,
-                           restorable_by=None, filter=None):
+                           restorable_by=None, filter=None,
+                           max_results=None, next_token=None):
         """Describes one or more of the snapshots available to you.
 
         Args:
@@ -868,6 +866,8 @@ class CloudController(object):
                 Not used now.
             filter (list of filter dict): You can specify filters so that the
                 response includes information for only certain snapshots.
+            max_results (int): The maximum number of items to return.
+            next_token (str): The token for the next set of items to return.
 
         Returns:
             A list of snapshots.
@@ -1104,9 +1104,7 @@ class CloudController(object):
             filter (list of filter dict): You can specify filters so that the
                 response includes information for only certain tags.
             max_results (int): The maximum number of items to return.
-                Not used now.
             next_token (str): The token for the next set of items to return.
-                Not used now.
 
         Returns:
             A list of tags.
