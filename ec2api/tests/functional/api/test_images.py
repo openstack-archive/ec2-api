@@ -214,6 +214,7 @@ class ImageTest(base.EC2TestCase):
         self.assertEqual(1, len(data['Images']))
         image = data['Images'][0]
 
+        self.assertIsNotNone(image['CreationDate'])
         self.assertEqual("ebs", image['RootDeviceType'])
         self.assertFalse(image['Public'])
         self.assertEqual(name, image['Name'])

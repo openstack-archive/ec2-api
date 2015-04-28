@@ -116,7 +116,6 @@ Availability zone related:
 
 Image related:
 - CopyImage
-- creationDate Image property
 - platform Image property
 - productCodes Image property
 - hypervisor Image property

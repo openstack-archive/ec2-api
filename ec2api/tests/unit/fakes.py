@@ -1079,6 +1079,7 @@ class OSImage(object):
     def __init__(self, image_dict):
         self.id = image_dict['id']
         self.owner = image_dict.get('owner')
+        self.created_at = image_dict.get('created_at')
         self.is_public = image_dict.get('is_public')
         self.status = image_dict.get('status')
         self.container_format = image_dict.get('container_format')
@@ -1098,9 +1099,12 @@ class OSImage(object):
     def delete(self):
         pass
 
+TIME_CREATE_IMAGE = timeutils.isotime(None, True)
+
 EC2_IMAGE_1 = {
     'imageId': ID_EC2_IMAGE_1,
     'imageOwnerId': ID_OS_PROJECT,
+    'creationDate': TIME_CREATE_IMAGE,
     'isPublic': False,
     'imageState': 'available',
     'imageType': 'machine',
@@ -1133,6 +1137,7 @@ EC2_IMAGE_1 = {
 EC2_IMAGE_2 = {
     'imageId': ID_EC2_IMAGE_2,
     'imageOwnerId': ID_OS_PROJECT,
+    'creationDate': TIME_CREATE_IMAGE,
     'isPublic': True,
     'imageState': 'available',
     'imageType': 'machine',
@@ -1174,6 +1179,7 @@ DB_IMAGE_ARI_1 = {
 OS_IMAGE_1 = {
     'id': ID_OS_IMAGE_1,
     'owner': ID_OS_PROJECT,
+    'created_at': TIME_CREATE_IMAGE,
     'is_public': False,
     'status': 'active',
     'container_format': 'ami',
@@ -1215,6 +1221,7 @@ OS_IMAGE_1 = {
 OS_IMAGE_2 = {
     'id': ID_OS_IMAGE_2,
     'owner': ID_OS_PROJECT,
+    'created_at': TIME_CREATE_IMAGE,
     'is_public': True,
     'status': 'active',
     'container_format': 'ami',

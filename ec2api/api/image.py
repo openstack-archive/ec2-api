@@ -481,6 +481,7 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
                                    ec2utils.get_ec2_id_kind(image['id'])],
                  'isPublic': image['is_public'],
                  'architecture': os_image.properties.get('architecture'),
+                 'creationDate': os_image.created_at
                  }
     if 'description' in image:
         ec2_image['description'] = image['description']
