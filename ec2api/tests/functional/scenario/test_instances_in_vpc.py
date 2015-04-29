@@ -15,12 +15,12 @@
 
 import netaddr
 from oslo_log import log
+from tempest_lib.common import ssh
 from tempest_lib.common.utils import data_utils
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
 from ec2api.tests.functional.scenario import base as scenario_base
-from ec2api.tests.functional import ssh
 
 CONF = config.CONF
 LOG = log.getLogger(__name__)
