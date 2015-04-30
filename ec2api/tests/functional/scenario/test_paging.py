@@ -110,7 +110,7 @@ class TagsPagingTest(scenario_base.BaseScenarioTest):
             MaxResults=5, NextToken=data['NextToken'],
             Filters=[{'Name': 'resource-id', 'Values': [volume_id]}])
         self.assertNotEmpty(data['Tags'])
-        self.assertIn('bbb', [k.get('Value') for k in data['Tags']])
+        self.assertLess(1, len(data['Tags']))
 
     def test_tags_paging_with_tags_deletion(self):
         volume_id, keys = self._create_volume_and_tags()
