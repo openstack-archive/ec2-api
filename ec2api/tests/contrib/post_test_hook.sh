@@ -30,6 +30,20 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
     exit 1
   fi
 
+  # prepare flavor
+  nova flavor-create --is-public True m1.ec2api 16 512 0 1
+
+  REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
+  REGULAR_IMAGE_FNAME="precise"
+  glance image-create --disk-format raw --container-format bare --is-public True --name $REGULAR_IMAGE_FNAME --location $REGULAR_IMAGE_URL
+  if [[ "$?" -ne "0" ]]; then
+    echo "Creation precise image failed"
+    exit 1
+  fi
+  sleep 60
+  # find this image
+  image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "precise" | grep "ami-" | head -n 1 | awk '{print $2}')
+
   # create separate user/project
   tenant_name="tenant-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
   eval $(openstack project create -f shell -c id $tenant_name)
@@ -109,7 +123,10 @@ ec2_url = $EC2_URL
 aws_access = $EC2_ACCESS_KEY
 aws_secret = $EC2_SECRET_KEY
 image_id = $image_id
+image_id_ubuntu = $image_id_ubuntu
 ebs_image_id = $ebs_image_id
+build_timeout = 300
+instance_type = m1.ec2api
 EOF"
 
   # local workaround for LP#1439819. it doesn't work in gating because glance check isatty property.

@@ -35,6 +35,7 @@ logging.getLogger('botocore').setLevel(logging.INFO)
 logging.getLogger(
     'botocore.vendored.requests.packages.urllib3.connectionpool'
 ).setLevel(logging.WARNING)
+logging.getLogger('paramiko.transport').setLevel(logging.WARNING)
 
 
 class EC2Waiter(object):
