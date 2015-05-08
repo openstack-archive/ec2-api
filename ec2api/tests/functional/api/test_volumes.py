@@ -45,7 +45,7 @@ class VolumeTest(base.EC2TestCase):
         self.assertIsNotNone(data['CreateTime'])
         self.assertEqual(CONF.aws.aws_zone, data['AvailabilityZone'])
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
@@ -74,7 +74,7 @@ class VolumeTest(base.EC2TestCase):
 
         self.assertTrue(data['Encrypted'])
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
@@ -108,11 +108,11 @@ class VolumeTest(base.EC2TestCase):
         if 'SnapshotId' in volume:
             self.assertIsNone(volume['SnapshotId'])
 
-        data = self.client.delete_volume(VolumeId=volume_id_ext)
+        self.client.delete_volume(VolumeId=volume_id_ext)
         self.cancelResourceCleanUp(res_clean_ext)
         self.get_volume_waiter().wait_delete(volume_id_ext)
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
@@ -138,29 +138,13 @@ class VolumeTest(base.EC2TestCase):
         self.assertIn('Events', volume_status)
         self.assertIn('VolumeStatus', volume_status)
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_attach_detach_volume(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        kwargs = {
-            'ImageId': image_id,
-            'InstanceType': instance_type,
-            'MinCount': 1,
-            'MaxCount': 1,
-            'Placement': {'AvailabilityZone': CONF.aws.aws_zone}
-        }
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance()
 
         kwargs = {
             'Size': 1,
@@ -177,7 +161,7 @@ class VolumeTest(base.EC2TestCase):
             'InstanceId': instance_id,
             'VolumeId': volume_id,
         }
-        data = self.client.attach_volume(*[], **kwargs)
+        self.client.attach_volume(*[], **kwargs)
         clean_vi = self.addResourceCleanUp(self.client.detach_volume,
                                            VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_available(
@@ -203,7 +187,7 @@ class VolumeTest(base.EC2TestCase):
         self.assertIn('DeviceName', bdms[0])
         self.assertIn('Ebs', bdms[0])
 
-        data = self.client.detach_volume(VolumeId=volume_id)
+        self.client.detach_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_vi)
         self.get_volume_attachment_waiter().wait_delete(volume_id)
 
@@ -213,33 +197,16 @@ class VolumeTest(base.EC2TestCase):
         self.assertEqual('available', volume['State'])
         self.assertEqual(0, len(volume['Attachments']))
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_v)
         self.get_volume_waiter().wait_delete(volume_id)
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(clean_i)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_attaching_stage(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        kwargs = {
-            'ImageId': image_id,
-            'InstanceType': instance_type,
-            'MinCount': 1,
-            'MaxCount': 1,
-            'Placement': {'AvailabilityZone': CONF.aws.aws_zone}
-        }
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance()
 
         data = self.client.create_volume(
             AvailabilityZone=CONF.aws.aws_zone, Size=1)
@@ -267,39 +234,22 @@ class VolumeTest(base.EC2TestCase):
         self.get_volume_attachment_waiter().wait_available(
             volume_id, final_set=('attached'))
 
-        data = self.client.detach_volume(VolumeId=volume_id)
+        self.client.detach_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_vi)
         self.get_volume_attachment_waiter().wait_delete(volume_id)
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_v)
         self.get_volume_waiter().wait_delete(volume_id)
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(clean_i)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "Volume statuses are not implemented")
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_delete_detach_attached_volume(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        kwargs = {
-            'ImageId': image_id,
-            'InstanceType': instance_type,
-            'MinCount': 1,
-            'MaxCount': 1,
-            'Placement': {'AvailabilityZone': CONF.aws.aws_zone}
-        }
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance()
 
         kwargs = {
             'Size': 1,
@@ -316,7 +266,7 @@ class VolumeTest(base.EC2TestCase):
             'InstanceId': instance_id,
             'VolumeId': volume_id,
         }
-        data = self.client.attach_volume(*[], **kwargs)
+        self.client.attach_volume(*[], **kwargs)
         clean_vi = self.addResourceCleanUp(self.client.detach_volume,
                                            VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_available(
@@ -335,7 +285,7 @@ class VolumeTest(base.EC2TestCase):
                           self.client.delete_volume,
                           VolumeId=volume_id)
 
-        data = self.client.detach_volume(VolumeId=volume_id)
+        self.client.detach_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_vi)
         self.get_volume_attachment_waiter().wait_delete(volume_id)
 
@@ -343,7 +293,7 @@ class VolumeTest(base.EC2TestCase):
                           self.client.detach_volume,
                           VolumeId=volume_id)
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_v)
         self.get_volume_waiter().wait_delete(volume_id)
 
@@ -351,29 +301,12 @@ class VolumeTest(base.EC2TestCase):
                           self.client.detach_volume,
                           VolumeId=volume_id)
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(clean_i)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_volume_auto_termination_swithed_off(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        kwargs = {
-            'ImageId': image_id,
-            'InstanceType': instance_type,
-            'MinCount': 1,
-            'MaxCount': 1,
-            'Placement': {'AvailabilityZone': CONF.aws.aws_zone}
-        }
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance()
 
         kwargs = {
             'Size': 1,
@@ -390,13 +323,12 @@ class VolumeTest(base.EC2TestCase):
             'InstanceId': instance_id,
             'VolumeId': volume_id,
         }
-        data = self.client.attach_volume(*[], **kwargs)
+        self.client.attach_volume(*[], **kwargs)
         self.addResourceCleanUp(self.client.detach_volume, VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_available(
             volume_id, final_set=('attached'))
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(clean_i)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
         data = self.client.describe_volumes(VolumeIds=[volume_id])
@@ -406,31 +338,15 @@ class VolumeTest(base.EC2TestCase):
         if 'Attachments' in volume:
             self.assertEqual(0, len(volume['Attachments']))
 
-        data = self.client.delete_volume(VolumeId=volume_id)
+        self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_v)
         self.get_volume_waiter().wait_delete(volume_id)
 
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "modify_instance_attribute is not implemented")
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_volume_auto_termination_swithed_on(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        kwargs = {
-            'ImageId': image_id,
-            'InstanceType': instance_type,
-            'MinCount': 1,
-            'MaxCount': 1,
-            'Placement': {'AvailabilityZone': CONF.aws.aws_zone}
-        }
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance()
 
         kwargs = {
             'Size': 1,
@@ -446,7 +362,7 @@ class VolumeTest(base.EC2TestCase):
             'InstanceId': instance_id,
             'VolumeId': volume_id,
         }
-        data = self.client.attach_volume(*[], **kwargs)
+        self.client.attach_volume(*[], **kwargs)
         self.addResourceCleanUp(self.client.detach_volume, VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_available(
             volume_id, final_set=('attached'))
@@ -457,10 +373,9 @@ class VolumeTest(base.EC2TestCase):
                                      'Ebs': {'VolumeId': volume_id,
                                              'DeleteOnTermination': True}}],
         }
-        data = self.client.modify_instance_attribute(*[], **kwargs)
+        self.client.modify_instance_attribute(*[], **kwargs)
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(clean_i)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.assertRaises('InvalidVolume.NotFound',

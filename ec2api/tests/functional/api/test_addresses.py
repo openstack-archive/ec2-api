@@ -17,6 +17,7 @@ import time
 
 import botocore.exceptions
 from oslo_log import log
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -225,12 +226,9 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
 
     @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_associate_disassociate_vpc_addresses(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
         aws_zone = CONF.aws.aws_zone
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
 
         base_net = '10.3.0.0'
         data = self.client.create_vpc(CidrBlock=base_net + '/20')
@@ -246,14 +244,7 @@ class AddressTest(base.EC2TestCase):
         clean_subnet = self.addResourceCleanUp(self.client.delete_subnet,
                                                SubnetId=subnet_id)
 
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type, MinCount=1,
-            MaxCount=1, SubnetId=subnet_id)
-        instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(SubnetId=subnet_id)
 
         data = self.client.allocate_address(Domain='vpc')
         alloc_id = data['AllocationId']
@@ -305,7 +296,6 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_a)
 
         self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(clean_i)
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.client.delete_subnet(SubnetId=subnet_id)
@@ -316,21 +306,9 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_vpc)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_associate_disassociate_standard_addresses(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        data = self.client.run_instances(ImageId=image_id,
-                                         InstanceType=instance_type,
-                                         MinCount=1,
-                                         MaxCount=1)
-        instance_id = data['Instances'][0]['InstanceId']
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance()
 
         data = self.client.allocate_address(*[], **{})
         ip = data['PublicIp']
@@ -359,7 +337,6 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_a)
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(clean_i)
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()

@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import botocore.exceptions
 from tempest_lib.common.utils import data_utils
 import testtools
 
@@ -133,16 +132,7 @@ class ImageTest(base.EC2TestCase):
         if 'RootDeviceType' in image and 'ebs' in image['RootDeviceType']:
             raise self.skipException('image_id should not be EBS image.')
 
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=CONF.aws.instance_type,
-            Placement={'AvailabilityZone': CONF.aws.aws_zone},
-            MinCount=1, MaxCount=1)
-        self.assertEqual(1, len(data['Instances']))
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(ImageId=image_id)
 
         def _rollback(fn_data):
             self.client.deregister_image(ImageId=fn_data['ImageId'])
@@ -152,7 +142,6 @@ class ImageTest(base.EC2TestCase):
             InstanceId=instance_id, Name='name', Description='desc')
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
     def _create_image(self, name, desc):
@@ -162,16 +151,7 @@ class ImageTest(base.EC2TestCase):
         self.assertTrue('RootDeviceType' in image
                         and 'ebs' in image['RootDeviceType'])
 
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=CONF.aws.instance_type,
-            Placement={'AvailabilityZone': CONF.aws.aws_zone},
-            MinCount=1, MaxCount=1)
-        self.assertEqual(1, len(data['Instances']))
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(ImageId=image_id)
 
         data = self.client.create_image(InstanceId=instance_id,
                                              Name=name, Description=desc)
@@ -184,20 +164,10 @@ class ImageTest(base.EC2TestCase):
         for bdm in data['Images'][0].get('BlockDeviceMappings', []):
             if 'Ebs' in bdm and 'SnapshotId' in bdm['Ebs']:
                 snapshot_id = bdm['Ebs']['SnapshotId']
-                kwargs = {'SnapshotIds': [snapshot_id]}
-                try:
-                    data = self.client.describe_snapshots(**kwargs)
-                    volume_id = data['Snapshots'][0].get('VolumeId')
-                    if volume_id:
-                        self.addResourceCleanUp(self.client.delete_volume,
-                                                VolumeId=volume_id)
-                except botocore.exceptions.ClientError:
-                    pass
                 self.addResourceCleanUp(self.client.delete_snapshot,
                                         SnapshotId=snapshot_id)
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         return image_id, image_clean

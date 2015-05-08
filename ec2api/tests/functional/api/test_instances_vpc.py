@@ -36,8 +36,6 @@ class InstanceInVPCTest(base.EC2TestCase):
         super(InstanceInVPCTest, cls).setUpClass()
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
-        if not CONF.aws.image_id:
-            raise cls.skipException('aws image_id does not provided')
 
         data = cls.client.create_vpc(CidrBlock=cls.VPC_CIDR)
         cls.vpc_id = data['Vpc']['VpcId']
@@ -53,18 +51,9 @@ class InstanceInVPCTest(base.EC2TestCase):
                                      SubnetId=cls.subnet_id)
         cls.get_subnet_waiter().wait_available(cls.subnet_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_delete_instance(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type, MinCount=1,
-            MaxCount=1, SubnetId=self.subnet_id)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(SubnetId=self.subnet_id)
 
         data = self.client.describe_instances(InstanceIds=[instance_id])
         reservations = data.get('Reservations', [])
@@ -87,26 +76,16 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.assertEqual(self.vpc_id, ni['VpcId'])
         self.assertEqual(self.subnet_id, ni['SubnetId'])
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
         # NOTE(andrey-mp): There is difference between Openstack and Amazon.
         # Amazon returns instance in 'terminated' state some time after
         # instance deletion. But Openstack doesn't return such instance.
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_describe_instances_filter(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type, MinCount=1,
-            MaxCount=1, SubnetId=self.subnet_id)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(SubnetId=self.subnet_id)
 
         data = self.client.describe_instances(InstanceIds=[instance_id])
         self.assert_instance(data, instance_id)
@@ -150,8 +129,7 @@ class InstanceInVPCTest(base.EC2TestCase):
             Filters=[{'Name': 'vpc-id', 'Values': [self.vpc_id]}])
         self.assert_instance(data, instance_id)
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
     def assert_instance(self, data, instance_id):
@@ -167,6 +145,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         "one subnet. Openstack can't do it without additional configuration."
         "Worked only from Juno with parameter in config - "
         "nova.conf/neutron/allow_duplicate_networks = True")
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_instance_with_two_interfaces(self):
         kwargs = {
             'SubnetId': self.subnet_id,
@@ -186,69 +165,46 @@ class InstanceInVPCTest(base.EC2TestCase):
             self.client.delete_network_interface, NetworkInterfaceId=ni_id2)
         self.get_network_interface_waiter().wait_available(ni_id2)
 
-        kwargs = {
-            'ImageId': CONF.aws.image_id,
-            'InstanceType': CONF.aws.instance_type,
-            'MinCount': 1,
-            'MaxCount': 1,
-            'NetworkInterfaces': [{'NetworkInterfaceId': ni_id1,
-                                   'DeviceIndex': 0},
-                                  {'NetworkInterfaceId': ni_id2,
-                                   'DeviceIndex': 2}]
-        }
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(
+            NetworkInterfaces=[{'NetworkInterfaceId': ni_id1,
+                                'DeviceIndex': 0},
+                               {'NetworkInterfaceId': ni_id2,
+                                'DeviceIndex': 2}])
 
         instance = self.get_instance(instance_id)
         nis = instance.get('NetworkInterfaces', [])
         self.assertEqual(2, len(nis))
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.get_network_interface_waiter().wait_available(ni_id1)
         self.get_network_interface_waiter().wait_available(ni_id2)
 
-        data = self.client.delete_network_interface(
+        self.client.delete_network_interface(
             NetworkInterfaceId=ni_id2)
         self.cancelResourceCleanUp(clean_ni2)
         self.get_network_interface_waiter().wait_delete(ni_id2)
 
-        data = self.client.delete_network_interface(
+        self.client.delete_network_interface(
             NetworkInterfaceId=ni_id1)
         self.cancelResourceCleanUp(clean_ni1)
         self.get_network_interface_waiter().wait_delete(ni_id1)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_instance_with_private_ip(self):
         ip = '10.16.0.12'
 
-        kwargs = {
-            'ImageId': CONF.aws.image_id,
-            'InstanceType': CONF.aws.instance_type,
-            'MinCount': 1,
-            'MaxCount': 1,
-            'SubnetId': self.subnet_id,
-            'PrivateIpAddress': ip
-        }
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(SubnetId=self.subnet_id,
+                                        PrivateIpAddress=ip)
 
         instance = self.get_instance(instance_id)
         self.assertEqual(ip, instance['PrivateIpAddress'])
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_instance_with_invalid_params(self):
         def _rollback(fn_data):
             self.client.terminate_instances(

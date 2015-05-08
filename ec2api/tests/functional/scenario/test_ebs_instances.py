@@ -67,17 +67,9 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
 
         Launch EBS-backed instance with left root device after termination
         """
-        instance_type = CONF.aws.instance_type
-        data = self.client.run_instances(
-            ImageId=self.image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1,
+        instance_id = self.run_instance(ImageId=self.image_id,
             BlockDeviceMappings=[{'DeviceName': self.root_device_name,
                                   'Ebs': {'DeleteOnTermination': False}}])
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
 
         bdt = self.get_instance_bdm(instance_id, self.root_device_name)
         self.assertIsNotNone(bdt)
@@ -92,7 +84,6 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.assertEqual(1, len(data['Volumes']))
 
         self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.get_volume_waiter().wait_available(volume_id)
@@ -109,17 +100,9 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         """Launch EBS-backed instance with resizing root device."""
         new_size = int(math.ceil(self.root_device_size * 1.1))
 
-        instance_type = CONF.aws.instance_type
-        data = self.client.run_instances(
-            ImageId=self.image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1,
+        instance_id = self.run_instance(ImageId=self.image_id,
             BlockDeviceMappings=[{'DeviceName': self.root_device_name,
                                   'Ebs': {'VolumeSize': new_size}}])
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
 
         bdt = self.get_instance_bdm(instance_id, self.root_device_name)
         self.assertIsNotNone(bdt)
@@ -133,7 +116,6 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.assertEqual(new_size, volume['Size'])
 
         self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
     @testtools.skipUnless(
@@ -145,17 +127,9 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         device_name_prefix = _get_device_name_prefix(self.root_device_name)
         device_name = device_name_prefix + 'd'
 
-        instance_type = CONF.aws.instance_type
-        data = self.client.run_instances(
-            ImageId=self.image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1,
+        instance_id = self.run_instance(ImageId=self.image_id,
             BlockDeviceMappings=[{'DeviceName': device_name,
                                   'Ebs': {'VolumeSize': 1}}])
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
 
         bdt = self.get_instance_bdm(instance_id, device_name)
         self.assertIsNotNone(bdt)
@@ -169,7 +143,6 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.assertEqual(1, volume['Size'])
 
         self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
 
@@ -347,17 +320,9 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
     def test_create_ebs_instance_snapshot(self):
         """Create snapshot of EBS-backed instance and check it."""
 
-        instance_type = CONF.aws.instance_type
-        data = self.client.run_instances(
-            ImageId=self.image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
-        instance = self.get_instance(instance_id)
+        instance_id = self.run_instance(ImageId=self.image_id)
 
+        instance = self.get_instance(instance_id)
         bdt = self.get_instance_bdm(instance_id, None)
         self.assertIsNotNone(bdt)
         volume_id = bdt['Ebs'].get('VolumeId')
@@ -368,7 +333,6 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
                                                   final_set=('stopped'))
 
         self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         data = self.client.create_snapshot(VolumeId=volume_id)
@@ -397,19 +361,11 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
                                           ImageId=image_id)
         self.get_image_waiter().wait_available(image_id)
 
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(ImageId=image_id)
 
         # NOTE(andrey-mp): if instance will run then test will pass
 
         self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.client.deregister_image(ImageId=image_id)
@@ -442,16 +398,11 @@ class EC2_EBSInstanceResizeRootDevice(base.EC2TestCase):
         "Unexpected Forbidden raised: Can't detach root device volume")
     def test_resize_root_ebs_device(self):
         """Resize root device of launched instance."""
-        instance_type = CONF.aws.instance_type
-        data = self.client.run_instances(
-            ImageId=self.image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        instance = data['Instances'][0]
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        clean_dict = dict()
+        instance_id = self.run_instance(clean_dict=clean_dict,
+                                        ImageId=self.image_id)
+        res_clean = clean_dict['instance']
+        instance = self.get_instance(instance_id)
 
         bdt = self.get_instance_bdm(instance_id, None)
         self.assertIsNotNone(bdt)
@@ -497,6 +448,7 @@ class EC2_EBSInstanceResizeRootDevice(base.EC2TestCase):
             volume_id2, final_set=('attached'))
 
         # NOTE(andrey-mp): move this cleanup operation to the end of trash
+        # (it will remove first)
         self.cancelResourceCleanUp(res_clean)
         res_clean = self.addResourceCleanUp(self.client.terminate_instances,
                                             InstanceIds=[instance_id])

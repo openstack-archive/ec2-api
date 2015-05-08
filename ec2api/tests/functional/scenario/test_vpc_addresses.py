@@ -16,6 +16,7 @@
 import time
 
 from oslo_log import log
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -28,11 +29,8 @@ LOG = log.getLogger(__name__)
 class VpcAddressTest(scenario_base.BaseScenarioTest):
 
     @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_auto_diassociate_address(self):
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
         vpc_id, subnet_id = self.create_vpc_and_subnet('10.3.0.0/20')
         ni_id1 = self.create_network_interface(subnet_id)
         self.create_and_attach_internet_gateway(vpc_id)

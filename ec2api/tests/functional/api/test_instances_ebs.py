@@ -14,6 +14,7 @@
 #    under the License.
 
 from oslo_log import log
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -23,27 +24,11 @@ LOG = log.getLogger(__name__)
 
 
 class InstanceWithEBSTest(base.EC2TestCase):
-    @classmethod
-    @base.safe_setup
-    def setUpClass(cls):
-        super(InstanceWithEBSTest, cls).setUpClass()
-        if not CONF.aws.ebs_image_id:
-            raise cls.skipException('aws EBS image does not provided')
-        cls.image_id = CONF.aws.ebs_image_id
-        cls.zone = CONF.aws.aws_zone
 
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_create_get_delete_ebs_instance(self):
         """Launch EBS-backed instance, check results, and terminate it."""
-        data = self.client.run_instances(
-            ImageId=self.image_id, InstanceType=CONF.aws.instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        self.assertEqual(1, len(data['Instances']))
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
-
+        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id)
         instance = self.get_instance(instance_id)
 
         self.assertEqual('ebs', instance.get('RootDeviceType'))
@@ -66,27 +51,19 @@ class InstanceWithEBSTest(base.EC2TestCase):
         self.assertEqual(1, len(data['Volumes']))
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_create_root_volume_snapshot(self):
         """Create snapshot of root volume of EBS-backed instance."""
-        data = self.client.run_instances(
-            ImageId=self.image_id, InstanceType=CONF.aws.instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        self.assertEqual(1, len(data['Instances']))
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id)
 
         bdt = self.get_instance_bdm(instance_id, None)
         self.assertIsNotNone(bdt)
         volume_id = bdt['Ebs'].get('VolumeId')
         self.assertIsNotNone(volume_id)
 
-        data = self.client.stop_instances(InstanceIds=[instance_id])
+        self.client.stop_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('stopped'))
 
@@ -105,7 +82,6 @@ class InstanceWithEBSTest(base.EC2TestCase):
                                                   final_set=('completed'))
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         data = self.client.delete_snapshot(SnapshotId=snapshot_id)

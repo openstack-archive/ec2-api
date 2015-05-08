@@ -531,7 +531,51 @@ class EC2TestCase(base.BaseTestCase):
         """
         instance = self.get_instance(instance_id)
         if not device_name:
-            device_name = instance['RootDeviceName']
-        bdms = instance['BlockDeviceMappings']
+            device_name = instance.get('RootDeviceName')
+        if not device_name:
+            return None
+        bdms = instance.get('BlockDeviceMappings')
+        if bdms is None:
+            return None
         bdt = [bdt for bdt in bdms if bdt['DeviceName'] == device_name]
         return None if len(bdt) == 0 else bdt[0]
+
+    def run_instance(self, clean_dict=None, **kwargs):
+        kwargs.setdefault('ImageId', CONF.aws.image_id)
+        kwargs.setdefault('InstanceType', CONF.aws.instance_type)
+        kwargs.setdefault('Placement', {'AvailabilityZone': CONF.aws.aws_zone})
+        kwargs['MinCount'] = 1
+        kwargs['MaxCount'] = 1
+        data = self.client.run_instances(*[], **kwargs)
+        instance_id = data['Instances'][0]['InstanceId']
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
+                                            InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        # NOTE(andrey-mp): openstack has a bug - it doesn't delete volume
+        # that is created from EBS image
+        volume_ids = list()
+        instance = self.get_instance(instance_id)
+        bdms = instance.get('BlockDeviceMappings')
+        if bdms is None:
+            return instance_id
+        for bdm in bdms:
+            if 'Ebs' not in bdm:
+                continue
+            if not bdm['Ebs'].get('DeleteOnTermination', False):
+                volume_id = bdm['Ebs'].get('VolumeId')
+                volume_ids.append(volume_id)
+        if volume_ids:
+            # NOTE(andrey-mp): instance must be deleted first.
+            self.cancelResourceCleanUp(res_clean)
+            for volume_id in volume_ids:
+                self.addResourceCleanUp(self.client.delete_volume,
+                                        VolumeId=volume_id)
+            res_clean = self.addResourceCleanUp(
+                self.client.terminate_instances, InstanceIds=[instance_id])
+
+        if clean_dict is not None:
+            clean_dict['instance'] = res_clean
+
+        return instance_id

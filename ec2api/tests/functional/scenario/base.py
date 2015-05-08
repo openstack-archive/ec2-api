@@ -27,20 +27,6 @@ LOG = log.getLogger(__name__)
 
 class BaseScenarioTest(base.EC2TestCase):
 
-    def run_instance(self, **kwargs):
-        kwargs.setdefault('ImageId', CONF.aws.image_id)
-        kwargs.setdefault('InstanceType', CONF.aws.instance_type)
-        kwargs.setdefault('Placement', {'AvailabilityZone': CONF.aws.aws_zone})
-        kwargs['MinCount'] = 1
-        kwargs['MaxCount'] = 1
-        data = self.client.run_instances(*[], **kwargs)
-        instance_id = data['Instances'][0]['InstanceId']
-        self.addResourceCleanUp(self.client.terminate_instances,
-                                InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
-        return instance_id
-
     def get_instance_ip(self, instance_id):
         instance = self.get_instance(instance_id)
         public_ip = instance.get('PublicIpAddress')

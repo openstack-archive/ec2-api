@@ -18,6 +18,7 @@ import time
 import botocore.exceptions
 from oslo_log import log
 from tempest_lib.common.utils import data_utils
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -365,12 +366,8 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_attach_network_interface(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
         kwargs = {
             'SubnetId': self.subnet_id,
         }
@@ -383,14 +380,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.assertIsNotNone(address)
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type, MinCount=1,
-            MaxCount=1, SubnetId=self.subnet_id)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(SubnetId=self.subnet_id)
 
         # NOTE(andrey-mp): Amazon can't attach to device index = 0
         kwargs = {
@@ -427,23 +417,11 @@ class NetworkInterfaceTest(base.EC2TestCase):
         data = self.client.detach_network_interface(*[], **kwargs)
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_network_interfaces_are_not_deleted_on_termination(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type, MinCount=1,
-            MaxCount=1, SubnetId=self.subnet_id)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(SubnetId=self.subnet_id)
 
         instance = self.get_instance(instance_id)
         nis = instance.get('NetworkInterfaces', [])
@@ -459,7 +437,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
                 'DeleteOnTermination': False,
             }
         }
-        data = self.client.modify_network_interface_attribute(*[], **kwargs)
+        self.client.modify_network_interface_attribute(*[], **kwargs)
         clean_ni = self.addResourceCleanUp(
             self.client.delete_network_interface, NetworkInterfaceId=ni_id)
 
@@ -489,7 +467,6 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.assertFalse(ni['Attachment']['DeleteOnTermination'])
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.get_network_interface_waiter().wait_available(ni_id)
@@ -505,20 +482,9 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_ni2)
         self.get_network_interface_waiter().wait_delete(ni_id2)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_network_interfaces_are_deleted_on_termination(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        if not image_id:
-            raise self.skipException('aws image_id does not provided')
-
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type, MinCount=1,
-            MaxCount=1, SubnetId=self.subnet_id)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance(SubnetId=self.subnet_id)
 
         instance = self.get_instance(instance_id)
         nis = instance.get('NetworkInterfaces', [])
@@ -552,7 +518,6 @@ class NetworkInterfaceTest(base.EC2TestCase):
         data = self.client.modify_network_interface_attribute(*[], **kwargs)
 
         data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
         self.get_network_interface_waiter().wait_delete(ni_id)

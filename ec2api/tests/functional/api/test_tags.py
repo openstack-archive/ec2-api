@@ -16,6 +16,7 @@
 import time
 
 from tempest_lib.common.utils import data_utils
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -40,7 +41,7 @@ class TagTest(base.EC2TestCase):
 
     def test_create_get_delete_tag(self):
         tag_key = data_utils.rand_name('tag-key')
-        data = self.client.create_tags(Resources=[self.volume_id],
+        self.client.create_tags(Resources=[self.volume_id],
             Tags=[{'Key': tag_key, 'Value': 'fake_value'}])
         self.addResourceCleanUp(self.client.delete_tags,
                                 Resources=[self.volume_id],
@@ -50,8 +51,8 @@ class TagTest(base.EC2TestCase):
             Filters=[{'Name': 'resource-id', 'Values': [self.volume_id]}])
         self.assertEqual(1, len(data['Tags']))
 
-        data = self.client.delete_tags(Resources=[self.volume_id],
-                                       Tags=[{'Key': tag_key}])
+        self.client.delete_tags(Resources=[self.volume_id],
+                                Tags=[{'Key': tag_key}])
 
         data = self.client.describe_tags(
             Filters=[{'Name': 'resource-id', 'Values': [self.volume_id]}])
@@ -59,7 +60,7 @@ class TagTest(base.EC2TestCase):
 
     def test_describe_tags(self):
         tag_key = data_utils.rand_name('tag-key')
-        data = self.client.create_tags(Resources=[self.volume_id],
+        self.client.create_tags(Resources=[self.volume_id],
             Tags=[{'Key': tag_key, 'Value': 'fake_value'}])
         self.addResourceCleanUp(self.client.delete_tags,
                                 Resources=[self.volume_id],
@@ -97,8 +98,8 @@ class TagTest(base.EC2TestCase):
             Filters=[{'Name': 'resource-type', 'Values': ['volume']}])
         self.assertIn(tag_key, [k.get('Key') for k in data['Tags']])
 
-        data = self.client.delete_tags(Resources=[self.volume_id],
-                                       Tags=[{'Key': tag_key}])
+        self.client.delete_tags(Resources=[self.volume_id],
+                                Tags=[{'Key': tag_key}])
 
         data = self.client.describe_tags(
             Filters=[{'Name': 'resource-id', 'Values': [self.volume_id]}])
@@ -126,8 +127,8 @@ class TagTest(base.EC2TestCase):
 
         describe_func(Filters=[{'Name': 'tag-key', 'Values': [tag_key]}])
 
-        data = self.client.delete_tags(Resources=[resource_id],
-                                       Tags=[{'Key': tag_key}])
+        self.client.delete_tags(Resources=[resource_id],
+                                Tags=[{'Key': tag_key}])
 
         data = self.client.describe_tags(
             Filters=[{'Name': 'resource-id', 'Values': [resource_id]}])
@@ -192,7 +193,7 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(res_id, 'dhcp-options', describe_func)
 
-        data = self.client.delete_dhcp_options(DhcpOptionsId=res_id)
+        self.client.delete_dhcp_options(DhcpOptionsId=res_id)
         self.cancelResourceCleanUp(res_clean)
 
     def test_tag_volume(self):
@@ -216,20 +217,12 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource_negative(res_id)
 
-        data = self.client.release_address(AllocationId=res_id)
+        self.client.release_address(AllocationId=res_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_tag_instance(self):
-        instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
-        data = self.client.run_instances(
-            ImageId=image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
+        instance_id = self.run_instance()
 
         def describe_func(*args, **kwargs):
             data = self.client.describe_instances(*args, **kwargs)
@@ -240,8 +233,7 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(instance_id, 'instance', describe_func)
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
+        self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()
@@ -259,7 +251,7 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(gw_id, 'internet-gateway', describe_func)
 
-        data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
+        self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
     @base.skip_without_vpc()
@@ -292,16 +284,15 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(ni_id, 'network-interface', describe_func)
 
-        data = self.client.delete_network_interface(
-            NetworkInterfaceId=ni_id)
+        self.client.delete_network_interface(NetworkInterfaceId=ni_id)
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
-        data = self.client.delete_subnet(SubnetId=subnet_id)
+        self.client.delete_subnet(SubnetId=subnet_id)
         self.cancelResourceCleanUp(subnet_clean)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
-        data = self.client.delete_vpc(VpcId=vpc_id)
+        self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
@@ -325,10 +316,10 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(rt_id, 'route-table', describe_func)
 
-        data = self.client.delete_route_table(RouteTableId=rt_id)
+        self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean)
 
-        data = self.client.delete_vpc(VpcId=vpc_id)
+        self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
@@ -358,10 +349,10 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(group_id, 'security-group', describe_func)
 
-        data = self.client.delete_security_group(GroupId=group_id)
+        self.client.delete_security_group(GroupId=group_id)
         self.cancelResourceCleanUp(res_clean)
 
-        data = self.client.delete_vpc(VpcId=vpc_id)
+        self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
@@ -380,7 +371,7 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(snapshot_id, 'snapshot', describe_func)
 
-        data = self.client.delete_snapshot(SnapshotId=snapshot_id)
+        self.client.delete_snapshot(SnapshotId=snapshot_id)
         self.cancelResourceCleanUp(res_clean)
         self.get_snapshot_waiter().wait_delete(snapshot_id)
 
@@ -406,11 +397,11 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(subnet_id, 'subnet', describe_func)
 
-        data = self.client.delete_subnet(SubnetId=subnet_id)
+        self.client.delete_subnet(SubnetId=subnet_id)
         self.cancelResourceCleanUp(res_clean)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
-        data = self.client.delete_vpc(VpcId=vpc_id)
+        self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
@@ -429,6 +420,6 @@ class TagTest(base.EC2TestCase):
 
         self._test_tag_resource(vpc_id, 'vpc', describe_func)
 
-        data = self.client.delete_vpc(VpcId=vpc_id)
+        self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)

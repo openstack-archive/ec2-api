@@ -16,6 +16,7 @@
 from oslo_log import log
 from tempest_lib.common import ssh
 from tempest_lib.common.utils import data_utils
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -27,14 +28,8 @@ LOG = log.getLogger(__name__)
 
 class InstanceRestartTest(scenario_base.BaseScenarioTest):
 
-    @classmethod
-    @base.safe_setup
-    def setUpClass(cls):
-        super(InstanceRestartTest, cls).setUpClass()
-        if not CONF.aws.image_id_ubuntu:
-            raise cls.skipException('ubuntu image_id does not provided')
-        cls.zone = CONF.aws.aws_zone
-
+    @testtools.skipUnless(CONF.aws.image_id_ubuntu,
+                          "ubuntu image id is not defined")
     def test_stop_start_instance(self):
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)
@@ -59,6 +54,8 @@ class InstanceRestartTest(scenario_base.BaseScenarioTest):
         data = ssh_client.exec_command('last -x')
         self.assertIn("shutdown", data)
 
+    @testtools.skipUnless(CONF.aws.image_id_ubuntu,
+                          "ubuntu image id is not defined")
     def test_reboot_instance(self):
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)
