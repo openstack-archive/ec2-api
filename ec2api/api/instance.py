@@ -167,6 +167,8 @@ def run_instances(context, image_id, min_count, max_count,
                         'launch_index': launch_index}
             if client_token:
                 instance['client_token'] = client_token
+            if disable_api_termination:
+                instance['disable_api_termination'] = disable_api_termination
 
             instance = db_api.add_item(context, 'i', instance)
             cleaner.addCleanup(db_api.delete_item, context, instance['id'])
@@ -194,6 +196,12 @@ def terminate_instances(context, instance_id):
 
     nova = clients.nova(context)
     state_changes = []
+    for instance in instances:
+        if instance.get('disable_api_termination'):
+            message = _("The instance '%s' may not be terminated. Modify its "
+                        "'disableApiTermination' instance attribute and try "
+                        "again.") % instance['id']
+            raise exception.OperationNotPermitted(message=message)
     for instance in instances:
         try:
             os_instance = nova.servers.get(instance['os_id'])
@@ -502,8 +510,8 @@ def describe_instance_attribute(context, instance_id, attribute):
             context, getattr(os_instance, 'security_groups', []))
 
     def _format_attr_instance_type(result):
-        result['instanceType'] = {'value': _cloud_format_instance_type(
-                                                       context, os_instance)}
+        result['instanceType'] = {
+            'value': _cloud_format_instance_type(context, os_instance)}
 
     def _format_attr_kernel(result):
         value = _cloud_format_kernel_id(context, os_instance)
@@ -527,7 +535,8 @@ def describe_instance_attribute(context, instance_id, attribute):
             result['userData'] = {'value': user_data}
 
     def _format_attr_disable_api_termination(result):
-        result['disableApiTermination'] = {'value': False}
+        result['disableApiTermination'] = {
+            'value': instance.get('disable_api_termination', False)}
 
     attribute_formatter = {
         'blockDeviceMapping': _format_attr_block_device_mapping,
@@ -542,12 +551,67 @@ def describe_instance_attribute(context, instance_id, attribute):
 
     fn = attribute_formatter.get(attribute)
     if fn is None:
-        # TODO(ft): clarify an exact AWS error
-        raise exception.InvalidAttribute(attr=attribute)
+        raise exception.InvalidParameterValue(value=attribute,
+                                              parameter='attribute',
+                                              reason='Unknown attribute.')
 
     result = {'instance_id': instance_id}
     fn(result)
     return result
+
+
+def modify_instance_attribute(context, instance_id, attribute=None,
+                              value=None, source_dest_check=None,
+                              block_device_mapping=None,
+                              disable_api_termination=None,
+                              ebs_optimized=None, group_id=None,
+                              instance_initiated_shutdown_behavior=None,
+                              instance_type=None, kernel=None,
+                              ramdisk=None, sriov_net_support=None,
+                              user_data=None):
+    # NOTE(andrey-mp): other parameters can be added in same way
+
+    if attribute is not None:
+        if attribute == 'userData':
+            if user_data is not None:
+                raise exception.InvalidParameterCombination()
+        elif attribute == 'disableApiTermination':
+            if disable_api_termination is not None:
+                raise exception.InvalidParameterCombination()
+        else:
+            raise exception.InvalidParameterValue(value=attribute,
+                                                  parameter='attribute',
+                                                  reason='Unknown attribute.')
+        if value is None:
+            raise exception.MissingParameter(param='value')
+
+    params_count = (
+        int(source_dest_check is not None) +
+        int(group_id is not None) + int(instance_type is not None) +
+        int(disable_api_termination is not None) + int(user_data is not None))
+    if (params_count > 1
+            or (attribute is not None and params_count == 1)
+            or (params_count == 0 and attribute is None)):
+        raise exception.InvalidParameterCombination()
+
+    if attribute == 'userData':
+        user_data = value
+    elif attribute == 'disableApiTermination':
+        disable_api_termination = value
+
+    if disable_api_termination is not None:
+        instance = ec2utils.get_db_item(context, instance_id)
+        instance['disable_api_termination'] = value
+        db_api.update_item(context, instance)
+        return True
+
+    raise exception.InvalidParameterCombination()
+
+
+def reset_instance_attribute(context, instance_id, attribute):
+    raise exception.InvalidParameterValue(value=attribute,
+                                          parameter='attribute',
+                                          reason='Unknown attribute.')
 
 
 def _format_reservation(context, reservation, formatted_instances, os_groups):

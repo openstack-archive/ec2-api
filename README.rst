@@ -131,8 +131,6 @@ Image related:
 Instance related:
 - DescribeInstanceStatus
 - ReportInstanceStatus
-- ModifyInstanceAttribute
-- ResetInstanceAttribute
 - productCodes Instance property
 - sourceDestCheck Instance property
 - ebsOptimized Instance property
@@ -143,7 +141,6 @@ Instance related:
 - publicDnsName Instance property
 - stateTransitionReason Instance property
 - architecture Instance property
-- ebsOptimized Instance property
 - hypervisor Instance property
 - iamInstanceProfile Instance property
 - instanceLifecycle Instance property
@@ -151,7 +148,6 @@ Instance related:
 - stateReason Instance property
 - virtualizationType Instance property
 - instanceInitiatedShutdownBehavior Instance attribute
-- disableApiTermination Instance attribute
 - attachTime EbsInstanceBlockDevice property
 
 Network interface related:

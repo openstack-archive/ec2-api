@@ -596,6 +596,101 @@ class CloudController(object):
             Specified attribute.
         """
 
+    @module_and_param_types(instance, 'i_id', 'str',
+                            'dummy', 'bool',
+                            'dummy',
+                            'bool',
+                            'bool', 'sg_ids',
+                            'str',
+                            'str', 'str',
+                            'str', 'str',
+                            'str')
+    def modify_instance_attribute(self, context, instance_id, attribute=None,
+                                  value=None, source_dest_check=None,
+                                  block_device_mapping=None,
+                                  disable_api_termination=None,
+                                  ebs_optimized=None, group_id=None,
+                                  instance_initiated_shutdown_behavior=None,
+                                  instance_type=None, kernel=None,
+                                  ramdisk=None, sriov_net_support=None,
+                                  user_data=None):
+        """Modifies the specified attribute of the specified instance.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (str): The ID of the instance.
+            attribute (str): The name of the attribute.
+            value: The value of the attribute being modified.
+            source_dest_check: Indicates whether source/destination checking is
+                enabled. A value of true means checking is enabled, and false
+                means checking is disabled.
+                This value must be false for a NAT instance to perform NAT.
+                Unsupported now.
+            block_device_mapping (list of dict):
+                Modifies the DeleteOnTermination attribute for volumes that are
+                currently attached. The volume must be owned by the caller. If
+                no value is specified for DeleteOnTermination, the default is
+                true and the volume is deleted when the instance is terminated.
+                Dict can contain:
+                device_name (str): The device name exposed to the instance
+                    (for example, /dev/sdh or xvdh).
+                virtual_name (str): The virtual device name (ephemeral[0..3]).
+                ebs (dict): Dict can contain:
+                    volume_id (str): The ID of the volume (Nova extension).
+                    delete_on_termination (bool): Indicates whether to delete
+                        the volume on instance termination.
+                no_device (str): Suppresses the device mapping.
+                Unsupported now.
+            disable_api_termination (boolean): If the value is true, you can't
+                terminate the instance using the Amazon EC2 console, CLI, or
+                API; otherwise, you can.
+            ebs_optimized (boolean): Whether the instance is optimized for EBS.
+                Unsupported now.
+            group_id (list of str): [EC2-VPC] Changes the security
+                groups of the instance. You must specify at least one security
+                group, even if it's just the default security group for the
+                VPC. You must specify the security group ID, not the security
+                group name.
+                Unsupported now.
+            instance_initiated_shutdown_behavior (str): Indicates whether an
+                instance stops or terminates when you initiate shutdown from
+                the instance.
+                Unsupported now.
+            instance_type (str): Changes the instance type to the specified
+                value. For more information, see Instance Types. If the
+                instance type is not valid, the error returned is
+                InvalidInstanceAttributeValue.
+                Unsupported now.
+            kernel (str): Changes the instance's kernel to the specified value.
+                Unsupported now.
+            ramdisk (str): Changes the instance's RAM disk.
+                Unsupported now.
+            sriov_net_support (str): SR-IOV mode for networking.
+                Unsupported now.
+            user_data (str): Changes the instance's user data.
+                Unsupported now.
+
+        Returns:
+            true if the request succeeds.
+        """
+
+    @module_and_param_types(instance, 'i_id', 'str')
+    def reset_instance_attribute(self, context, instance_id, attribute):
+        """Resets an attribute of an instance to its default value.
+
+        To reset the kernel or ramdisk, the instance must be in a stopped
+        state. To reset the SourceDestCheck, the instance can be either
+        running or stopped.
+
+        Args:
+            context (RequestContext): The request context.
+            instance_id (str): The ID of the instance.
+            attribute (str): The attribute to reset.
+
+        Returns:
+            true if the request succeeds.
+        """
+
     @module_and_param_types(key_pair, 'str255s', 'filter')
     def describe_key_pairs(self, context, key_name=None, filter=None):
         """Describes one or more of your key pairs.

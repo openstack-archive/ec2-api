@@ -315,3 +315,102 @@ class InstanceTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
+
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
+    def test_disable_api_termination_attribute(self):
+        instance_type = CONF.aws.instance_type
+        image_id = CONF.aws.image_id
+        data = self.client.run_instances(MinCount=1, MaxCount=1,
+            ImageId=image_id, InstanceType=instance_type,
+            Placement={'AvailabilityZone': CONF.aws.aws_zone},
+            DisableApiTermination=True)
+        instance_id = data['Instances'][0]['InstanceId']
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
+                                            InstanceIds=[instance_id])
+        self.addResourceCleanUp(self.client.modify_instance_attribute,
+                                InstanceId=instance_id,
+                                DisableApiTermination={'Value': True})
+        self.assertEqual(1, len(data['Instances']))
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        data = self.client.describe_instance_attribute(
+            InstanceId=instance_id, Attribute='disableApiTermination')
+        self.assertIn('DisableApiTermination', data)
+        self.assertIn('Value', data['DisableApiTermination'])
+        self.assertTrue(data['DisableApiTermination']['Value'])
+
+        data = self.client.modify_instance_attribute(InstanceId=instance_id,
+            Attribute='disableApiTermination', Value='False')
+        data = self.client.describe_instance_attribute(
+            InstanceId=instance_id, Attribute='disableApiTermination')
+        self.assertFalse(data['DisableApiTermination']['Value'])
+
+        data = self.client.modify_instance_attribute(InstanceId=instance_id,
+            Attribute='disableApiTermination', Value='True')
+        data = self.client.describe_instance_attribute(
+            InstanceId=instance_id, Attribute='disableApiTermination')
+        self.assertTrue(data['DisableApiTermination']['Value'])
+
+        self.assertRaises('OperationNotPermitted',
+                          self.client.terminate_instances,
+                          InstanceIds=[instance_id])
+
+        data = self.client.modify_instance_attribute(InstanceId=instance_id,
+            DisableApiTermination={'Value': False})
+        data = self.client.describe_instance_attribute(
+            InstanceId=instance_id, Attribute='disableApiTermination')
+        self.assertFalse(data['DisableApiTermination']['Value'])
+
+        self.client.terminate_instances(InstanceIds=[instance_id])
+        self.cancelResourceCleanUp(res_clean)
+        self.get_instance_waiter().wait_delete(instance_id)
+
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
+    def test_instance_attributes_negative(self):
+        instance_type = CONF.aws.instance_type
+        image_id = CONF.aws.image_id
+        data = self.client.run_instances(MinCount=1, MaxCount=1,
+            ImageId=image_id, InstanceType=instance_type,
+            Placement={'AvailabilityZone': CONF.aws.aws_zone})
+        instance_id = data['Instances'][0]['InstanceId']
+        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
+                                            InstanceIds=[instance_id])
+        self.assertEqual(1, len(data['Instances']))
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        self.assertRaises('InvalidParameterValue',
+            self.client.describe_instance_attribute,
+            InstanceId=instance_id, Attribute='fake_attribute')
+        self.assertRaises('InvalidInstanceID.NotFound',
+            self.client.describe_instance_attribute,
+            InstanceId='i-0', Attribute='disableApiTermination')
+
+        self.assertRaises('InvalidParameterValue',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id, Attribute='fake_attribute')
+        self.assertRaises('MissingParameter',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id, Attribute='disableApiTermination')
+        self.assertRaises('InvalidParameterCombination',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id)
+        self.assertRaises('InvalidParameterCombination',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id, Attribute='disableApiTermination',
+            Value='True', DisableApiTermination={'Value': False})
+
+        self.assertRaises('InvalidParameterValue',
+            self.client.reset_instance_attribute,
+            InstanceId=instance_id, Attribute='fake_attribute')
+        self.assertRaises('InvalidParameterValue',
+            self.client.reset_instance_attribute,
+            InstanceId=instance_id, Attribute='disableApiTermination')
+        self.assertRaises('InvalidParameterValue',
+            self.client.reset_instance_attribute,
+            InstanceId='i-0', Attribute='disableApiTermination')
+
+        self.client.terminate_instances(InstanceIds=[instance_id])
+        self.cancelResourceCleanUp(res_clean)
+        self.get_instance_waiter().wait_delete(instance_id)
