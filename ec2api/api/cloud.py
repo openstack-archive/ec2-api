@@ -1735,7 +1735,7 @@ class VpcCloudController(CloudController):
                             'str')
     def describe_network_interface_attribute(self, context,
                                              network_interface_id,
-                                             attribute):
+                                             attribute=None):
         """Describes the specified attribute of the specified network interface.
 
 

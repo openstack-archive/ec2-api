@@ -315,14 +315,49 @@ def unassign_private_ip_addresses(context, network_interface_id,
 
 
 def describe_network_interface_attribute(context, network_interface_id,
-                                         attribute):
+                                         attribute=None):
+    if attribute is None:
+        raise exception.InvalidParameterCombination(
+            _('No attributes specified.'))
     network_interface = ec2utils.get_db_item(context, network_interface_id)
-    # TODO(Alex): Implement attachments, groupSet
 
-    db_key = attribute if attribute == 'description' else 'source_dest_check'
-    default_value = '' if attribute == 'description' else True
-    return {'networkInterfaceId': network_interface['id'],
-            attribute: {'value': network_interface.get(db_key, default_value)}}
+    def _format_attr_description(result):
+        result['description'] = {
+            'value': network_interface.get('description', '')}
+
+    def _format_attr_source_dest_check(result):
+        result['sourceDestCheck'] = {
+            'value': network_interface.get('source_dest_check', True)}
+
+    def _format_attr_group_set(result):
+        ec2_network_interface = describe_network_interfaces(context,
+            network_interface_id=[network_interface_id]
+        )['networkInterfaceSet'][0]
+        result['groupSet'] = ec2_network_interface['groupSet']
+
+    def _format_attr_attachment(result):
+        ec2_network_interface = describe_network_interfaces(context,
+            network_interface_id=[network_interface_id]
+        )['networkInterfaceSet'][0]
+        if 'attachment' in ec2_network_interface:
+            result['attachment'] = ec2_network_interface['attachment']
+
+    attribute_formatter = {
+        'description': _format_attr_description,
+        'sourceDestCheck': _format_attr_source_dest_check,
+        'groupSet': _format_attr_group_set,
+        'attachment': _format_attr_attachment,
+    }
+
+    fn = attribute_formatter.get(attribute)
+    if fn is None:
+        raise exception.InvalidParameterValue(value=attribute,
+                                              parameter='attribute',
+                                              reason='Unknown attribute.')
+
+    result = {'networkInterfaceId': network_interface['id']}
+    fn(result)
+    return result
 
 
 def modify_network_interface_attribute(context, network_interface_id,
