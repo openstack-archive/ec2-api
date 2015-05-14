@@ -132,19 +132,6 @@ class BaseScenarioTest(base.EC2TestCase):
         }
         self.client.create_route(*[], **kwargs)
 
-    def create_vpc_and_subnet(self, cidr):
-        data = self.client.create_vpc(CidrBlock=cidr)
-        vpc_id = data['Vpc']['VpcId']
-        self.addResourceCleanUp(self.client.delete_vpc, VpcId=vpc_id)
-        self.get_vpc_waiter().wait_available(vpc_id)
-
-        data = self.client.create_subnet(VpcId=vpc_id, CidrBlock=cidr,
-            AvailabilityZone=CONF.aws.aws_zone)
-        subnet_id = data['Subnet']['SubnetId']
-        self.addResourceCleanUp(self.client.delete_subnet, SubnetId=subnet_id)
-
-        return vpc_id, subnet_id
-
     def create_network_interface(self, subnet_id):
         data = self.client.create_network_interface(SubnetId=subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']

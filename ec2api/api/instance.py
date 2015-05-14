@@ -506,8 +506,17 @@ def describe_instance_attribute(context, instance_id, attribute):
         _cloud_format_instance_bdm(context, os_instance, result)
 
     def _format_attr_group_set(result):
-        result['groupSet'] = _format_group_set(
-            context, getattr(os_instance, 'security_groups', []))
+        if instance.get('vpc_id'):
+            enis = network_interface_api.describe_network_interfaces(
+                context, filter=[{'name': 'attachment.instance-id',
+                                  'value': [instance_id]}]
+                )['networkInterfaceSet']
+            if len(enis) != 1:
+                raise exception.InvalidInstanceId(instance_id=instance_id)
+            result['groupSet'] = enis[0]['groupSet']
+        else:
+            result['groupSet'] = _format_group_set(
+                context, getattr(os_instance, 'security_groups', []))
 
     def _format_attr_instance_type(result):
         result['instanceType'] = {
@@ -572,10 +581,7 @@ def modify_instance_attribute(context, instance_id, attribute=None,
     # NOTE(andrey-mp): other parameters can be added in same way
 
     if attribute is not None:
-        if attribute == 'userData':
-            if user_data is not None:
-                raise exception.InvalidParameterCombination()
-        elif attribute == 'disableApiTermination':
+        if attribute == 'disableApiTermination':
             if disable_api_termination is not None:
                 raise exception.InvalidParameterCombination()
         else:
@@ -588,21 +594,33 @@ def modify_instance_attribute(context, instance_id, attribute=None,
     params_count = (
         int(source_dest_check is not None) +
         int(group_id is not None) + int(instance_type is not None) +
-        int(disable_api_termination is not None) + int(user_data is not None))
+        int(disable_api_termination is not None))
     if (params_count > 1
             or (attribute is not None and params_count == 1)
             or (params_count == 0 and attribute is None)):
         raise exception.InvalidParameterCombination()
 
-    if attribute == 'userData':
-        user_data = value
-    elif attribute == 'disableApiTermination':
+    if attribute == 'disableApiTermination':
         disable_api_termination = value
 
+    instance = ec2utils.get_db_item(context, instance_id)
     if disable_api_termination is not None:
         instance = ec2utils.get_db_item(context, instance_id)
         instance['disable_api_termination'] = value
         db_api.update_item(context, instance)
+        return True
+    elif group_id is not None:
+        if not instance.get('vpc_id'):
+            raise exception.InvalidParameterCombination(message=_('You may '
+                'only modify the groupSet attribute for VPC instances'))
+        enis = network_interface_api.describe_network_interfaces(
+            context, filter=[{'name': 'attachment.instance-id',
+                              'value': [instance_id]}]
+            )['networkInterfaceSet']
+        if len(enis) != 1:
+            raise exception.InvalidInstanceId(instance_id=instance_id)
+        network_interface_api.modify_network_interface_attribute(context,
+            enis[0]['networkInterfaceId'], security_group_id=group_id)
         return True
 
     raise exception.InvalidParameterCombination()
@@ -667,9 +685,11 @@ def _format_instance(context, instance, os_instance, ec2_network_interfaces,
         if fixed_ip6:
             ec2_instance['dnsNameV6'] = fixed_ip6
         dns_name = floating_ip
-        # TODO(ft): euca2ools require groupId for an instance security group.
-        # But ec2-api doesn't store IDs for EC2 Classic groups.
-        # ec2_instance['groupSet'] = _format_group_set(
+        # TODO(ft): euca2ools require groupId for an instance security group
+        # for describing instances only.
+        # But ec2-api doesn't store IDs for EC2 lassic groups.
+        # if getattr(os_instance, 'security_groups', None):
+        #     ec2_instance['groupSet'] = _format_group_set(
         #         context, os_instance.security_groups)
     else:
         primary_ec2_network_interface = None

@@ -48,8 +48,8 @@ class SecurityGroupTest(base.EC2TestCase):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
         data = self.client.create_security_group(VpcId=self.vpc_id,
-                                                     GroupName=name,
-                                                     Description=desc)
+                                                 GroupName=name,
+                                                 Description=desc)
         group_id = data['GroupId']
         res_clean = self.addResourceCleanUp(self.client.delete_security_group,
                                             GroupId=group_id)
@@ -65,6 +65,53 @@ class SecurityGroupTest(base.EC2TestCase):
         self.assertRaises('InvalidGroup.NotFound',
                           self.client.delete_security_group,
                           GroupId=group_id)
+
+    def test_create_duplicate_security_group(self):
+        name = data_utils.rand_name('sgName')
+        desc = data_utils.rand_name('sgDesc')
+        data = self.client.create_security_group(VpcId=self.vpc_id,
+                                                 GroupName=name,
+                                                 Description=desc)
+        group_id = data['GroupId']
+        res_clean = self.addResourceCleanUp(self.client.delete_security_group,
+                                            GroupId=group_id)
+        time.sleep(2)
+
+        self.assertRaises('InvalidGroup.Duplicate',
+            self.client.create_security_group,
+            VpcId=self.vpc_id, GroupName=name, Description=desc)
+
+        data = self.client.delete_security_group(GroupId=group_id)
+        self.cancelResourceCleanUp(res_clean)
+
+    def test_create_duplicate_security_group_in_another_vpc(self):
+        name = data_utils.rand_name('sgName')
+        desc = data_utils.rand_name('sgDesc')
+        data = self.client.create_security_group(VpcId=self.vpc_id,
+                                                 GroupName=name,
+                                                 Description=desc)
+        group_id = data['GroupId']
+        res_clean = self.addResourceCleanUp(self.client.delete_security_group,
+                                            GroupId=group_id)
+        time.sleep(2)
+
+        data = self.client.create_vpc(CidrBlock=self.VPC_CIDR)
+        vpc_id = data['Vpc']['VpcId']
+        dv_clean = self.addResourceCleanUp(self.client.delete_vpc,
+                                           VpcId=vpc_id)
+
+        data = self.client.create_security_group(VpcId=vpc_id,
+                                                 GroupName=name,
+                                                 Description=desc)
+        time.sleep(2)
+        self.client.delete_security_group(GroupId=data['GroupId'])
+
+        self.client.delete_vpc(VpcId=vpc_id)
+        self.cancelResourceCleanUp(dv_clean)
+        self.get_vpc_waiter().wait_delete(vpc_id)
+
+        data = self.client.delete_security_group(GroupId=group_id)
+        self.cancelResourceCleanUp(res_clean)
 
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "MismatchError: 'InvalidParameterValue' != 'ValidationError'")

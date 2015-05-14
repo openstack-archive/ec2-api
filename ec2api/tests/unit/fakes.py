@@ -530,6 +530,9 @@ EC2_INSTANCE_1 = {
 EC2_INSTANCE_2 = {
     'instanceId': ID_EC2_INSTANCE_2,
     'privateIpAddress': None,
+    # TODO(andrey-mp): related to describing groups in instances
+    # 'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP},
+    #              {'groupName': NAME_OTHER_OS_SECURITY_GROUP}],
     'amiLaunchIndex': 0,
     'placement': {'availabilityZone': NAME_AVAILABILITY_ZONE},
     'dnsName': IP_ADDRESS_NOVA_1,

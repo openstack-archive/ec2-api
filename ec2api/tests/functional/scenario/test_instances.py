@@ -18,6 +18,7 @@ import base64
 from oslo_log import log
 from tempest_lib.common import ssh
 from tempest_lib.common.utils import data_utils
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -29,14 +30,7 @@ LOG = log.getLogger(__name__)
 
 class InstancesTest(scenario_base.BaseScenarioTest):
 
-    @classmethod
-    @base.safe_setup
-    def setUpClass(cls):
-        super(InstancesTest, cls).setUpClass()
-        if not CONF.aws.image_id:
-            raise cls.skipException('aws image_id does not provided')
-        cls.zone = CONF.aws.aws_zone
-
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_userdata(self):
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)
@@ -61,6 +55,7 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         data = ssh_client.exec_command('curl %s/latest/meta-data/ami-id' % url)
         self.assertEqual(CONF.aws.image_id, data)
 
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_compare_console_output(self):
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)

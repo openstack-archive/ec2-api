@@ -17,6 +17,7 @@ import netaddr
 from oslo_log import log
 from tempest_lib.common import ssh
 from tempest_lib.common.utils import data_utils
+import testtools
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -27,15 +28,6 @@ LOG = log.getLogger(__name__)
 
 
 class InstancesInVPCTest(scenario_base.BaseScenarioTest):
-
-    @classmethod
-    @base.safe_setup
-    def setUpClass(cls):
-        super(InstancesInVPCTest, cls).setUpClass()
-        if not base.TesterStateHolder().get_vpc_enabled():
-            raise cls.skipException('VPC is disabled')
-        if not CONF.aws.image_id:
-            raise cls.skipException('aws image_id does not provided')
 
     def _test_instances(self, subnet_size):
         cidr = netaddr.IPNetwork('10.20.0.0/8')
@@ -65,8 +57,12 @@ class InstancesInVPCTest(scenario_base.BaseScenarioTest):
         waiter = base.EC2Waiter(ssh_client.exec_command)
         waiter.wait_no_exception('ping %s -c 1' % last_ip)
 
+    @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_instances_in_min_subnet(self):
         self._test_instances(28)
 
+    @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_instances_in_max_subnet(self):
         self._test_instances(16)
