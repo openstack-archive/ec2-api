@@ -224,3 +224,11 @@ def validate_security_group_str(value, parameter_name, vpc_id=None):
     if msg:
         raise exception.ValidationError(reason=msg)
     return True
+
+
+def validate_vpn_connection_type(value):
+    if value != 'ipsec.1':
+        raise exception.InvalidParameterValue(
+            value=type, parameter='type',
+            reason=_('Invalid VPN connection type.'))
+    return True

@@ -76,6 +76,7 @@ class EC2ValidationTestCase(testtools.TestCase):
         validator.eipalloc_id('eipalloc-00000001')
         validator.eipassoc_id('eipassoc-00000001')
         validator.rtbassoc_id('rtbassoc-00000001')
+        validator.cgw_id('cgw-00000001')
 
         invalid_ids = ['1234', 'a-1111', '', 'i-1111', 'i-rrr', 'foobar']
 
@@ -97,6 +98,7 @@ class EC2ValidationTestCase(testtools.TestCase):
         check_raise_invalid_parameters(validator.eipalloc_id)
         check_raise_invalid_parameters(validator.eipassoc_id)
         check_raise_invalid_parameters(validator.rtbassoc_id)
+        check_raise_invalid_parameters(validator.cgw_id)
 
         invalid_ids = ['1234', 'a-1111', '', 'vpc-1111', 'vpc-rrr', 'foobar']
 
@@ -157,6 +159,16 @@ class EC2ValidationTestCase(testtools.TestCase):
         validator = common.Validator(params={'vpc_id': 'vpc_id'})
         check_raise_validation_error('aa #^% -=99')
         check_raise_validation_error('x' * 256)
+
+    def test_validate_vpn_connection_type(self):
+        validator = common.Validator()
+        validator.vpn_connection_type('ipsec.1')
+
+        invalid_ids = ['1234', 'a-1111', '', 'vpc-1111', 'vpc-rrr', 'foobar',
+                       'ipsec1', 'openvpn', 'pptp', 'l2tp', 'freelan']
+        for id in invalid_ids:
+            self.assertRaises(exception.InvalidParameterValue,
+                              validator.vpn_connection_type, id)
 
 
 class EC2TimestampValidationTestCase(testtools.TestCase):

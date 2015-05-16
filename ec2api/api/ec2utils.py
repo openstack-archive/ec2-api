@@ -189,6 +189,7 @@ NOT_FOUND_EXCEPTION_MAP = {
     'ami': exception.InvalidAMIIDNotFound,
     'aki': exception.InvalidAMIIDNotFound,
     'ari': exception.InvalidAMIIDNotFound,
+    'cgw': exception.InvalidCustomerGatewayIDNotFound,
 }
 
 

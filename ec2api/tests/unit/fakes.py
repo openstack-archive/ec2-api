@@ -234,6 +234,14 @@ FINGERPRINT_KEY_PAIR = (
               '2a:72:dd:aa:0d:a6:45:4d:27:4f:75:28:73:0d:a6:10:35:88:e1:ce')
 
 
+# customer gateway constants
+ID_EC2_CUSTOMER_GATEWAY_1 = random_ec2_id('cgw')
+ID_EC2_CUSTOMER_GATEWAY_2 = random_ec2_id('cgw')
+
+IP_CUSTOMER_GATEWAY_ADDRESS_1 = '172.16.1.11'
+IP_CUSTOMER_GATEWAY_ADDRESS_2 = '172.31.2.22'
+
+
 # Object constants section
 # Constant name notation:
 # [<subtype>]<object_name>
@@ -1487,6 +1495,36 @@ OS_KEY_PAIR = {'name': NAME_KEY_PAIR,
 EC2_KEY_PAIR = {'keyName': NAME_KEY_PAIR,
                 'keyFingerprint': FINGERPRINT_KEY_PAIR,
                 'keyMaterial': PRIVATE_KEY_KEY_PAIR}
+
+
+# customer gateway objects
+DB_CUSTOMER_GATEWAY_1 = {
+    'id': ID_EC2_CUSTOMER_GATEWAY_1,
+    'ip_address': IP_CUSTOMER_GATEWAY_ADDRESS_1,
+    'os_id': None,
+    'vpc_id': None,
+}
+DB_CUSTOMER_GATEWAY_2 = {
+    'id': ID_EC2_CUSTOMER_GATEWAY_2,
+    'ip_address': IP_CUSTOMER_GATEWAY_ADDRESS_2,
+    'os_id': None,
+    'vpc_id': None,
+}
+
+EC2_CUSTOMER_GATEWAY_1 = {
+    'customerGatewayId': ID_EC2_CUSTOMER_GATEWAY_1,
+    'ipAddress': IP_CUSTOMER_GATEWAY_ADDRESS_1,
+    'state': 'available',
+    'type': 'ipsec.1',
+    'bgpAsn': 65000,
+}
+EC2_CUSTOMER_GATEWAY_2 = {
+    'customerGatewayId': ID_EC2_CUSTOMER_GATEWAY_2,
+    'ipAddress': IP_CUSTOMER_GATEWAY_ADDRESS_2,
+    'state': 'available',
+    'type': 'ipsec.1',
+    'bgpAsn': 65000,
+}
 
 
 # Object generator functions section

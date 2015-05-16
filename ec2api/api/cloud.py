@@ -27,6 +27,7 @@ from oslo_log import log as logging
 
 from ec2api.api import address
 from ec2api.api import availability_zone
+from ec2api.api import customer_gateway
 from ec2api.api import dhcp_options
 from ec2api.api import image
 from ec2api.api import instance
@@ -1774,4 +1775,59 @@ class VpcCloudController(CloudController):
 
         Returns:
             true if the request succeeds.
+        """
+
+    @module_and_param_types(customer_gateway, 'ip', 'vpn_connection_type',
+                            'int')
+    def create_customer_gateway(self, context, ip_address, type,
+                                bgp_asn=None):
+        """Provides information to EC2 API about VPN customer gateway device.
+
+        Args:
+            context (RequestContext): The request context.
+            ip_address (str): The Internet-routable IP address for the
+                customer gateway's outside interface.
+            type (str): The type of VPN connection that this customer gateway
+                supports (ipsec.1).
+            bgp_asn (int): For devices that support BGP,
+                the customer gateway's BGP ASN (65000 otherwise).
+
+        Returns:
+            Information about the customer gateway.
+
+        You cannot create more than one customer gateway with the same VPN
+        type, IP address, and BGP ASN parameter values. If you run an
+        identical request more than one time, subsequent requests return
+        information about the existing customer gateway.
+        """
+
+    @module_and_param_types(customer_gateway, 'cgw_id')
+    def delete_customer_gateway(self, context, customer_gateway_id):
+        """Deletes the specified customer gateway.
+
+        Args:
+            context (RequestContext): The request context.
+            customer_gateway_id (str): The ID of the customer gateway.
+
+        Returns:
+            true if the request succeeds.
+
+        You must delete the VPN connection before you can delete the customer
+        gateway.
+        """
+
+    @module_and_param_types(customer_gateway, 'cgw_ids',
+                            'filter')
+    def describe_customer_gateways(self, context, customer_gateway_id=None,
+                                   filter=None):
+        """Describes one or more of your VPN customer gateways.
+
+        Args:
+            context (RequestContext): The request context.
+            customer_gateway_id (list of str): One or more customer gateway
+                IDs.
+            filter (list of filter dict): One or more filters.
+
+        Returns:
+            Information about one or more customer gateways.
         """
