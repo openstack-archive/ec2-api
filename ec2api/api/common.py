@@ -247,6 +247,12 @@ class Validator(object):
     def dopt_ids(self, ids):
         self.multi(ids, self.dopt_id)
 
+    def vgw_id(self, id):
+        self.ec2_id(id, ['vgw'])
+
+    def vgw_ids(self, ids):
+        self.multi(ids, self.vgw_id)
+
     def cgw_id(self, id):
         self.ec2_id(id, ['cgw'])
 
@@ -265,7 +271,7 @@ class Validator(object):
 
 
 VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb',
-             'cgw']
+             'vgw', 'cgw']
 
 
 class UniversalDescriber(object):

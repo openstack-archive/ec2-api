@@ -174,6 +174,12 @@ class VpcTestCase(base.ApiTestCase):
                                  fakes.OS_SECURITY_GROUP_2]})
         do_check()
 
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1)]})
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1, )
+        do_check()
+
     def test_delete_vpc_not_conststent_os_vpc(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
 

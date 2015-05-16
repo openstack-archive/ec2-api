@@ -41,6 +41,7 @@ from ec2api.api import subnet
 from ec2api.api import tag
 from ec2api.api import volume
 from ec2api.api import vpc
+from ec2api.api import vpn_gateway
 from ec2api import exception
 
 CONF = cfg.CONF
@@ -1775,6 +1776,73 @@ class VpcCloudController(CloudController):
 
         Returns:
             true if the request succeeds.
+        """
+
+    @module_and_param_types(vpn_gateway, 'vpn_connection_type', 'str')
+    def create_vpn_gateway(self, context, type, availability_zone=None):
+        """Creates a virtual private gateway.
+
+        Args:
+            context (RequestContext): The request context.
+            type (str): The type of VPN connection this virtual private
+                gateway supports (ipsec.1).
+            availability_zone (str): The Availability Zone for the virtual
+                private gateway.
+
+        Returns:
+            Information about the virtual private gateway.
+        """
+
+    @module_and_param_types(vpn_gateway, 'vpc_id', 'vgw_id')
+    def attach_vpn_gateway(self, context, vpc_id, vpn_gateway_id):
+        """Attaches a virtual private gateway to a VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            vpc_id (str): The ID of the VPC.
+            vpn_gateway_id (str): he ID of the virtual private gateway.
+
+        Returns:
+            Information about the attachment.
+        """
+
+    @module_and_param_types(vpn_gateway, 'vpc_id', 'vgw_id')
+    def detach_vpn_gateway(self, context, vpc_id, vpn_gateway_id):
+        """Detaches a virtual private gateway from a VPC.
+
+        Args:
+            context (RequestContext): The request context.
+            vpc_id (str): The ID of the VPC.
+            vpn_gateway_id (str): he ID of the virtual private gateway.
+
+        Returns:
+            true if the request succeeds.
+        """
+
+    @module_and_param_types(vpn_gateway, 'vgw_id')
+    def delete_vpn_gateway(self, context, vpn_gateway_id):
+        """Deletes the specified virtual private gateway.
+
+        Args:
+            context (RequestContext): The request context.
+            vpn_gateway_id (str): The ID of the virtual private gateway.
+
+        Returns:
+            true if the request succeeds.
+        """
+
+    @module_and_param_types(vpn_gateway, 'vgw_ids', 'filter')
+    def describe_vpn_gateways(self, context, vpn_gateway_id=None, filter=None):
+        """Describes one or more of your virtual private gateways.
+
+        Args:
+            context (RequestContext): The request context.
+            vpn_gateway_id (list of str): One or more virtual private gateway
+                IDs.
+            filter (list of filter dict): One or more filters.
+
+        Returns:
+            Information about one or more virtual private gateways.
         """
 
     @module_and_param_types(customer_gateway, 'ip', 'vpn_connection_type',
