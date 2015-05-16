@@ -405,6 +405,11 @@ class InvalidAvailabilityZoneNotFound(EC2NotFoundException):
     msg_fmt = _("Availability zone %(id)s not found")
 
 
+class InvalidGatewayIDNotFound(EC2NotFoundException):
+    ec2_code = 'InvalidGatewayID.NotFound'
+    msg_fmt = _("The gateway ID '%(id)s' does not exist")
+
+
 class InvalidVpnGatewayIDNotFound(EC2NotFoundException):
     ec2_code = 'InvalidVpnGatewayID.NotFound'
     msg_fmt = _("The vpnGateway ID '%(id)s' does not exist")

@@ -1330,7 +1330,7 @@ class VpcCloudController(CloudController):
         """
 
     @module_and_param_types(route_table, 'rtb_id', 'cidr',
-                            'igw_id', 'i_id',
+                            'igw_or_vgw_id', 'i_id',
                             'eni_id',
                             'dummy')
     def create_route(self, context, route_table_id, destination_cidr_block,
@@ -1363,7 +1363,7 @@ class VpcCloudController(CloudController):
         """
 
     @module_and_param_types(route_table, 'rtb_id', 'cidr',
-                            'igw_id', 'i_id',
+                            'igw_or_vgw_id', 'i_id',
                             'eni_id',
                             'dummy')
     def replace_route(self, context, route_table_id, destination_cidr_block,

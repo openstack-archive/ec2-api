@@ -26,7 +26,10 @@ from ec2api import exception
 from ec2api.i18n import _
 
 
-Validator = common.Validator
+class Validator(common.Validator):
+
+    def igw_or_vgw_id(self, id):
+        self.ec2_id(id, ['igw', 'vgw'])
 
 
 def create_route_table(context, vpc_id):
@@ -219,8 +222,9 @@ class RouteTableDescriber(common.TaggableItemsDescriber,
         self.associations = associations
         vpcs = db_api.get_items(self.context, 'vpc')
         self.vpcs = {vpc['id']: vpc for vpc in vpcs}
-        gateways = db_api.get_items(self.context, 'igw')
-        self.gateways = {igw['id']: igw for igw in gateways}
+        gateways = (db_api.get_items(self.context, 'igw') +
+                    db_api.get_items(self.context, 'vgw'))
+        self.gateways = {gw['id']: gw for gw in gateways}
         # TODO(ft): scan route tables to get only used instances and
         # network interfaces to reduce DB and Nova throughput
         network_interfaces = db_api.get_items(self.context, 'eni')
@@ -303,11 +307,14 @@ def _set_route(context, route_table_id, destination_cidr_block,
     if gateway_id:
         gateway = ec2utils.get_db_item(context, gateway_id)
         if gateway.get('vpc_id') != route_table['vpc_id']:
-            msg = _('Route table %(rtb_id)s and network gateway %(igw_id)s '
-                    'belong to different networks')
-            msg = msg % {'rtb_id': route_table_id,
-                         'igw_id': gateway_id}
-            raise exception.InvalidParameterValue(msg)
+            if ec2utils.get_ec2_id_kind(gateway_id) == 'vgw':
+                raise exception.InvalidGatewayIDNotFound(id=gateway['id'])
+            else:  # igw
+                raise exception.InvalidParameterValue(
+                    _('Route table %(rtb_id)s and network gateway %(igw_id)s '
+                      'belong to different networks') %
+                    {'rtb_id': route_table_id,
+                     'igw_id': gateway_id})
         route = {'gateway_id': gateway['id']}
     elif network_interface_id:
         network_interface = ec2utils.get_db_item(context, network_interface_id)
@@ -491,7 +498,7 @@ def _get_subnet_host_routes(context, route_table, gateway_ip,
         if 'gateway_id' in route:
             gateway_id = route['gateway_id']
             if gateway_id:
-                gateway = router_objects.get(route['gateway_id'])
+                gateway = router_objects.get(gateway_id)
                 if (not gateway or
                         gateway['vpc_id'] != route_table['vpc_id']):
                     return '127.0.0.1'
@@ -503,7 +510,9 @@ def _get_subnet_host_routes(context, route_table, gateway_ip,
 
     host_routes = [{'destination': route['destination_cidr_block'],
                     'nexthop': get_nexthop(route)}
-                   for route in route_table['routes']]
+                   for route in route_table['routes']
+                   if (not route.get('gateway_id') or
+                       ec2utils.get_ec2_id_kind(route['gateway_id']) == 'igw')]
     if not any(r['destination'] == '0.0.0.0/0' for r in host_routes):
         host_routes.append({'destination': '0.0.0.0/0',
                             'nexthop': '127.0.0.1'})
