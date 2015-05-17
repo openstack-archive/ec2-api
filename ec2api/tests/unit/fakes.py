@@ -139,12 +139,15 @@ IP_ADDRESS_NOVA_1 = '192.168.2.100'
 # security group constants
 ID_EC2_SECURITY_GROUP_1 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
+ID_EC2_SECURITY_GROUP_3 = random_ec2_id('sg')
 ID_OS_SECURITY_GROUP_1 = random_os_id()
 ID_OS_SECURITY_GROUP_2 = random_os_id()
 ID_OS_SECURITY_GROUP_3 = random_os_id()
 
+ID_NOVA_OS_SECURITY_GROUP_1 = 1
+ID_NOVA_OS_SECURITY_GROUP_2 = 2
+
 NAME_DEFAULT_OS_SECURITY_GROUP = 'default'
-NAME_OTHER_OS_SECURITY_GROUP = 'other'
 
 
 # route table constants
@@ -546,9 +549,8 @@ EC2_INSTANCE_1 = {
 EC2_INSTANCE_2 = {
     'instanceId': ID_EC2_INSTANCE_2,
     'privateIpAddress': None,
-    # TODO(andrey-mp): related to describing groups in instances
-    # 'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP},
-    #              {'groupName': NAME_OTHER_OS_SECURITY_GROUP}],
+    'groupSet': [{'groupName': 'groupname3',
+                  'groupId': ID_EC2_SECURITY_GROUP_3}],
     'amiLaunchIndex': 0,
     'placement': {'availabilityZone': NAME_AVAILABILITY_ZONE},
     'dnsName': IP_ADDRESS_NOVA_1,
@@ -579,8 +581,8 @@ EC2_RESERVATION_1 = {
 EC2_RESERVATION_2 = {
     'reservationId': ID_EC2_RESERVATION_2,
     'ownerId': ID_OS_PROJECT,
-    'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP},
-                 {'groupName': NAME_OTHER_OS_SECURITY_GROUP}],
+    'groupSet': [{'groupName': 'groupname3',
+                  'groupId': ID_EC2_SECURITY_GROUP_3}],
     'instancesSet': [EC2_INSTANCE_2],
 }
 EC2_BDM_METADATA_INSTANCE_1 = {}
@@ -674,8 +676,7 @@ OS_INSTANCE_1 = {
 OS_INSTANCE_2 = {
     'id': ID_OS_INSTANCE_2,
     'flavor': {'id': 'fakeFlavorId'},
-    'security_groups': [{'name': NAME_DEFAULT_OS_SECURITY_GROUP},
-                        {'name': NAME_OTHER_OS_SECURITY_GROUP}],
+    'security_groups': [{'name': 'groupname3'}],
     'availability_zone': NAME_AVAILABILITY_ZONE,
     'addresses': {
         ID_EC2_SUBNET_1: [{'addr': IPV6_INSTANCE_2,
@@ -835,6 +836,11 @@ DB_SECURITY_GROUP_2 = {
     'os_id': ID_OS_SECURITY_GROUP_2,
     'vpc_id': ID_EC2_VPC_1,
 }
+DB_SECURITY_GROUP_3 = {
+    'id': ID_EC2_SECURITY_GROUP_3,
+    'os_id': ID_OS_SECURITY_GROUP_3,
+    'vpc_id': None,
+}
 OS_SECURITY_GROUP_RULE_1 = {
     'direction': 'ingress',
     'ethertype': 'IPv4',
@@ -894,49 +900,7 @@ OS_SECURITY_GROUP_2 = {
 }
 OS_SECURITY_GROUP_3 = {
     'id': ID_OS_SECURITY_GROUP_3,
-    'name': ID_EC2_VPC_2,
-    'description': 'Group description',
-    'tenant_id': ID_OS_PROJECT
-}
-NOVA_SECURITY_GROUP_RULE_1 = {
-    'id': random_os_id(),
-    'from_port': 10,
-    'to_port': 10,
-    'ip_protocol': 'tcp',
-    'group': None,
-    'ip_range': {'cidr': '192.168.1.0/24'},
-    'parent_group_id': ID_OS_SECURITY_GROUP_2
-}
-NOVA_SECURITY_GROUP_RULE_2 = {
-    'id': random_os_id(),
-    'from_port': None,
-    'to_port': None,
-    'ip_protocol': 'icmp',
-    'group': {'name': 'groupname'},
-    'ip_range': None,
-    'parent_group_id': ID_OS_SECURITY_GROUP_2
-}
-NOVA_SECURITY_GROUP_1 = {
-    'id': ID_OS_SECURITY_GROUP_1,
-    'name': 'groupname',
-    'security_group_rules':
-    [{'group': None,
-      'ip_range': None,
-      'ip_protocol': None,
-      'to_port': None,
-      'parent_group_id': ID_OS_SECURITY_GROUP_1,
-      'from_port': None,
-      'id': random_os_id()}],
-    'description': 'Group description',
-    'tenant_id': ID_OS_PROJECT
-}
-NOVA_SECURITY_GROUP_2 = {
-    'id': ID_OS_SECURITY_GROUP_2,
-    'name': 'groupname2',
-    'security_group_rules': [
-        NOVA_SECURITY_GROUP_RULE_1,
-        NOVA_SECURITY_GROUP_RULE_2
-    ],
+    'name': 'groupname3',
     'description': 'Group description',
     'tenant_id': ID_OS_PROJECT
 }
@@ -978,28 +942,78 @@ EC2_SECURITY_GROUP_2 = {
 EC2_SECURITY_GROUP_3 = {
     'groupDescription': 'Group description',
     'ipPermissions': None,
-    'groupName': ID_EC2_VPC_2,
+    'ipPermissionsEgress': None,
+    'groupName': 'groupname3',
     'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_3
+}
+
+NOVA_DB_SECURITY_GROUP_1 = {
+    'id': ID_EC2_SECURITY_GROUP_1,
+    'os_id': str(ID_NOVA_OS_SECURITY_GROUP_1),
+    'vpc_id': None,
+}
+NOVA_DB_SECURITY_GROUP_2 = {
+    'id': ID_EC2_SECURITY_GROUP_2,
+    'os_id': str(ID_NOVA_OS_SECURITY_GROUP_2),
+    'vpc_id': None,
+}
+NOVA_SECURITY_GROUP_RULE_1 = {
+    'id': random_os_id(),
+    'from_port': 10,
+    'to_port': 10,
+    'ip_protocol': 'tcp',
+    'group': None,
+    'ip_range': {'cidr': '192.168.1.0/24'},
+    'parent_group_id': ID_NOVA_OS_SECURITY_GROUP_2
+}
+NOVA_SECURITY_GROUP_RULE_2 = {
+    'id': random_os_id(),
+    'from_port': None,
+    'to_port': None,
+    'ip_protocol': 'icmp',
+    'group': {'name': 'groupname'},
+    'ip_range': None,
+    'parent_group_id': ID_NOVA_OS_SECURITY_GROUP_2
+}
+NOVA_SECURITY_GROUP_1 = {
+    'id': ID_NOVA_OS_SECURITY_GROUP_1,
+    'name': 'groupname',
+    'security_group_rules':
+    [{'group': None,
+      'ip_range': None,
+      'ip_protocol': None,
+      'to_port': None,
+      'parent_group_id': ID_NOVA_OS_SECURITY_GROUP_1,
+      'from_port': None,
+      'id': random_os_id()}],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
+NOVA_SECURITY_GROUP_2 = {
+    'id': ID_NOVA_OS_SECURITY_GROUP_2,
+    'name': 'groupname2',
+    'security_group_rules': [
+        NOVA_SECURITY_GROUP_RULE_1,
+        NOVA_SECURITY_GROUP_RULE_2
+    ],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
 }
 EC2_NOVA_SECURITY_GROUP_1 = {
     'groupDescription': 'Group description',
     'ipPermissions': None,
     'groupName': 'groupname',
+    'ipPermissionsEgress': None,
     'ipPermissions':
-    [{'toPort': 65535,
-      'ipProtocol': 'tcp',
-      'fromPort': 1},
-     {'toPort': 65535,
-      'ipProtocol': 'udp',
-      'fromPort': 1},
-     {'toPort': -1,
-      'ipProtocol': 'icmp',
-      'fromPort': -1}],
+    [{'fromPort': -1, 'ipProtocol': -1, 'toPort': -1}],
     'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_1
 }
 EC2_NOVA_SECURITY_GROUP_2 = {
     'groupDescription': 'Group description',
     'groupName': 'groupname2',
+    'ipPermissionsEgress': None,
     'ipPermissions':
     [{'toPort': 10,
       'ipProtocol': 'tcp',
@@ -1012,9 +1026,11 @@ EC2_NOVA_SECURITY_GROUP_2 = {
       'fromPort': -1,
       'groups':
       [{'groupName': 'groupname',
+        'groupId': ID_EC2_SECURITY_GROUP_1,
         'userId': ID_OS_PROJECT}]
       }],
     'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_2
 }
 
 

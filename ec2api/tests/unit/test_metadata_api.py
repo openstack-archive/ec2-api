@@ -141,8 +141,7 @@ class MetadataApiTestCase(base.ApiTestCase):
                self.fake_context,
                ['2009-04-04', 'meta-data', 'security-groups'],
                fakes.ID_OS_INSTANCE_2, fakes.IP_NETWORK_INTERFACE_1)
-        self.assertEqual('\n'.join([fakes.NAME_DEFAULT_OS_SECURITY_GROUP,
-                                    fakes.NAME_OTHER_OS_SECURITY_GROUP]),
+        self.assertEqual('\n'.join(['groupname3']),
                          retval)
 
     def test_local_hostname(self):

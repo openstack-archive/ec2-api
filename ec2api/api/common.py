@@ -270,7 +270,7 @@ class Validator(object):
         validator.validate_vpn_connection_type(value)
 
 
-VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb',
+VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'rtb',
              'vgw', 'cgw']
 
 
@@ -296,7 +296,7 @@ class UniversalDescriber(object):
     def auto_update_db(self, item, os_item):
         if item is None and self.KIND not in VPC_KINDS:
             item = ec2utils.auto_create_db_item(self.context, self.KIND,
-                                                os_item.id)
+                                                self.get_id(os_item))
         return item
 
     def get_id(self, os_item):

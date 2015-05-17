@@ -48,6 +48,8 @@ SECURITY_GROUP_MAP = {'domain-name-servers': 'dns-servers',
                       'netbios-name-servers': 'netbios-ns',
                       'netbios-node-type': 'netbios-nodetype'}
 
+DEFAULT_GROUP_NAME = 'default'
+
 
 def get_security_group_engine():
     if CONF.full_vpc_support:
@@ -58,20 +60,36 @@ def get_security_group_engine():
 
 def create_security_group(context, group_name, group_description,
                           vpc_id=None):
-    nova = clients.nova(context)
+    if group_name == DEFAULT_GROUP_NAME:
+        if vpc_id:
+            raise exception.InvalidParameterValue(
+                _('Cannot use reserved security group name: %s')
+                % DEFAULT_GROUP_NAME)
+        else:
+            raise exception.InvalidGroupReserved(group_name=group_name)
+    filter = [{'name': 'group-name',
+               'value': [group_name]}]
     if vpc_id and group_name != vpc_id:
-        security_groups = describe_security_groups(
-            context,
-            filter=[{'name': 'vpc-id',
-                     'value': [vpc_id]},
-                    {'name': 'group-name',
-                     'value': [group_name]}])['securityGroupInfo']
-        if security_groups:
-            raise exception.InvalidGroupDuplicate(name=group_name)
+        filter.append({'name': 'vpc-id',
+                       'value': [vpc_id]})
+    security_groups = describe_security_groups(
+        context, filter=filter)['securityGroupInfo']
+    if not vpc_id:
+        # TODO(andrey-mp): remove it when fitering by None will be implemented
+        security_groups = [sg for sg in security_groups
+                           if sg.get('vpcId') is None]
+    if security_groups:
+        raise exception.InvalidGroupDuplicate(name=group_name)
+
+    return _create_security_group(context, group_name, group_description,
+                                  vpc_id)
+
+
+def _create_security_group(context, group_name, group_description,
+                           vpc_id=None):
+    nova = clients.nova(context)
     with common.OnCrashCleaner() as cleaner:
         try:
-            # TODO(Alex): Shouldn't allow creation of groups with existing
-            # name if in the same VPC or in EC2-Classic.
             os_security_group = nova.security_groups.create(group_name,
                                                             group_description)
         except nova_exception.OverLimit:
@@ -81,19 +99,18 @@ def create_security_group(context, group_name, group_description,
         if vpc_id:
             # NOTE(Alex) Check if such vpc exists
             ec2utils.get_db_item(context, vpc_id)
-            security_group = db_api.add_item(context, 'sg',
-                                             {'vpc_id': vpc_id,
-                                              'os_id': os_security_group.id})
-            return {'return': 'true',
-                    'groupId': security_group['id']}
-    return {'return': 'true'}
+        security_group = db_api.add_item(context, 'sg',
+                                         {'vpc_id': vpc_id,
+                                          'os_id': os_security_group.id})
+        return {'return': 'true',
+                'groupId': security_group['id']}
 
 
 def _create_default_security_group(context, vpc):
     # NOTE(Alex): OpenStack doesn't allow creation of another group
     # named 'default' hence vpc-id is used.
-    return create_security_group(context, vpc['id'],
-                                 'Default VPC security group', vpc['id'])
+    return _create_security_group(context, vpc['id'],
+                                  'Default VPC security group', vpc['id'])
 
 
 def delete_security_group(context, group_name=None, group_id=None,
@@ -150,8 +167,8 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
 
     def check_and_repair_default_groups(self, os_groups, db_groups):
         vpcs = ec2utils.get_db_items(self.context, 'vpc', None)
-        os_groups_dict = dict((g['name'], g['id']) for g in os_groups)
-        db_groups_dict = dict((g['os_id'], g['vpc_id']) for g in db_groups)
+        os_groups_dict = {g['name']: g['id'] for g in os_groups}
+        db_groups_dict = {g['os_id']: g['vpc_id'] for g in db_groups}
         had_to_repair = False
         for vpc in vpcs:
             os_group = os_groups_dict.get(vpc['id'])
@@ -184,6 +201,10 @@ def authorize_security_group_ingress(context, group_id=None,
 
 
 def authorize_security_group_egress(context, group_id, ip_permissions=None):
+    security_group = ec2utils.get_db_item(context, group_id)
+    if not security_group.get('vpc_id'):
+        raise exception.InvalidParameterValue(message=_('Only Amazon VPC '
+            'security groups may be used with this operation.'))
     return _authorize_security_group(context, group_id, None,
                                      ip_permissions, 'egress')
 
@@ -285,6 +306,10 @@ def revoke_security_group_ingress(context, group_id=None,
 
 
 def revoke_security_group_egress(context, group_id, ip_permissions=None):
+    security_group = ec2utils.get_db_item(context, group_id)
+    if not security_group.get('vpc_id'):
+        raise exception.InvalidParameterValue(message=_('Only Amazon VPC '
+            'security groups may be used with this operation.'))
     return _revoke_security_group(context, group_id, None,
                                   ip_permissions, 'egress')
 
@@ -321,7 +346,10 @@ def _revoke_security_group(context, group_id, group_name, ip_permissions,
                 os_rules_to_delete.append(os_rule['id'])
 
     if len(os_rules_to_delete) != len(rules_bodies):
-        raise exception.InvalidPermissionNotFound()
+        security_group = ec2utils.get_db_item(context, group_id)
+        if security_group.get('vpc_id'):
+            raise exception.InvalidPermissionNotFound()
+        return True
     for os_rule_id in os_rules_to_delete:
         security_group_engine.delete_os_group_rule(context, os_rule_id)
     return True
@@ -333,10 +361,11 @@ def _translate_group_name(context, os_group, db_groups):
     # to be called right after getting security groups from OpenStack
     # in order to avoid problems with incoming 'default' name value
     # in all of the subsequent handling (filtering, using in parameters...)
-    if (os_group['name'].startswith('vpc-') and db_groups and
-            next((g for g in db_groups
-                  if g['os_id'] == os_group['id']), None)):
-        return 'default'
+    if os_group['name'].startswith('vpc-') and db_groups:
+        db_group = next((g for g in db_groups
+                        if g['os_id'] == os_group['id']), None)
+        if db_group and db_group.get('vpc_id'):
+            return DEFAULT_GROUP_NAME
     return os_group['name']
 
 
@@ -362,8 +391,8 @@ def _format_security_groups_ids_names(context):
 def _format_security_group(security_group, os_security_group,
                            security_groups, os_security_groups):
     ec2_security_group = {}
-    if security_group is not None:
-        ec2_security_group['groupId'] = security_group['id']
+    ec2_security_group['groupId'] = security_group['id']
+    if security_group.get('vpc_id'):
         ec2_security_group['vpcId'] = security_group['vpc_id']
     ec2_security_group['ownerId'] = os_security_group['tenant_id']
     ec2_security_group['groupName'] = os_security_group['name']
@@ -417,8 +446,7 @@ def _format_security_group(security_group, os_security_group,
                 ingress_permissions.append(ec2_rule)
 
     ec2_security_group['ipPermissions'] = ingress_permissions
-    if security_group is not None:
-        ec2_security_group['ipPermissionsEgress'] = egress_permissions
+    ec2_security_group['ipPermissionsEgress'] = egress_permissions
     return ec2_security_group
 
 
@@ -540,7 +568,7 @@ class SecurityGroupEngineNova(object):
     def convert_groups_to_neutron_format(self, context, nova_security_groups):
         neutron_security_groups = []
         for nova_group in nova_security_groups:
-            neutron_group = {'id': nova_group.id,
+            neutron_group = {'id': str(nova_group.id),
                              'name': nova_group.name,
                              'description': nova_group.description,
                              'tenant_id': nova_group.tenant_id}
@@ -556,7 +584,7 @@ class SecurityGroupEngineNova(object):
 
     def convert_rule_to_neutron(self, context, nova_rule,
                                 nova_security_groups=None):
-        neutron_rule = {'id': nova_rule['id'],
+        neutron_rule = {'id': str(nova_rule['id']),
                         'protocol': nova_rule['ip_protocol'],
                         'port_range_min': nova_rule['from_port'],
                         'port_range_max': nova_rule['to_port'],
@@ -565,7 +593,7 @@ class SecurityGroupEngineNova(object):
                         'remote_group_id': None,
                         'direction': 'ingress',
                         'ethertype': 'IPv4',
-                        'security_group_id': nova_rule['parent_group_id']}
+                        'security_group_id': str(nova_rule['parent_group_id'])}
         if (nova_rule.get('group') or {}).get('name'):
             neutron_rule['remote_group_id'] = (
                 self.get_group_os_id(context, None,
@@ -576,10 +604,10 @@ class SecurityGroupEngineNova(object):
     def get_group_os_id(self, context, group_id, group_name,
                         nova_security_groups=None):
         if group_id:
-            return group_id
+            return ec2utils.get_db_item(context, group_id, 'sg')['os_id']
         nova_group = self.get_nova_group_by_name(context, group_name,
                                                  nova_security_groups)
-        return nova_group.id
+        return str(nova_group.id)
 
     def get_nova_group_by_name(self, context, group_name,
                                nova_security_groups=None):

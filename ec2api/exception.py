@@ -460,3 +460,8 @@ class RulesPerSecurityGroupLimitExceeded(EC2OverlimitException):
 class VpnGatewayAttachmentLimitExceeded(EC2OverlimitException):
     msg_fmt = _('The maximum number of virtual private gateway attachments '
                 'has been reached.')
+
+
+class InvalidGroupReserved(EC2InvalidException):
+    ec2_code = 'InvalidGroup.Reserved'
+    msg_fmt = _("The security group '%(group_name)' is reserved.")

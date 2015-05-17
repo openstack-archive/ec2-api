@@ -42,7 +42,8 @@ class InstanceTestCase(base.ApiTestCase):
         address_api_patcher = mock.patch('ec2api.api.address')
         self.address_api = address_api_patcher.start()
         self.addCleanup(address_api_patcher.stop)
-        security_group_api_patcher = mock.patch('ec2api.api.security_group')
+        security_group_api_patcher = mock.patch(
+            'ec2api.api.instance.security_group_api')
         self.security_group_api = security_group_api_patcher.start()
         self.addCleanup(security_group_api_patcher.stop)
         utils_generate_uid_patcher = (
@@ -69,10 +70,6 @@ class InstanceTestCase(base.ApiTestCase):
                 self.nova
                 if (kwargs.get('auth_token') != 'admin_token') else
                 None))
-
-        format_security_groups_ids_names = (
-            self.security_group_api.format_security_groups_ids_names)
-        format_security_groups_ids_names.return_value = {}
 
         self.fake_flavor = mock.Mock()
         self.fake_flavor.configure_mock(name='fake_flavor',
@@ -716,6 +713,9 @@ class InstanceTestCase(base.ApiTestCase):
             lambda *args, **kwargs: copy.deepcopy({
                 'networkInterfaceSet': [fakes.EC2_NETWORK_INTERFACE_1,
                                         fakes.EC2_NETWORK_INTERFACE_2]}))
+        self.security_group_api.describe_security_groups.return_value = {
+            'securityGroupInfo': [fakes.EC2_SECURITY_GROUP_1,
+                                  fakes.EC2_SECURITY_GROUP_3]}
 
         resp = self.execute('DescribeInstances', {})
 
@@ -824,6 +824,9 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2),
             fakes.OSVolume(fakes.OS_VOLUME_3)]
+        self.security_group_api.describe_security_groups.return_value = {
+            'securityGroupInfo': [fakes.EC2_SECURITY_GROUP_1,
+                                  fakes.EC2_SECURITY_GROUP_3]}
 
         resp = self.execute('DescribeInstances', {})
 
@@ -840,6 +843,9 @@ class InstanceTestCase(base.ApiTestCase):
         self.set_mock_db_items(*self.DB_INSTANCES)
         describe_network_interfaces = (
             self.network_interface_api.describe_network_interfaces)
+        self.security_group_api.describe_security_groups.return_value = {
+            'securityGroupInfo': [fakes.EC2_SECURITY_GROUP_1,
+                                  fakes.EC2_SECURITY_GROUP_3]}
 
         def do_check(ips_by_instance=[], ec2_enis_by_instance=[],
                      ec2_instance_ips=[]):
@@ -909,6 +915,8 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_2)]
+        self.security_group_api.describe_security_groups.return_value = {
+            'securityGroupInfo': [fakes.EC2_SECURITY_GROUP_3]}
 
         resp = self.execute('DescribeInstances', {})
 
@@ -968,6 +976,9 @@ class InstanceTestCase(base.ApiTestCase):
                     fakes.OSInstance_full(fakes.OS_INSTANCE_2))}))
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_2)]
+        self.security_group_api.describe_security_groups.return_value = {
+            'securityGroupInfo': [fakes.EC2_SECURITY_GROUP_1,
+                                  fakes.EC2_SECURITY_GROUP_3]}
 
         def do_check(instance_id, attribute, expected):
             resp = self.execute('DescribeInstanceAttribute',
@@ -1442,14 +1453,14 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         setattr(os_instance, 'OS-EXT-STS:vm_state', 'active')
         formatted_instance = instance_api._format_instance(
             fake_context, instance, os_instance, [], {},
-            os_flavors=fake_flavors)
+            None, None, fake_flavors, [])
         self.assertEqual({'name': 'running', 'code': 16},
                          formatted_instance['instanceState'])
 
         setattr(os_instance, 'OS-EXT-STS:vm_state', 'stopped')
         formatted_instance = instance_api._format_instance(
             fake_context, instance, os_instance, [], {},
-            os_flavors=fake_flavors)
+            None, None, fake_flavors, [])
         self.assertEqual({'name': 'stopped', 'code': 80},
                          formatted_instance['instanceState'])
 
@@ -1461,7 +1472,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         setattr(os_instance, 'OS-EXT-SRV-ATTR:ramdisk_id', ramdisk_id)
         formatted_instance = instance_api._format_instance(
             fake_context, instance, os_instance, [], {},
-            os_flavors=fake_flavors)
+            None, None, fake_flavors, [])
         db_api.add_item_id.assert_has_calls(
             [mock.call(mock.ANY, 'ami', os_instance.image['id'],
                        project_id=None),

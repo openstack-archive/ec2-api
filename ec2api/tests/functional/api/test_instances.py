@@ -52,13 +52,11 @@ class InstanceTest(base.EC2TestCase):
         self.assertNotEmpty(reservations)
         instances = reservations[0].get('Instances', [])
         self.assertEqual(1, len(instances))
-        # TODO(andrey-mp): uncomment when group_id will be implemented for
-        # EC2 classic security groups
-        # self.assertEqual(1, len(instances[0]['SecurityGroups']))
-        # groups = reservations[0].get('Groups', [])
-        # self.assertEqual(1, len(groups))
-        # self.assertEqual(groups[0]['GroupName'],
-        #                  instances[0]['SecurityGroups'][0]['GroupName'])
+        self.assertEqual(1, len(instances[0]['SecurityGroups']))
+        groups = reservations[0].get('Groups', [])
+        self.assertEqual(1, len(groups))
+        self.assertEqual(groups[0]['GroupName'],
+                         instances[0]['SecurityGroups'][0]['GroupName'])
 
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)

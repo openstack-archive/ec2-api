@@ -27,7 +27,84 @@ CONF = config.CONF
 LOG = log.getLogger(__name__)
 
 
-class SecurityGroupTest(base.EC2TestCase):
+class SecurityGroupBaseTest(base.EC2TestCase):
+
+    def _test_rules(self, add_func, del_func, field, vpc_id=None):
+        kwargs = dict()
+        if vpc_id:
+            kwargs['Filters'] = [{'Name': 'vpc-id',
+                                  'Values': [vpc_id]}]
+        data = self.client.describe_security_groups(*[], **kwargs)
+        default_group = data['SecurityGroups'][0]
+
+        name = data_utils.rand_name('sgName')
+        desc = data_utils.rand_name('sgDesc')
+        kwargs = {'GroupName': name, 'Description': desc}
+        if vpc_id:
+            kwargs['VpcId'] = vpc_id
+        data = self.client.create_security_group(*[], **kwargs)
+        group_id = data['GroupId']
+        res_clean = self.addResourceCleanUp(self.client.delete_security_group,
+                                            GroupId=group_id)
+        time.sleep(2)
+        data = self.client.describe_security_groups(GroupIds=[group_id])
+        count = len(data['SecurityGroups'][0][field])
+
+        kwargs = {
+            'GroupId': group_id,
+            'IpPermissions': [{
+                'IpProtocol': 'icmp',
+                'FromPort': -1,
+                'ToPort': -1,
+                'IpRanges': [{
+                    'CidrIp': '10.0.0.0/8'
+                }],
+            }, {
+                'UserIdGroupPairs': [{'GroupId': default_group['GroupId']}],
+                'ToPort': 65535,
+                'IpProtocol': 'tcp',
+                'FromPort': 1
+            }]
+        }
+        add_func(*[], **kwargs)
+
+        data = self.client.describe_security_groups(GroupIds=[group_id])
+        self.assertEqual(1, len(data['SecurityGroups']))
+        self.assertEqual(count + 2, len(data['SecurityGroups'][0][field]))
+        found = 0
+        for perm in data['SecurityGroups'][0][field]:
+            cidrs = [v['CidrIp'] for v in perm.get('IpRanges', [])]
+            if (perm.get('FromPort') == -1 and
+                    perm.get('ToPort') == -1 and
+                    perm.get('IpProtocol') == 'icmp' and
+                    len(perm.get('IpRanges')) == 1 and
+                    '10.0.0.0/8' in cidrs):
+                found = found + 1
+            elif (perm.get('FromPort') == 1 and
+                    perm.get('ToPort') == 65535 and
+                    perm.get('IpProtocol') == 'tcp' and
+                    len(perm.get('UserIdGroupPairs')) == 1 and
+                    perm.get('UserIdGroupPairs')[0]['GroupId']
+                    == default_group['GroupId']):
+                found = found + 1
+        self.assertEqual(2, found)
+
+        del_func(*[], **kwargs)
+
+        data = self.client.describe_security_groups(GroupIds=[group_id])
+        self.assertEqual(1, len(data['SecurityGroups']))
+        self.assertEqual(count, len(data['SecurityGroups'][0][field]))
+
+        if vpc_id:
+            self.assertRaises('InvalidPermission.NotFound', del_func, **kwargs)
+        else:
+            del_func(*[], **kwargs)
+
+        self.client.delete_security_group(GroupId=group_id)
+        self.cancelResourceCleanUp(res_clean)
+
+
+class SecurityGroupInVPCTest(SecurityGroupBaseTest):
 
     VPC_CIDR = '10.10.0.0/20'
     vpc_id = None
@@ -35,7 +112,7 @@ class SecurityGroupTest(base.EC2TestCase):
     @classmethod
     @base.safe_setup
     def setUpClass(cls):
-        super(SecurityGroupTest, cls).setUpClass()
+        super(SecurityGroupInVPCTest, cls).setUpClass()
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
@@ -55,7 +132,7 @@ class SecurityGroupTest(base.EC2TestCase):
                                             GroupId=group_id)
         time.sleep(2)
 
-        data = self.client.delete_security_group(GroupId=group_id)
+        self.client.delete_security_group(GroupId=group_id)
         self.cancelResourceCleanUp(res_clean)
 
         self.assertRaises('InvalidGroup.NotFound',
@@ -128,6 +205,11 @@ class SecurityGroupTest(base.EC2TestCase):
                           VpcId=self.vpc_id, GroupName=valid,
                           Description=invalid)
 
+        self.assertRaises('InvalidParameterValue',
+                          self.client.create_security_group,
+                          VpcId=self.vpc_id, GroupName='default',
+                          Description='default')
+
         self.assertRaises('MissingParameter',
                           self.client.create_security_group,
                           VpcId=self.vpc_id, GroupName=valid, Description='')
@@ -139,56 +221,81 @@ class SecurityGroupTest(base.EC2TestCase):
     def test_ingress_rules(self):
         self._test_rules(self.client.authorize_security_group_ingress,
                          self.client.revoke_security_group_ingress,
-                         'IpPermissions')
+                         'IpPermissions', self.vpc_id)
 
     def test_egress_rules(self):
         self._test_rules(self.client.authorize_security_group_egress,
                          self.client.revoke_security_group_egress,
-                         'IpPermissionsEgress')
+                         'IpPermissionsEgress', self.vpc_id)
 
-    def _test_rules(self, add_func, del_func, field):
+
+class SecurityGroupEC2ClassicTest(SecurityGroupBaseTest):
+
+    def test_create_delete_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
-        data = self.client.create_security_group(VpcId=self.vpc_id,
-                                                 GroupName=name,
+        data = self.client.create_security_group(GroupName=name,
                                                  Description=desc)
         group_id = data['GroupId']
         res_clean = self.addResourceCleanUp(self.client.delete_security_group,
                                             GroupId=group_id)
         time.sleep(2)
-        data = self.client.describe_security_groups(GroupIds=[group_id])
-        count = len(data['SecurityGroups'][0][field])
 
-        kwargs = {
-            'GroupId': group_id,
-            'IpPermissions': [{
-                'IpProtocol': 'icmp',
-                'FromPort': -1,
-                'ToPort': -1,
-                'IpRanges': [{
-                    'CidrIp': '10.0.0.0/8'
-                }],
-            }]
-        }
-        data = add_func(*[], **kwargs)
+        data = self.client.describe_security_groups(GroupNames=[name])
+        self.assertEqual(1, len(data['SecurityGroups']))
+        self.assertEqual(group_id, data['SecurityGroups'][0]['GroupId'])
 
         data = self.client.describe_security_groups(GroupIds=[group_id])
         self.assertEqual(1, len(data['SecurityGroups']))
-        self.assertEqual(count + 1, len(data['SecurityGroups'][0][field]))
-        found = False
-        for perm in data['SecurityGroups'][0][field]:
-            cidrs = [v['CidrIp'] for v in perm.get('IpRanges', [])]
-            if (perm.get('FromPort') == -1 and
-                    perm.get('ToPort') == -1 and
-                    perm.get('IpProtocol') == 'icmp' and
-                    len(perm.get('IpRanges')) == 1 and
-                    '10.0.0.0/8' in cidrs):
-                found = True
-        self.assertTrue(found)
+        self.assertEqual(name, data['SecurityGroups'][0]['GroupName'])
 
-        data = del_func(*[], **kwargs)
-
-        self.assertRaises('InvalidPermission.NotFound', del_func, **kwargs)
-
-        data = self.client.delete_security_group(GroupId=group_id)
+        self.client.delete_security_group(GroupName=name)
         self.cancelResourceCleanUp(res_clean)
+
+    def test_create_duplicate_security_group(self):
+        name = data_utils.rand_name('sgName')
+        desc = data_utils.rand_name('sgDesc')
+        data = self.client.create_security_group(GroupName=name,
+                                                 Description=desc)
+        group_id = data['GroupId']
+        res_clean = self.addResourceCleanUp(self.client.delete_security_group,
+                                            GroupId=group_id)
+        time.sleep(2)
+
+        self.assertRaises('InvalidGroup.Duplicate',
+            self.client.create_security_group,
+            GroupName=name, Description=desc)
+
+        self.client.delete_security_group(GroupId=group_id)
+        self.cancelResourceCleanUp(res_clean)
+
+    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+        "MismatchError: 'MissingParameter' != 'ValidationError'")
+    def test_create_invalid_name_desc(self):
+        valid = data_utils.rand_name('sgName')
+
+        self.assertRaises('MissingParameter',
+            self.client.create_security_group,
+            GroupName=valid, Description='')
+
+        self.assertRaises('MissingParameter',
+            self.client.create_security_group,
+            GroupName='', Description=valid)
+
+        self.assertRaises('InvalidGroup.Reserved',
+            self.client.create_security_group,
+            GroupName='default', Description='default')
+
+    def test_ingress_rules(self):
+        self._test_rules(self.client.authorize_security_group_ingress,
+                         self.client.revoke_security_group_ingress,
+                         'IpPermissions')
+
+    def test_egress_rules(self):
+        def _test():
+            self._test_rules(
+                self.client.authorize_security_group_egress,
+                self.client.revoke_security_group_egress,
+                'IpPermissionsEgress')
+
+        self.assertRaises('InvalidParameterValue', _test)

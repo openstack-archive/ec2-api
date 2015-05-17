@@ -74,6 +74,9 @@ AWSGroup = [
     cfg.BoolOpt('run_incompatible_tests',
                 default=False,
                 help='Will run all tests plus incompatible with Amazon.'),
+    cfg.BoolOpt('run_long_tests',
+                default=False,
+                help='Will run all long tests also.'),
 ]
 
 

@@ -303,7 +303,7 @@ class InstanceDescriber(common.TaggableItemsDescriber):
         super(InstanceDescriber, self).__init__()
         self.reservations = {}
         self.reservation_instances = collections.defaultdict(list)
-        self.reservation_os_groups = {}
+        self.reservation_groups = {}
         self.obsolete_instances = []
 
     def format(self, instance, os_instance):
@@ -311,7 +311,7 @@ class InstanceDescriber(common.TaggableItemsDescriber):
                 self.context, instance, os_instance,
                 self.ec2_network_interfaces.get(instance['id']),
                 self.image_ids, self.volumes, self.os_volumes,
-                self.os_flavors)
+                self.os_flavors, self.groups_name_to_id)
 
         reservation_id = instance['reservation_id']
         if reservation_id in self.reservations:
@@ -321,11 +321,11 @@ class InstanceDescriber(common.TaggableItemsDescriber):
                            'owner_id': os_instance.tenant_id}
             self.reservations[reservation_id] = reservation
             if not instance['vpc_id']:
-                self.reservation_os_groups[reservation_id] = (
-                    getattr(os_instance, 'security_groups', []))
+                self.reservation_groups[reservation_id] = (
+                    formatted_instance.get('groupSet'))
 
         self.reservation_instances[
-                reservation['id']].append(formatted_instance)
+            reservation['id']].append(formatted_instance)
 
         return formatted_instance
 
@@ -334,6 +334,7 @@ class InstanceDescriber(common.TaggableItemsDescriber):
         self.ec2_network_interfaces = (
             instance_engine.get_ec2_network_interfaces(
                 self.context, self.ids))
+        self.groups_name_to_id = _get_groups_name_to_id(self.context)
         self.volumes = {v['os_id']: v
                         for v in db_api.get_items(self.context, 'vol')}
         self.image_ids = {i['os_id']: i['id']
@@ -385,8 +386,8 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
         if not formatted_instances:
             return None
         return _format_reservation(self.context, reservation,
-                                   formatted_instances,
-                                   self.os_groups.get(reservation['id']))
+            formatted_instances,
+            self.groups.get(reservation['id']))
 
     def get_db_items(self):
         return self.reservations
@@ -420,7 +421,7 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
 
         self.reservations = instance_describer.reservations.values()
         self.instances = instance_describer.reservation_instances
-        self.os_groups = instance_describer.reservation_os_groups
+        self.groups = instance_describer.reservation_groups
         self.suitable_instances = set(i['instanceId']
                                       for i in formatted_instances)
 
@@ -515,8 +516,9 @@ def describe_instance_attribute(context, instance_id, attribute):
                 raise exception.InvalidInstanceId(instance_id=instance_id)
             result['groupSet'] = enis[0]['groupSet']
         else:
+            groups = _get_groups_name_to_id(context)
             result['groupSet'] = _format_group_set(
-                context, getattr(os_instance, 'security_groups', []))
+                context, getattr(os_instance, 'security_groups', []), groups)
 
     def _format_attr_instance_type(result):
         result['instanceType'] = {
@@ -632,20 +634,19 @@ def reset_instance_attribute(context, instance_id, attribute):
                                           reason='Unknown attribute.')
 
 
-def _format_reservation(context, reservation, formatted_instances, os_groups):
+def _format_reservation(context, reservation, formatted_instances, groups):
     return {
         'reservationId': reservation['id'],
         'ownerId': reservation['owner_id'],
         'instancesSet': sorted(formatted_instances,
                                key=lambda i: i['amiLaunchIndex']),
-        'groupSet': (_format_group_set(context, os_groups)
-                     if os_groups is not None else [])
+        'groupSet': groups
     }
 
 
 def _format_instance(context, instance, os_instance, ec2_network_interfaces,
-                     image_ids, volumes=None, os_volumes=None,
-                     os_flavors=None):
+                     image_ids, volumes, os_volumes, os_flavors,
+                     groups_name_to_id):
     ec2_instance = {
         'amiLaunchIndex': instance['launch_index'],
         'imageId': (ec2utils.os_id_to_ec2_id(context, 'ami',
@@ -685,12 +686,9 @@ def _format_instance(context, instance, os_instance, ec2_network_interfaces,
         if fixed_ip6:
             ec2_instance['dnsNameV6'] = fixed_ip6
         dns_name = floating_ip
-        # TODO(ft): euca2ools require groupId for an instance security group
-        # for describing instances only.
-        # But ec2-api doesn't store IDs for EC2 lassic groups.
-        # if getattr(os_instance, 'security_groups', None):
-        #     ec2_instance['groupSet'] = _format_group_set(
-        #         context, os_instance.security_groups)
+        if getattr(os_instance, 'security_groups', None):
+            ec2_instance['groupSet'] = _format_group_set(
+                context, os_instance.security_groups, groups_name_to_id)
     else:
         primary_ec2_network_interface = None
         for ec2_network_interface in ec2_network_interfaces:
@@ -822,12 +820,22 @@ def _parse_block_device_mapping(context, block_device_mapping):
     return bdm
 
 
-def _format_group_set(context, os_security_groups):
+def _format_group_set(context, os_security_groups, groups):
     if not os_security_groups:
         return None
-    # TODO(ft): euca2ools require groupId for an instance security group.
-    # But ec2-api doesn't store IDs for EC2 Classic groups.
-    return [{'groupName': sg['name']} for sg in os_security_groups]
+    return [{'groupName': sg['name'],
+             'groupId': groups[sg['name']]}
+            for sg in os_security_groups
+            if sg['name'] in groups]
+
+
+def _get_groups_name_to_id(context):
+    # TODO(andrey-mp): remove filtering by vpcId=None when fitering
+    # by None will be implemented
+    return {g['groupName']: g['groupId'] for g in
+        security_group_api.describe_security_groups(context)
+        ['securityGroupInfo']
+        if not g.get('vpcId')}
 
 
 def _get_ip_info_for_instance(os_instance):

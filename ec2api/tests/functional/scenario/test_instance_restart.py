@@ -28,6 +28,7 @@ LOG = log.getLogger(__name__)
 
 class InstanceRestartTest(scenario_base.BaseScenarioTest):
 
+    @testtools.skipUnless(CONF.aws.run_long_tests, 'Slow test has skipped.')
     @testtools.skipUnless(CONF.aws.image_id_ubuntu,
                           "ubuntu image id is not defined")
     def test_stop_start_instance(self):
@@ -54,6 +55,7 @@ class InstanceRestartTest(scenario_base.BaseScenarioTest):
         data = ssh_client.exec_command('last -x')
         self.assertIn("shutdown", data)
 
+    @testtools.skipUnless(CONF.aws.run_long_tests, 'Slow test has skipped.')
     @testtools.skipUnless(CONF.aws.image_id_ubuntu,
                           "ubuntu image id is not defined")
     def test_reboot_instance(self):
