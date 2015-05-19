@@ -400,6 +400,11 @@ class InvalidAvailabilityZoneNotFound(EC2NotFoundException):
     msg_fmt = _("Availability zone %(id)s not found")
 
 
+class InvalidCustomerGatewayIDNotFound(EC2NotFoundException):
+    ec2_code = 'InvalidCustomerGatewayID.NotFound'
+    msg_fmt = _("The customerGateway ID '%(id)s' does not exist")
+
+
 class ResourceLimitExceeded(EC2OverlimitException):
     msg_fmt = _('You have reached the limit of %(resource)s')
 

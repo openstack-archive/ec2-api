@@ -247,6 +247,12 @@ class Validator(object):
     def dopt_ids(self, ids):
         self.multi(ids, self.dopt_id)
 
+    def cgw_id(self, id):
+        self.ec2_id(id, ['cgw'])
+
+    def cgw_ids(self, ids):
+        self.multi(ids, self.cgw_id)
+
     def security_group_str(self, value):
         validator.validate_security_group_str(value, self.param_name,
                                               self.params.get('vpc_id'))
@@ -254,8 +260,12 @@ class Validator(object):
     def security_group_strs(self, values):
         self.multi(values, self.security_group_str)
 
+    def vpn_connection_type(self, value):
+        validator.validate_vpn_connection_type(value)
 
-VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb']
+
+VPC_KINDS = ['vpc', 'igw', 'subnet', 'eni', 'dopt', 'eipalloc', 'sg', 'rtb',
+             'cgw']
 
 
 class UniversalDescriber(object):
