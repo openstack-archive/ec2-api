@@ -44,6 +44,14 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   nova flavor-create --is-public True m1.ec2api 16 512 0 1
   nova flavor-create --is-public True m1.ec2api-alt 17 256 0 1
 
+  # find simple image
+  euca-describe-images
+  if [[ "$?" -ne "0" ]]; then
+    echo "Looks like euca2ools is not correctly installed."
+    exit 1
+  fi
+  image_id=$(euca-describe-images --show-empty-fields | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
+
   # prepare ubuntu image
   if [[ $RUN_LONG_TESTS == "1" ]]; then
     REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
@@ -125,9 +133,6 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   else
     echo "Downloading of image $CIRROS_IMAGE_URL failed."
   fi
-
-  # find simple image
-  image_id=$(euca-describe-images --show-empty-fields | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
 
   # create EBS image
   MAX_FAIL=20
@@ -228,10 +233,14 @@ ca_bundle=$OS_CACERT
 EOF"
 fi
 
-sudo pip install -r test-requirements.txt
+sudo pip install virtualenv
+virtualenv .venv --system-site-package
+source .venv/bin/activate
+pip install -r test-requirements.txt
 sudo OS_STDOUT_CAPTURE=-1 OS_STDERR_CAPTURE=-1 OS_TEST_TIMEOUT=500 OS_TEST_LOCK_PATH=${TMPDIR:-'/tmp'} \
   python -m subunit.run discover -t ./ ./ec2api/tests/functional | subunit-2to1 | tools/colorizer.py
 RETVAL=$?
+deactivate
 
 # Here can be some commands for log archiving, etc...
 

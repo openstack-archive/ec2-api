@@ -19,120 +19,52 @@ import os
 from oslo_config import cfg
 from oslo_log import log as logging
 
-
-def register_opt_group(conf, opt_group, options):
-    conf.register_group(opt_group)
-    for opt in options:
-        conf.register_opt(opt, group=opt_group.name)
+from ec2api.tests.functional import config_opts
 
 
-aws_group = cfg.OptGroup(name='aws',
-                         title='AWS options')
-AWSGroup = [
-    cfg.StrOpt('ec2_url',
-               default="http://localhost:8788/",
-               help="EC2 URL"),
-    cfg.StrOpt('s3_url',
-               default="http://localhost:3334/",
-               help="S3 URL"),
-    cfg.StrOpt('ca_bundle',
-               default=None,
-               help="The CA certificate bundle to use when verifying "
-                    "SSL certificates."),
-    cfg.StrOpt('aws_secret',
-               default=None,
-               help="AWS Secret Key",
-               secret=True),
-    cfg.StrOpt('aws_access',
-               default=None,
-               help="AWS Access Key"),
-    cfg.StrOpt('aws_region',
-               default="RegionOne",
-               help="AWS region for EC2 tests"),
-    cfg.StrOpt('aws_zone',
-               default='nova',
-               help="AWS zone inside region for EC2 tests"),
-    cfg.IntOpt('build_timeout',
-               default=120,
-               help="Status Change Timeout"),
-    cfg.IntOpt('build_interval',
-               default=1,
-               help="Status Change Test Interval"),
-    cfg.StrOpt('instance_type',
-               default="m1.tiny",
-               help="Instance type"),
-    cfg.StrOpt('instance_type_alt',
-               default=None,
-               help="Instance type"),
-    cfg.StrOpt('image_id',
-               default=None,
-               help="Image ID for instance running(can be cirros). "
-                    "It must be any instance with instance-store "
-                    "root device type."),
-    cfg.StrOpt('ebs_image_id',
-               default=None,
-               help="EBS Image ID for testing snapshots, volumes, instances."),
-    cfg.StrOpt('image_user',
-               default='cirros',
-               help="User for sshing into instance based on configured image"),
-    cfg.StrOpt('image_id_ubuntu',
-               default=None,
-               help="Fully functional image ID for instance running. "
-                    "For some tests it must be ubuntu-trusty-i386."),
-    cfg.StrOpt('image_user_ubuntu',
-               default='ubuntu',
-               help="User for sshing into instance based on configured image"),
-    cfg.BoolOpt('run_incompatible_tests',
-                default=False,
-                help='Will run all tests plus incompatible with Amazon.'),
-    cfg.BoolOpt('run_long_tests',
-                default=False,
-                help='Will run all long tests also.'),
-    cfg.StrOpt('ami_image_location',
-               default=None,
-               help="S3 URL with manifest of AMI Machine Image."),
-    cfg.BoolOpt('run_ssh',
-                default=True,
-                help='Can block all tests that wants to ssh into instance.'),
-]
-
-
-def register_opts():
-    register_opt_group(cfg.CONF, aws_group, AWSGroup)
+LOG = logging.getLogger('ec2api')
 
 
 # this should never be called outside of this class
 class ConfigPrivate(object):
     """Provides OpenStack configuration information."""
 
-    DEFAULT_CONFIG_DIR = os.path.join(
-        os.path.abspath(os.path.dirname(os.path.dirname(__file__))),
-        "etc")
-
     DEFAULT_CONFIG_FILE = "functional_tests.conf"
 
-    def __init__(self, parse_conf=True):
+    def __init__(self):
         """Initialize a configuration from a conf directory and conf file."""
         super(ConfigPrivate, self).__init__()
-        config_files = []
+
+        # if this was run from tempest runner then config already parsed
+        if config_opts.aws_group.name in cfg.CONF:
+            self.aws = cfg.CONF.aws
+            return
 
         # Environment variables override defaults...
-        conf_dir = os.environ.get('TEST_CONFIG_DIR', '.')
         conf_file = os.environ.get('TEST_CONFIG', self.DEFAULT_CONFIG_FILE)
-        path = os.path.join(conf_dir, conf_file)
+        conf_dirs = list()
+        if os.environ.get('TEST_CONFIG_DIR'):
+            conf_dirs.append(os.environ.get('TEST_CONFIG_DIR'))
+        conf_dirs.append('.')
+        conf_dirs.append(os.path.dirname(os.path.dirname(
+                            os.path.dirname(os.path.dirname(__file__)))))
+        for _dir in conf_dirs:
+            path = os.path.join(_dir, conf_file)
+            if os.path.isfile(path):
+                break
+        else:
+            raise Exception('Config could not be found')
 
-        # only parse the config file if we expect one to exist. This is needed
-        # to remove an issue with the config file up to date checker.
-        if parse_conf:
-            config_files.append(path)
-
-        cfg.CONF([], project='ec2api', default_config_files=config_files)
-        LOG = logging.getLogger('ec2api')
         LOG.info("Using ec2api config file %s" % path)
-        register_opts()
+        conf = cfg.CONF
+        conf([], project='ec2api', default_config_files=[path])
+        conf.register_group(config_opts.aws_group)
+        group_name = config_opts.aws_group.name
+        for opt in config_opts.AWSGroup:
+            conf.register_opt(opt, group=group_name)
         self.aws = cfg.CONF.aws
-        if parse_conf:
-            cfg.CONF.log_opt_values(LOG, std_logging.DEBUG)
+
+        conf.log_opt_values(LOG, std_logging.DEBUG)
 
 
 class ConfigProxy(object):
