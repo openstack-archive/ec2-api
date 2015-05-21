@@ -76,6 +76,7 @@ class EC2ValidationTestCase(testtools.TestCase):
         validator.eipalloc_id('eipalloc-00000001')
         validator.eipassoc_id('eipassoc-00000001')
         validator.rtbassoc_id('rtbassoc-00000001')
+        validator.vgw_id('vgw-00000001')
         validator.cgw_id('cgw-00000001')
 
         invalid_ids = ['1234', 'a-1111', '', 'i-1111', 'i-rrr', 'foobar']
@@ -98,6 +99,7 @@ class EC2ValidationTestCase(testtools.TestCase):
         check_raise_invalid_parameters(validator.eipalloc_id)
         check_raise_invalid_parameters(validator.eipassoc_id)
         check_raise_invalid_parameters(validator.rtbassoc_id)
+        check_raise_invalid_parameters(validator.vgw_id)
         check_raise_invalid_parameters(validator.cgw_id)
 
         invalid_ids = ['1234', 'a-1111', '', 'vpc-1111', 'vpc-rrr', 'foobar']

@@ -24,6 +24,7 @@ from ec2api.api import internet_gateway as internet_gateway_api
 from ec2api.api import route_table as route_table_api
 from ec2api.api import security_group as security_group_api
 from ec2api.api import subnet as subnet_api
+from ec2api.api import vpn_gateway as vpn_gateway_api
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
@@ -79,8 +80,12 @@ def delete_vpc(context, vpc_id):
         context,
         filter=[{'name': 'vpc-id',
                  'value': [vpc['id']]}])['securityGroupInfo']
+    vpn_gateways = vpn_gateway_api.describe_vpn_gateways(
+        context,
+        filter=[{'name': 'attachment.vpc-id',
+                 'value': [vpc['id']]}])['vpnGatewaySet']
     if (subnets or internet_gateways or len(route_tables) > 1 or
-            len(security_groups) > 1):
+            len(security_groups) > 1 or vpn_gateways):
         msg = _("The vpc '%(vpc_id)s' has dependencies and "
                 "cannot be deleted.")
         msg = msg % {'vpc_id': vpc['id']}

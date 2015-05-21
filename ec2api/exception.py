@@ -211,6 +211,11 @@ class InvalidVpcRange(EC2InvalidException):
     msg_fmt = _("The CIDR '%(cidr_block)s' is invalid.")
 
 
+class InvalidVpcState(EC2InvalidException):
+    msg_fmt = _('VPC %(vpc_id)s is currently attached to '
+                'the Virtual Private Gateway %(vgw_id)s')
+
+
 class InvalidSubnetRange(EC2InvalidException):
     ec2_code = 'InvalidSubnet.Range'
     msg_fmt = _("The CIDR '%(cidr_block)s' is invalid.")
@@ -400,9 +405,20 @@ class InvalidAvailabilityZoneNotFound(EC2NotFoundException):
     msg_fmt = _("Availability zone %(id)s not found")
 
 
+class InvalidVpnGatewayIDNotFound(EC2NotFoundException):
+    ec2_code = 'InvalidVpnGatewayID.NotFound'
+    msg_fmt = _("The vpnGateway ID '%(id)s' does not exist")
+
+
 class InvalidCustomerGatewayIDNotFound(EC2NotFoundException):
     ec2_code = 'InvalidCustomerGatewayID.NotFound'
     msg_fmt = _("The customerGateway ID '%(id)s' does not exist")
+
+
+class InvalidVpnGatewayAttachmentNotFound(EC2NotFoundException):
+    ec2_code = 'InvalidVpnGatewayAttachment.NotFound'
+    msg_fmt = _("The attachment with vpn gateway ID '%(vgw_id)s' "
+                "and vpc ID '%(vpc_id)s' does not exist")
 
 
 class ResourceLimitExceeded(EC2OverlimitException):
@@ -434,3 +450,8 @@ class SecurityGroupLimitExceeded(EC2OverlimitException):
 class RulesPerSecurityGroupLimitExceeded(EC2OverlimitException):
     msg_fmt = _("You've reached the limit on the number of rules that "
                 "you can add to a security group.")
+
+
+class VpnGatewayAttachmentLimitExceeded(EC2OverlimitException):
+    msg_fmt = _('The maximum number of virtual private gateway attachments '
+                'has been reached.')

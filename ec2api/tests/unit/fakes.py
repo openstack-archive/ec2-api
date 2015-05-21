@@ -234,6 +234,11 @@ FINGERPRINT_KEY_PAIR = (
               '2a:72:dd:aa:0d:a6:45:4d:27:4f:75:28:73:0d:a6:10:35:88:e1:ce')
 
 
+# vpn gateway constants
+ID_EC2_VPN_GATEWAY_1 = random_ec2_id('vgw')
+ID_EC2_VPN_GATEWAY_2 = random_ec2_id('vgw')
+
+
 # customer gateway constants
 ID_EC2_CUSTOMER_GATEWAY_1 = random_ec2_id('cgw')
 ID_EC2_CUSTOMER_GATEWAY_2 = random_ec2_id('cgw')
@@ -1499,6 +1504,32 @@ EC2_KEY_PAIR = {'keyName': NAME_KEY_PAIR,
                 'keyFingerprint': FINGERPRINT_KEY_PAIR,
                 'keyMaterial': PRIVATE_KEY_KEY_PAIR}
 
+
+# vpn gateway objects
+DB_VPN_GATEWAY_1 = {
+    'id': ID_EC2_VPN_GATEWAY_1,
+    'os_id': None,
+    'vpc_id': ID_EC2_VPC_1,
+}
+DB_VPN_GATEWAY_2 = {
+    'id': ID_EC2_VPN_GATEWAY_2,
+    'os_id': None,
+    'vpc_id': None,
+}
+
+EC2_VPN_GATEWAY_1 = {
+    'vpnGatewayId': ID_EC2_VPN_GATEWAY_1,
+    'state': 'available',
+    'type': 'ipsec.1',
+    'attachments': [{'state': 'attached',
+                     'vpcId': ID_EC2_VPC_1}],
+}
+EC2_VPN_GATEWAY_2 = {
+    'vpnGatewayId': ID_EC2_VPN_GATEWAY_2,
+    'state': 'available',
+    'type': 'ipsec.1',
+    'attachments': None,
+}
 
 # customer gateway objects
 DB_CUSTOMER_GATEWAY_1 = {
