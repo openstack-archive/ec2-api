@@ -15,10 +15,12 @@
 import copy
 
 import mock
+from oslotest import base as test_base
 
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import route_table
+from ec2api import exception
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -57,7 +59,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_create_route(self, routes_updater):
         self.set_mock_db_items(
             fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
-            fakes.DB_VPC_1, fakes.DB_IGW_1,
+            fakes.DB_VPC_1, fakes.DB_IGW_1, fakes.DB_VPN_GATEWAY_1,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2)
 
         def do_check(params, route_table, rollback_route_table_state):
@@ -78,6 +80,14 @@ class RouteTableTestCase(base.ApiTestCase):
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                   'DestinationCidrBlock': '0.0.0.0/0',
                   'GatewayId': fakes.ID_EC2_IGW_1},
+                 route_table, fakes.DB_ROUTE_TABLE_1)
+
+        route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
+        route_table['routes'].append({'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1,
+                                      'destination_cidr_block': '0.0.0.0/0'})
+        do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+                  'DestinationCidrBlock': '0.0.0.0/0',
+                  'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1},
                  route_table, fakes.DB_ROUTE_TABLE_1)
 
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
@@ -124,7 +134,8 @@ class RouteTableTestCase(base.ApiTestCase):
         self.set_mock_db_items(
             fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
             fakes.DB_VPC_1, eni_vpc_2, fakes.DB_IGW_1, fakes.DB_IGW_2,
-            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2)
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
+            fakes.DB_VPN_GATEWAY_2)
 
         def do_check(params, error_code):
             self.assert_execution_error(error_code, 'CreateRoute', params)
@@ -169,11 +180,29 @@ class RouteTableTestCase(base.ApiTestCase):
                   'GatewayId': fakes.ID_EC2_IGW_1},
                  'InvalidParameterCombination')
 
+        # NOTE(ft): unknown internet gateway
+        do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                  'DestinationCidrBlock': '192.168.100.0/0',
+                  'GatewayId': fakes.random_ec2_id('igw')},
+                 'InvalidInternetGatewayID.NotFound')
+
         # NOTE(ft): gateway from different vpc
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
                   'DestinationCidrBlock': '192.168.100.0/0',
                   'GatewayId': fakes.ID_EC2_IGW_2},
                  'InvalidParameterValue')
+
+        # NOTE(ft): unknown vpn gateway
+        do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                  'DestinationCidrBlock': '192.168.100.0/0',
+                  'GatewayId': fakes.random_ec2_id('vgw')},
+                 'InvalidVpnGatewayID.NotFound')
+
+        # NOTE(ft): vpn gateway from different vpc
+        do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                  'DestinationCidrBlock': '192.168.100.0/0',
+                  'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2},
+                 'InvalidGatewayID.NotFound')
 
         # NOTE(ft): network interface from different vpc
         do_check({'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
@@ -244,7 +273,6 @@ class RouteTableTestCase(base.ApiTestCase):
                              fakes.ID_EC2_NETWORK_INTERFACE_1})
         self.assertEqual(True, resp['return'])
 
-        rollback_route_table_state = route_table
         route_table = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
         route_table['routes'].append({
             'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1,
@@ -563,7 +591,7 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.DB_ROUTE_TABLE_3, fakes.DB_SUBNET_1, fakes.DB_SUBNET_2,
             fakes.DB_VPC_1, fakes.DB_VPC_2, fakes.DB_IGW_1, fakes.DB_IGW_2,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
-            fakes.DB_INSTANCE_1)
+            fakes.DB_INSTANCE_1, fakes.DB_VPN_GATEWAY_1)
         self.nova.servers.get.return_value = (
             mock.NonCallableMock(status='ACTIVE'))
 
@@ -623,10 +651,17 @@ class RouteTableTestCase(base.ApiTestCase):
         route_table_2['routes'].append(
             {'destination_cidr_block': '192.168.88.0/24',
              'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_2})
+        route_table_2['routes'].append(
+            {'destination_cidr_block': '192.168.111.0/24',
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1})
+        route_table_2['routes'].append(
+            {'destination_cidr_block': '192.168.122.0/24',
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_2})
         self.set_mock_db_items(
             route_table_1, route_table_2, fakes.DB_VPC_1, fakes.DB_VPC_2,
             igw_1, igw_2, subnet_1, subnet_2,
-            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2)
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
+            fakes.DB_VPN_GATEWAY_2)
         self.nova.servers.get.return_value = (
             mock.NonCallableMock(status='DOWN'))
         resp = self.execute('DescribeRouteTables', {})
@@ -662,6 +697,16 @@ class RouteTableTestCase(base.ApiTestCase):
             'instanceOwnerId': fakes.ID_OS_PROJECT,
             'state': 'blackhole',
             'origin': 'CreateRoute'})
+        ec2_route_table_2['routeSet'].append({
+            'destinationCidrBlock': '192.168.111.0/24',
+            'gatewayId': fakes.ID_EC2_VPN_GATEWAY_1,
+            'state': 'blackhole',
+            'origin': 'CreateRoute'})
+        ec2_route_table_2['routeSet'].append({
+            'destinationCidrBlock': '192.168.122.0/24',
+            'gatewayId': fakes.ID_EC2_VPN_GATEWAY_2,
+            'state': 'blackhole',
+            'origin': 'CreateRoute'})
         ec2_route_table_2['associationSet'] = [{
             'routeTableAssociationId':
             fakes.ID_EC2_SUBNET_2.replace('subnet', 'rtbassoc'),
@@ -675,10 +720,17 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_get_subnet_host_routes(self):
         self.set_mock_db_items(
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
-            fakes.DB_IGW_1)
+            fakes.DB_IGW_1, fakes.DB_VPN_GATEWAY_1)
 
+        route_table_1 = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
+        route_table_1['routes'].append(
+            {'destination_cidr_block': '192.168.111.0/24',
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1})
+        route_table_1['routes'].append(
+            {'destination_cidr_block': '192.168.222.0/24',
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_2})
         host_routes = route_table._get_subnet_host_routes(
-            mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.IP_GATEWAY_SUBNET_1)
+            mock.ANY, route_table_1, fakes.IP_GATEWAY_SUBNET_1)
 
         self.assertThat(host_routes,
                         matchers.ListMatches([
@@ -785,3 +837,19 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
             fakes.ID_EC2_NETWORK_INTERFACE_2:
                         fakes.DB_NETWORK_INTERFACE_2}))
+
+
+class RouteTableValidatorTestCase(test_base.BaseTestCase):
+
+    def test_validate_igw_or_vgw_id(self):
+        validator = route_table.Validator()
+        validator.igw_or_vgw_id(fakes.random_ec2_id('igw'))
+        validator.igw_or_vgw_id(fakes.random_ec2_id('vgw'))
+
+        invalid_ids = ['1234', 'a-1111', '', 'i-1111', 'i-rrr', 'foobar',
+                       fakes.random_ec2_id('eni'), fakes.random_ec2_id('i'),
+                       fakes.random_ec2_id('rtb'), fakes.random_ec2_id('vpn')]
+
+        for id in invalid_ids:
+            self.assertRaises(exception.InvalidParameterValue,
+                              validator.igw_or_vgw_id, id)

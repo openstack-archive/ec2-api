@@ -247,6 +247,9 @@ IP_CUSTOMER_GATEWAY_ADDRESS_1 = '172.16.1.11'
 IP_CUSTOMER_GATEWAY_ADDRESS_2 = '172.31.2.22'
 
 
+# vpn connection constants
+CIDR_VPN_1_STATIC = '192.168.101.0/24'
+
 # Object constants section
 # Constant name notation:
 # [<subtype>]<object_name>
@@ -1036,7 +1039,9 @@ DB_ROUTE_TABLE_3 = {
     'id': ID_EC2_ROUTE_TABLE_3,
     'vpc_id': ID_EC2_VPC_1,
     'routes': [{'destination_cidr_block': CIDR_VPC_1,
-                'gateway_id': None}],
+                'gateway_id': None},
+               {'destination_cidr_block': CIDR_VPN_1_STATIC,
+                'gateway_id': ID_EC2_VPN_GATEWAY_1}],
 }
 EC2_ROUTE_TABLE_1 = {
     'routeTableId': ID_EC2_ROUTE_TABLE_1,
@@ -1079,7 +1084,11 @@ EC2_ROUTE_TABLE_3 = {
         {'destinationCidrBlock': CIDR_VPC_1,
          'gatewayId': 'local',
          'state': 'active',
-         'origin': 'CreateRouteTable'}],
+         'origin': 'CreateRouteTable'},
+        {'destinationCidrBlock': CIDR_VPN_1_STATIC,
+         'gatewayId': ID_EC2_VPN_GATEWAY_1,
+         'state': 'active',
+         'origin': 'CreateRoute'}],
     'associationSet': [
         {'routeTableAssociationId': ID_EC2_ROUTE_TABLE_ASSOCIATION_3,
          'routeTableId': ID_EC2_ROUTE_TABLE_3,
