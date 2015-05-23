@@ -126,6 +126,9 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.assertRaises('InvalidInstanceID.NotFound',
             self.client.describe_instance_attribute,
             InstanceId='i-0', Attribute='disableApiTermination')
+        self.assertRaises('InvalidParameterCombination',
+            self.client.describe_instance_attribute,
+            InstanceId=instance_id, Attribute='sourceDestCheck')
 
         self.assertRaises('InvalidParameterValue',
             self.client.modify_instance_attribute,
@@ -141,6 +144,13 @@ class InstanceAttributeTest(base.EC2TestCase):
             InstanceId=instance_id, Attribute='disableApiTermination',
             Value='True', DisableApiTermination={'Value': False})
 
+        self.assertRaises('InvalidParameterCombination',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id, Groups=['sg-0'])
+        self.assertRaises('InvalidParameterCombination',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id, Attribute='sourceDestCheck', Value='False')
+
         self.assertRaises('InvalidParameterValue',
             self.client.reset_instance_attribute,
             InstanceId=instance_id, Attribute='fake_attribute')
@@ -154,22 +164,17 @@ class InstanceAttributeTest(base.EC2TestCase):
             self.client.reset_instance_attribute,
             InstanceId=instance_id, Attribute='groupSet')
 
+        self.assertRaises('InvalidParameterCombination',
+            self.client.reset_instance_attribute,
+            InstanceId=instance_id, Attribute='sourceDestCheck')
+
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
-    def test_cant_work_with_group_set_for_multiple_interfaces(self):
-        cidr = '10.30.0.0/24'
-        data = self.client.create_vpc(CidrBlock=cidr)
-        vpc_id = data['Vpc']['VpcId']
-        self.addResourceCleanUp(self.client.delete_vpc, VpcId=vpc_id)
-        self.get_vpc_waiter().wait_available(vpc_id)
-
-        data = self.client.create_subnet(VpcId=vpc_id, CidrBlock=cidr,
-            AvailabilityZone=CONF.aws.aws_zone)
-        subnet_id = data['Subnet']['SubnetId']
-        self.addResourceCleanUp(self.client.delete_subnet, SubnetId=subnet_id)
+    def test_attributes_for_multiple_interfaces_negative(self):
+        vpc_id, subnet_id = self.create_vpc_and_subnet('10.30.0.0/24')
 
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
@@ -198,10 +203,19 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.assertRaises('InvalidInstanceID',
             self.client.describe_instance_attribute,
             InstanceId=instance_id, Attribute='groupSet')
-
         self.assertRaises('InvalidInstanceID',
             self.client.modify_instance_attribute,
             InstanceId=instance_id, Groups=['sg-0'])
+
+        self.assertRaises('InvalidInstanceID',
+            self.client.describe_instance_attribute,
+            InstanceId=instance_id, Attribute='sourceDestCheck')
+        self.assertRaises('InvalidInstanceID',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id, SourceDestCheck={'Value': False})
+        self.assertRaises('InvalidInstanceID',
+            self.client.reset_instance_attribute,
+            InstanceId=instance_id, Attribute='sourceDestCheck')
 
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
@@ -249,6 +263,38 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.assertIn('Groups', data)
         self.assertEqual(1, len(data['Groups']))
         self.assertEqual(default_group_id, data['Groups'][0]['GroupId'])
+
+        self.client.terminate_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_delete(instance_id)
+
+    @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
+    def test_source_dest_check_attribute(self):
+        vpc_id, subnet_id = self.create_vpc_and_subnet('10.30.0.0/24')
+
+        instance_id = self.run_instance(SubnetId=subnet_id)
+
+        def do_check(value):
+            data = self.client.describe_instance_attribute(
+                InstanceId=instance_id, Attribute='sourceDestCheck')
+            self.assertIn('SourceDestCheck', data)
+            self.assertEqual(value, data['SourceDestCheck'].get('Value'))
+
+        do_check(True)
+
+        self.client.modify_instance_attribute(
+            InstanceId=instance_id, Attribute='sourceDestCheck',
+            Value='False')
+        do_check(False)
+
+        self.client.reset_instance_attribute(
+            InstanceId=instance_id, Attribute='sourceDestCheck')
+        do_check(True)
+
+        self.client.modify_instance_attribute(
+            InstanceId=instance_id, Attribute='sourceDestCheck',
+            Value='False')
+        do_check(False)
 
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)

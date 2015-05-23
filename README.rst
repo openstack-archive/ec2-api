@@ -132,7 +132,6 @@ Instance related:
 - DescribeInstanceStatus
 - ReportInstanceStatus
 - productCodes Instance property
-- sourceDestCheck Instance property
 - ebsOptimized Instance property
 - sriovNetSupport Instance property
 - monitoring Instance property

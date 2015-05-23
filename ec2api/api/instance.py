@@ -506,6 +506,18 @@ def describe_instance_attribute(context, instance_id, attribute):
         # but AWS doesn't. This is legacy behavior of Nova EC2
         _cloud_format_instance_bdm(context, os_instance, result)
 
+    def _format_source_dest_check(result):
+        if not instance.get('vpc_id'):
+            raise exception.InvalidParameterCombination(_('You may only '
+                'describe the sourceDestCheck attribute for VPC instances'))
+        enis = network_interface_api.describe_network_interfaces(
+            context, filter=[{'name': 'attachment.instance-id',
+                              'value': [instance_id]}]
+            )['networkInterfaceSet']
+        if len(enis) != 1:
+            raise exception.InvalidInstanceId(instance_id=instance_id)
+        result['sourceDestCheck'] = {'value': enis[0]['sourceDestCheck']}
+
     def _format_attr_group_set(result):
         if instance.get('vpc_id'):
             enis = network_interface_api.describe_network_interfaces(
@@ -553,6 +565,7 @@ def describe_instance_attribute(context, instance_id, attribute):
         'blockDeviceMapping': _format_attr_block_device_mapping,
         'disableApiTermination': _format_attr_disable_api_termination,
         'groupSet': _format_attr_group_set,
+        'sourceDestCheck': _format_source_dest_check,
         'instanceType': _format_attr_instance_type,
         'kernel': _format_attr_kernel,
         'ramdisk': _format_attr_ramdisk,
@@ -586,6 +599,9 @@ def modify_instance_attribute(context, instance_id, attribute=None,
         if attribute == 'disableApiTermination':
             if disable_api_termination is not None:
                 raise exception.InvalidParameterCombination()
+        elif attribute == 'sourceDestCheck':
+            if source_dest_check is not None:
+                raise exception.InvalidParameterCombination()
         else:
             raise exception.InvalidParameterValue(value=attribute,
                                                   parameter='attribute',
@@ -604,6 +620,8 @@ def modify_instance_attribute(context, instance_id, attribute=None,
 
     if attribute == 'disableApiTermination':
         disable_api_termination = value
+    elif attribute == 'sourceDestCheck':
+        source_dest_check = value
 
     instance = ec2utils.get_db_item(context, instance_id)
     if disable_api_termination is not None:
@@ -624,11 +642,39 @@ def modify_instance_attribute(context, instance_id, attribute=None,
         network_interface_api.modify_network_interface_attribute(context,
             enis[0]['networkInterfaceId'], security_group_id=group_id)
         return True
+    elif source_dest_check is not None:
+        if not instance.get('vpc_id'):
+            raise exception.InvalidParameterCombination(message=_('You may '
+                'only modify the sourceDestCheck attribute for VPC instances'))
+        enis = network_interface_api.describe_network_interfaces(
+            context, filter=[{'name': 'attachment.instance-id',
+                              'value': [instance_id]}]
+            )['networkInterfaceSet']
+        if len(enis) != 1:
+            raise exception.InvalidInstanceId(instance_id=instance_id)
+        network_interface_api.modify_network_interface_attribute(context,
+            enis[0]['networkInterfaceId'], source_dest_check=source_dest_check)
+        return True
 
     raise exception.InvalidParameterCombination()
 
 
 def reset_instance_attribute(context, instance_id, attribute):
+    if attribute == 'sourceDestCheck':
+        instance = ec2utils.get_db_item(context, instance_id)
+        if not instance.get('vpc_id'):
+            raise exception.InvalidParameterCombination(message=_('You may '
+                'only reset the sourceDestCheck attribute for VPC instances'))
+        enis = network_interface_api.describe_network_interfaces(
+            context, filter=[{'name': 'attachment.instance-id',
+                              'value': [instance_id]}]
+            )['networkInterfaceSet']
+        if len(enis) != 1:
+            raise exception.InvalidInstanceId(instance_id=instance_id)
+        network_interface_api.modify_network_interface_attribute(context,
+            enis[0]['networkInterfaceId'], source_dest_check=True)
+        return True
+
     raise exception.InvalidParameterValue(value=attribute,
                                           parameter='attribute',
                                           reason='Unknown attribute.')
@@ -713,7 +759,9 @@ def _format_instance(context, instance, os_instance, ec2_network_interfaces,
         if primary_ec2_network_interface:
             ec2_instance.update({
                 'subnetId': primary_ec2_network_interface['subnetId'],
-                'groupSet': primary_ec2_network_interface['groupSet']})
+                'groupSet': primary_ec2_network_interface['groupSet'],
+                'sourceDestCheck':
+                    primary_ec2_network_interface['sourceDestCheck']})
             fixed_ip = primary_ec2_network_interface['privateIpAddress']
             if 'association' in primary_ec2_network_interface:
                 association = primary_ec2_network_interface['association']

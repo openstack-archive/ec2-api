@@ -545,6 +545,7 @@ EC2_INSTANCE_1 = {
     'instanceType': 'fake_flavor',
     'ipAddress': IP_ADDRESS_2,
     'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_1,
+    'sourceDestCheck': True,
 }
 EC2_INSTANCE_2 = {
     'instanceId': ID_EC2_INSTANCE_2,
@@ -1716,6 +1717,7 @@ def gen_ec2_instance(ec2_instance_id, private_ip_address='',
         if primary_eni:
             ec2_instance['subnetId'] = primary_eni['subnetId']
             ec2_instance['groupSet'] = primary_eni['groupSet']
+            ec2_instance['sourceDestCheck'] = primary_eni['sourceDestCheck']
             if private_ip_address == '':
                 ec2_instance['privateIpAddress'] = (
                                     primary_eni['privateIpAddress'])

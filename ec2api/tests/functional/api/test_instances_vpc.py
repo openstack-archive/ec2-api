@@ -63,8 +63,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         instance = instances[0]
         self.assertEqual(self.vpc_id, instance['VpcId'])
         self.assertEqual(self.subnet_id, instance['SubnetId'])
-        if CONF.aws.run_incompatible_tests:
-            self.assertTrue(instance['SourceDestCheck'])
+        self.assertTrue(instance['SourceDestCheck'])
         self.assertEqual(1, len(instance['NetworkInterfaces']))
         ni = instance['NetworkInterfaces'][0]
         self.assertIsNone(ni['Description'])
