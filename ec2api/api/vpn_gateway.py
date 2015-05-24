@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from neutronclient.common import exceptions as neutron_exception
+from oslo_log import log as logging
 
 from ec2api.api import clients
 from ec2api.api import common
@@ -20,6 +21,9 @@ from ec2api.api import ec2utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
+
+
+LOG = logging.getLogger(__name__)
 
 
 Validator = common.Validator
@@ -40,6 +44,8 @@ def attach_vpn_gateway(context, vpc_id, vpn_gateway_id):
         raise exception.InvalidVpcState(vpc_id=vpc['id'],
                                         vgw_id=attached_vgw['id'])
 
+    subnets = [subnet for subnet in db_api.get_items(context, 'subnet')
+               if subnet['vpc_id'] == vpc['id']]
     if not vpn_gateway['vpc_id']:
         external_network_id = None
         if not ec2utils.get_attached_gateway(context, vpc['id'], 'igw'):
@@ -53,6 +59,12 @@ def attach_vpn_gateway(context, vpc_id, vpn_gateway_id):
             if external_network_id:
                 neutron.add_gateway_router(vpc['os_id'],
                                            {'network_id': external_network_id})
+                cleaner.addCleanup(neutron.remove_gateway_router, vpc['os_id'])
+
+            for subnet in subnets:
+                _create_subnet_vpnservice(context, neutron, cleaner,
+                                          subnet, vpc)
+            # TODO(ft): start vpn connections
 
     return {'attachment': _format_attachment(vpn_gateway)}
 
@@ -67,10 +79,16 @@ def detach_vpn_gateway(context, vpc_id, vpn_gateway_id):
     neutron = clients.neutron(context)
     remove_os_gateway_router = (
         ec2utils.get_attached_gateway(context, vpc_id, 'igw') is None)
+    subnets = [subnet for subnet in db_api.get_items(context, 'subnet')
+               if subnet['vpc_id'] == vpc['id']]
     with common.OnCrashCleaner() as cleaner:
         _detach_vpn_gateway_item(context, vpn_gateway)
         cleaner.addCleanup(_attach_vpn_gateway_item, context, vpn_gateway,
                            vpc_id)
+        # TODO(ft): stop vpn connections
+        for subnet in subnets:
+            _delete_subnet_vpnservice(context, neutron, cleaner, subnet)
+
         if remove_os_gateway_router:
             try:
                 neutron.remove_gateway_router(vpc['os_id'])
@@ -124,6 +142,57 @@ def _format_attachment(vpn_gateway):
             'vpcId': vpn_gateway['vpc_id']}
 
 
+def _start_vpn_in_subnet(context, neutron, cleaner, subnet, vpc, route_table):
+    vpn_gateway = ec2utils.get_attached_gateway(context, vpc['id'], 'vgw')
+    if not vpn_gateway:
+        return
+    _create_subnet_vpnservice(context, neutron, cleaner, subnet, vpc)
+    # TODO(ft): start vpn connections
+
+
+def _stop_vpn_in_subnet(context, neutron, cleaner, subnet):
+    os_vpnservice_id = subnet.get('os_vpnservice_id')
+    if not os_vpnservice_id:
+        return
+    # TODO(ft): stop vpn connections
+    _safe_delete_vpnservice(neutron, os_vpnservice_id, subnet['id'])
+
+
+def _create_subnet_vpnservice(context, neutron, cleaner, subnet, vpc):
+    os_vpnservice = {'subnet_id': subnet['os_id'],
+                     'router_id': vpc['os_id'],
+                     'name': subnet['id']}
+    os_vpnservice = neutron.create_vpnservice(
+        {'vpnservice': os_vpnservice})['vpnservice']
+    cleaner.addCleanup(neutron.delete_vpnservice, os_vpnservice['id'])
+
+    _set_vpnservice_in_subnet_item(context, subnet, os_vpnservice['id'])
+    cleaner.addCleanup(_clear_vpnservice_in_subnet_item,
+                       context, subnet)
+
+
+def _delete_subnet_vpnservice(context, neutron, cleaner, subnet):
+    os_vpnservice_id = subnet['os_vpnservice_id']
+    _clear_vpnservice_in_subnet_item(context, subnet)
+    cleaner.addCleanup(_set_vpnservice_in_subnet_item,
+                       context, subnet, os_vpnservice_id)
+    _safe_delete_vpnservice(neutron, os_vpnservice_id, subnet['id'])
+
+
+def _safe_delete_vpnservice(neutron, os_vpnservice_id, subnet_id):
+    try:
+        neutron.delete_vpnservice(os_vpnservice_id)
+    except neutron_exception.NotFound:
+        pass
+    except neutron_exception.Conflict as ex:
+        LOG.warning(
+            _('Failed to delete vpnservice %(os_id)s for subnet %(id)s. '
+              'Reason: %(reason)s'),
+            {'id': subnet_id,
+             'os_id': os_vpnservice_id,
+             'reason': ex.message})
+
+
 def _attach_vpn_gateway_item(context, vpn_gateway, vpc_id):
     vpn_gateway['vpc_id'] = vpc_id
     db_api.update_item(context, vpn_gateway)
@@ -132,3 +201,13 @@ def _attach_vpn_gateway_item(context, vpn_gateway, vpc_id):
 def _detach_vpn_gateway_item(context, vpn_gateway):
     vpn_gateway['vpc_id'] = None
     db_api.update_item(context, vpn_gateway)
+
+
+def _set_vpnservice_in_subnet_item(context, subnet, os_vpnservice_id):
+    subnet['os_vpnservice_id'] = os_vpnservice_id
+    db_api.update_item(context, subnet)
+
+
+def _clear_vpnservice_in_subnet_item(context, subnet):
+    del subnet['os_vpnservice_id']
+    db_api.update_item(context, subnet)

@@ -145,6 +145,25 @@ class CopyingMock(mock.MagicMock):
         return super(CopyingMock, self).__call__(*args, **kwargs)
 
 
+def deepcopy_call_args_saver(destination):
+    # NOTE(ft): deepcopy fails to copy a complicated mock like
+    # neutron client mock or OnCrashCleaner object
+    def safe_copy(obj):
+        try:
+            return copy.deepcopy(obj)
+        except Exception:
+            return obj
+
+    def side_effect(*args, **kwargs):
+        destination.append(
+            mock.call(
+                *[safe_copy(arg)
+                  for arg in args],
+                **{key: safe_copy(val)
+                   for key, val in kwargs.iteritems()}))
+    return side_effect
+
+
 _xml_scheme = re.compile('\sxmlns=".*"')
 
 
