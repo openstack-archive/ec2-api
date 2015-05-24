@@ -345,3 +345,9 @@ def get_os_public_network(context):
             LOG.error(msg)
         raise exception.Unsupported(_('Feature is restricted by OS admin'))
     return os_networks[0]
+
+
+def get_attached_gateway(context, vpc_id, gateway_kind):
+    # TODO(ft): move search by vpc_id to DB api
+    return next((gw for gw in db_api.get_items(context, gateway_kind)
+                 if gw['vpc_id'] == vpc_id), None)

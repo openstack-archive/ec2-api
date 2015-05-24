@@ -43,29 +43,37 @@ class IgwTestCase(base.ApiTestCase):
 
     def test_attach_igw(self):
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
-        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2)
+        self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2,
+                               fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2)
         self.neutron.list_networks.return_value = (
                 {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
 
-        resp = self.execute(
-                'AttachInternetGateway',
-                {'VpcId': fakes.ID_EC2_VPC_2,
-                 'InternetGatewayId': fakes.ID_EC2_IGW_2})
+        def do_check():
+            resp = self.execute(
+                    'AttachInternetGateway',
+                    {'VpcId': fakes.ID_EC2_VPC_2,
+                     'InternetGatewayId': fakes.ID_EC2_IGW_2})
 
-        self.assertEqual(True, resp['return'])
-        self.db_api.get_item_by_id.assert_any_call(mock.ANY,
-                                                   fakes.ID_EC2_IGW_2)
-        self.db_api.get_item_by_id.assert_any_call(mock.ANY,
-                                                   fakes.ID_EC2_VPC_2)
-        self.db_api.get_items.assert_called_once_with(mock.ANY, 'igw')
-        self.db_api.update_item.assert_called_once_with(
-                mock.ANY, self.DB_IGW_2_ATTACHED)
+            self.assertEqual(True, resp['return'])
+            self.db_api.update_item.assert_called_once_with(
+                    mock.ANY, self.DB_IGW_2_ATTACHED)
+
+        do_check()
         self.neutron.add_gateway_router.assert_called_once_with(
                 fakes.ID_OS_ROUTER_2,
                 {'network_id': fakes.ID_OS_PUBLIC_NETWORK})
         self.neutron.list_networks.assert_called_once_with(
                 **{'router:external': True,
                    'name': fakes.NAME_OS_PUBLIC_NETWORK})
+
+        # VPN gateway is already attached
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        vgw_2 = tools.update_dict(fakes.DB_VPN_GATEWAY_2,
+                                  {'vpc_id': fakes.ID_EC2_VPC_2})
+        self.add_mock_db_items(vgw_2)
+        do_check()
+        self.assertFalse(self.neutron.add_gateway_router.called)
 
     def test_attach_igw_invalid_parameters(self):
         def do_check(error_code):
@@ -113,20 +121,25 @@ class IgwTestCase(base.ApiTestCase):
     def test_detach_igw(self):
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
 
-        resp = self.execute(
-                'DetachInternetGateway',
-                {'VpcId': fakes.EC2_VPC_1['vpcId'],
-                 'InternetGatewayId': fakes.EC2_IGW_1['internetGatewayId']})
+        def do_check():
+            resp = self.execute(
+                    'DetachInternetGateway',
+                    {'VpcId': fakes.ID_EC2_VPC_1,
+                     'InternetGatewayId': fakes.ID_EC2_IGW_1})
+            self.assertEqual(True, resp['return'])
+            self.db_api.update_item.assert_called_once_with(
+                    mock.ANY, self.DB_IGW_1_DETACHED)
 
-        self.assertEqual(True, resp['return'])
-        self.db_api.get_item_by_id.assert_any_call(mock.ANY,
-                                                   fakes.ID_EC2_IGW_1)
-        self.db_api.get_item_by_id.assert_any_call(mock.ANY,
-                                                   fakes.ID_EC2_VPC_1)
-        self.db_api.update_item.assert_called_once_with(
-                mock.ANY, self.DB_IGW_1_DETACHED)
+        do_check()
         self.neutron.remove_gateway_router.assert_called_once_with(
                 fakes.ID_OS_ROUTER_1)
+
+        # VPN gateway is still attached
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        self.add_mock_db_items(fakes.DB_VPN_GATEWAY_1)
+        do_check()
+        self.assertFalse(self.neutron.remove_gateway_router.called)
 
     def test_detach_igw_invalid_parameters(self):
         def do_check(error_code):
