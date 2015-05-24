@@ -280,19 +280,21 @@ class VpnGatewayTestCase(base.ApiTestCase):
             mock.ANY, fakes.ID_EC2_VPN_GATEWAY_2)
 
     def test_delete_vpn_gateway_invalid_parameters(self):
-        def do_check(error_code):
-            self.assert_execution_error(
-                error_code, 'DeleteVpnGateway',
-                {'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
-
-            self.assertFalse(self.db_api.delete_item.called)
-            self.db_api.reset_mock()
-
         self.set_mock_db_items()
-        do_check('InvalidVpnGatewayID.NotFound')
+        self.assert_execution_error(
+            'InvalidVpnGatewayID.NotFound', 'DeleteVpnGateway',
+            {'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
 
         self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1)
-        do_check('IncorrectState')
+        self.assert_execution_error(
+            'IncorrectState', 'DeleteVpnGateway',
+            {'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+
+        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_2,
+                               fakes.DB_VPN_CONNECTION_2)
+        self.assert_execution_error(
+            'IncorrectState', 'DeleteVpnGateway',
+            {'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
 
     def test_describe_vpn_gateways(self):
         self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2)

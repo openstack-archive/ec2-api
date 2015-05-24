@@ -101,7 +101,8 @@ def detach_vpn_gateway(context, vpc_id, vpn_gateway_id):
 def delete_vpn_gateway(context, vpn_gateway_id):
     vpn_gateway = ec2utils.get_db_item(context, vpn_gateway_id)
     vpn_connections = db_api.get_items(context, 'vpn')
-    if vpn_gateway['vpc_id']:
+    if vpn_gateway['vpc_id'] or any(vpn['vpn_gateway_id'] == vpn_gateway['id']
+                                    for vpn in vpn_connections):
         raise exception.IncorrectState(reason=_('The VPN gateway is in use.'))
     db_api.delete_item(context, vpn_gateway['id'])
     return True

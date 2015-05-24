@@ -89,6 +89,14 @@ class CustomerGatewayTestCase(base.ApiTestCase):
             {'CustomerGatewayId': fakes.ID_EC2_CUSTOMER_GATEWAY_2})
         self.assertFalse(self.db_api.delete_item.called)
 
+        self.set_mock_db_items(fakes.DB_CUSTOMER_GATEWAY_1,
+                               fakes.DB_VPN_CONNECTION_1)
+        self.assert_execution_error(
+            'IncorrectState',
+            'DeleteCustomerGateway',
+            {'CustomerGatewayId': fakes.ID_EC2_CUSTOMER_GATEWAY_1})
+        self.assertFalse(self.db_api.delete_item.called)
+
     def test_describe_customer_gateways(self):
         self.set_mock_db_items(fakes.DB_CUSTOMER_GATEWAY_1,
                                fakes.DB_CUSTOMER_GATEWAY_2)

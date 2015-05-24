@@ -69,6 +69,7 @@ class EC2UtilsTestCase(testtools.TestCase):
         check_not_found('aki', exception.InvalidAMIIDNotFound)
         check_not_found('vgw', exception.InvalidVpnGatewayIDNotFound)
         check_not_found('cgw', exception.InvalidCustomerGatewayIDNotFound)
+        check_not_found('vpn', exception.InvalidVpnConnectionIDNotFound)
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_db_items(self, db_api):
@@ -125,6 +126,7 @@ class EC2UtilsTestCase(testtools.TestCase):
         check_not_found('ari', exception.InvalidAMIIDNotFound)
         check_not_found('vgw', exception.InvalidVpnGatewayIDNotFound)
         check_not_found('cgw', exception.InvalidCustomerGatewayIDNotFound)
+        check_not_found('vpn', exception.InvalidVpnConnectionIDNotFound)
 
     """Unit test api xml conversion."""
     def test_number_conversion(self):
