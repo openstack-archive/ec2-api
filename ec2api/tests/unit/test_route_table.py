@@ -338,6 +338,106 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_any_call(
             mock.ANY, fakes.DB_ROUTE_TABLE_2)
 
+    def test_enable_vgw_route_propagation(self):
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_VPN_GATEWAY_1)
+        resp = self.execute('EnableVgwRoutePropagation',
+                            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+                             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+        self.assertEqual({'return': True}, resp)
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
+            tools.update_dict(
+                fakes.DB_ROUTE_TABLE_1,
+                {'propagating_gateways': [fakes.ID_EC2_VPN_GATEWAY_1]}))
+
+        self.db_api.reset_mock()
+        self.set_mock_db_items(
+            fakes.DB_ROUTE_TABLE_2,
+            tools.update_dict(fakes.DB_VPN_GATEWAY_2,
+                              {'vpc_id': fakes.ID_EC2_VPC_1}))
+        resp = self.execute('EnableVgwRoutePropagation',
+                            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+        self.assertEqual({'return': True}, resp)
+        db_route_table_2 = copy.deepcopy(fakes.DB_ROUTE_TABLE_2)
+        db_route_table_2['propagating_gateways'].append(
+            fakes.ID_EC2_VPN_GATEWAY_2)
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, db_route_table_2)
+
+    def test_enable_vgw_route_propagation_idempotent(self):
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2, fakes.DB_VPN_GATEWAY_1)
+        resp = self.execute('EnableVgwRoutePropagation',
+                            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+        self.assertEqual({'return': True}, resp)
+        self.assertFalse(self.db_api.update_item.called)
+
+    def test_enable_vgw_route_propagation_invalid_parameters(self):
+        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1)
+        self.assert_execution_error(
+            'InvalidRouteTableID.NotFound', 'EnableVgwRoutePropagation',
+            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1)
+        self.assert_execution_error(
+            'InvalidVpnGatewayID.NotFound', 'EnableVgwRoutePropagation',
+            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_VPN_GATEWAY_2)
+        self.assert_execution_error(
+            'Gateway.NotAttached', 'EnableVgwRoutePropagation',
+            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+
+        self.set_mock_db_items(
+            fakes.DB_ROUTE_TABLE_1,
+            tools.update_dict(fakes.DB_VPN_GATEWAY_2,
+                              {'vpc_id': fakes.ID_EC2_VPC_2}))
+        self.assert_execution_error(
+            'Gateway.NotAttached', 'EnableVgwRoutePropagation',
+            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+
+    def test_disable_vgw_route_propagation(self):
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2)
+        resp = self.execute('DisableVgwRoutePropagation',
+                            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+        self.assertEqual({'return': True}, resp)
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, tools.purge_dict(fakes.DB_ROUTE_TABLE_2,
+                                       ('propagating_gateways',)))
+
+        self.db_api.reset_mock()
+        db_route_table_2 = copy.deepcopy(fakes.DB_ROUTE_TABLE_2)
+        db_route_table_2['propagating_gateways'].append(
+            fakes.ID_EC2_VPN_GATEWAY_2)
+        self.set_mock_db_items(db_route_table_2)
+        resp = self.execute('DisableVgwRoutePropagation',
+                            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+        self.assertEqual({'return': True}, resp)
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, fakes.DB_ROUTE_TABLE_2)
+
+    def test_disable_vgw_route_propagation_idempotent(self):
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2)
+        resp = self.execute('DisableVgwRoutePropagation',
+                            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+                             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+        self.assertEqual({'return': True}, resp)
+        self.assertFalse(self.db_api.update_item.called)
+
+    def test_disable_vgw_route_propagation_invalid_parameters(self):
+        self.set_mock_db_items()
+        self.assert_execution_error(
+            'InvalidRouteTableID.NotFound', 'DisableVgwRoutePropagation',
+            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+
     @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_associate_route_table(self, routes_updater):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1,
@@ -592,7 +692,8 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.DB_ROUTE_TABLE_3, fakes.DB_SUBNET_1, fakes.DB_SUBNET_2,
             fakes.DB_VPC_1, fakes.DB_VPC_2, fakes.DB_IGW_1, fakes.DB_IGW_2,
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
-            fakes.DB_INSTANCE_1, fakes.DB_VPN_GATEWAY_1)
+            fakes.DB_INSTANCE_1, fakes.DB_VPN_GATEWAY_1,
+            fakes.DB_VPN_CONNECTION_1)
         self.nova.servers.get.return_value = (
             mock.NonCallableMock(status='ACTIVE'))
 
@@ -600,7 +701,8 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertThat(resp['routeTableSet'],
                         matchers.ListMatches([fakes.EC2_ROUTE_TABLE_1,
                                               fakes.EC2_ROUTE_TABLE_2,
-                                              fakes.EC2_ROUTE_TABLE_3]))
+                                              fakes.EC2_ROUTE_TABLE_3],
+                                             orderless_lists=True))
 
         resp = self.execute('DescribeRouteTables',
                             {'RouteTableId.1': fakes.ID_EC2_ROUTE_TABLE_1})
@@ -690,6 +792,7 @@ class RouteTableTestCase(base.ApiTestCase):
                 'main': False})
         ec2_route_table_2 = copy.deepcopy(fakes.EC2_ROUTE_TABLE_2)
         ec2_route_table_2['routeSet'][1]['state'] = 'blackhole'
+        del ec2_route_table_2['routeSet'][2]
         ec2_route_table_2['routeSet'][2]['state'] = 'blackhole'
         ec2_route_table_2['routeSet'].append({
             'destinationCidrBlock': '192.168.88.0/24',
@@ -717,6 +820,68 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertThat(resp['routeTableSet'],
                         matchers.ListMatches([ec2_route_table_1,
                                               ec2_route_table_2]))
+
+    def test_format_route_table(self):
+        id_db_ec2_vpn_gateway_3 = fakes.random_ec2_id('vgw')
+        db_route_table_1 = tools.update_dict(
+            fakes.DB_ROUTE_TABLE_1,
+            {'propagating_gateways': [fakes.ID_EC2_VPN_GATEWAY_1,
+                                      fakes.ID_EC2_VPN_GATEWAY_2,
+                                      id_db_ec2_vpn_gateway_3]})
+        db_route_table_1['routes'].extend(
+            [{'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1,
+              'destination_cidr_block': fakes.CIDR_VPN_1_STATIC},
+             {'gateway_id': fakes.ID_EC2_VPN_GATEWAY_2,
+              'destination_cidr_block': '192.168.201.0/24'}])
+        vpn_connection_3 = tools.update_dict(
+            fakes.DB_VPN_CONNECTION_1,
+            {'customer_gateway_id': fakes.random_ec2_id('cgw')})
+        vpn_connection_3['cidrs'].append('192.168.120.0/24')
+        ec2_route_table_1 = tools.patch_dict(
+            fakes.EC2_ROUTE_TABLE_1,
+            {'propagatingVgwSet': [{'gatewayId': fakes.ID_EC2_VPN_GATEWAY_1},
+                                   {'gatewayId': fakes.ID_EC2_VPN_GATEWAY_2},
+                                   {'gatewayId': id_db_ec2_vpn_gateway_3}]},
+            ('associationSet',))
+        ec2_route_table_1['routeSet'].extend(
+            [{'gatewayId': fakes.ID_EC2_VPN_GATEWAY_1,
+              'destinationCidrBlock': fakes.CIDR_VPN_1_STATIC,
+              'origin': 'CreateRoute',
+              'state': 'active'},
+             {'gatewayId': fakes.ID_EC2_VPN_GATEWAY_2,
+              'destinationCidrBlock': '192.168.201.0/24',
+              'origin': 'CreateRoute',
+              'state': 'blackhole'},
+             {'gatewayId': fakes.ID_EC2_VPN_GATEWAY_1,
+              'destinationCidrBlock': fakes.CIDR_VPN_1_PROPAGATED_1,
+              'origin': 'EnableVgwRoutePropagation',
+              'state': 'active'},
+             {'gatewayId': fakes.ID_EC2_VPN_GATEWAY_1,
+              'destinationCidrBlock': '192.168.120.0/24',
+              'origin': 'EnableVgwRoutePropagation',
+              'state': 'active'},
+             {'gatewayId': fakes.ID_EC2_VPN_GATEWAY_2,
+              'destinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_1,
+              'origin': 'EnableVgwRoutePropagation',
+              'state': 'blackhole'},
+             {'gatewayId': fakes.ID_EC2_VPN_GATEWAY_2,
+              'destinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_2,
+              'origin': 'EnableVgwRoutePropagation',
+              'state': 'blackhole'}])
+
+        self.assertThat(
+            route_table._format_route_table(
+                self._create_context(), db_route_table_1,
+                gateways={gw['id']: gw
+                          for gw in (fakes.DB_VPN_GATEWAY_1,
+                                     fakes.DB_VPN_GATEWAY_2,
+                                     fakes.DB_IGW_1)},
+                vpn_connections_by_gateway_id={
+                    fakes.ID_EC2_VPN_GATEWAY_1: [fakes.DB_VPN_CONNECTION_1,
+                                                 vpn_connection_3],
+                    fakes.ID_EC2_VPN_GATEWAY_2: [fakes.DB_VPN_CONNECTION_2]}),
+            matchers.DictMatches(ec2_route_table_1, orderless_lists=True),
+            verbose=True)
 
     def test_get_subnet_host_routes(self):
         self.set_mock_db_items(

@@ -258,7 +258,7 @@ class ResourceAlreadyAssociated(EC2IncorrectStateException):
 
 class GatewayNotAttached(EC2IncorrectStateException):
     ec2_code = 'Gateway.NotAttached'
-    msg_fmt = _("resource %(igw_id)s is not attached to network %(vpc_id)s")
+    msg_fmt = _("resource %(gw_id)s is not attached to network %(vpc_id)s")
 
 
 class IncorrectInstanceState(EC2IncorrectStateException):

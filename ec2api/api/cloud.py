@@ -1502,6 +1502,36 @@ class VpcCloudController(CloudController):
             true if the requests succeeds.
         """
 
+    @module_and_param_types(route_table, 'rtb_id',
+                            'vgw_id')
+    def enable_vgw_route_propagation(self, context, route_table_id,
+                                     gateway_id):
+        """Enables a VGW to propagate routes to the specified route table.
+
+        Args:
+            context (RequestContext): The request context.
+            route_table_id (str): The ID of the route table.
+            gateway_id (str): The ID of the virtual private gateway.
+
+        Returns:
+            true if the requests succeeds.
+        """
+
+    @module_and_param_types(route_table, 'rtb_id',
+                            'vgw_id')
+    def disable_vgw_route_propagation(self, context, route_table_id,
+                                      gateway_id):
+        """Disables a (VGW) from propagating routes to a specified route table.
+
+        Args:
+            context (RequestContext): The request context.
+            route_table_id (str): The ID of the route table.
+            gateway_id (str): The ID of the virtual private gateway.
+
+        Returns:
+            true if the requests succeeds.
+        """
+
     @module_and_param_types(route_table, 'rtb_id', 'subnet_id')
     def associate_route_table(self, context, route_table_id, subnet_id):
         """Associates a subnet with a route table.
