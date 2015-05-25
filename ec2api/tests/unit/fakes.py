@@ -242,6 +242,8 @@ FINGERPRINT_KEY_PAIR = (
 ID_EC2_VPN_GATEWAY_1 = random_ec2_id('vgw')
 ID_EC2_VPN_GATEWAY_2 = random_ec2_id('vgw')
 
+ID_OS_VPNSERVICE_1 = random_os_id()
+ID_OS_VPNSERVICE_2 = random_os_id()
 
 # customer gateway constants
 ID_EC2_CUSTOMER_GATEWAY_1 = random_ec2_id('cgw')
@@ -314,11 +316,13 @@ EC2_IGW_2 = {'internetGatewayId': ID_EC2_IGW_2,
 # 2 subnets in the first vpc
 DB_SUBNET_1 = {'id': ID_EC2_SUBNET_1,
                'os_id': ID_OS_SUBNET_1,
-               'vpc_id': ID_EC2_VPC_1}
+               'vpc_id': ID_EC2_VPC_1,
+               'os_vpnservice_id': ID_OS_VPNSERVICE_1}
 DB_SUBNET_2 = {'id': ID_EC2_SUBNET_2,
                'os_id': ID_OS_SUBNET_2,
                'vpc_id': ID_EC2_VPC_1,
-               'route_table_id': ID_EC2_ROUTE_TABLE_3}
+               'route_table_id': ID_EC2_ROUTE_TABLE_3,
+               'os_vpnservice_id': ID_OS_VPNSERVICE_2}
 
 EC2_SUBNET_1 = {'subnetId': ID_EC2_SUBNET_1,
                 'state': 'available',
@@ -1557,6 +1561,19 @@ EC2_VPN_GATEWAY_2 = {
     'state': 'available',
     'type': 'ipsec.1',
     'attachments': None,
+}
+
+OS_VPNSERVICE_1 = {
+    'id': ID_OS_VPNSERVICE_1,
+    'subnet_id': ID_OS_SUBNET_1,
+    'router_id': ID_OS_ROUTER_1,
+    'name': ID_EC2_SUBNET_1,
+}
+OS_VPNSERVICE_2 = {
+    'id': ID_OS_VPNSERVICE_2,
+    'subnet_id': ID_OS_SUBNET_2,
+    'router_id': ID_OS_ROUTER_1,
+    'name': ID_EC2_SUBNET_2,
 }
 
 # customer gateway objects

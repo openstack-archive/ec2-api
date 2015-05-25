@@ -15,6 +15,7 @@
 import mock
 from neutronclient.common import exceptions as neutron_exception
 
+from ec2api.api import common
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -22,6 +23,13 @@ from ec2api.tests.unit import tools
 
 
 class SubnetTestCase(base.ApiTestCase):
+
+    def setUp(self):
+        super(SubnetTestCase, self).setUp()
+        vpn_gateway_api_patcher = (
+            mock.patch('ec2api.api.subnet.vpn_gateway_api'))
+        self.vpn_gateway_api = vpn_gateway_api_patcher.start()
+        self.addCleanup(vpn_gateway_api_patcher.stop)
 
     def test_create_subnet(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
@@ -32,13 +40,14 @@ class SubnetTestCase(base.ApiTestCase):
                                          {'status': 'available'}))
         self.neutron.create_subnet.side_effect = (
                 tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_1))
+        subnet_1 = tools.purge_dict(fakes.DB_SUBNET_1, ('os_vpnservice_id',))
 
         def check_response(resp):
             self.assertThat(fakes.EC2_SUBNET_1, matchers.DictMatches(
                     resp['subnet']))
             self.db_api.add_item.assert_called_once_with(
                     mock.ANY, 'subnet',
-                    tools.purge_dict(fakes.DB_SUBNET_1, ('id',)),
+                    tools.purge_dict(subnet_1, ('id',)),
                     project_id=None)
             self.neutron.create_network.assert_called_once_with(
                     {'network': {}})
@@ -54,6 +63,12 @@ class SubnetTestCase(base.ApiTestCase):
             self.neutron.add_interface_router.assert_called_once_with(
                     fakes.ID_OS_ROUTER_1,
                     {'subnet_id': fakes.ID_OS_SUBNET_1})
+            self.vpn_gateway_api._start_vpn_in_subnet.assert_called_once_with(
+                mock.ANY, self.neutron, mock.ANY, subnet_1,
+                fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
+            self.assertIsInstance(
+                self.vpn_gateway_api._start_vpn_in_subnet.call_args[0][2],
+                common.OnCrashCleaner)
 
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': fakes.CIDR_SUBNET_1})
@@ -61,6 +76,7 @@ class SubnetTestCase(base.ApiTestCase):
 
         self.neutron.reset_mock()
         self.db_api.reset_mock()
+        self.vpn_gateway_api.reset_mock()
 
         resp = self.execute('CreateSubnet', {'VpcId': fakes.ID_EC2_VPC_1,
                                              'CidrBlock': fakes.CIDR_SUBNET_1,
@@ -183,6 +199,11 @@ class SubnetTestCase(base.ApiTestCase):
                 mock.call.remove_interface_router(
                     fakes.ID_OS_ROUTER_1,
                     {'subnet_id': fakes.ID_OS_SUBNET_1})))
+        self.vpn_gateway_api._stop_vpn_in_subnet.assert_called_once_with(
+            mock.ANY, self.neutron, mock.ANY, fakes.DB_SUBNET_1)
+        self.assertIsInstance(
+            self.vpn_gateway_api._stop_vpn_in_subnet.call_args[0][2],
+            common.OnCrashCleaner)
 
     def test_delete_subnet_inconsistent_os(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_SUBNET_1)

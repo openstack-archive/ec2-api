@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import netaddr
 from neutronclient.common import exceptions as neutron_exception
 from oslo_config import cfg
@@ -23,6 +22,7 @@ from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import route_table as route_table_api
+from ec2api.api import vpn_gateway as vpn_gateway_api
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
@@ -78,6 +78,8 @@ def create_subnet(context, vpc_id, cidr_block,
                                  {'os_id': os_subnet['id'],
                                   'vpc_id': vpc['id']})
         cleaner.addCleanup(db_api.delete_item, context, subnet['id'])
+        vpn_gateway_api._start_vpn_in_subnet(context, neutron, cleaner,
+                                             subnet, vpc, main_route_table)
         neutron.update_network(os_network['id'],
                                {'network': {'name': subnet['id']}})
         neutron.update_subnet(os_subnet['id'],
@@ -102,6 +104,7 @@ def delete_subnet(context, subnet_id):
     with common.OnCrashCleaner() as cleaner:
         db_api.delete_item(context, subnet['id'])
         cleaner.addCleanup(db_api.restore_item, context, 'subnet', subnet)
+        vpn_gateway_api._stop_vpn_in_subnet(context, neutron, cleaner, subnet)
         try:
             neutron.remove_interface_router(vpc['os_id'],
                                             {'subnet_id': subnet['os_id']})

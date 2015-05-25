@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+
+import fixtures
 import mock
 from neutronclient.common import exceptions as neutron_exception
 
+from ec2api.api import common
+from ec2api.api import vpn_gateway as vpn_gateway_api
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -29,6 +34,8 @@ class VpnGatewayTestCase(base.ApiTestCase):
             fakes.DB_VPN_GATEWAY_2, {'vpc_id': fakes.ID_EC2_VPC_2})
         self.DB_VPN_GATEWAY_1_DETACHED = tools.update_dict(
             fakes.DB_VPN_GATEWAY_1, {'vpc_id': None})
+        self.DB_SUBNET_1_NO_VPN = tools.purge_dict(
+            fakes.DB_SUBNET_1, ('os_vpnservice_id',))
 
     def test_create_vpn_gateway(self):
         self.db_api.add_item.side_effect = (
@@ -38,14 +45,31 @@ class VpnGatewayTestCase(base.ApiTestCase):
                             {'Type': 'ipsec.1'})
         self.assertEqual({'vpnGateway': fakes.EC2_VPN_GATEWAY_2}, resp)
         self.db_api.add_item.assert_called_once_with(
-                mock.ANY, 'vgw', {}, project_id=None)
+            mock.ANY, 'vgw', {}, project_id=None)
 
-    def test_attach_vpn_gateway(self):
+    @mock.patch('ec2api.api.vpn_gateway._create_subnet_vpnservice',
+                wraps=vpn_gateway_api._create_subnet_vpnservice)
+    def test_attach_vpn_gateway(self, create_vpnservice):
+        create_vpnservice_calls = []
+        create_vpnservice.side_effect = (
+            tools.deepcopy_call_args_saver(create_vpnservice_calls))
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
-        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2,
-                               fakes.DB_VPC_2, fakes.DB_IGW_1, fakes.DB_IGW_2)
+        subnet_2 = tools.patch_dict(fakes.DB_SUBNET_2,
+                                    {'vpc_id': fakes.ID_EC2_VPC_2},
+                                    ('os_vpnservice_id',))
+        self.set_mock_db_items(
+            fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2,
+            fakes.DB_VPC_2, fakes.DB_IGW_1, fakes.DB_IGW_2,
+            fakes.DB_SUBNET_1, subnet_2)
+        subnet_2_updated = tools.update_dict(
+            subnet_2, {'os_vpnservice_id': fakes.ID_OS_VPNSERVICE_2})
+        os_vpnservice_2 = tools.patch_dict(fakes.OS_VPNSERVICE_2,
+                                           {'router_id': fakes.ID_OS_ROUTER_2},
+                                           ('id',))
         self.neutron.list_networks.return_value = (
-                {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
+            {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
+        self.neutron.create_vpnservice.side_effect = tools.get_neutron_create(
+            'vpnservice', fakes.ID_OS_VPNSERVICE_2)
 
         def do_check():
             resp = self.execute('AttachVpnGateway',
@@ -54,20 +78,32 @@ class VpnGatewayTestCase(base.ApiTestCase):
             self.assertEqual({'attachment': {'state': 'attached',
                                              'vpcId': fakes.ID_EC2_VPC_2}},
                              resp)
-            self.db_api.update_item.assert_called_once_with(
-                    mock.ANY, self.DB_VPN_GATEWAY_2_ATTACHED)
+            self.assertEqual(2, self.db_api.update_item.call_count)
+            self.db_api.update_item.assert_has_calls(
+                [mock.call(mock.ANY, self.DB_VPN_GATEWAY_2_ATTACHED),
+                 mock.call(mock.ANY, subnet_2_updated)])
+            self.neutron.create_vpnservice.assert_called_once_with(
+                {'vpnservice': os_vpnservice_2})
+            self.assertEqual(1, len(create_vpnservice_calls))
+            self.assertEqual(
+                mock.call(mock.ANY, self.neutron, mock.ANY, subnet_2,
+                          fakes.DB_VPC_2),
+                create_vpnservice_calls[0])
+            self.assertIsInstance(create_vpnservice_calls[0][1][2],
+                                  common.OnCrashCleaner)
 
         do_check()
         self.neutron.add_gateway_router.assert_called_once_with(
-                fakes.ID_OS_ROUTER_2,
-                {'network_id': fakes.ID_OS_PUBLIC_NETWORK})
+            fakes.ID_OS_ROUTER_2,
+            {'network_id': fakes.ID_OS_PUBLIC_NETWORK})
         self.neutron.list_networks.assert_called_once_with(
-                **{'router:external': True,
-                   'name': fakes.NAME_OS_PUBLIC_NETWORK})
+            **{'router:external': True,
+               'name': fakes.NAME_OS_PUBLIC_NETWORK})
 
         # Internet gateway is already attached
         self.db_api.reset_mock()
         self.neutron.reset_mock()
+        del create_vpnservice_calls[:]
         igw_2 = tools.update_dict(fakes.DB_IGW_2,
                                   {'vpc_id': fakes.ID_EC2_VPC_2})
         self.add_mock_db_items(igw_2)
@@ -86,6 +122,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
                          resp)
         self.assertFalse(self.db_api.update_item.called)
         self.assertFalse(self.neutron.add_gateway_router.called)
+        self.assertFalse(self.neutron.create_vpnservice.called)
 
     def test_attach_vpn_gateway_invalid_parameters(self):
         def do_check(error_code):
@@ -118,11 +155,14 @@ class VpnGatewayTestCase(base.ApiTestCase):
     @tools.screen_unexpected_exception_logs
     def test_attach_vpn_gateway_rollback(self):
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
-        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2,
-                               fakes.DB_VPC_2)
+        subnet_2 = tools.patch_dict(fakes.DB_SUBNET_2,
+                                    {'vpc_id': fakes.ID_EC2_VPC_2},
+                                    ('os_vpnservice_id',))
+        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_2, fakes.DB_VPC_2,
+                               subnet_2)
         self.neutron.list_networks.return_value = (
-                {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
-        self.neutron.add_gateway_router.side_effect = Exception()
+            {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
+        self.neutron.create_vpnservice.side_effect = Exception()
 
         self.assert_execution_error(
             self.ANY_EXECUTE_ERROR, 'AttachVpnGateway',
@@ -130,27 +170,49 @@ class VpnGatewayTestCase(base.ApiTestCase):
              'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
 
         self.db_api.update_item.assert_any_call(
-                mock.ANY, fakes.DB_VPN_GATEWAY_2)
+            mock.ANY, fakes.DB_VPN_GATEWAY_2)
+        self.neutron.remove_gateway_router.assert_called_once_with(
+            fakes.ID_OS_ROUTER_2)
 
-    def test_detach_vpn_gateway(self):
-        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1)
+    @mock.patch('ec2api.api.vpn_gateway._delete_subnet_vpnservice',
+                wraps=vpn_gateway_api._delete_subnet_vpnservice)
+    def test_detach_vpn_gateway(self, delete_vpnservice):
+        delete_vpnservice_calls = []
+        delete_vpnservice.side_effect = (
+            tools.deepcopy_call_args_saver(delete_vpnservice_calls))
+        self.set_mock_db_items(
+            fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1,
+            fakes.DB_SUBNET_1,
+            tools.update_dict(fakes.DB_SUBNET_2,
+                              {'vpc_id': fakes.ID_EC2_VPC_2}))
 
         def do_check():
             resp = self.execute(
-                    'DetachVpnGateway',
-                    {'VpcId': fakes.ID_EC2_VPC_1,
-                     'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+                'DetachVpnGateway',
+                {'VpcId': fakes.ID_EC2_VPC_1,
+                 'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
             self.assertEqual({'return': True}, resp)
-            self.db_api.update_item.assert_called_once_with(
-                    mock.ANY, self.DB_VPN_GATEWAY_1_DETACHED)
+            self.assertEqual(2, self.db_api.update_item.call_count)
+            self.db_api.update_item.assert_has_calls(
+                [mock.call(mock.ANY, self.DB_VPN_GATEWAY_1_DETACHED),
+                 mock.call(mock.ANY, self.DB_SUBNET_1_NO_VPN)])
+            self.neutron.delete_vpnservice.assert_called_once_with(
+                fakes.ID_OS_VPNSERVICE_1)
+            self.assertEqual(1, len(delete_vpnservice_calls))
+            self.assertEqual(
+                mock.call(mock.ANY, self.neutron, mock.ANY, fakes.DB_SUBNET_1),
+                delete_vpnservice_calls[0])
+            self.assertIsInstance(delete_vpnservice_calls[0][1][2],
+                                  common.OnCrashCleaner)
 
         do_check()
         self.neutron.remove_gateway_router.assert_called_once_with(
-                fakes.ID_OS_ROUTER_1)
+            fakes.ID_OS_ROUTER_1)
 
         # Internet gateway is still attached
         self.db_api.reset_mock()
         self.neutron.reset_mock()
+        del delete_vpnservice_calls[:]
         self.add_mock_db_items(fakes.DB_IGW_1)
         do_check()
         self.assertFalse(self.neutron.remove_gateway_router.called)
@@ -180,20 +242,21 @@ class VpnGatewayTestCase(base.ApiTestCase):
     def test_detach_vpn_gateway_no_router(self):
         self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1)
         self.neutron.remove_gateway_router.side_effect = (
-                neutron_exception.NotFound)
+            neutron_exception.NotFound)
 
         resp = self.execute(
-                'DetachVpnGateway',
-                {'VpcId': fakes.ID_EC2_VPC_1,
-                 'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+            'DetachVpnGateway',
+            {'VpcId': fakes.ID_EC2_VPC_1,
+             'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
 
         self.assertEqual(True, resp['return'])
         self.neutron.remove_gateway_router.assert_called_once_with(
-                fakes.ID_OS_ROUTER_1)
+            fakes.ID_OS_ROUTER_1)
 
     @tools.screen_unexpected_exception_logs
     def test_detach_vpn_gateway_rollback(self):
-        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1)
+        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1,
+                               fakes.DB_SUBNET_1)
         self.neutron.remove_gateway_router.side_effect = Exception()
 
         self.assert_execution_error(
@@ -201,15 +264,16 @@ class VpnGatewayTestCase(base.ApiTestCase):
             {'VpcId': fakes.ID_EC2_VPC_1,
              'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
 
-        self.db_api.update_item.assert_any_call(
-                mock.ANY, fakes.DB_VPN_GATEWAY_1)
+        self.db_api.update_item.assert_has_calls(
+            [mock.call(mock.ANY, fakes.DB_SUBNET_1),
+             mock.call(mock.ANY, fakes.DB_VPN_GATEWAY_1)])
 
     def test_delete_vpn_gateway(self):
         self.set_mock_db_items(fakes.DB_VPN_GATEWAY_2)
 
         resp = self.execute(
-                'DeleteVpnGateway',
-                {'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+            'DeleteVpnGateway',
+            {'VpnGatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
 
         self.assertEqual({'return': True}, resp)
         self.db_api.delete_item.assert_called_once_with(
@@ -255,3 +319,111 @@ class VpnGatewayTestCase(base.ApiTestCase):
         self.check_tag_support(
             'DescribeVpnGateways', 'vpnGatewaySet',
             fakes.ID_EC2_VPN_GATEWAY_2, 'vpnGatewayId')
+
+    @mock.patch('ec2api.api.vpn_gateway._create_subnet_vpnservice')
+    def test_start_vpn_in_subnet(self, create_subnet_vpnservice):
+        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2)
+
+        context = mock.Mock()
+        cleaner = common.OnCrashCleaner()
+        vpn_gateway_api._start_vpn_in_subnet(
+            context, self.neutron, cleaner, copy.deepcopy(fakes.DB_SUBNET_1),
+            fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
+        create_subnet_vpnservice.assert_called_once_with(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_1, fakes.DB_VPC_1)
+
+        create_subnet_vpnservice.reset_mock()
+        self.add_mock_db_items(self.DB_VPN_GATEWAY_1_DETACHED)
+        vpn_gateway_api._start_vpn_in_subnet(
+            context, self.neutron, cleaner, copy.deepcopy(fakes.DB_SUBNET_1),
+            fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
+        self.assertFalse(create_subnet_vpnservice.called)
+
+    @mock.patch('ec2api.api.vpn_gateway._safe_delete_vpnservice')
+    def test_stop_vpn_in_subnet(self, delete_vpnservice):
+        context = mock.Mock()
+        cleaner = common.OnCrashCleaner()
+        vpn_gateway_api._stop_vpn_in_subnet(
+            context, self.neutron, cleaner, copy.deepcopy(fakes.DB_SUBNET_1))
+        delete_vpnservice.assert_called_once_with(
+            self.neutron, fakes.ID_OS_VPNSERVICE_1, fakes.ID_EC2_SUBNET_1)
+
+        delete_vpnservice.reset_mock()
+        vpn_gateway_api._stop_vpn_in_subnet(
+            context, self.neutron, cleaner, self.DB_SUBNET_1_NO_VPN)
+        self.assertFalse(delete_vpnservice.called)
+
+    def test_create_subnet_vpnservice(self):
+        self.neutron.create_vpnservice.side_effect = tools.get_neutron_create(
+            'vpnservice', fakes.ID_OS_VPNSERVICE_1)
+        context = mock.Mock()
+        cleaner = common.OnCrashCleaner()
+
+        vpn_gateway_api._create_subnet_vpnservice(
+            context, self.neutron, cleaner,
+            copy.deepcopy(self.DB_SUBNET_1_NO_VPN), fakes.DB_VPC_1)
+
+        self.neutron.create_vpnservice.assert_called_once_with(
+            {'vpnservice': tools.purge_dict(fakes.OS_VPNSERVICE_1,
+                                            ('id',))})
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, fakes.DB_SUBNET_1)
+
+        try:
+            with common.OnCrashCleaner() as cleaner:
+                vpn_gateway_api._create_subnet_vpnservice(
+                    context, self.neutron, cleaner,
+                    copy.deepcopy(self.DB_SUBNET_1_NO_VPN), fakes.DB_VPC_1)
+                raise Exception('fake-exception')
+        except Exception as ex:
+            if ex.message != 'fake-exception':
+                raise
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, self.DB_SUBNET_1_NO_VPN)
+        self.neutron.delete_vpnservice.assert_called_once_with(
+            fakes.ID_OS_VPNSERVICE_1)
+
+    @mock.patch('ec2api.api.vpn_gateway._safe_delete_vpnservice')
+    def test_delete_subnet_vpnservice(self, delete_vpnservice):
+        context = mock.Mock()
+        cleaner = common.OnCrashCleaner()
+
+        vpn_gateway_api._delete_subnet_vpnservice(
+            context, self.neutron, cleaner, copy.deepcopy(fakes.DB_SUBNET_1))
+
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, self.DB_SUBNET_1_NO_VPN)
+
+        try:
+            with common.OnCrashCleaner() as cleaner:
+                vpn_gateway_api._delete_subnet_vpnservice(
+                    context, self.neutron, cleaner,
+                    copy.deepcopy(fakes.DB_SUBNET_1))
+                raise Exception('fake-exception')
+        except Exception as ex:
+            if ex.message != 'fake-exception':
+                raise
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, fakes.DB_SUBNET_1)
+        self.assertFalse(self.neutron.create_vpnservice.called)
+
+    def test_safe_delete_vpnservice(self):
+        vpn_gateway_api._safe_delete_vpnservice(
+            self.neutron, fakes.ID_OS_VPNSERVICE_1, fakes.ID_EC2_SUBNET_1)
+        self.neutron.delete_vpnservice.assert_called_once_with(
+            fakes.ID_OS_VPNSERVICE_1)
+
+        self.neutron.delete_vpnservice.side_effect = (
+            neutron_exception.NotFound())
+        with fixtures.FakeLogger() as log:
+            vpn_gateway_api._safe_delete_vpnservice(
+                self.neutron, fakes.ID_OS_VPNSERVICE_1, fakes.ID_EC2_SUBNET_1)
+        self.assertEqual(0, len(log.output))
+
+        self.neutron.delete_vpnservice.side_effect = (
+            neutron_exception.Conflict())
+        with fixtures.FakeLogger() as log:
+            vpn_gateway_api._safe_delete_vpnservice(
+                self.neutron, fakes.ID_OS_VPNSERVICE_1, fakes.ID_EC2_SUBNET_1)
+        self.assertIn(fakes.ID_EC2_SUBNET_1, log.output)
+        self.assertIn(fakes.ID_OS_VPNSERVICE_1, log.output)
