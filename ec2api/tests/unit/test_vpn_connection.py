@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+
 import mock
 
 from ec2api.tests.unit import base
@@ -144,6 +146,61 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.neutron.delete_ikepolicy.assert_called_once_with(
             fakes.ID_OS_IKEPOLICY_1)
 
+    def test_create_vpn_connection_route(self):
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2)
+
+        resp = self.execute(
+            'CreateVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': '192.168.123.0/24'})
+        self.assertEqual({'return': True}, resp)
+
+        vpn = copy.deepcopy(fakes.DB_VPN_CONNECTION_2)
+        vpn['cidrs'].append('192.168.123.0/24')
+        self.db_api.update_item.assert_called_once_with(mock.ANY, vpn)
+
+    def test_create_vpn_connection_route_idempotent(self):
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2)
+
+        resp = self.execute(
+            'CreateVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_1})
+        self.assertEqual({'return': True}, resp)
+        self.assertFalse(self.db_api.update_item.called)
+
+    def test_create_vpn_connection_route_invalid_parameters(self):
+        self.set_mock_db_items()
+        self.assert_execution_error(
+            'InvalidVpnConnectionID.NotFound', 'CreateVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_1})
+
+    def test_delete_vpn_connection_route(self):
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2)
+
+        resp = self.execute(
+            'DeleteVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_1})
+        self.assertEqual({'return': True}, resp)
+        vpn = tools.update_dict(fakes.DB_VPN_CONNECTION_2,
+                                {'cidrs': [fakes.CIDR_VPN_2_PROPAGATED_2]})
+        self.db_api.update_item.assert_called_once_with(mock.ANY, vpn)
+
+    def test_delete_vpn_connection_route_invalid_parameters(self):
+        self.set_mock_db_items()
+        self.assert_execution_error(
+            'InvalidVpnConnectionID.NotFound', 'DeleteVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_1})
+
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2)
+        self.assert_execution_error(
+            'InvalidRoute.NotFound', 'DeleteVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': '192.168.123.0/24'})
+
     def test_delete_vpn_connection(self):
         self.set_mock_db_items(fakes.DB_VPN_CONNECTION_1)
         resp = self.execute('DeleteVpnConnection',
@@ -202,6 +259,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
             [('customer-gateway-id', fakes.ID_EC2_CUSTOMER_GATEWAY_1),
              ('state', 'available'),
              ('option.static-routes-only', True),
+             ('route.destination-cidr-block', fakes.CIDR_VPN_2_PROPAGATED_1),
              ('type', 'ipsec.1'),
              ('vpn-connection-id', fakes.ID_EC2_VPN_CONNECTION_1),
              ('vpn-gateway-id', fakes.ID_EC2_VPN_GATEWAY_1)])
