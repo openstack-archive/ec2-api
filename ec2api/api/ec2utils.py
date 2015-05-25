@@ -191,6 +191,7 @@ NOT_FOUND_EXCEPTION_MAP = {
     'ari': exception.InvalidAMIIDNotFound,
     'vgw': exception.InvalidVpnGatewayIDNotFound,
     'cgw': exception.InvalidCustomerGatewayIDNotFound,
+    'vpn': exception.InvalidVpnConnectionIDNotFound,
 }
 
 

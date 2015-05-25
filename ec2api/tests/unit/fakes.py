@@ -254,6 +254,16 @@ IP_CUSTOMER_GATEWAY_ADDRESS_2 = '172.31.2.22'
 
 
 # vpn connection constants
+ID_EC2_VPN_CONNECTION_1 = random_ec2_id('vpn')
+ID_EC2_VPN_CONNECTION_2 = random_ec2_id('vpn')
+
+ID_OS_IKEPOLICY_1 = random_os_id()
+ID_OS_IKEPOLICY_2 = random_os_id()
+ID_OS_IPSECPOLICY_1 = random_os_id()
+ID_OS_IPSECPOLICY_2 = random_os_id()
+
+PRE_SHARED_KEY_1 = 'Z54kLbANio5A1.XmkjwYvWuSfVx3_xuG'
+PRE_SHARED_KEY_2 = 'FSbXpA.G9306W.BQ2n6W9JZJsyZcMN2G'
 CIDR_VPN_1_STATIC = '192.168.101.0/24'
 
 # Object constants section
@@ -1603,6 +1613,85 @@ EC2_CUSTOMER_GATEWAY_2 = {
     'state': 'available',
     'type': 'ipsec.1',
     'bgpAsn': 65000,
+}
+
+
+# VPN connection objects
+DB_VPN_CONNECTION_1 = {
+    'id': ID_EC2_VPN_CONNECTION_1,
+    'customer_gateway_id': ID_EC2_CUSTOMER_GATEWAY_1,
+    'vpn_gateway_id': ID_EC2_VPN_GATEWAY_1,
+    'pre_shared_key': PRE_SHARED_KEY_1,
+    'os_ikepolicy_id': ID_OS_IKEPOLICY_1,
+    'os_ipsecpolicy_id': ID_OS_IPSECPOLICY_1,
+}
+DB_VPN_CONNECTION_2 = {
+    'id': ID_EC2_VPN_CONNECTION_2,
+    'customer_gateway_id': ID_EC2_CUSTOMER_GATEWAY_2,
+    'vpn_gateway_id': ID_EC2_VPN_GATEWAY_2,
+    'pre_shared_key': PRE_SHARED_KEY_2,
+    'os_ikepolicy_id': ID_OS_IKEPOLICY_2,
+    'os_ipsecpolicy_id': ID_OS_IPSECPOLICY_2,
+}
+
+EC2_VPN_CONNECTION_1 = {
+    'vpnConnectionId': ID_EC2_VPN_CONNECTION_1,
+    'vpnGatewayId': ID_EC2_VPN_GATEWAY_1,
+    'customerGatewayId': ID_EC2_CUSTOMER_GATEWAY_1,
+    'state': 'available',
+    'type': 'ipsec.1',
+    'vgwTelemetry': None,
+    'options': {'staticRoutesOnly': True},
+}
+EC2_VPN_CONNECTION_2 = {
+    'vpnConnectionId': ID_EC2_VPN_CONNECTION_2,
+    'vpnGatewayId': ID_EC2_VPN_GATEWAY_2,
+    'customerGatewayId': ID_EC2_CUSTOMER_GATEWAY_2,
+    'state': 'available',
+    'type': 'ipsec.1',
+    'vgwTelemetry': None,
+    'options': {'staticRoutesOnly': True},
+}
+
+OS_IKEPOLICY_1 = {
+    'id': ID_OS_IKEPOLICY_1,
+    'ike_version': 'v1',
+    'auth_algorithm': 'sha1',
+    'encryption_algorithm': 'aes-128',
+    'pfs': 'group2',
+    'phase1_negotiation_mode': 'main',
+    'lifetime': {'units': 'seconds',
+                 'value': 28800}
+}
+OS_IKEPOLICY_2 = {
+    'id': ID_OS_IKEPOLICY_2,
+    'ike_version': 'v1',
+    'auth_algorithm': 'sha1',
+    'encryption_algorithm': 'aes-128',
+    'pfs': 'group2',
+    'phase1_negotiation_mode': 'main',
+    'lifetime': {'units': 'seconds',
+                 'value': 28800}
+}
+OS_IPSECPOLICY_1 = {
+    'id': ID_OS_IPSECPOLICY_1,
+    'transform_protocol': 'esp',
+    'auth_algorithm': 'sha1',
+    'encryption_algorithm': 'aes-128',
+    'pfs': 'group2',
+    'encapsulation_mode': 'tunnel',
+    'lifetime': {'units': 'seconds',
+                 'value': 3600}
+}
+OS_IPSECPOLICY_2 = {
+    'id': ID_OS_IPSECPOLICY_2,
+    'transform_protocol': 'esp',
+    'auth_algorithm': 'sha1',
+    'encryption_algorithm': 'aes-128',
+    'pfs': 'group2',
+    'encapsulation_mode': 'tunnel',
+    'lifetime': {'units': 'seconds',
+                 'value': 3600}
 }
 
 

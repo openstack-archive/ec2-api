@@ -41,6 +41,7 @@ from ec2api.api import subnet
 from ec2api.api import tag
 from ec2api.api import volume
 from ec2api.api import vpc
+from ec2api.api import vpn_connection
 from ec2api.api import vpn_gateway
 from ec2api import exception
 
@@ -1993,4 +1994,52 @@ class VpcCloudController(CloudController):
 
         Returns:
             Information about one or more customer gateways.
+        """
+
+    @module_and_param_types(vpn_connection, 'cgw_id',
+                            'vgw_id', 'vpn_connection_type', 'dummy')
+    def create_vpn_connection(self, context, customer_gateway_id,
+                              vpn_gateway_id, type, options=None):
+        """Creates a VPN connection.
+
+        Args:
+            context (RequestContext): The request context.
+            customer_gateway_id (str): The ID of the customer gateway.
+            vpn_gateway_id (str): The ID of the virtual private gateway.
+            type (str): The type of VPN connection (ipsec.1).
+            options (dict of options): Indicates whether the VPN connection
+                requires static routes.
+
+        Returns:
+            Information about the VPN connection.
+
+        Creates a VPN connection between an existing virtual private gateway
+        and a VPN customer gateway.
+        """
+
+    @module_and_param_types(vpn_connection, 'vpn_id')
+    def delete_vpn_connection(self, context, vpn_connection_id):
+        """Deletes the specified VPN connection.
+
+        Args:
+            context (RequestContext): The request context.
+            vpn_connection_id (str): The ID of the VPN connection.
+
+        Returns:
+            true if the request succeeds.
+        """
+
+    @module_and_param_types(vpn_connection, 'vpn_ids',
+                            'filter')
+    def describe_vpn_connections(self, context, vpn_connection_id=None,
+                                 filter=None):
+        """Describes one or more of your VPN connections.
+
+        Args:
+            context (RequestContext): The request context.
+            vpn_connection_id (list of str): One or more VPN connection IDs.
+            filter (list of filter dict): One or more filters.
+
+        Returns:
+            Information about one or more VPN connections.
         """

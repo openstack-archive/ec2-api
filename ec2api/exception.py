@@ -302,6 +302,11 @@ class RouteAlreadyExists(EC2DuplicateException):
                 'already exists.')
 
 
+class InvalidCustomerGatewayDuplicateIpAddress(EC2DuplicateException):
+    ec2_code = 'InvalidCustomerGateway.DuplicateIpAddress'
+    msg_fmt = _('Conflict among chosen gateway IP addresses.')
+
+
 class InvalidVpcIDNotFound(EC2NotFoundException):
     ec2_code = 'InvalidVpcID.NotFound'
     msg_fmt = _("The vpc ID '%(id)s' does not exist")
@@ -418,6 +423,11 @@ class InvalidVpnGatewayIDNotFound(EC2NotFoundException):
 class InvalidCustomerGatewayIDNotFound(EC2NotFoundException):
     ec2_code = 'InvalidCustomerGatewayID.NotFound'
     msg_fmt = _("The customerGateway ID '%(id)s' does not exist")
+
+
+class InvalidVpnConnectionIDNotFound(EC2NotFoundException):
+    ec2_code = 'InvalidVpnConnectionID.NotFound'
+    msg_fmt = _("The vpnConnection ID '%(id)s' does not exist")
 
 
 class InvalidVpnGatewayAttachmentNotFound(EC2NotFoundException):
