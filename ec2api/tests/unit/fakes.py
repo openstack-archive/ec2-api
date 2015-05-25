@@ -265,6 +265,8 @@ ID_OS_IPSECPOLICY_2 = random_os_id()
 PRE_SHARED_KEY_1 = 'Z54kLbANio5A1.XmkjwYvWuSfVx3_xuG'
 PRE_SHARED_KEY_2 = 'FSbXpA.G9306W.BQ2n6W9JZJsyZcMN2G'
 CIDR_VPN_1_STATIC = '192.168.101.0/24'
+CIDR_VPN_2_PROPAGATED_1 = '192.168.210.0/24'
+CIDR_VPN_2_PROPAGATED_2 = '192.168.220.0/24'
 
 # Object constants section
 # Constant name notation:
@@ -1624,6 +1626,7 @@ DB_VPN_CONNECTION_1 = {
     'pre_shared_key': PRE_SHARED_KEY_1,
     'os_ikepolicy_id': ID_OS_IKEPOLICY_1,
     'os_ipsecpolicy_id': ID_OS_IPSECPOLICY_1,
+    'cidrs': [],
 }
 DB_VPN_CONNECTION_2 = {
     'id': ID_EC2_VPN_CONNECTION_2,
@@ -1632,6 +1635,8 @@ DB_VPN_CONNECTION_2 = {
     'pre_shared_key': PRE_SHARED_KEY_2,
     'os_ikepolicy_id': ID_OS_IKEPOLICY_2,
     'os_ipsecpolicy_id': ID_OS_IPSECPOLICY_2,
+    'cidrs': [CIDR_VPN_2_PROPAGATED_1,
+              CIDR_VPN_2_PROPAGATED_2],
 }
 
 EC2_VPN_CONNECTION_1 = {
@@ -1640,6 +1645,7 @@ EC2_VPN_CONNECTION_1 = {
     'customerGatewayId': ID_EC2_CUSTOMER_GATEWAY_1,
     'state': 'available',
     'type': 'ipsec.1',
+    'routes': None,
     'vgwTelemetry': None,
     'options': {'staticRoutesOnly': True},
 }
@@ -1649,6 +1655,10 @@ EC2_VPN_CONNECTION_2 = {
     'customerGatewayId': ID_EC2_CUSTOMER_GATEWAY_2,
     'state': 'available',
     'type': 'ipsec.1',
+    'routes': [{'destinationCidrBlock': CIDR_VPN_2_PROPAGATED_1,
+                'state': 'available'},
+               {'destinationCidrBlock': CIDR_VPN_2_PROPAGATED_2,
+                'state': 'available'}],
     'vgwTelemetry': None,
     'options': {'staticRoutesOnly': True},
 }

@@ -2017,6 +2017,41 @@ class VpcCloudController(CloudController):
         and a VPN customer gateway.
         """
 
+    @module_and_param_types(vpn_connection, 'vpn_id',
+                            'cidr')
+    def create_vpn_connection_route(self, context, vpn_connection_id,
+                                    destination_cidr_block):
+        """Creates a static route associated with a VPN connection.
+
+        Args:
+            context (RequestContext): The request context.
+            vpn_connection_id (str): The ID of the VPN connection.
+            destination_cidr_block (str): The CIDR block associated with the
+                local subnet of the customer network.
+
+        Returns:
+            true if the request succeeds.
+
+        The static route allows traffic to be routed from the virtual private
+        gateway to the VPN customer gateway.
+        """
+
+    @module_and_param_types(vpn_connection, 'vpn_id',
+                            'cidr')
+    def delete_vpn_connection_route(self, context, vpn_connection_id,
+                                    destination_cidr_block):
+        """Deletes the specified static route associated with a VPN connection.
+
+        Args:
+            context (RequestContext): The request context.
+            vpn_connection_id (str): The ID of the VPN connection.
+            destination_cidr_block (str): The CIDR block associated with the
+                local subnet of the customer network.
+
+        Returns:
+            true if the request succeeds.
+        """
+
     @module_and_param_types(vpn_connection, 'vpn_id')
     def delete_vpn_connection(self, context, vpn_connection_id):
         """Deletes the specified VPN connection.

@@ -82,6 +82,7 @@ def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
               'pre_shared_key': psk,
               'os_ikepolicy_id': os_ikepolicy['id'],
               'os_ipsecpolicy_id': os_ipsecpolicy['id'],
+              'cidrs': [],
               })
         cleaner.addCleanup(db_api.delete_item, context, vpn_connection['id'])
 
@@ -92,6 +93,28 @@ def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
             {'ipsecpolicy': {'name': vpn_connection['id']}})
 
     return {'vpnConnection': _format_vpn_connection(vpn_connection)}
+
+
+def create_vpn_connection_route(context, vpn_connection_id,
+                                destination_cidr_block):
+    vpn_connection = ec2utils.get_db_item(context, vpn_connection_id)
+    if destination_cidr_block in vpn_connection['cidrs']:
+        return True
+    vpn_connection['cidrs'].append(destination_cidr_block)
+    db_api.update_item(context, vpn_connection)
+    return True
+
+
+def delete_vpn_connection_route(context, vpn_connection_id,
+                                destination_cidr_block):
+    vpn_connection = ec2utils.get_db_item(context, vpn_connection_id)
+    if destination_cidr_block not in vpn_connection['cidrs']:
+        raise exception.InvalidRouteNotFound(
+            _('The specified route %(destination_cidr_block)s does not exist')
+            % {'destination_cidr_block': destination_cidr_block})
+    vpn_connection['cidrs'].remove(destination_cidr_block)
+    db_api.update_item(context, vpn_connection)
+    return True
 
 
 def delete_vpn_connection(context, vpn_connection_id):
@@ -138,6 +161,8 @@ class VpnConnectionDescriber(common.TaggableItemsDescriber,
     FILTER_MAP = {'customer-gateway-id': 'customerGatewayId',
                   'state': 'state',
                   'option.static-routes-only': ('options', 'staticRoutesOnly'),
+                  'route.destination-cidr-block': ['routes',
+                                                   'destination_cidr_block'],
                   'type': 'type',
                   'vpn-connection-id': 'vpnConnectionId',
                   'vpn-gateway-id': 'vpnGatewayId'}
@@ -152,5 +177,8 @@ def _format_vpn_connection(vpn_connection):
             'customerGatewayId': vpn_connection['customer_gateway_id'],
             'state': 'available',
             'type': 'ipsec.1',
+            'routes': [{'destination_cidr_block': cidr,
+                        'state': 'available'}
+                       for cidr in vpn_connection['cidrs']],
             'vgwTelemetry': [],
             'options': {'staticRoutesOnly': True}}
