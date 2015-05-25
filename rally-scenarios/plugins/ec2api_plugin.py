@@ -115,7 +115,7 @@ class EC2APIPlugin(base.Scenario):
     @base.scenario()
     @_runner(_run_both)
     def describe_one_instance(self, client):
-        client_id = client._endpoint
+        client_id = str(client._endpoint)
         instance_id = self._instance_id_by_client.get(client_id)
         if not instance_id:
             data = client.describe_instances()
