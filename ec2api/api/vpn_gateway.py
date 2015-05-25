@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from neutronclient.common import exceptions as neutron_exception
+
+from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.db import api as db_api
@@ -32,16 +35,24 @@ def attach_vpn_gateway(context, vpc_id, vpn_gateway_id):
     vpc = ec2utils.get_db_item(context, vpc_id)
     if vpn_gateway['vpc_id'] and vpn_gateway['vpc_id'] != vpc['id']:
         raise exception.VpnGatewayAttachmentLimitExceeded()
-    attached_vgw = next((gw for gw in db_api.get_items(context, 'vgw')
-                         if (gw['id'] != vpn_gateway['id'] and
-                             gw['vpc_id'] == vpc['id'])), None)
-    if attached_vgw:
+    attached_vgw = ec2utils.get_attached_gateway(context, vpc['id'], 'vgw')
+    if attached_vgw and attached_vgw['id'] != vpn_gateway['id']:
         raise exception.InvalidVpcState(vpc_id=vpc['id'],
                                         vgw_id=attached_vgw['id'])
 
     if not vpn_gateway['vpc_id']:
-        vpn_gateway['vpc_id'] = vpc['id']
-        db_api.update_item(context, vpn_gateway)
+        external_network_id = None
+        if not ec2utils.get_attached_gateway(context, vpc['id'], 'igw'):
+            external_network_id = ec2utils.get_os_public_network(context)['id']
+        neutron = clients.neutron(context)
+
+        with common.OnCrashCleaner() as cleaner:
+            _attach_vpn_gateway_item(context, vpn_gateway, vpc['id'])
+            cleaner.addCleanup(_detach_vpn_gateway_item, context, vpn_gateway)
+
+            if external_network_id:
+                neutron.add_gateway_router(vpc['os_id'],
+                                           {'network_id': external_network_id})
 
     return {'attachment': _format_attachment(vpn_gateway)}
 
@@ -52,8 +63,20 @@ def detach_vpn_gateway(context, vpc_id, vpn_gateway_id):
         raise exception.InvalidVpnGatewayAttachmentNotFound(
             vgw_id=vpn_gateway_id, vpc_id=vpc_id)
 
-    vpn_gateway['vpc_id'] = None
-    db_api.update_item(context, vpn_gateway)
+    vpc = db_api.get_item_by_id(context, vpc_id)
+    neutron = clients.neutron(context)
+    remove_os_gateway_router = (
+        ec2utils.get_attached_gateway(context, vpc_id, 'igw') is None)
+    with common.OnCrashCleaner() as cleaner:
+        _detach_vpn_gateway_item(context, vpn_gateway)
+        cleaner.addCleanup(_attach_vpn_gateway_item, context, vpn_gateway,
+                           vpc_id)
+        if remove_os_gateway_router:
+            try:
+                neutron.remove_gateway_router(vpc['os_id'])
+            except neutron_exception.NotFound:
+                pass
+
     return True
 
 
@@ -99,3 +122,13 @@ def _format_vpn_gateway(vpn_gateway):
 def _format_attachment(vpn_gateway):
     return {'state': 'attached',
             'vpcId': vpn_gateway['vpc_id']}
+
+
+def _attach_vpn_gateway_item(context, vpn_gateway, vpc_id):
+    vpn_gateway['vpc_id'] = vpc_id
+    db_api.update_item(context, vpn_gateway)
+
+
+def _detach_vpn_gateway_item(context, vpn_gateway):
+    vpn_gateway['vpc_id'] = None
+    db_api.update_item(context, vpn_gateway)

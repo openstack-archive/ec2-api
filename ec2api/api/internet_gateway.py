@@ -47,26 +47,27 @@ def attach_internet_gateway(context, internet_gateway_id, vpc_id):
     if igw.get('vpc_id'):
         msg_params = {'igw_id': igw['id'],
                       'vpc_id': igw['vpc_id']}
-        msg = _("resource %(igw_id)s is already attached to "
-                "network %(vpc_id)s") % msg_params
+        msg = _('resource %(igw_id)s is already attached to '
+                'network %(vpc_id)s') % msg_params
         raise exception.ResourceAlreadyAssociated(msg)
     vpc = ec2utils.get_db_item(context, vpc_id)
-    # TODO(ft): move search by vpc_id to DB api
-    for gw in db_api.get_items(context, 'igw'):
-        if gw.get('vpc_id') == vpc['id']:
-            msg = _("Network %(vpc_id)s already has an internet gateway "
-                    "attached") % {'vpc_id': vpc['id']}
-            raise exception.InvalidParameterValue(msg)
+    if ec2utils.get_attached_gateway(context, vpc['id'], 'igw'):
+        msg = _('Network %(vpc_id)s already has an internet gateway '
+                'attached') % {'vpc_id': vpc['id']}
+        raise exception.InvalidParameterValue(msg)
 
-    os_public_network = ec2utils.get_os_public_network(context)
+    external_network_id = None
+    if not ec2utils.get_attached_gateway(context, vpc['id'], 'vgw'):
+        external_network_id = ec2utils.get_os_public_network(context)['id']
     neutron = clients.neutron(context)
 
     # TODO(ft): set attaching state into db
     with common.OnCrashCleaner() as cleaner:
         _attach_internet_gateway_item(context, igw, vpc['id'])
         cleaner.addCleanup(_detach_internet_gateway_item, context, igw)
-        neutron.add_gateway_router(vpc['os_id'],
-                                   {'network_id': os_public_network['id']})
+        if external_network_id:
+            neutron.add_gateway_router(vpc['os_id'],
+                                       {'network_id': external_network_id})
     return True
 
 
@@ -77,16 +78,19 @@ def detach_internet_gateway(context, internet_gateway_id, vpc_id):
         raise exception.GatewayNotAttached(igw_id=igw['id'],
                                            vpc_id=vpc['id'])
 
+    remove_os_gateway_router = (
+        ec2utils.get_attached_gateway(context, vpc_id, 'vgw') is None)
     neutron = clients.neutron(context)
     # TODO(ft): set detaching state into db
     with common.OnCrashCleaner() as cleaner:
         _detach_internet_gateway_item(context, igw)
         cleaner.addCleanup(_attach_internet_gateway_item,
                            context, igw, vpc['id'])
-        try:
-            neutron.remove_gateway_router(vpc["os_id"])
-        except neutron_exception.NotFound:
-            pass
+        if remove_os_gateway_router:
+            try:
+                neutron.remove_gateway_router(vpc['os_id'])
+            except neutron_exception.NotFound:
+                pass
     return True
 
 
