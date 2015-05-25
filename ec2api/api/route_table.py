@@ -85,6 +85,35 @@ def delete_route(context, route_table_id, destination_cidr_block):
     return True
 
 
+def enable_vgw_route_propagation(context, route_table_id, gateway_id):
+    route_table = ec2utils.get_db_item(context, route_table_id)
+    # NOTE(ft): AWS returns GatewayNotAttached for all invalid cases of
+    # gateway_id value
+    vpn_gateway = ec2utils.get_db_item(context, gateway_id)
+    if vpn_gateway['vpc_id'] != route_table['vpc_id']:
+        raise exception.GatewayNotAttached(gw_id=vpn_gateway['id'],
+                                           vpc_id=route_table['vpc_id'])
+    if vpn_gateway['id'] in route_table.setdefault('propagating_gateways', []):
+        return True
+    vgws = route_table.setdefault('propagating_gateways', [])
+    vgws.append(gateway_id)
+    db_api.update_item(context, route_table)
+    return True
+
+
+def disable_vgw_route_propagation(context, route_table_id, gateway_id):
+    route_table = ec2utils.get_db_item(context, route_table_id)
+    if gateway_id not in route_table.get('propagating_gateways', []):
+        return True
+
+    vgws = route_table['propagating_gateways']
+    vgws.remove(gateway_id)
+    if not vgws:
+        del route_table['propagating_gateways']
+    db_api.update_item(context, route_table)
+    return True
+
+
 def associate_route_table(context, route_table_id, subnet_id):
     route_table = ec2utils.get_db_item(context, route_table_id)
     subnet = ec2utils.get_db_item(context, subnet_id)
@@ -210,7 +239,8 @@ class RouteTableDescriber(common.TaggableItemsDescriber,
             is_main=(self.vpcs[route_table['vpc_id']]['route_table_id'] ==
                      route_table['id']),
             gateways=self.gateways,
-            network_interfaces=self.network_interfaces)
+            network_interfaces=self.network_interfaces,
+            vpn_connections_by_gateway_id=self.vpn_connections_by_gateway_id)
 
     def get_db_items(self):
         associations = collections.defaultdict(list)
@@ -228,6 +258,12 @@ class RouteTableDescriber(common.TaggableItemsDescriber,
         network_interfaces = db_api.get_items(self.context, 'eni')
         self.network_interfaces = {eni['id']: eni
                                    for eni in network_interfaces}
+        vpn_connections = db_api.get_items(self.context, 'vpn')
+        vpns_by_gateway_id = {}
+        for vpn in vpn_connections:
+            vpns = vpns_by_gateway_id.setdefault(vpn['vpn_gateway_id'], [])
+            vpns.append(vpn)
+        self.vpn_connections_by_gateway_id = vpns_by_gateway_id
         return super(RouteTableDescriber, self).get_db_items()
 
 
@@ -373,14 +409,20 @@ def _set_route(context, route_table_id, destination_cidr_block,
 def _format_route_table(context, route_table, is_main=False,
                         associated_subnet_ids=[],
                         gateways={},
-                        network_interfaces={}):
+                        network_interfaces={},
+                        vpn_connections_by_gateway_id={}):
     vpc_id = route_table['vpc_id']
-    ec2_route_table = {'routeTableId': route_table['id'],
-                       'vpcId': vpc_id,
-                       'routeSet': [],
-                       # NOTE(ft): AWS returns empty tag set for a route table
-                       # if no tag exists
-                       'tagSet': []}
+    ec2_route_table = {
+        'routeTableId': route_table['id'],
+        'vpcId': vpc_id,
+        'routeSet': [],
+        'propagatingVgwSet': [
+            {'gatewayId': vgw_id}
+            for vgw_id in route_table.get('propagating_gateways', [])],
+        # NOTE(ft): AWS returns empty tag set for a route table
+        # if no tag exists
+        'tagSet': [],
+    }
     # TODO(ft): refactor to get Nova instances outside of this function
     nova = clients.nova(context)
     for route in route_table['routes']:
@@ -423,6 +465,21 @@ def _format_route_table(context, route_table, is_main=False,
             ec2_route.update({'networkInterfaceId': network_interface_id,
                               'state': state})
         ec2_route_table['routeSet'].append(ec2_route)
+
+    for vgw_id in route_table.get('propagating_gateways', []):
+        vgw = gateways.get(vgw_id)
+        if vgw and vgw_id in vpn_connections_by_gateway_id:
+            cidrs = set()
+            vpn_connections = vpn_connections_by_gateway_id[vgw_id]
+            for vpn_connection in vpn_connections:
+                cidrs.update(vpn_connection['cidrs'])
+            state = 'active' if vgw['vpc_id'] == vpc_id else 'blackhole'
+            for cidr in cidrs:
+                ec2_route = {'gatewayId': vgw_id,
+                             'destinationCidrBlock': cidr,
+                             'state': state,
+                             'origin': 'EnableVgwRoutePropagation'}
+                ec2_route_table['routeSet'].append(ec2_route)
 
     associations = []
     if is_main:
@@ -510,6 +567,12 @@ def _get_subnet_host_routes(context, route_table, gateway_ip,
             return '127.0.0.1'
         return network_interface['private_ip_address']
 
+    # TODO(ft): perhaps we should consider vpn routes here.
+    # For example if no internet gateway is attached, but vpn gateway is,
+    # a host should route trafic related to vpn gateways to Neutron router.
+    # Otherwise if internet gateway is attached, but vpn gateway is dead,
+    # vpn related trafic should be terminated to 127.0.0.1.
+    # Next question is route precedence in overlapping case.
     host_routes = [{'destination': route['destination_cidr_block'],
                     'nexthop': get_nexthop(route)}
                    for route in route_table['routes']

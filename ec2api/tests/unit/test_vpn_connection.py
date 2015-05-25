@@ -16,6 +16,7 @@ import copy
 
 import mock
 
+from ec2api.api import vpn_connection
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -46,7 +47,9 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertThat(
             resp,
             matchers.DictMatches(
-                {'vpnConnection': fakes.EC2_VPN_CONNECTION_1}))
+                {'vpnConnection': (
+                    tools.update_dict(fakes.EC2_VPN_CONNECTION_1,
+                                      {'routes': None}))}))
 
         self.neutron.create_ikepolicy.assert_called_once_with(
             {'ikepolicy': tools.purge_dict(fakes.OS_IKEPOLICY_1, ('id',))})
@@ -54,7 +57,8 @@ class VpnConnectionTestCase(base.ApiTestCase):
             {'ipsecpolicy': tools.purge_dict(fakes.OS_IPSECPOLICY_1, ('id',))})
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vpn',
-            tools.purge_dict(fakes.DB_VPN_CONNECTION_1, ('id',)),
+            tools.patch_dict(fakes.DB_VPN_CONNECTION_1,
+                             {'cidrs': []}, ('id', )),
             project_id=None)
         self.neutron.update_ikepolicy.assert_called_once_with(
             fakes.ID_OS_IKEPOLICY_1,
@@ -267,3 +271,13 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.check_tag_support(
             'DescribeVpnConnections', 'vpnConnectionSet',
             fakes.ID_EC2_VPN_CONNECTION_1, 'vpnConnectionId')
+
+    def test_format_vpn_connection(self):
+        db_vpn_connection_1 = tools.update_dict(fakes.DB_VPN_CONNECTION_1,
+                                                {'cidrs': []})
+        ec2_vpn_connection_1 = tools.update_dict(fakes.EC2_VPN_CONNECTION_1,
+                                                 {'routes': [],
+                                                  'vgwTelemetry': []})
+        self.assertEqual(
+            ec2_vpn_connection_1,
+            vpn_connection._format_vpn_connection(db_vpn_connection_1))

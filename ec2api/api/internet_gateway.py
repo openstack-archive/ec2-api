@@ -75,7 +75,7 @@ def detach_internet_gateway(context, internet_gateway_id, vpc_id):
     igw = ec2utils.get_db_item(context, internet_gateway_id)
     vpc = ec2utils.get_db_item(context, vpc_id)
     if igw.get('vpc_id') != vpc['id']:
-        raise exception.GatewayNotAttached(igw_id=igw['id'],
+        raise exception.GatewayNotAttached(gw_id=igw['id'],
                                            vpc_id=vpc['id'])
 
     remove_os_gateway_router = (
