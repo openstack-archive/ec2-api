@@ -69,7 +69,7 @@ class RouteTableTestCase(base.ApiTestCase):
             self.db_api.update_item.assert_called_once_with(
                 mock.ANY, route_table)
             routes_updater.assert_called_once_with(
-                mock.ANY, route_table, mock.ANY)
+                mock.ANY, mock.ANY, route_table)
 
             self.db_api.update_item.reset_mock()
             routes_updater.reset_mock()
@@ -278,7 +278,7 @@ class RouteTableTestCase(base.ApiTestCase):
             'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1,
             'destination_cidr_block': '0.0.0.0/0'})
         self.db_api.update_item.assert_called_once_with(mock.ANY, route_table)
-        routes_updater.assert_called_once_with(mock.ANY, route_table, mock.ANY)
+        routes_updater.assert_called_once_with(mock.ANY, mock.ANY, route_table)
 
     def test_replace_route_invalid_parameters(self):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1,
@@ -304,7 +304,7 @@ class RouteTableTestCase(base.ApiTestCase):
             if r['destination_cidr_block'] != fakes.CIDR_EXTERNAL_NETWORK]
         self.db_api.update_item.assert_called_once_with(mock.ANY, route_table)
         routes_updater.assert_called_once_with(
-            mock.ANY, route_table, mock.ANY)
+            mock.ANY, mock.ANY, route_table)
 
     def test_delete_route_invalid_parameters(self):
         self.set_mock_db_items()
@@ -338,7 +338,7 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_any_call(
             mock.ANY, fakes.DB_ROUTE_TABLE_2)
 
-    @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
+    @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_associate_route_table(self, routes_updater):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1,
                                fakes.DB_SUBNET_1)
@@ -347,13 +347,13 @@ class RouteTableTestCase(base.ApiTestCase):
                              'SubnetId': fakes.ID_EC2_SUBNET_1})
         self.assertEqual(fakes.ID_EC2_SUBNET_1.replace('subnet', 'rtbassoc'),
                          resp['associationId'])
-        subnet = tools.update_dict(
+        subnet_1 = tools.update_dict(
             fakes.DB_SUBNET_1,
             {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1})
         self.db_api.update_item.assert_called_once_with(
-            mock.ANY, subnet)
+            mock.ANY, subnet_1)
         routes_updater.assert_called_once_with(
-            mock.ANY, subnet, fakes.DB_ROUTE_TABLE_1, mock.ANY)
+            mock.ANY, mock.ANY, subnet_1, fakes.DB_ROUTE_TABLE_1)
 
     def test_associate_route_table_invalid_parameters(self):
         def do_check(params, error_code):
@@ -388,7 +388,7 @@ class RouteTableTestCase(base.ApiTestCase):
                  'Resource.AlreadyAssociated')
 
     @tools.screen_unexpected_exception_logs
-    @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
+    @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_associate_route_table_rollback(self, routes_updater):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1,
                                fakes.DB_SUBNET_1)
@@ -401,7 +401,7 @@ class RouteTableTestCase(base.ApiTestCase):
 
         self.db_api.update_item.assert_any_call(mock.ANY, fakes.DB_SUBNET_1)
 
-    @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
+    @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_replace_route_table_association(self, routes_updater):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2, fakes.DB_ROUTE_TABLE_3,
                                fakes.DB_SUBNET_2)
@@ -411,13 +411,13 @@ class RouteTableTestCase(base.ApiTestCase):
              'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
         self.assertEqual(fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_2,
                          resp['newAssociationId'])
-        subnet = tools.update_dict(
+        subnet_2 = tools.update_dict(
             fakes.DB_SUBNET_2,
             {'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2})
         self.db_api.update_item.assert_called_once_with(
-            mock.ANY, subnet)
+            mock.ANY, subnet_2)
         routes_updater.assert_called_once_with(
-            mock.ANY, subnet, fakes.DB_ROUTE_TABLE_2, mock.ANY)
+            mock.ANY, mock.ANY, subnet_2, fakes.DB_ROUTE_TABLE_2)
 
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
     def test_replace_route_table_association_main(self, routes_updater):
@@ -435,7 +435,8 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_called_once_with(
             mock.ANY, vpc)
         routes_updater.assert_called_once_with(
-            mock.ANY, fakes.DB_ROUTE_TABLE_2, mock.ANY, is_main=True)
+            mock.ANY, mock.ANY, fakes.DB_ROUTE_TABLE_2,
+            default_associations_only=True)
 
     def test_replace_route_table_association_invalid_parameters(self):
         def do_check(params, error_code):
@@ -481,7 +482,7 @@ class RouteTableTestCase(base.ApiTestCase):
                  'InvalidParameterValue')
 
     @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
-    @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
+    @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_replace_route_table_association_rollback(self, routes_updater,
                                                       multiply_routes_updater):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
@@ -510,7 +511,7 @@ class RouteTableTestCase(base.ApiTestCase):
             self.db_api.update_item.assert_any_call(
                 mock.ANY, fakes.DB_SUBNET_2)
 
-    @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
+    @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_disassociate_route_table(self, routes_updater):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_3,
                                fakes.DB_SUBNET_2, fakes.DB_VPC_1)
@@ -518,11 +519,11 @@ class RouteTableTestCase(base.ApiTestCase):
             'DisassociateRouteTable',
             {'AssociationId': fakes.ID_EC2_ROUTE_TABLE_ASSOCIATION_3})
         self.assertEqual(True, resp['return'])
-        subnet = tools.purge_dict(fakes.DB_SUBNET_2, ('route_table_id',))
+        subnet_1 = tools.purge_dict(fakes.DB_SUBNET_2, ('route_table_id',))
         self.db_api.update_item.assert_called_once_with(
-            mock.ANY, subnet)
+            mock.ANY, subnet_1)
         routes_updater.assert_called_once_with(
-            mock.ANY, subnet, fakes.DB_ROUTE_TABLE_1, mock.ANY)
+            mock.ANY, mock.ANY, subnet_1, fakes.DB_ROUTE_TABLE_1)
 
     def test_disassociate_route_table_invalid_parameter(self):
         def do_check(params, error_code):
@@ -543,7 +544,7 @@ class RouteTableTestCase(base.ApiTestCase):
                  'InvalidParameterValue')
 
     @tools.screen_unexpected_exception_logs
-    @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
+    @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_disassociate_route_table_rollback(self, routes_updater):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_3,
                                fakes.DB_SUBNET_2, fakes.DB_VPC_1)
@@ -752,31 +753,42 @@ class RouteTableTestCase(base.ApiTestCase):
                              'nexthop': fakes.IP_GATEWAY_SUBNET_1}]))
 
     @mock.patch('ec2api.api.route_table._get_subnet_host_routes')
-    def test_update_subnet_host_routes(self, routes_getter):
-        self.neutron.show_subnet.return_value = {'subnet': fakes.OS_SUBNET_1}
+    @mock.patch('ec2api.api.route_table._get_router_destinations')
+    def test_update_host_routes(self, destinations_getter, routes_getter):
+        self.neutron.show_subnet.side_effect = tools.get_by_1st_arg_getter(
+            {fakes.ID_OS_SUBNET_1: {'subnet': fakes.OS_SUBNET_1},
+             fakes.ID_OS_SUBNET_2: {'subnet': fakes.OS_SUBNET_2}})
         routes_getter.return_value = 'fake_routes'
+        destinations_getter.return_value = {'fake': 'objects'}
 
-        route_table._update_subnet_host_routes(
-            self._create_context(), fakes.DB_SUBNET_1,
-            fakes.DB_ROUTE_TABLE_1, common.OnCrashCleaner(),
-            router_objects={'fake': 'objects'})
+        route_table._update_host_routes(
+            self._create_context(), self.neutron, common.OnCrashCleaner(),
+            fakes.DB_ROUTE_TABLE_1, [fakes.DB_SUBNET_1, fakes.DB_SUBNET_2])
 
-        self.neutron.show_subnet.assert_called_once_with(fakes.ID_OS_SUBNET_1)
-        routes_getter.assert_called_once_with(
+        destinations_getter.assert_called_once_with(
+            mock.ANY, fakes.DB_ROUTE_TABLE_1)
+        self.assertEqual(2, routes_getter.call_count)
+        routes_getter.assert_any_call(
             mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.IP_GATEWAY_SUBNET_1,
             {'fake': 'objects'})
-        self.neutron.update_subnet.assert_called_once_with(
+        routes_getter.assert_any_call(
+            mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.IP_GATEWAY_SUBNET_2,
+            {'fake': 'objects'})
+        self.assertEqual(2, self.neutron.update_subnet.call_count)
+        self.neutron.update_subnet.assert_any_call(
             fakes.ID_OS_SUBNET_1,
+            {'subnet': {'host_routes': 'fake_routes'}})
+        self.neutron.update_subnet.assert_any_call(
+            fakes.ID_OS_SUBNET_2,
             {'subnet': {'host_routes': 'fake_routes'}})
 
         self.neutron.reset_mock()
 
         try:
             with common.OnCrashCleaner() as cleaner:
-                route_table._update_subnet_host_routes(
-                    self._create_context(), fakes.DB_SUBNET_1,
-                    fakes.DB_ROUTE_TABLE_1, cleaner,
-                    router_objects={'fake': 'objects'})
+                route_table._update_host_routes(
+                    self._create_context(), self.neutron, cleaner,
+                    fakes.DB_ROUTE_TABLE_1, [fakes.DB_SUBNET_1])
                 raise Exception('fake_exception')
         except Exception as ex:
             if ex.message != 'fake_exception':
@@ -786,57 +798,77 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.ID_OS_SUBNET_1,
             {'subnet': {'host_routes': fakes.OS_SUBNET_1['host_routes']}})
 
-    @mock.patch('ec2api.api.route_table._get_router_objects')
-    @mock.patch('ec2api.api.route_table._update_subnet_host_routes')
-    def test_update_routes_in_associated_subnets(self, routes_updater,
-                                                 get_router_objects):
-        subnet_default_rtb = {'id': 'fake_1',
+    @mock.patch('ec2api.api.route_table._update_host_routes')
+    def test_update_routes_in_associated_subnets(self, routes_updater):
+        subnet_default_rtb = {'id': fakes.random_ec2_id('subnet'),
                               'vpc_id': fakes.ID_EC2_VPC_1}
-        subnet_rtb_2 = {'id': 'fake_2',
+        subnet_rtb_1 = {'id': fakes.random_ec2_id('subnet'),
+                        'vpc_id': fakes.ID_EC2_VPC_1,
+                        'route_table_id': fakes.ID_EC2_ROUTE_TABLE_1}
+        subnet_rtb_2 = {'id': fakes.random_ec2_id('subnet'),
                         'vpc_id': fakes.ID_EC2_VPC_1,
                         'route_table_id': fakes.ID_EC2_ROUTE_TABLE_2}
-        subnet_vpc_2 = {'id': 'fake_3',
+        subnet_vpc_2 = {'id': fakes.random_ec2_id('subnet'),
                         'vpc_id': fakes.ID_EC2_VPC_2}
-        self.db_api.get_items.return_value = [subnet_default_rtb,
-                                              subnet_rtb_2, subnet_vpc_2]
-        self.db_api.get_item_by_id.return_value = fakes.DB_VPC_1
-        get_router_objects.return_value = {'fake': 'objects'}
+        self.set_mock_db_items(subnet_default_rtb, subnet_rtb_1, subnet_rtb_2,
+                               subnet_vpc_2, fakes.DB_VPC_1)
 
-        route_table._update_routes_in_associated_subnets(
-            mock.MagicMock(), fakes.DB_ROUTE_TABLE_2, 'fake_cleaner')
+        def do_check(rtb, subnets, default_associations_only=None):
+            self.db_api.reset_mock()
+            routes_updater.reset_mock()
 
+            route_table._update_routes_in_associated_subnets(
+                mock.MagicMock(), 'fake_cleaner', rtb,
+                default_associations_only=default_associations_only)
+
+            self.db_api.get_items.assert_called_once_with(
+                mock.ANY, 'subnet')
+            routes_updater.assert_called_once_with(
+                mock.ANY, self.neutron, 'fake_cleaner', rtb, subnets)
+
+        do_check(fakes.DB_ROUTE_TABLE_2, [subnet_rtb_2])
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_VPC_1)
-        routes_updater.assert_called_once_with(
-            mock.ANY, subnet_rtb_2, fakes.DB_ROUTE_TABLE_2, 'fake_cleaner',
-            router_objects={'fake': 'objects'}, neutron=mock.ANY)
-        get_router_objects.assert_called_once_with(mock.ANY,
-                                                   fakes.DB_ROUTE_TABLE_2)
 
-        self.db_api.get_item_by_id.reset_mock()
-        routes_updater.reset_mock()
-        get_router_objects.reset_mock()
+        do_check(fakes.DB_ROUTE_TABLE_1, [subnet_default_rtb, subnet_rtb_1])
+        self.db_api.get_item_by_id.assert_called_once_with(
+            mock.ANY, fakes.ID_EC2_VPC_1)
 
-        route_table._update_routes_in_associated_subnets(
-            mock.MagicMock(), fakes.DB_ROUTE_TABLE_1, 'fake_cleaner',
-            is_main=True)
+        do_check(fakes.DB_ROUTE_TABLE_1, [subnet_default_rtb],
+                 default_associations_only=True)
+        self.assertFalse(self.db_api.get_item_by_id.called)
 
-        self.assertEqual(0, self.db_api.get_item_by_id.call_count)
-        routes_updater.assert_called_once_with(
-            mock.ANY, subnet_default_rtb, fakes.DB_ROUTE_TABLE_1,
-            'fake_cleaner', router_objects={'fake': 'objects'},
-            neutron=mock.ANY)
-        get_router_objects.assert_called_once_with(mock.ANY,
-                                                   fakes.DB_ROUTE_TABLE_1)
-
-    def test_get_router_objects(self):
+    def test_get_router_destinations(self):
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_NETWORK_INTERFACE_2)
-        host_routes = route_table._get_router_objects('fake_context',
-                                                      fakes.DB_ROUTE_TABLE_2)
+        route_table_2 = copy.deepcopy(fakes.DB_ROUTE_TABLE_2)
+        fake_igw_id = fakes.random_ec2_id('igw')
+        fake_vgw_id = fakes.random_ec2_id('vgw')
+        fake_eni_id = fakes.random_ec2_id('eni')
+        route_table_2['routes'].extend([
+            {'gateway_id': fake_igw_id,
+             'destination_cidr_block': 'fake'},
+            {'gateway_id': fake_vgw_id,
+             'destination_cidr_block': 'fake'},
+            {'network_interface_id': fake_eni_id,
+             'destination_cidr_block': 'fake'}])
+        host_routes = route_table._get_router_destinations('fake_context',
+                                                           route_table_2)
         self.assertThat(host_routes, matchers.DictMatches({
             fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
             fakes.ID_EC2_NETWORK_INTERFACE_2:
                         fakes.DB_NETWORK_INTERFACE_2}))
+        self.db_api.get_items_by_ids.assert_called_once_with(
+            mock.ANY, [fakes.ID_EC2_NETWORK_INTERFACE_2, fakes.ID_EC2_IGW_1,
+                       fake_igw_id, fake_vgw_id, fake_eni_id])
+
+    @mock.patch('ec2api.api.route_table._update_host_routes')
+    def test_update_subnet_routes(self, host_routes_updater):
+        route_table._update_subnet_routes(
+            self._create_context(), 'fake_cleaner', fakes.DB_SUBNET_1,
+            fakes.DB_ROUTE_TABLE_1)
+        host_routes_updater.assert_called_once_with(
+            mock.ANY, self.neutron, 'fake_cleaner', fakes.DB_ROUTE_TABLE_1,
+            [fakes.DB_SUBNET_1])
 
 
 class RouteTableValidatorTestCase(test_base.BaseTestCase):

@@ -79,6 +79,7 @@ CIDR_SUBNET_1 = '10.10.1.0/24'
 IP_FIRST_SUBNET_1 = '10.10.1.4'
 IP_LAST_SUBNET_1 = '10.10.1.254'
 IP_GATEWAY_SUBNET_1 = '10.10.1.1'
+IP_GATEWAY_SUBNET_2 = '10.10.2.1'
 CIDR_SUBNET_2 = '10.10.2.0/24'
 IP_FIRST_SUBNET_2 = '10.10.2.4'
 IP_LAST_SUBNET_2 = '10.10.2.254'
@@ -347,7 +348,8 @@ OS_SUBNET_2 = {'id': ID_OS_SUBNET_2,
                'network_id': ID_OS_NETWORK_2,
                'name': ID_EC2_SUBNET_2,
                'ip_version': '4',
-               'cidr': CIDR_SUBNET_2}
+               'cidr': CIDR_SUBNET_2,
+               'host_routes': []}
 OS_NETWORK_1 = {'id': ID_OS_NETWORK_1,
                 'name': ID_EC2_SUBNET_1,
                 'status': 'available'}
