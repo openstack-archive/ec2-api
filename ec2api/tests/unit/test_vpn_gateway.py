@@ -367,37 +367,68 @@ class VpnGatewayTestCase(base.ApiTestCase):
             'DescribeVpnGateways', 'vpnGatewaySet',
             fakes.ID_EC2_VPN_GATEWAY_2, 'vpnGatewayId')
 
+    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections')
     @mock.patch('ec2api.api.vpn_gateway._create_subnet_vpnservice')
-    def test_start_vpn_in_subnet(self, create_subnet_vpnservice):
-        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2)
-
+    def test_start_vpn_in_subnet(self, create_subnet_vpnservice,
+                                 reset_vpn_connection):
         context = mock.Mock()
         cleaner = common.OnCrashCleaner()
+        mock_manager = mock.Mock()
+        mock_manager.attach_mock(create_subnet_vpnservice,
+                                 'create_subnet_vpnservice')
+        mock_manager.attach_mock(reset_vpn_connection, 'reset_vpn_connection')
+
+        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2)
         vpn_gateway_api._start_vpn_in_subnet(
             context, self.neutron, cleaner, copy.deepcopy(fakes.DB_SUBNET_1),
             fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
-        create_subnet_vpnservice.assert_called_once_with(
-            context, self.neutron, cleaner, fakes.DB_SUBNET_1, fakes.DB_VPC_1)
+        mock_manager.assert_has_calls([
+            mock.call.create_subnet_vpnservice(
+                context, self.neutron, cleaner,
+                fakes.DB_SUBNET_1, fakes.DB_VPC_1),
+            mock.call.reset_vpn_connection(
+                context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1,
+                subnets=[fakes.DB_SUBNET_1],
+                route_tables=[fakes.DB_ROUTE_TABLE_1])])
 
         create_subnet_vpnservice.reset_mock()
+        reset_vpn_connection.reset_mock()
         self.add_mock_db_items(self.DB_VPN_GATEWAY_1_DETACHED)
         vpn_gateway_api._start_vpn_in_subnet(
             context, self.neutron, cleaner, copy.deepcopy(fakes.DB_SUBNET_1),
             fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.assertFalse(create_subnet_vpnservice.called)
+        self.assertFalse(reset_vpn_connection.called)
 
+    @mock.patch('ec2api.api.vpn_connection._delete_subnet_vpn')
     @mock.patch('ec2api.api.vpn_gateway._safe_delete_vpnservice')
-    def test_stop_vpn_in_subnet(self, delete_vpnservice):
+    def test_stop_vpn_in_subnet(self, delete_vpnservice, delete_subnet_vpn):
         context = mock.Mock()
         cleaner = common.OnCrashCleaner()
+        mock_manager = mock.Mock()
+        mock_manager.attach_mock(delete_vpnservice, 'delete_vpnservice')
+        mock_manager.attach_mock(delete_subnet_vpn, 'delete_subnet_vpn')
+
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_1,
+                               fakes.DB_VPN_CONNECTION_2)
         vpn_gateway_api._stop_vpn_in_subnet(
             context, self.neutron, cleaner, copy.deepcopy(fakes.DB_SUBNET_1))
-        delete_vpnservice.assert_called_once_with(
-            self.neutron, fakes.ID_OS_VPNSERVICE_1, fakes.ID_EC2_SUBNET_1)
+        mock_manager.has_calls([
+            mock.call.delete_subnet_vpn(
+                context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+                fakes.DB_VPN_CONNECTION_1),
+            mock.call.delete_subnet_vpn(
+                context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+                fakes.DB_VPN_CONNECTION_2),
+            mock.call.delete_vpnservice(
+                self.neutron, fakes.ID_OS_VPNSERVICE_1,
+                fakes.ID_EC2_SUBNET_1)])
 
+        delete_subnet_vpn.reset_mock()
         delete_vpnservice.reset_mock()
         vpn_gateway_api._stop_vpn_in_subnet(
             context, self.neutron, cleaner, self.DB_SUBNET_1_NO_VPN)
+        self.assertFalse(delete_subnet_vpn.called)
         self.assertFalse(delete_vpnservice.called)
 
     def test_create_subnet_vpnservice(self):

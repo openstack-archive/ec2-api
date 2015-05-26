@@ -151,14 +151,18 @@ def _start_vpn_in_subnet(context, neutron, cleaner, subnet, vpc, route_table):
     if not vpn_gateway:
         return
     _create_subnet_vpnservice(context, neutron, cleaner, subnet, vpc)
-    # TODO(ft): start vpn connections
+    vpn_connection_api._reset_vpn_connections(context, neutron, cleaner,
+                                              vpn_gateway, subnets=[subnet],
+                                              route_tables=[route_table])
 
 
 def _stop_vpn_in_subnet(context, neutron, cleaner, subnet):
     os_vpnservice_id = subnet.get('os_vpnservice_id')
     if not os_vpnservice_id:
         return
-    # TODO(ft): stop vpn connections
+    for vpn in db_api.get_items(context, 'vpn'):
+        vpn_connection_api._delete_subnet_vpn(context, neutron, cleaner,
+                                              subnet, vpn)
     _safe_delete_vpnservice(neutron, os_vpnservice_id, subnet['id'])
 
 
