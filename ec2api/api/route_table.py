@@ -26,6 +26,10 @@ from ec2api import exception
 from ec2api.i18n import _
 
 
+HOST_TARGET = 'host'
+VPN_TARGET = 'vpn'
+
+
 class Validator(common.Validator):
 
     def igw_or_vgw_id(self, id):
@@ -73,6 +77,12 @@ def delete_route(context, route_table_id, destination_cidr_block):
         raise exception.InvalidRouteNotFound(
             route_table_id=route_table_id,
             destination_cidr_block=destination_cidr_block)
+    update_target = _get_route_target(route)
+    if update_target == VPN_TARGET:
+        vpn_gateway = db_api.get_item_by_id(context, route['gateway_id'])
+        if (not vpn_gateway or
+                vpn_gateway['vpc_id'] != route_table['vpc_id']):
+            update_target = None
     rollback_route_table_state = copy.deepcopy(route_table)
     del route_table['routes'][route_index]
     with common.OnCrashCleaner() as cleaner:
@@ -80,7 +90,9 @@ def delete_route(context, route_table_id, destination_cidr_block):
         cleaner.addCleanup(db_api.update_item, context,
                            rollback_route_table_state)
 
-        _update_routes_in_associated_subnets(context, cleaner, route_table)
+        if update_target:
+            _update_routes_in_associated_subnets(
+                context, cleaner, route_table, update_target=update_target)
 
     return True
 
@@ -327,16 +339,18 @@ def _set_route(context, route_table_id, destination_cidr_block,
 
     rollabck_route_table_state = copy.deepcopy(route_table)
     if do_replace:
-        route_count = len(route_table['routes'])
-        route_table['routes'] = [
-            r for r in route_table['routes']
-            if r['destination_cidr_block'] != destination_cidr_block]
-        if route_count == len(route_table['routes']):
+        route_index, old_route = next(
+            ((i, r) for i, r in enumerate(route_table['routes'])
+             if r['destination_cidr_block'] == destination_cidr_block),
+            (None, None))
+        if route_index is None:
             msg = _("There is no route defined for "
                     "'%(destination_cidr_block)s' in the route table. "
                     "Use CreateRoute instead.")
             msg = msg % {'destination_cidr_block': destination_cidr_block}
             raise exception.InvalidParameterValue(msg)
+        else:
+            del route_table['routes'][route_index]
 
     if gateway_id:
         gateway = ec2utils.get_db_item(context, gateway_id)
@@ -382,9 +396,13 @@ def _set_route(context, route_table_id, destination_cidr_block,
         raise exception.InvalidRequest('Parameter VpcPeeringConnectionId is '
                                        'not supported by this implementation')
     route['destination_cidr_block'] = destination_cidr_block
+    update_target = _get_route_target(route)
 
     if do_replace:
         idempotent_call = False
+        old_target = _get_route_target(old_route)
+        if old_target != update_target:
+            update_target = None
     else:
         old_route = next((r for r in route_table['routes']
                           if r['destination_cidr_block'] ==
@@ -401,7 +419,8 @@ def _set_route(context, route_table_id, destination_cidr_block,
         db_api.update_item(context, route_table)
         cleaner.addCleanup(db_api.update_item, context,
                            rollabck_route_table_state)
-        _update_routes_in_associated_subnets(context, cleaner, route_table)
+        _update_routes_in_associated_subnets(context, cleaner, route_table,
+                                             update_target=update_target)
 
     return True
 
@@ -502,7 +521,8 @@ def _format_route_table(context, route_table, is_main=False,
 
 
 def _update_routes_in_associated_subnets(context, cleaner, route_table,
-                                         default_associations_only=None):
+                                         default_associations_only=None,
+                                         update_target=None):
     if default_associations_only:
         appropriate_rtb_ids = (None,)
     else:
@@ -515,7 +535,8 @@ def _update_routes_in_associated_subnets(context, cleaner, route_table,
     subnets = [subnet for subnet in db_api.get_items(context, 'subnet')
                if (subnet['vpc_id'] == route_table['vpc_id'] and
                    subnet.get('route_table_id') in appropriate_rtb_ids)]
-    _update_host_routes(context, neutron, cleaner, route_table, subnets)
+    if not update_target or update_target == HOST_TARGET:
+        _update_host_routes(context, neutron, cleaner, route_table, subnets)
 
 
 def _update_subnet_routes(context, cleaner, subnet, route_table):
@@ -583,6 +604,13 @@ def _get_subnet_host_routes(context, route_table, gateway_ip,
                             'nexthop': '127.0.0.1'})
 
     return host_routes
+
+
+def _get_route_target(route):
+    if ec2utils.get_ec2_id_kind(route.get('gateway_id') or '') == 'vgw':
+        return VPN_TARGET
+    else:
+        return HOST_TARGET
 
 
 def _associate_subnet_item(context, subnet, route_table_id):
