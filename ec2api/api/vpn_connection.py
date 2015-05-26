@@ -231,6 +231,15 @@ def _stop_gateway_vpn_connections(context, neutron, cleaner, vpn_gateway):
                                connection_ids)
 
 
+def _update_vpn_routes(context, neutron, cleaner, route_table, subnets):
+    vpn_gateway = ec2utils.get_attached_gateway(
+        context, route_table['vpc_id'], 'vgw')
+    if not vpn_gateway:
+        return
+    _reset_vpn_connections(context, neutron, cleaner, vpn_gateway,
+                           route_tables=[route_table], subnets=subnets)
+
+
 def _reset_vpn_connections(context, neutron, cleaner, vpn_gateway,
                            subnets=None, route_tables=None,
                            vpn_connections=None):

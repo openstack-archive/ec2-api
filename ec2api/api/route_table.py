@@ -21,6 +21,7 @@ from novaclient import exceptions as nova_exception
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
+from ec2api.api import vpn_connection as vpn_connection_api
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
@@ -107,9 +108,14 @@ def enable_vgw_route_propagation(context, route_table_id, gateway_id):
                                            vpc_id=route_table['vpc_id'])
     if vpn_gateway['id'] in route_table.setdefault('propagating_gateways', []):
         return True
-    vgws = route_table.setdefault('propagating_gateways', [])
-    vgws.append(gateway_id)
-    db_api.update_item(context, route_table)
+    with common.OnCrashCleaner() as cleaner:
+        _append_propagation_to_route_table_item(context, route_table,
+                                                vpn_gateway['id'])
+        cleaner.addCleanup(_remove_propagation_from_route_table_item,
+                           context, route_table, vpn_gateway['id'])
+
+        _update_routes_in_associated_subnets(context, cleaner, route_table,
+                                             update_target=VPN_TARGET)
     return True
 
 
@@ -117,12 +123,17 @@ def disable_vgw_route_propagation(context, route_table_id, gateway_id):
     route_table = ec2utils.get_db_item(context, route_table_id)
     if gateway_id not in route_table.get('propagating_gateways', []):
         return True
+    vpn_gateway = db_api.get_item_by_id(context, gateway_id)
 
-    vgws = route_table['propagating_gateways']
-    vgws.remove(gateway_id)
-    if not vgws:
-        del route_table['propagating_gateways']
-    db_api.update_item(context, route_table)
+    with common.OnCrashCleaner() as cleaner:
+        _remove_propagation_from_route_table_item(context, route_table,
+                                                  gateway_id)
+        cleaner.addCleanup(_append_propagation_to_route_table_item,
+                           context, route_table, gateway_id)
+
+        if vpn_gateway and vpn_gateway['vpc_id'] == route_table['vpc_id']:
+            _update_routes_in_associated_subnets(context, cleaner, route_table,
+                                                 update_target=VPN_TARGET)
     return True
 
 
@@ -537,11 +548,16 @@ def _update_routes_in_associated_subnets(context, cleaner, route_table,
                    subnet.get('route_table_id') in appropriate_rtb_ids)]
     if not update_target or update_target == HOST_TARGET:
         _update_host_routes(context, neutron, cleaner, route_table, subnets)
+    if not update_target or update_target == VPN_TARGET:
+        vpn_connection_api._update_vpn_routes(context, neutron, cleaner,
+                                              route_table, subnets)
 
 
 def _update_subnet_routes(context, cleaner, subnet, route_table):
     neutron = clients.neutron(context)
     _update_host_routes(context, neutron, cleaner, route_table, [subnet])
+    vpn_connection_api._update_vpn_routes(context, neutron, cleaner,
+                                          route_table, [subnet])
 
 
 def _update_host_routes(context, neutron, cleaner, route_table, subnets):
@@ -626,3 +642,18 @@ def _disassociate_subnet_item(context, subnet):
 def _associate_vpc_item(context, vpc, route_table_id):
     vpc['route_table_id'] = route_table_id
     db_api.update_item(context, vpc)
+
+
+def _append_propagation_to_route_table_item(context, route_table, gateway_id):
+    vgws = route_table.setdefault('propagating_gateways', [])
+    vgws.append(gateway_id)
+    db_api.update_item(context, route_table)
+
+
+def _remove_propagation_from_route_table_item(context, route_table,
+                                              gateway_id):
+    vgws = route_table['propagating_gateways']
+    vgws.remove(gateway_id)
+    if not vgws:
+        del route_table['propagating_gateways']
+    db_api.update_item(context, route_table)

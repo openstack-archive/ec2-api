@@ -390,6 +390,25 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_called_with(
             mock.ANY, fakes.DB_VPN_CONNECTION_1)
 
+    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections')
+    def test_update_vpn_routes(self, reset_vpn_connections):
+        context = mock.Mock
+        cleaner = common.OnCrashCleaner()
+
+        self.set_mock_db_items()
+        vpn_connection_api._update_vpn_routes(
+            context, self.neutron, cleaner,
+            fakes.DB_ROUTE_TABLE_1, [fakes.DB_SUBNET_1])
+        self.assertFalse(reset_vpn_connections.called)
+
+        self.set_mock_db_items(fakes.DB_VPN_GATEWAY_1)
+        vpn_connection_api._update_vpn_routes(
+            context, self.neutron, cleaner,
+            fakes.DB_ROUTE_TABLE_1, [fakes.DB_SUBNET_1])
+        reset_vpn_connections.assert_called_once_with(
+            context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1,
+            route_tables=[fakes.DB_ROUTE_TABLE_1], subnets=[fakes.DB_SUBNET_1])
+
     @mock.patch('ec2api.api.vpn_connection._delete_subnet_vpn')
     @mock.patch('ec2api.api.vpn_connection._set_subnet_vpn')
     @mock.patch('ec2api.api.vpn_connection._get_route_table_vpn_cidrs',

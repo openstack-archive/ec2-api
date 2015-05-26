@@ -344,17 +344,21 @@ class RouteTableTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_any_call(
             mock.ANY, fakes.DB_ROUTE_TABLE_2)
 
-    def test_enable_vgw_route_propagation(self):
+    @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
+    def test_enable_vgw_route_propagation(self, routes_updater):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_VPN_GATEWAY_1)
         resp = self.execute('EnableVgwRoutePropagation',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
                              'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
         self.assertEqual({'return': True}, resp)
+        route_table_1_updated = tools.update_dict(
+            fakes.DB_ROUTE_TABLE_1,
+            {'propagating_gateways': [fakes.ID_EC2_VPN_GATEWAY_1]})
         self.db_api.update_item.assert_called_once_with(
-            mock.ANY,
-            tools.update_dict(
-                fakes.DB_ROUTE_TABLE_1,
-                {'propagating_gateways': [fakes.ID_EC2_VPN_GATEWAY_1]}))
+            mock.ANY, route_table_1_updated)
+        routes_updater.assert_called_once_with(
+            mock.ANY, mock.ANY, route_table_1_updated,
+            update_target=route_table_api.VPN_TARGET)
 
         self.db_api.reset_mock()
         self.set_mock_db_items(
@@ -407,17 +411,35 @@ class RouteTableTestCase(base.ApiTestCase):
             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
              'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
 
-    def test_disable_vgw_route_propagation(self):
-        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2)
+    @tools.screen_unexpected_exception_logs
+    @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
+    def test_enable_vgw_route_propagation_rollback(self, routes_updater):
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_1, fakes.DB_VPN_GATEWAY_1)
+        routes_updater.side_effect = Exception()
+        self.assert_execution_error(
+            self.ANY_EXECUTE_ERROR, 'EnableVgwRoutePropagation',
+            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_1,
+             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, fakes.DB_ROUTE_TABLE_1)
+
+    @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
+    def test_disable_vgw_route_propagation(self, routes_updater):
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2, fakes.DB_VPN_GATEWAY_1)
         resp = self.execute('DisableVgwRoutePropagation',
                             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
                              'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
         self.assertEqual({'return': True}, resp)
+        route_table_1_updated = tools.purge_dict(
+            fakes.DB_ROUTE_TABLE_2, ('propagating_gateways',))
         self.db_api.update_item.assert_called_once_with(
-            mock.ANY, tools.purge_dict(fakes.DB_ROUTE_TABLE_2,
-                                       ('propagating_gateways',)))
+            mock.ANY, route_table_1_updated)
+        routes_updater.assert_called_once_with(
+            mock.ANY, mock.ANY, route_table_1_updated,
+            update_target=route_table_api.VPN_TARGET)
 
         self.db_api.reset_mock()
+        routes_updater.reset_mock()
         db_route_table_2 = copy.deepcopy(fakes.DB_ROUTE_TABLE_2)
         db_route_table_2['propagating_gateways'].append(
             fakes.ID_EC2_VPN_GATEWAY_2)
@@ -428,6 +450,7 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertEqual({'return': True}, resp)
         self.db_api.update_item.assert_called_once_with(
             mock.ANY, fakes.DB_ROUTE_TABLE_2)
+        self.assertFalse(routes_updater.called)
 
     def test_disable_vgw_route_propagation_idempotent(self):
         self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2)
@@ -443,6 +466,18 @@ class RouteTableTestCase(base.ApiTestCase):
             'InvalidRouteTableID.NotFound', 'DisableVgwRoutePropagation',
             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
              'GatewayId': fakes.ID_EC2_VPN_GATEWAY_2})
+
+    @tools.screen_unexpected_exception_logs
+    @mock.patch('ec2api.api.route_table._update_routes_in_associated_subnets')
+    def test_disable_vgw_route_propagation_rollbadk(self, routes_updater):
+        self.set_mock_db_items(fakes.DB_ROUTE_TABLE_2, fakes.DB_VPN_GATEWAY_1)
+        routes_updater.side_effect = Exception()
+        self.assert_execution_error(
+            self.ANY_EXECUTE_ERROR, 'DisableVgwRoutePropagation',
+            {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2,
+             'GatewayId': fakes.ID_EC2_VPN_GATEWAY_1})
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, fakes.DB_ROUTE_TABLE_2)
 
     @mock.patch('ec2api.api.route_table._update_subnet_routes')
     def test_associate_route_table(self, routes_updater):
@@ -969,8 +1004,10 @@ class RouteTableTestCase(base.ApiTestCase):
             fakes.ID_OS_SUBNET_1,
             {'subnet': {'host_routes': fakes.OS_SUBNET_1['host_routes']}})
 
+    @mock.patch('ec2api.api.vpn_connection._update_vpn_routes')
     @mock.patch('ec2api.api.route_table._update_host_routes')
-    def test_update_routes_in_associated_subnets(self, routes_updater):
+    def test_update_routes_in_associated_subnets(self, routes_updater,
+                                  update_vpn_routes):
         subnet_default_rtb = {'id': fakes.random_ec2_id('subnet'),
                               'vpc_id': fakes.ID_EC2_VPC_1}
         subnet_rtb_1 = {'id': fakes.random_ec2_id('subnet'),
@@ -984,19 +1021,29 @@ class RouteTableTestCase(base.ApiTestCase):
         self.set_mock_db_items(subnet_default_rtb, subnet_rtb_1, subnet_rtb_2,
                                subnet_vpc_2, fakes.DB_VPC_1)
 
-        def do_check(rtb, subnets, default_associations_only=None):
+        def do_check(rtb, subnets, default_associations_only=None,
+                     host_only=None):
             self.db_api.reset_mock()
             routes_updater.reset_mock()
+            update_vpn_routes.reset_mock()
             route_table_api._update_routes_in_associated_subnets(
-                mock.MagicMock(), 'fake_cleaner', rtb,
-                default_associations_only=default_associations_only)
+                self._create_context(), 'fake_cleaner', rtb,
+                default_associations_only=default_associations_only,
+                update_target=(route_table_api.HOST_TARGET
+                               if host_only else
+                               None))
 
-            self.db_api.get_items.assert_called_once_with(
+            self.db_api.get_items.assert_any_call(
                 mock.ANY, 'subnet')
             routes_updater.assert_called_once_with(
                 mock.ANY, self.neutron, 'fake_cleaner', rtb, subnets)
+            if host_only:
+                self.assertFalse(update_vpn_routes.called)
+            else:
+                update_vpn_routes.assert_called_once_with(
+                    mock.ANY, self.neutron, 'fake_cleaner', rtb, subnets)
 
-        do_check(fakes.DB_ROUTE_TABLE_2, [subnet_rtb_2])
+        do_check(fakes.DB_ROUTE_TABLE_2, [subnet_rtb_2], host_only=True)
         self.db_api.get_item_by_id.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_VPC_1)
 
@@ -1009,10 +1056,14 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertFalse(self.db_api.get_item_by_id.called)
 
         routes_updater.reset_mock()
+        update_vpn_routes.reset_mock()
         route_table_api._update_routes_in_associated_subnets(
             mock.MagicMock(), 'fake_cleaner', fakes.DB_ROUTE_TABLE_1,
             update_target=route_table_api.VPN_TARGET)
         self.assertFalse(routes_updater.called)
+        update_vpn_routes.assert_called_once_with(
+            mock.ANY, self.neutron, 'fake_cleaner',
+            fakes.DB_ROUTE_TABLE_1, [subnet_default_rtb, subnet_rtb_1])
 
     def test_get_router_destinations(self):
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_NETWORK_INTERFACE_2)
@@ -1037,12 +1088,17 @@ class RouteTableTestCase(base.ApiTestCase):
             mock.ANY, [fakes.ID_EC2_NETWORK_INTERFACE_2, fakes.ID_EC2_IGW_1,
                        fake_igw_id, fake_vgw_id, fake_eni_id])
 
+    @mock.patch('ec2api.api.vpn_connection._update_vpn_routes')
     @mock.patch('ec2api.api.route_table._update_host_routes')
-    def test_update_subnet_routes(self, host_routes_updater):
+    def test_update_subnet_routes(self, host_routes_updater,
+                                  update_vpn_routes):
         route_table_api._update_subnet_routes(
             self._create_context(), 'fake_cleaner', fakes.DB_SUBNET_1,
             fakes.DB_ROUTE_TABLE_1)
         host_routes_updater.assert_called_once_with(
+            mock.ANY, self.neutron, 'fake_cleaner', fakes.DB_ROUTE_TABLE_1,
+            [fakes.DB_SUBNET_1])
+        update_vpn_routes.assert_called_once_with(
             mock.ANY, self.neutron, 'fake_cleaner', fakes.DB_ROUTE_TABLE_1,
             [fakes.DB_SUBNET_1])
 
