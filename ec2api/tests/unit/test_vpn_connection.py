@@ -349,6 +349,47 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertEqual(
             3, self.neutron.delete_ipsec_site_connection.call_count)
 
+    @mock.patch('ec2api.api.vpn_connection._stop_vpn_connection',
+                new_callable=tools.CopyingMock)
+    def test_stop_gateway_vpn_connections(self, stop_vpn_connection):
+        context = mock.Mock
+        cleaner = common.OnCrashCleaner()
+        vpn_connection_3 = tools.update_dict(
+            fakes.DB_VPN_CONNECTION_1,
+            {'id': fakes.random_ec2_id('vpn'),
+             'os_ipsec_site_connections': {}})
+
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_1, vpn_connection_3,
+                               fakes.DB_VPN_CONNECTION_2)
+        vpn_connection_api._stop_gateway_vpn_connections(
+            context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1)
+        self.assertEqual(2, stop_vpn_connection.call_count)
+        stop_vpn_connection.assert_any_call(
+            self.neutron, fakes.DB_VPN_CONNECTION_1)
+        stop_vpn_connection.assert_any_call(
+            self.neutron, vpn_connection_3)
+        self.assertEqual(2, self.db_api.update_item.call_count)
+        self.db_api.update_item.assert_any_call(
+            mock.ANY, tools.update_dict(fakes.DB_VPN_CONNECTION_1,
+                                        {'os_ipsec_site_connections': {}}))
+        self.db_api.update_item.assert_any_call(
+            mock.ANY, vpn_connection_3)
+
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        stop_vpn_connection.reset_mock()
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_1)
+        try:
+            with common.OnCrashCleaner() as cleaner:
+                vpn_connection_api._stop_gateway_vpn_connections(
+                    context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1)
+                raise Exception('fake-exception')
+        except Exception as ex:
+            if ex.message != 'fake-exception':
+                raise
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, fakes.DB_VPN_CONNECTION_1)
+
     @mock.patch('ec2api.api.vpn_connection._delete_subnet_vpn')
     @mock.patch('ec2api.api.vpn_connection._set_subnet_vpn')
     @mock.patch('ec2api.api.vpn_connection._get_route_table_vpn_cidrs',

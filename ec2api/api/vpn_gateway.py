@@ -18,6 +18,7 @@ from oslo_log import log as logging
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
+from ec2api.api import vpn_connection as vpn_connection_api
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
@@ -64,7 +65,8 @@ def attach_vpn_gateway(context, vpc_id, vpn_gateway_id):
             for subnet in subnets:
                 _create_subnet_vpnservice(context, neutron, cleaner,
                                           subnet, vpc)
-            # TODO(ft): start vpn connections
+            vpn_connection_api._reset_vpn_connections(
+                context, neutron, cleaner, vpn_gateway, subnets=subnets)
 
     return {'attachment': _format_attachment(vpn_gateway)}
 
@@ -85,7 +87,8 @@ def detach_vpn_gateway(context, vpc_id, vpn_gateway_id):
         _detach_vpn_gateway_item(context, vpn_gateway)
         cleaner.addCleanup(_attach_vpn_gateway_item, context, vpn_gateway,
                            vpc_id)
-        # TODO(ft): stop vpn connections
+        vpn_connection_api._stop_gateway_vpn_connections(
+            context, neutron, cleaner, vpn_gateway)
         for subnet in subnets:
             _delete_subnet_vpnservice(context, neutron, cleaner, subnet)
 

@@ -215,6 +215,22 @@ def _stop_vpn_connection(neutron, vpn_connection):
             pass
 
 
+def _stop_gateway_vpn_connections(context, neutron, cleaner, vpn_gateway):
+    def undo_vpn_connection(context, vpn_connection, connections_ids):
+        vpn_connection['os_ipsec_site_connections'] = connections_ids
+        db_api.update_item(context, vpn_connection)
+
+    for vpn_connection in db_api.get_items(context, 'vpn'):
+        if vpn_connection['vpn_gateway_id'] == vpn_gateway['id']:
+            _stop_vpn_connection(neutron, vpn_connection)
+
+            connection_ids = vpn_connection['os_ipsec_site_connections']
+            vpn_connection['os_ipsec_site_connections'] = {}
+            db_api.update_item(context, vpn_connection)
+            cleaner.addCleanup(undo_vpn_connection, context, vpn_connection,
+                               connection_ids)
+
+
 def _reset_vpn_connections(context, neutron, cleaner, vpn_gateway,
                            subnets=None, route_tables=None,
                            vpn_connections=None):
