@@ -261,6 +261,7 @@ ID_OS_IKEPOLICY_1 = random_os_id()
 ID_OS_IKEPOLICY_2 = random_os_id()
 ID_OS_IPSECPOLICY_1 = random_os_id()
 ID_OS_IPSECPOLICY_2 = random_os_id()
+ID_OS_IPSEC_SITE_CONNECTION_2 = random_os_id()
 
 PRE_SHARED_KEY_1 = 'Z54kLbANio5A1.XmkjwYvWuSfVx3_xuG'
 PRE_SHARED_KEY_2 = 'FSbXpA.G9306W.BQ2n6W9JZJsyZcMN2G'
@@ -1630,15 +1631,21 @@ EC2_CUSTOMER_GATEWAY_2 = {
 # VPN connection objects
 DB_VPN_CONNECTION_1 = {
     'id': ID_EC2_VPN_CONNECTION_1,
+    'vpc_id': None,
+    'os_id': None,
     'customer_gateway_id': ID_EC2_CUSTOMER_GATEWAY_1,
     'vpn_gateway_id': ID_EC2_VPN_GATEWAY_1,
     'pre_shared_key': PRE_SHARED_KEY_1,
     'os_ikepolicy_id': ID_OS_IKEPOLICY_1,
     'os_ipsecpolicy_id': ID_OS_IPSECPOLICY_1,
     'cidrs': [CIDR_VPN_1_PROPAGATED_1],
+    'os_ipsec_site_connections': {
+        ID_EC2_SUBNET_2: ID_OS_IPSEC_SITE_CONNECTION_2},
 }
 DB_VPN_CONNECTION_2 = {
     'id': ID_EC2_VPN_CONNECTION_2,
+    'vpc_id': None,
+    'os_id': None,
     'customer_gateway_id': ID_EC2_CUSTOMER_GATEWAY_2,
     'vpn_gateway_id': ID_EC2_VPN_GATEWAY_2,
     'pre_shared_key': PRE_SHARED_KEY_2,
@@ -1646,6 +1653,7 @@ DB_VPN_CONNECTION_2 = {
     'os_ipsecpolicy_id': ID_OS_IPSECPOLICY_2,
     'cidrs': [CIDR_VPN_2_PROPAGATED_1,
               CIDR_VPN_2_PROPAGATED_2],
+    'os_ipsec_site_connections': {},
 }
 
 EC2_VPN_CONNECTION_1 = {

@@ -83,7 +83,7 @@ def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
               'os_ikepolicy_id': os_ikepolicy['id'],
               'os_ipsecpolicy_id': os_ipsecpolicy['id'],
               'cidrs': [],
-              })
+              'os_ipsec_site_connections': {}})
         cleaner.addCleanup(db_api.delete_item, context, vpn_connection['id'])
 
         neutron.update_ikepolicy(
@@ -91,6 +91,9 @@ def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
         neutron.update_ipsecpolicy(
             os_ipsecpolicy['id'],
             {'ipsecpolicy': {'name': vpn_connection['id']}})
+
+        _reset_vpn_connections(context, neutron, cleaner,
+                               vpn_gateway, vpn_connections=[vpn_connection])
 
     return {'vpnConnection': _format_vpn_connection(vpn_connection)}
 
@@ -100,8 +103,17 @@ def create_vpn_connection_route(context, vpn_connection_id,
     vpn_connection = ec2utils.get_db_item(context, vpn_connection_id)
     if destination_cidr_block in vpn_connection['cidrs']:
         return True
-    vpn_connection['cidrs'].append(destination_cidr_block)
-    db_api.update_item(context, vpn_connection)
+    neutron = clients.neutron(context)
+    vpn_gateway = db_api.get_item_by_id(context, vpn_connection_id)
+    with common.OnCrashCleaner() as cleaner:
+        _add_cidr_to_vpn_connection_item(context, vpn_connection,
+                                         destination_cidr_block)
+        cleaner.addCleanup(_remove_cidr_from_vpn_connection_item,
+                           context, vpn_connection, destination_cidr_block)
+
+        _reset_vpn_connections(context, neutron, cleaner,
+                               vpn_gateway, [vpn_connection])
+
     return True
 
 
@@ -112,8 +124,17 @@ def delete_vpn_connection_route(context, vpn_connection_id,
         raise exception.InvalidRouteNotFound(
             _('The specified route %(destination_cidr_block)s does not exist')
             % {'destination_cidr_block': destination_cidr_block})
-    vpn_connection['cidrs'].remove(destination_cidr_block)
-    db_api.update_item(context, vpn_connection)
+    neutron = clients.neutron(context)
+    vpn_gateway = db_api.get_item_by_id(context, vpn_connection_id)
+    with common.OnCrashCleaner() as cleaner:
+        _remove_cidr_from_vpn_connection_item(context, vpn_connection,
+                                              destination_cidr_block)
+        cleaner.addCleanup(_add_cidr_to_vpn_connection_item,
+                           context, vpn_connection, destination_cidr_block)
+
+        _reset_vpn_connections(context, neutron, cleaner,
+                               vpn_gateway, [vpn_connection])
+
     return True
 
 
@@ -123,6 +144,7 @@ def delete_vpn_connection(context, vpn_connection_id):
         db_api.delete_item(context, vpn_connection['id'])
         cleaner.addCleanup(db_api.restore_item, context, 'vpn', vpn_connection)
         neutron = clients.neutron(context)
+        _stop_vpn_connection(neutron, vpn_connection)
         try:
             neutron.delete_ipsecpolicy(vpn_connection['os_ipsecpolicy_id'])
         except neutron_exception.Conflict as ex:
@@ -182,3 +204,142 @@ def _format_vpn_connection(vpn_connection):
                        for cidr in vpn_connection['cidrs']],
             'vgwTelemetry': [],
             'options': {'staticRoutesOnly': True}}
+
+
+def _stop_vpn_connection(neutron, vpn_connection):
+    connection_ids = vpn_connection['os_ipsec_site_connections']
+    for os_connection_id in connection_ids.itervalues():
+        try:
+            neutron.delete_ipsec_site_connection(os_connection_id)
+        except neutron_exception.NotFound:
+            pass
+
+
+def _reset_vpn_connections(context, neutron, cleaner, vpn_gateway,
+                           subnets=None, route_tables=None,
+                           vpn_connections=None):
+    if not vpn_gateway['vpc_id']:
+        return
+    # TODO(ft): implement search filters in DB api
+    vpn_connections = (vpn_connections or
+                       [vpn for vpn in db_api.get_items(context, 'vpn')
+                        if vpn['vpn_gateway_id'] == vpn_gateway['id']])
+    if not vpn_connections:
+        return
+    subnets = (subnets or
+               [subnet for subnet in db_api.get_items(context, 'subnet')
+                if subnet['vpc_id'] == vpn_gateway['vpc_id']])
+    if not subnets:
+        return
+    vpc = db_api.get_item_by_id(context, vpn_gateway['vpc_id'])
+    customer_gateways = {cgw['id']: cgw
+                         for cgw in db_api.get_items(context, 'cgw')}
+    route_tables = route_tables or db_api.get_items(context, 'rtb')
+    route_tables = {rtb['id']: rtb
+                    for rtb in route_tables
+                    if rtb['vpc_id'] == vpc['id']}
+    route_tables_cidrs = {}
+    for subnet in subnets:
+        route_table_id = subnet.get('route_table_id', vpc['route_table_id'])
+        if route_table_id not in route_tables_cidrs:
+            route_tables_cidrs[route_table_id] = (
+                _get_route_table_vpn_cidrs(route_tables[route_table_id],
+                                           vpn_gateway, vpn_connections))
+        cidrs = route_tables_cidrs[route_table_id]
+        for vpn_conn in vpn_connections:
+            if vpn_conn['id'] in cidrs:
+                _set_subnet_vpn(
+                    context, neutron, cleaner, subnet, vpn_conn,
+                    customer_gateways[vpn_conn['customer_gateway_id']],
+                    cidrs[vpn_conn['id']])
+            else:
+                _delete_subnet_vpn(context, neutron, cleaner, subnet, vpn_conn)
+
+
+def _set_subnet_vpn(context, neutron, cleaner, subnet, vpn_connection,
+                    customer_gateway, cidrs):
+    subnets_connections = vpn_connection['os_ipsec_site_connections']
+    os_connection_id = subnets_connections.get(subnet['id'])
+    if os_connection_id:
+        # TODO(ft): restore original peer_cidrs on crash
+        neutron.update_ipsec_site_connection(
+            os_connection_id,
+            {'ipsec_site_connection': {'peer_cidrs': cidrs}})
+    else:
+        os_connection = {
+            'vpnservice_id': subnet['os_vpnservice_id'],
+            'ikepolicy_id': vpn_connection['os_ikepolicy_id'],
+            'ipsecpolicy_id': vpn_connection['os_ipsecpolicy_id'],
+            'peer_address': customer_gateway['ip_address'],
+            'peer_cidrs': cidrs,
+            'psk': vpn_connection['pre_shared_key'],
+            'name': '%s/%s' % (vpn_connection['id'], subnet['id']),
+            'peer_id': customer_gateway['ip_address'],
+            'mtu': 1387 + 40,  # AWS MSS + 20 byte IP and 20 byte TCP headers
+            'initiator': 'response-only',
+        }
+        os_connection = (neutron.create_ipsec_site_connection(
+            {'ipsec_site_connection': os_connection})
+            ['ipsec_site_connection'])
+        cleaner.addCleanup(neutron.delete_ipsec_site_connection,
+                           os_connection['id'])
+
+        _add_subnet_connection_to_vpn_connection_item(
+            context, vpn_connection, subnet['id'], os_connection['id'])
+        cleaner.addCleanup(_remove_subnet_connection_from_vpn_connection_item,
+                           context, vpn_connection, subnet['id'])
+
+
+def _delete_subnet_vpn(context, neutron, cleaner, subnet, vpn_connection):
+    subnets_connections = vpn_connection['os_ipsec_site_connections']
+    os_connection_id = subnets_connections.get(subnet['id'])
+    if not os_connection_id:
+        return
+
+    _remove_subnet_connection_from_vpn_connection_item(
+        context, vpn_connection, subnet['id'])
+    cleaner.addCleanup(_add_subnet_connection_to_vpn_connection_item,
+                       context, vpn_connection, subnet['id'], os_connection_id)
+    try:
+        neutron.delete_ipsec_site_connection(os_connection_id)
+    except neutron_exception.NotFound:
+        pass
+
+
+def _get_route_table_vpn_cidrs(route_table, vpn_gateway, vpn_connections):
+    static_cidrs = [route['destination_cidr_block']
+                    for route in route_table['routes']
+                    if route.get('gateway_id') == vpn_gateway['id']]
+    is_propagation_enabled = (
+        vpn_gateway['id'] in route_table.get('propagating_gateways', []))
+    vpn_cidrs = {}
+    for vpn in vpn_connections:
+        if is_propagation_enabled:
+            cidrs = list(set(static_cidrs + vpn['cidrs']))
+        else:
+            cidrs = static_cidrs
+        if cidrs:
+            vpn_cidrs[vpn['id']] = cidrs
+    return vpn_cidrs
+
+
+def _add_cidr_to_vpn_connection_item(context, vpn_connection, cidr):
+    vpn_connection['cidrs'].append(cidr)
+    db_api.update_item(context, vpn_connection)
+
+
+def _remove_cidr_from_vpn_connection_item(context, vpn_connection, cidr):
+    vpn_connection['cidrs'].remove(cidr)
+    db_api.update_item(context, vpn_connection)
+
+
+def _add_subnet_connection_to_vpn_connection_item(context, vpn_connection,
+                                                  subnet_id, os_connection_id):
+    vpn_connection['os_ipsec_site_connections'][subnet_id] = os_connection_id
+    db_api.update_item(context, vpn_connection)
+
+
+def _remove_subnet_connection_from_vpn_connection_item(context, vpn_connection,
+                                                       subnet_id):
+    del vpn_connection['os_ipsec_site_connections'][subnet_id]
+    db_api.update_item(context, vpn_connection)

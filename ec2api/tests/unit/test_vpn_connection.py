@@ -15,8 +15,10 @@
 import copy
 
 import mock
+from neutronclient.common import exceptions as neutron_exception
 
-from ec2api.api import vpn_connection
+from ec2api.api import common
+from ec2api.api import vpn_connection as vpn_connection_api
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -25,11 +27,14 @@ from ec2api.tests.unit import tools
 
 class VpnConnectionTestCase(base.ApiTestCase):
 
+    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections',
+                wraps=vpn_connection_api._reset_vpn_connections)
     @mock.patch('random.choice')
-    def test_create_vpn_connection(self, random_choice):
+    def test_create_vpn_connection(self, random_choice, reset_vpn_connections):
         self.set_mock_db_items(
             fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2,
-            fakes.DB_CUSTOMER_GATEWAY_1, fakes.DB_CUSTOMER_GATEWAY_2)
+            fakes.DB_CUSTOMER_GATEWAY_1, fakes.DB_CUSTOMER_GATEWAY_2,
+            fakes.DB_VPC_1)
         self.neutron.create_ikepolicy.side_effect = (
             tools.get_neutron_create('ikepolicy', fakes.ID_OS_IKEPOLICY_1))
         self.neutron.create_ipsecpolicy.side_effect = (
@@ -55,10 +60,13 @@ class VpnConnectionTestCase(base.ApiTestCase):
             {'ikepolicy': tools.purge_dict(fakes.OS_IKEPOLICY_1, ('id',))})
         self.neutron.create_ipsecpolicy.assert_called_once_with(
             {'ipsecpolicy': tools.purge_dict(fakes.OS_IPSECPOLICY_1, ('id',))})
+        random_choice.assert_called_with(vpn_connection_api.SHARED_KEY_CHARS)
+        new_vpn_connection_1 = tools.update_dict(
+            fakes.DB_VPN_CONNECTION_1, {'cidrs': [],
+                                        'os_ipsec_site_connections': {}})
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vpn',
-            tools.patch_dict(fakes.DB_VPN_CONNECTION_1,
-                             {'cidrs': []}, ('id', )),
+            tools.purge_dict(new_vpn_connection_1, ('id', 'vpc_id', 'os_id')),
             project_id=None)
         self.neutron.update_ikepolicy.assert_called_once_with(
             fakes.ID_OS_IKEPOLICY_1,
@@ -66,6 +74,11 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.neutron.update_ipsecpolicy.assert_called_once_with(
             fakes.ID_OS_IPSECPOLICY_1,
             {'ipsecpolicy': {'name': fakes.ID_EC2_VPN_CONNECTION_1}})
+        reset_vpn_connections.assert_called_once_with(
+            mock.ANY, self.neutron, mock.ANY, fakes.DB_VPN_GATEWAY_1,
+            vpn_connections=[new_vpn_connection_1])
+        self.assertIsInstance(reset_vpn_connections.call_args[0][2],
+                              common.OnCrashCleaner)
 
     def test_create_vpn_connection_idempotent(self):
         self.set_mock_db_items(
@@ -151,7 +164,8 @@ class VpnConnectionTestCase(base.ApiTestCase):
             fakes.ID_OS_IKEPOLICY_1)
 
     def test_create_vpn_connection_route(self):
-        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2)
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2,
+                               fakes.DB_VPN_GATEWAY_2)
 
         resp = self.execute(
             'CreateVpnConnectionRoute',
@@ -180,8 +194,23 @@ class VpnConnectionTestCase(base.ApiTestCase):
             {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
              'DestinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_1})
 
+    @tools.screen_unexpected_exception_logs
+    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections')
+    def test_create_vpn_connection_route_rollback(self, reset_vpn_connections):
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2,
+                               fakes.DB_VPN_GATEWAY_2)
+        reset_vpn_connections.side_effect = Exception()
+
+        self.assert_execution_error(
+            self.ANY_EXECUTE_ERROR, 'CreateVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': '192.168.123.0/24'})
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, fakes.DB_VPN_CONNECTION_2)
+
     def test_delete_vpn_connection_route(self):
-        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2)
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2,
+                               fakes.DB_VPN_GATEWAY_2)
 
         resp = self.execute(
             'DeleteVpnConnectionRoute',
@@ -205,6 +234,20 @@ class VpnConnectionTestCase(base.ApiTestCase):
             {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
              'DestinationCidrBlock': '192.168.123.0/24'})
 
+    @tools.screen_unexpected_exception_logs
+    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections')
+    def test_delete_vpn_connection_route_rollback(self, reset_vpn_connections):
+        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2,
+                               fakes.DB_VPN_GATEWAY_2)
+        reset_vpn_connections.side_effect = Exception()
+
+        self.assert_execution_error(
+            self.ANY_EXECUTE_ERROR, 'DeleteVpnConnectionRoute',
+            {'VpnConnectionId': fakes.ID_EC2_VPN_CONNECTION_2,
+             'DestinationCidrBlock': fakes.CIDR_VPN_2_PROPAGATED_1})
+        self.assert_any_call(self.db_api.update_item,
+                             mock.ANY, fakes.DB_VPN_CONNECTION_2)
+
     def test_delete_vpn_connection(self):
         self.set_mock_db_items(fakes.DB_VPN_CONNECTION_1)
         resp = self.execute('DeleteVpnConnection',
@@ -212,6 +255,8 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertEqual({'return': True}, resp)
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_VPN_CONNECTION_1)
+        self.neutron.delete_ipsec_site_connection.assert_called_once_with(
+            fakes.ID_OS_IPSEC_SITE_CONNECTION_2)
         self.neutron.delete_ipsecpolicy.assert_called_once_with(
             fakes.ID_OS_IPSECPOLICY_1)
         self.neutron.delete_ikepolicy.assert_called_once_with(
@@ -234,6 +279,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
 
         self.db_api.restore_item.assert_called_once_with(
             mock.ANY, 'vpn', fakes.DB_VPN_CONNECTION_1)
+        self.assertFalse(self.neutron.create_ipsec_site_connection.called)
         self.assertFalse(self.neutron.create_ipsecpolicy.called)
         self.assertFalse(self.neutron.create_ikepolicy.called)
 
@@ -278,6 +324,342 @@ class VpnConnectionTestCase(base.ApiTestCase):
         ec2_vpn_connection_1 = tools.update_dict(fakes.EC2_VPN_CONNECTION_1,
                                                  {'routes': [],
                                                   'vgwTelemetry': []})
+        formatted = vpn_connection_api._format_vpn_connection(
+            db_vpn_connection_1)
+        self.assertThat(ec2_vpn_connection_1, matchers.DictMatches(formatted))
+
+    def test_stop_vpn_connection(self):
+        # delete several connections
+        os_conn_ids = [fakes.random_os_id() for _x in range(3)]
+        fake_conn = {
+            'os_ipsec_site_connections': {
+                fakes.random_ec2_id('subnet'): conn_id
+                for conn_id in os_conn_ids}}
+        vpn_connection_api._stop_vpn_connection(self.neutron, fake_conn)
         self.assertEqual(
-            ec2_vpn_connection_1,
-            vpn_connection._format_vpn_connection(db_vpn_connection_1))
+            3, self.neutron.delete_ipsec_site_connection.call_count)
+        for conn_id in os_conn_ids:
+            self.neutron.delete_ipsec_site_connection.assert_any_call(conn_id)
+
+        # delete several connections with exception suppressing
+        self.neutron.reset_mock()
+        self.neutron.delete_ipsec_site_connection.side_effect = [
+            None, neutron_exception.NotFound(), None]
+        vpn_connection_api._stop_vpn_connection(self.neutron, fake_conn)
+        self.assertEqual(
+            3, self.neutron.delete_ipsec_site_connection.call_count)
+
+    @mock.patch('ec2api.api.vpn_connection._delete_subnet_vpn')
+    @mock.patch('ec2api.api.vpn_connection._set_subnet_vpn')
+    @mock.patch('ec2api.api.vpn_connection._get_route_table_vpn_cidrs',
+                wraps=vpn_connection_api._get_route_table_vpn_cidrs)
+    def test_reset_vpn_connections(self, get_route_table_vpn_cidrs,
+                                   set_subnet_vpn, delete_subnet_vpn):
+        context = mock.Mock
+        cleaner = common.OnCrashCleaner()
+
+        vpn_gateway_3 = {'id': fakes.random_ec2_id('vpn'),
+                         'os_id': None,
+                         'vpc_id': None}
+        vpn_connection_api._reset_vpn_connections(
+            context, self.neutron, cleaner, vpn_gateway_3)
+        self.assertEqual(0, len(self.db_api.mock_calls))
+        self.assertFalse(get_route_table_vpn_cidrs.called)
+        self.assertFalse(set_subnet_vpn.called)
+        self.assertFalse(delete_subnet_vpn.called)
+
+        customer_gateway_3 = {'id': fakes.random_ec2_id('cgw')}
+        subnet_3 = {'id': fakes.random_ec2_id('subnet'),
+                    'vpc_id': fakes.ID_EC2_VPC_2}
+        vpn_connection_3 = {'id': fakes.random_ec2_id('vpn'),
+                            'vpn_gateway_id': fakes.ID_EC2_VPN_GATEWAY_1,
+                            'customer_gateway_id': customer_gateway_3['id'],
+                            'cidrs': []}
+        self.set_mock_db_items(
+            fakes.DB_VPC_1, fakes.DB_VPC_2,
+            fakes.DB_CUSTOMER_GATEWAY_1, fakes.DB_CUSTOMER_GATEWAY_2,
+            customer_gateway_3,
+            fakes.DB_SUBNET_1, fakes.DB_SUBNET_2, subnet_3,
+            fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
+            fakes.DB_ROUTE_TABLE_3,
+            fakes.DB_VPN_CONNECTION_1, fakes.DB_VPN_CONNECTION_2,
+            vpn_connection_3)
+
+        # common case
+        vpn_connection_api._reset_vpn_connections(
+            context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1)
+        self.assertEqual(2, set_subnet_vpn.call_count)
+        set_subnet_vpn.assert_any_call(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_2,
+            fakes.DB_VPN_CONNECTION_1, fakes.DB_CUSTOMER_GATEWAY_1,
+            [fakes.CIDR_VPN_1_STATIC])
+        set_subnet_vpn.assert_any_call(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_2,
+            vpn_connection_3, customer_gateway_3,
+            [fakes.CIDR_VPN_1_STATIC])
+        self.assertEqual(2, delete_subnet_vpn.call_count)
+        delete_subnet_vpn.assert_any_call(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+            fakes.DB_VPN_CONNECTION_1)
+        delete_subnet_vpn.assert_any_call(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+            vpn_connection_3)
+        self.assertEqual(2, get_route_table_vpn_cidrs.call_count)
+        get_route_table_vpn_cidrs.assert_any_call(
+            fakes.DB_ROUTE_TABLE_1, fakes.DB_VPN_GATEWAY_1,
+            [fakes.DB_VPN_CONNECTION_1, vpn_connection_3])
+        get_route_table_vpn_cidrs.assert_any_call(
+            fakes.DB_ROUTE_TABLE_3, fakes.DB_VPN_GATEWAY_1,
+            [fakes.DB_VPN_CONNECTION_1, vpn_connection_3])
+
+        # reset for the vpn connection
+        set_subnet_vpn.reset_mock()
+        delete_subnet_vpn.reset_mock()
+        self.db_api.reset_mock()
+        get_route_table_vpn_cidrs.reset_mock()
+        vpn_connection_api._reset_vpn_connections(
+            context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1,
+            vpn_connections=[fakes.DB_VPN_CONNECTION_1])
+        self.assertEqual(1, set_subnet_vpn.call_count)
+        self.assertEqual(1, delete_subnet_vpn.call_count)
+        self.assertNotIn(mock.call(mock.ANY, 'vpn'),
+                         self.db_api.get_items.mock_calls)
+
+        # reset for the subnet list
+        set_subnet_vpn.reset_mock()
+        delete_subnet_vpn.reset_mock()
+        self.db_api.reset_mock()
+        get_route_table_vpn_cidrs.reset_mock()
+        vpn_connection_api._reset_vpn_connections(
+            context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1,
+            subnets=[fakes.DB_SUBNET_1])
+        self.assertFalse(set_subnet_vpn.called)
+        self.assertEqual(2, delete_subnet_vpn.call_count)
+        self.assertNotIn(mock.call(mock.ANY, 'subnets'),
+                         self.db_api.get_items.mock_calls)
+
+        # reset for the subnet list and the route table
+        set_subnet_vpn.reset_mock()
+        delete_subnet_vpn.reset_mock()
+        self.db_api.reset_mock()
+        get_route_table_vpn_cidrs.reset_mock()
+        vpn_connection_api._reset_vpn_connections(
+            context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1,
+            subnets=[fakes.DB_SUBNET_2], route_tables=[fakes.DB_ROUTE_TABLE_3])
+        self.assertEqual(2, set_subnet_vpn.call_count)
+        self.assertFalse(delete_subnet_vpn.called)
+        self.assertNotIn(mock.call(mock.ANY, 'subnets'),
+                         self.db_api.get_items.mock_calls)
+        self.assertNotIn(mock.call(mock.ANY, 'rtb'),
+                         self.db_api.get_items.mock_calls)
+
+    def test_set_subnet_vpn(self):
+        context = mock.Mock
+        cleaner = common.OnCrashCleaner()
+        cidrs = [fakes.CIDR_VPN_1_STATIC, fakes.CIDR_VPN_1_PROPAGATED_1]
+
+        # create ipsec site connection case
+        id_os_connection = fakes.random_os_id()
+        os_connection = {
+            'vpnservice_id': fakes.ID_OS_VPNSERVICE_1,
+            'ikepolicy_id': fakes.ID_OS_IKEPOLICY_1,
+            'ipsecpolicy_id': fakes.ID_OS_IPSECPOLICY_1,
+            'peer_address': fakes.IP_CUSTOMER_GATEWAY_ADDRESS_1,
+            'peer_cidrs': cidrs,
+            'psk': fakes.PRE_SHARED_KEY_1,
+            'name': (fakes.ID_EC2_VPN_CONNECTION_1 + '/' +
+                     fakes.ID_EC2_SUBNET_1),
+            'peer_id': fakes.IP_CUSTOMER_GATEWAY_ADDRESS_1,
+            'mtu': 1427,
+            'initiator': 'response-only',
+        }
+        self.neutron.create_ipsec_site_connection.side_effect = (
+            tools.get_neutron_create('ipsec_site_connection',
+                                     id_os_connection))
+        vpn_connection_api._set_subnet_vpn(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+            copy.deepcopy(fakes.DB_VPN_CONNECTION_1),
+            fakes.DB_CUSTOMER_GATEWAY_1, cidrs)
+
+        self.neutron.create_ipsec_site_connection.assert_called_once_with(
+            {'ipsec_site_connection': os_connection})
+        vpn_connection_1 = copy.deepcopy(fakes.DB_VPN_CONNECTION_1)
+        (vpn_connection_1['os_ipsec_site_connections']
+         [fakes.ID_EC2_SUBNET_1]) = id_os_connection
+        self.db_api.update_item.assert_called_once_with(
+            context, vpn_connection_1)
+
+        # update ipsec site connection case
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        vpn_connection_api._set_subnet_vpn(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_2,
+            fakes.DB_VPN_CONNECTION_1, fakes.DB_CUSTOMER_GATEWAY_1, cidrs)
+        self.neutron.update_ipsec_site_connection.assert_called_once_with(
+            fakes.ID_OS_IPSEC_SITE_CONNECTION_2,
+            {'ipsec_site_connection': {'peer_cidrs': cidrs}})
+        self.assertFalse(self.neutron.create_ipsec_site_connection.called)
+        self.assertFalse(self.db_api.update_item.called)
+
+        # rollback creating of ipsec site connection case
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        try:
+            with common.OnCrashCleaner() as cleaner:
+                vpn_connection_api._set_subnet_vpn(
+                    context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+                    copy.deepcopy(fakes.DB_VPN_CONNECTION_1),
+                    fakes.DB_CUSTOMER_GATEWAY_1, cidrs)
+                raise Exception('fake-exception')
+        except Exception as ex:
+            if ex.message != 'fake-exception':
+                raise
+        self.neutron.delete_ipsec_site_connection.assert_called_once_with(
+            id_os_connection)
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, fakes.DB_VPN_CONNECTION_1)
+
+        # rollback updating of ipsec site connection case
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        try:
+            with common.OnCrashCleaner() as cleaner:
+                vpn_connection_api._set_subnet_vpn(
+                    context, self.neutron, cleaner, fakes.DB_SUBNET_2,
+                    fakes.DB_VPN_CONNECTION_1, fakes.DB_CUSTOMER_GATEWAY_1,
+                    cidrs)
+                raise Exception('fake-exception')
+        except Exception as ex:
+            if ex.message != 'fake-exception':
+                raise
+        self.assertFalse(self.neutron.delete_ipsec_site_connection.called)
+        self.assertFalse(self.db_api.update_item.called)
+
+    def test_delete_subnet_vpn(self):
+        context = mock.Mock
+        cleaner = common.OnCrashCleaner()
+
+        # subnet is not connected to the vpn
+        vpn_connection_api._delete_subnet_vpn(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+            fakes.DB_VPN_CONNECTION_1)
+        self.assertFalse(self.db_api.update_item.called)
+        self.assertFalse(self.neutron.delete_ipsec_site_connection.called)
+
+        # delete subnet vpn connection
+        vpn_connection_api._delete_subnet_vpn(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_2,
+            copy.deepcopy(fakes.DB_VPN_CONNECTION_1))
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, tools.update_dict(fakes.DB_VPN_CONNECTION_1,
+                                        {'os_ipsec_site_connections': {}}))
+        self.neutron.delete_ipsec_site_connection.assert_called_once_with(
+            fakes.ID_OS_IPSEC_SITE_CONNECTION_2)
+
+        # delete subnet vpn connection, leave connections of other subnets
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        id_os_connection = fakes.random_os_id()
+        vpn_connection_1 = copy.deepcopy(fakes.DB_VPN_CONNECTION_1)
+        (vpn_connection_1['os_ipsec_site_connections']
+         [fakes.ID_EC2_SUBNET_1]) = id_os_connection
+        vpn_connection_api._delete_subnet_vpn(
+            context, self.neutron, cleaner, fakes.DB_SUBNET_1,
+            vpn_connection_1)
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY, fakes.DB_VPN_CONNECTION_1)
+        self.neutron.delete_ipsec_site_connection.assert_called_once_with(
+            id_os_connection)
+
+        # rollback of deleting subnet vpn connection
+        self.db_api.reset_mock()
+        self.neutron.reset_mock()
+        try:
+            with common.OnCrashCleaner() as cleaner:
+                vpn_connection_api._delete_subnet_vpn(
+                    context, self.neutron, cleaner, fakes.DB_SUBNET_2,
+                    copy.deepcopy(fakes.DB_VPN_CONNECTION_1))
+                raise Exception('fake-exception')
+        except Exception as ex:
+            if ex.message != 'fake-exception':
+                raise
+        self.db_api.update_item.assert_called_with(
+            mock.ANY, fakes.DB_VPN_CONNECTION_1)
+        self.assertFalse(self.neutron.create_ipsec_site_connection.called)
+
+    def test_get_route_table_vpn_cidrs(self):
+        route_table_1 = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
+        vpn_connection_1 = tools.update_dict(
+            fakes.DB_VPN_CONNECTION_1, {'cidrs': []})
+        vpn_connection_2 = tools.update_dict(
+            vpn_connection_1, {'id': fakes.ID_EC2_VPN_CONNECTION_2})
+
+        self.assertThat(
+            vpn_connection_api._get_route_table_vpn_cidrs(
+                route_table_1, fakes.DB_VPN_GATEWAY_1, []),
+            matchers.DictMatches({}))
+
+        self.assertThat(
+            vpn_connection_api._get_route_table_vpn_cidrs(
+                route_table_1, fakes.DB_VPN_GATEWAY_1,
+                [vpn_connection_1, vpn_connection_2]),
+            matchers.DictMatches({}))
+
+        route_table_1['propagating_gateways'] = [fakes.ID_EC2_VPN_GATEWAY_1,
+                                                 fakes.ID_EC2_VPN_GATEWAY_2]
+        self.assertThat(
+            vpn_connection_api._get_route_table_vpn_cidrs(
+                route_table_1, fakes.DB_VPN_GATEWAY_1,
+                [vpn_connection_1, vpn_connection_2]),
+            matchers.DictMatches({}))
+
+        vpn_connection_1['cidrs'] = ['cidr_1']
+        self.assertThat(
+            vpn_connection_api._get_route_table_vpn_cidrs(
+                route_table_1, fakes.DB_VPN_GATEWAY_1,
+                [vpn_connection_1, vpn_connection_2]),
+            matchers.DictMatches({fakes.ID_EC2_VPN_CONNECTION_1: ['cidr_1']}))
+
+        vpn_connection_2['cidrs'] = ['cidr_1', 'cidr_2']
+        self.assertThat(
+            vpn_connection_api._get_route_table_vpn_cidrs(
+                route_table_1, fakes.DB_VPN_GATEWAY_1,
+                [vpn_connection_1, vpn_connection_2]),
+            matchers.DictMatches(
+                {fakes.ID_EC2_VPN_CONNECTION_1: ['cidr_1'],
+                 fakes.ID_EC2_VPN_CONNECTION_2: ['cidr_1', 'cidr_2']},
+                orderless_lists=True))
+
+        route_table_1['routes'] = [
+            {'destination_cidr_block': 'fake_1',
+             'network_interface_id': fakes.ID_EC2_NETWORK_INTERFACE_1},
+            {'destination_cidr_block': 'fake_2',
+             'gateway_id': None},
+            {'destination_cidr_block': 'fake_3',
+             'gateway_id': fakes.ID_EC2_IGW_1},
+            {'destination_cidr_block': 'cidr_3',
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1},
+            {'destination_cidr_block': 'cidr_4',
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1},
+            {'destination_cidr_block': 'fake_4',
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_2}]
+
+        self.assertThat(
+            vpn_connection_api._get_route_table_vpn_cidrs(
+                route_table_1, fakes.DB_VPN_GATEWAY_1,
+                [vpn_connection_1, vpn_connection_2]),
+            matchers.DictMatches(
+                {fakes.ID_EC2_VPN_CONNECTION_1: ['cidr_1', 'cidr_3', 'cidr_4'],
+                 fakes.ID_EC2_VPN_CONNECTION_2: ['cidr_1', 'cidr_2',
+                                                 'cidr_3', 'cidr_4']},
+                orderless_lists=True))
+
+        route_table_1['propagating_gateways'] = [fakes.ID_EC2_VPN_GATEWAY_2]
+        self.assertThat(
+            vpn_connection_api._get_route_table_vpn_cidrs(
+                route_table_1, fakes.DB_VPN_GATEWAY_1,
+                [vpn_connection_1, vpn_connection_2]),
+            matchers.DictMatches(
+                {fakes.ID_EC2_VPN_CONNECTION_1: ['cidr_3', 'cidr_4'],
+                 fakes.ID_EC2_VPN_CONNECTION_2: ['cidr_3', 'cidr_4']},
+                orderless_lists=True))
