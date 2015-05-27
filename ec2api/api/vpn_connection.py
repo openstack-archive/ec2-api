@@ -184,7 +184,7 @@ class VpnConnectionDescriber(common.TaggableItemsDescriber,
                   'state': 'state',
                   'option.static-routes-only': ('options', 'staticRoutesOnly'),
                   'route.destination-cidr-block': ['routes',
-                                                   'destination_cidr_block'],
+                                                   'destinationCidrBlock'],
                   'type': 'type',
                   'vpn-connection-id': 'vpnConnectionId',
                   'vpn-gateway-id': 'vpnGatewayId'}
@@ -199,7 +199,7 @@ def _format_vpn_connection(vpn_connection):
             'customerGatewayId': vpn_connection['customer_gateway_id'],
             'state': 'available',
             'type': 'ipsec.1',
-            'routes': [{'destination_cidr_block': cidr,
+            'routes': [{'destinationCidrBlock': cidr,
                         'state': 'available'}
                        for cidr in vpn_connection['cidrs']],
             'vgwTelemetry': [],

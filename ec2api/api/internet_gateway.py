@@ -39,7 +39,7 @@ Validator = common.Validator
 
 def create_internet_gateway(context):
     igw = db_api.add_item(context, 'igw', {})
-    return {'internet_gateway': _format_internet_gateway(igw)}
+    return {'internetGateway': _format_internet_gateway(igw)}
 
 
 def attach_internet_gateway(context, internet_gateway_id, vpc_id):

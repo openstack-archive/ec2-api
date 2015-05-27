@@ -579,7 +579,7 @@ def describe_instance_attribute(context, instance_id, attribute):
                                               parameter='attribute',
                                               reason='Unknown attribute.')
 
-    result = {'instance_id': instance_id}
+    result = {'instanceId': instance_id}
     fn(result)
     return result
 

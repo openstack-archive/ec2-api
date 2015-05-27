@@ -39,11 +39,6 @@ def _underscore_to_camelcase(st):
     return ''.join([x[:1].upper() + x[1:] for x in st.split('_')])
 
 
-def _underscore_to_xmlcase(st):
-    res = _underscore_to_camelcase(st)
-    return res[:1].lower() + res[1:]
-
-
 def _database_to_isoformat(datetimeobj):
     """Return a xs:dateTime parsable string from datatime."""
     return datetimeobj.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
@@ -134,7 +129,6 @@ class APIRequest(object):
             raise
 
     def _render_data(self, xml, el_name, data):
-        el_name = _underscore_to_xmlcase(el_name)
         data_el = xml.createElement(el_name)
 
         if isinstance(data, list):
