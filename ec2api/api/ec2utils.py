@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import re
+# TODO(termie): replace minidom with etree
+from xml.dom import minidom
 
 from glanceclient.common import exceptions as glance_exception
+from lxml import etree
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_utils import encodeutils
 from oslo_utils import timeutils
+import six
 
 from ec2api.api import clients
 from ec2api.db import api as db_api
@@ -114,6 +120,59 @@ def dict_from_dotted_str(items):
                 args[key] = value
 
     return args
+
+
+def _render_dict(xml, el, data):
+    try:
+        for key in data.keys():
+            val = data[key]
+            el.appendChild(_render_data(xml, key, val))
+    except Exception:
+        LOG.debug(data)
+        raise
+
+
+def _render_data(xml, el_name, data):
+    data_el = xml.createElement(el_name)
+
+    if isinstance(data, list):
+        for item in data:
+            data_el.appendChild(_render_data(xml, 'item', item))
+    elif isinstance(data, dict):
+        _render_dict(xml, data_el, data)
+    elif hasattr(data, '__dict__'):
+        _render_dict(xml, data_el, data.__dict__)
+    elif isinstance(data, bool):
+        data_el.appendChild(xml.createTextNode(str(data).lower()))
+    elif isinstance(data, datetime.datetime):
+        data_el.appendChild(
+            xml.createTextNode(_database_to_isoformat(data)))
+    elif data is not None:
+        data_el.appendChild(xml.createTextNode(
+            encodeutils.safe_encode(six.text_type(data))))
+
+    return data_el
+
+
+def _database_to_isoformat(datetimeobj):
+    """Return a xs:dateTime parsable string from datatime."""
+    return datetimeobj.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
+
+
+def dict_to_lxml(data_dict, root_tag):
+    xml = minidom.Document()
+
+    response_el = xml.createElement(root_tag)
+    _render_dict(xml, response_el, data_dict)
+
+    xml.appendChild(response_el)
+
+    response = xml.toxml()
+    root = etree.fromstring(response)
+
+    xml.unlink()
+
+    return root
 
 
 _ms_time_regex = re.compile('^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3,6}Z$')

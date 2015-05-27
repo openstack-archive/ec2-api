@@ -16,15 +16,9 @@
 APIRequest class
 """
 
-import datetime
-# TODO(termie): replace minidom with etree
-from xml.dom import minidom
-
 from lxml import etree
 from oslo_config import cfg
 from oslo_log import log as logging
-from oslo_utils import encodeutils
-import six
 
 from ec2api.api import cloud
 from ec2api.api import ec2utils
@@ -89,27 +83,16 @@ class APIRequest(object):
         return self._render_response(result, context.request_id)
 
     def _render_response(self, response_data, request_id):
-        xml = minidom.Document()
+        response_el = ec2utils.dict_to_lxml(
+            {'return': 'true'} if response_data is True else response_data,
+            self.action + 'Response')
+        response_el.attrib['xmlns'] = ('http://ec2.amazonaws.com/doc/%s/'
+                                       % self.version)
+        request_id_el = etree.Element('requestId')
+        request_id_el.text = request_id
+        response_el.insert(0, request_id_el)
 
-        response_el = xml.createElement(self.action + 'Response')
-        response_el.setAttribute('xmlns',
-                                 'http://ec2.amazonaws.com/doc/%s/'
-                                 % self.version)
-        request_id_el = xml.createElement('requestId')
-        request_id_el.appendChild(xml.createTextNode(request_id))
-        response_el.appendChild(request_id_el)
-        if response_data is True:
-            self._render_dict(xml, response_el, {'return': 'true'})
-        else:
-            self._render_dict(xml, response_el, response_data)
-
-        xml.appendChild(response_el)
-
-        response = xml.toxml()
-        root = etree.fromstring(response)
-        response = etree.tostring(root, pretty_print=True)
-
-        xml.unlink()
+        response = etree.tostring(response_el, pretty_print=True)
 
         # Don't write private key to log
         if self.action != "CreateKeyPair":
@@ -118,33 +101,3 @@ class APIRequest(object):
             LOG.debug("CreateKeyPair: Return Private Key")
 
         return response
-
-    def _render_dict(self, xml, el, data):
-        try:
-            for key in data.keys():
-                val = data[key]
-                el.appendChild(self._render_data(xml, key, val))
-        except Exception:
-            LOG.debug(data)
-            raise
-
-    def _render_data(self, xml, el_name, data):
-        data_el = xml.createElement(el_name)
-
-        if isinstance(data, list):
-            for item in data:
-                data_el.appendChild(self._render_data(xml, 'item', item))
-        elif isinstance(data, dict):
-            self._render_dict(xml, data_el, data)
-        elif hasattr(data, '__dict__'):
-            self._render_dict(xml, data_el, data.__dict__)
-        elif isinstance(data, bool):
-            data_el.appendChild(xml.createTextNode(str(data).lower()))
-        elif isinstance(data, datetime.datetime):
-            data_el.appendChild(
-                xml.createTextNode(_database_to_isoformat(data)))
-        elif data is not None:
-            data_el.appendChild(xml.createTextNode(
-                encodeutils.safe_encode(six.text_type(data))))
-
-        return data_el
