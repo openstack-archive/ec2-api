@@ -445,15 +445,24 @@ class XMLMatches(object):
 
     """Compare XML strings.  More complete than string comparison."""
 
-    def __init__(self, expected):
+    def __init__(self, expected, orderless_sequence=False):
         self.expected_xml = expected
+        self.orderless_sequence = orderless_sequence
         self.expected = etree.fromstring(expected)
+        if self.orderless_sequence:
+            self._sort_xml(self.expected)
 
     def __str__(self):
         return 'XMLMatches(%r)' % self.expected_xml
 
+    def _sort_xml(self, xml):
+        for parent in xml.xpath('//*[./*]'):
+            parent[:] = sorted(parent, key=lambda x: x.tag)
+
     def match(self, actual_xml):
         actual = etree.fromstring(actual_xml)
+        if self.orderless_sequence:
+            self._sort_xml(actual)
 
         state = XMLMatchState(self.expected_xml, actual_xml)
         result = self._compare_node(self.expected, actual, state, None)

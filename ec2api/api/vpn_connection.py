@@ -15,6 +15,8 @@
 import random
 import string
 
+from lxml import etree
+import netaddr
 from neutronclient.common import exceptions as neutron_exception
 from oslo_log import log as logging
 
@@ -33,6 +35,8 @@ Validator = common.Validator
 
 
 SHARED_KEY_CHARS = string.ascii_letters + '_.' + string.digits
+AWS_MSS = 1387
+MTU_MSS_DELTA = 40  # 20 byte IP and 20 byte TCP headers
 
 
 def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
@@ -47,7 +51,10 @@ def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
         None)
     if vpn_connection:
         if vpn_connection['vpn_gateway_id'] == vpn_gateway_id:
-            return {'vpnConnection': _format_vpn_connection(vpn_connection)}
+            ec2_vpn_connections = describe_vpn_connections(
+                context, vpn_connection_id=[vpn_connection['id']])
+            return {
+                'vpnConnection': ec2_vpn_connections['vpnConnectionSet'][0]}
         else:
             raise exception.InvalidCustomerGatewayDuplicateIpAddress()
     neutron = clients.neutron(context)
@@ -95,7 +102,10 @@ def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
         _reset_vpn_connections(context, neutron, cleaner,
                                vpn_gateway, vpn_connections=[vpn_connection])
 
-    return {'vpnConnection': _format_vpn_connection(vpn_connection)}
+    ec2_vpn_connections = describe_vpn_connections(
+        context, vpn_connection_id=[vpn_connection['id']])
+    return {
+        'vpnConnection': ec2_vpn_connections['vpnConnectionSet'][0]}
 
 
 def create_vpn_connection_route(context, vpn_connection_id,
@@ -180,7 +190,9 @@ class VpnConnectionDescriber(common.TaggableItemsDescriber,
                              common.NonOpenstackItemsDescriber):
 
     KIND = 'vpn'
-    FILTER_MAP = {'customer-gateway-id': 'customerGatewayId',
+    FILTER_MAP = {'customer-gateway-configuration': (
+                        'customerGatewayConfiguration'),
+                  'customer-gateway-id': 'customerGatewayId',
                   'state': 'state',
                   'option.static-routes-only': ('options', 'staticRoutesOnly'),
                   'route.destination-cidr-block': ['routes',
@@ -189,11 +201,44 @@ class VpnConnectionDescriber(common.TaggableItemsDescriber,
                   'vpn-connection-id': 'vpnConnectionId',
                   'vpn-gateway-id': 'vpnGatewayId'}
 
+    def get_db_items(self):
+        self.customer_gateways = {
+            cgw['id']: cgw
+            for cgw in db_api.get_items(self.context, 'cgw')}
+        neutron = clients.neutron(self.context)
+        self.os_ikepolicies = {
+            ike['id']: ike
+            for ike in neutron.list_ikepolicies(
+                tenant_id=self.context.project_id)['ikepolicies']}
+        self.os_ipsecpolicies = {
+            ipsec['id']: ipsec
+            for ipsec in neutron.list_ipsecpolicies(
+                tenant_id=self.context.project_id)['ipsecpolicies']}
+        self.os_ipsec_site_connections = {
+            conn['id']: conn
+            for conn in neutron.list_ipsec_site_connections(
+                tenant_id=self.context.project_id)['ipsec_site_connections']}
+        self.external_ips = _get_vpn_gateways_external_ips(
+            self.context, neutron)
+        return super(VpnConnectionDescriber, self).get_db_items()
+
     def format(self, vpn_connection):
-        return _format_vpn_connection(vpn_connection)
+        return _format_vpn_connection(
+            vpn_connection, self.customer_gateways, self.os_ikepolicies,
+            self.os_ipsecpolicies, self.os_ipsec_site_connections,
+            self.external_ips)
 
 
-def _format_vpn_connection(vpn_connection):
+def _format_vpn_connection(vpn_connection, customer_gateways, os_ikepolicies,
+                           os_ipsecpolicies, os_ipsec_site_connections,
+                           external_ips):
+    config_dict = _format_customer_config(
+        vpn_connection, customer_gateways, os_ikepolicies, os_ipsecpolicies,
+        os_ipsec_site_connections, external_ips)
+    config = ec2utils.dict_to_lxml(config_dict, 'vpn_connection')
+    config.attrib['id'] = vpn_connection['id']
+    config_str = etree.tostring(config, xml_declaration=True, encoding='UTF-8',
+                                pretty_print=True)
     return {'vpnConnectionId': vpn_connection['id'],
             'vpnGatewayId': vpn_connection['vpn_gateway_id'],
             'customerGatewayId': vpn_connection['customer_gateway_id'],
@@ -203,7 +248,70 @@ def _format_vpn_connection(vpn_connection):
                         'state': 'available'}
                        for cidr in vpn_connection['cidrs']],
             'vgwTelemetry': [],
-            'options': {'staticRoutesOnly': True}}
+            'options': {'staticRoutesOnly': True},
+            'customerGatewayConfiguration': config_str}
+
+
+def _format_customer_config(vpn_connection, customer_gateways, os_ikepolicies,
+                            os_ipsecpolicies, os_ipsec_site_connections,
+                            external_ips):
+    customer_gateway = customer_gateways[vpn_connection['customer_gateway_id']]
+    os_connections_ids = vpn_connection['os_ipsec_site_connections'].values()
+    if os_connections_ids:
+        os_ipsec_site_connection = next(
+            (os_ipsec_site_connections[conn_id]
+             for conn_id in os_connections_ids
+             if os_ipsec_site_connections.get(conn_id)),
+            None)
+    else:
+        os_ipsec_site_connection = None
+
+    # TODO(ft): figure out and add to the output tunnel internal addresses
+    config_dict = {
+        'customer_gateway_id': vpn_connection['customer_gateway_id'],
+        'vpn_gateway_id': vpn_connection['vpn_gateway_id'],
+        'vpn_connection_type': 'ipsec.1',
+        'vpn_connection_attributes': 'NoBGPVPNConnection',
+        'ipsec_tunnel': {
+            'customer_gateway': {
+                'tunnel_outside_address': {
+                    'ip_address': (
+                        os_ipsec_site_connection['peer_address']
+                        if os_ipsec_site_connection else
+                        customer_gateway['ip_address'])}},
+            'vpn_gateway': {
+                'tunnel_outside_address': {
+                    'ip_address': external_ips.get(
+                        vpn_connection['vpn_gateway_id'])}}},
+    }
+    os_ikepolicy = os_ikepolicies.get(vpn_connection['os_ikepolicy_id'])
+    if os_ikepolicy:
+        config_dict['ipsec_tunnel']['ike'] = {
+            'authentication_protocol': os_ikepolicy['auth_algorithm'],
+            'encryption_protocol': os_ikepolicy['encryption_algorithm'],
+            'lifetime': os_ikepolicy['lifetime']['value'],
+            'perfect_forward_secrecy': os_ikepolicy['pfs'],
+            'mode': os_ikepolicy['phase1_negotiation_mode'],
+            'pre_shared_key': (
+                os_ipsec_site_connection['psk']
+                if os_ipsec_site_connection else
+                vpn_connection['pre_shared_key']),
+        }
+    os_ipsecpolicy = os_ipsecpolicies.get(vpn_connection['os_ipsecpolicy_id'])
+    if os_ipsecpolicy:
+        config_dict['ipsec_tunnel']['ipsec'] = {
+            'protocol': os_ipsecpolicy['transform_protocol'],
+            'authentication_protocol': os_ipsecpolicy['auth_algorithm'],
+            'encryption_protocol': os_ipsecpolicy['encryption_algorithm'],
+            'lifetime': os_ipsecpolicy['lifetime']['value'],
+            'perfect_forward_secrecy': os_ipsecpolicy['pfs'],
+            'mode': os_ipsecpolicy['encapsulation_mode'],
+            'tcp_mss_adjustment': (
+                os_ipsec_site_connection['mtu'] - MTU_MSS_DELTA
+                if os_ipsec_site_connection else
+                AWS_MSS),
+        }
+    return config_dict
 
 
 def _stop_vpn_connection(neutron, vpn_connection):
@@ -300,7 +408,7 @@ def _set_subnet_vpn(context, neutron, cleaner, subnet, vpn_connection,
             'psk': vpn_connection['pre_shared_key'],
             'name': '%s/%s' % (vpn_connection['id'], subnet['id']),
             'peer_id': customer_gateway['ip_address'],
-            'mtu': 1387 + 40,  # AWS MSS + 20 byte IP and 20 byte TCP headers
+            'mtu': AWS_MSS + MTU_MSS_DELTA,
             'initiator': 'response-only',
         }
         os_connection = (neutron.create_ipsec_site_connection(
@@ -346,6 +454,23 @@ def _get_route_table_vpn_cidrs(route_table, vpn_gateway, vpn_connections):
         if cidrs:
             vpn_cidrs[vpn['id']] = cidrs
     return vpn_cidrs
+
+
+def _get_vpn_gateways_external_ips(context, neutron):
+    vpcs = {vpc['id']: vpc
+            for vpc in db_api.get_items(context, 'vpc')}
+    external_ips = {}
+    routers = neutron.list_routers(
+        tenant_id=context.project_id)['routers']
+    for router in routers:
+        info = router['external_gateway_info']
+        if info:
+            for ip in info['external_fixed_ips']:
+                if netaddr.valid_ipv4(ip['ip_address']):
+                    external_ips[router['id']] = ip['ip_address']
+    return {vgw['id']: external_ips.get(vpcs[vgw['vpc_id']]['os_id'])
+            for vgw in db_api.get_items(context, 'vgw')
+            if vgw['vpc_id']}
 
 
 def _add_cidr_to_vpn_connection_item(context, vpn_connection, cidr):

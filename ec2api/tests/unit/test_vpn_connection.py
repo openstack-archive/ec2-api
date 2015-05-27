@@ -27,10 +27,12 @@ from ec2api.tests.unit import tools
 
 class VpnConnectionTestCase(base.ApiTestCase):
 
+    @mock.patch('ec2api.api.vpn_connection.describe_vpn_connections')
     @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections',
                 wraps=vpn_connection_api._reset_vpn_connections)
     @mock.patch('random.choice')
-    def test_create_vpn_connection(self, random_choice, reset_vpn_connections):
+    def test_create_vpn_connection(self, random_choice, reset_vpn_connections,
+                                   describe_vpn_connections):
         self.set_mock_db_items(
             fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2,
             fakes.DB_CUSTOMER_GATEWAY_1, fakes.DB_CUSTOMER_GATEWAY_2,
@@ -42,6 +44,8 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.db_api.add_item.side_effect = (
             tools.get_db_api_add_item(fakes.ID_EC2_VPN_CONNECTION_1))
         random_choice.side_effect = iter(fakes.PRE_SHARED_KEY_1)
+        describe_vpn_connections.return_value = {
+            'vpnConnectionSet': [fakes.EC2_VPN_CONNECTION_1]}
 
         resp = self.execute(
             'CreateVpnConnection',
@@ -52,9 +56,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertThat(
             resp,
             matchers.DictMatches(
-                {'vpnConnection': (
-                    tools.update_dict(fakes.EC2_VPN_CONNECTION_1,
-                                      {'routes': None}))}))
+                {'vpnConnection': fakes.EC2_VPN_CONNECTION_1}))
 
         self.neutron.create_ikepolicy.assert_called_once_with(
             {'ikepolicy': tools.purge_dict(fakes.OS_IKEPOLICY_1, ('id',))})
@@ -79,11 +81,16 @@ class VpnConnectionTestCase(base.ApiTestCase):
             vpn_connections=[new_vpn_connection_1])
         self.assertIsInstance(reset_vpn_connections.call_args[0][2],
                               common.OnCrashCleaner)
+        describe_vpn_connections.assert_called_once_with(
+            mock.ANY, vpn_connection_id=[fakes.ID_EC2_VPN_CONNECTION_1])
 
-    def test_create_vpn_connection_idempotent(self):
+    @mock.patch('ec2api.api.vpn_connection.describe_vpn_connections')
+    def test_create_vpn_connection_idempotent(self, describe_vpn_connections):
         self.set_mock_db_items(
             fakes.DB_VPN_GATEWAY_1, fakes.DB_CUSTOMER_GATEWAY_1,
             fakes.DB_VPN_CONNECTION_1)
+        describe_vpn_connections.return_value = {
+            'vpnConnectionSet': [fakes.EC2_VPN_CONNECTION_1]}
 
         resp = self.execute(
             'CreateVpnConnection',
@@ -96,6 +103,8 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertFalse(self.neutron.create_ikepolicy.called)
         self.assertFalse(self.neutron.create_ipsecpolicy.called)
         self.assertFalse(self.db_api.add_item.called)
+        describe_vpn_connections.assert_called_once_with(
+            mock.ANY, vpn_connection_id=[fakes.ID_EC2_VPN_CONNECTION_1])
 
     def test_create_vpn_connection_invalid_parameters(self):
         self.assert_execution_error(
@@ -284,16 +293,48 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertFalse(self.neutron.create_ikepolicy.called)
 
     def test_describe_vpn_connections(self):
-        self.set_mock_db_items(fakes.DB_VPN_CONNECTION_1,
-                               fakes.DB_VPN_CONNECTION_2)
+        self.set_mock_db_items(
+            fakes.DB_VPN_CONNECTION_1, fakes.DB_VPN_CONNECTION_2,
+            fakes.DB_CUSTOMER_GATEWAY_1, fakes.DB_CUSTOMER_GATEWAY_2,
+            fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2,
+            fakes.DB_VPC_1, fakes.DB_VPC_2)
+        self.neutron.list_ikepolicies.return_value = {
+            'ikepolicies': [fakes.OS_IKEPOLICY_1, fakes.OS_IKEPOLICY_2]}
+        self.neutron.list_ipsecpolicies.return_value = {
+            'ipsecpolicies': [fakes.OS_IPSECPOLICY_1, fakes.OS_IPSECPOLICY_2]}
+        self.neutron.list_ipsec_site_connections.return_value = {
+            'ipsec_site_connections': []}
+        self.neutron.list_routers.return_value = {
+            'routers': [fakes.OS_ROUTER_1, fakes.OS_ROUTER_2]}
 
         resp = self.execute('DescribeVpnConnections', {})
+        vpns = [tools.update_dict(
+                    vpn, {'customerGatewayConfiguration': 'DONTCARE'})
+                for vpn in (fakes.EC2_VPN_CONNECTION_1,
+                            fakes.EC2_VPN_CONNECTION_2)]
         self.assertThat(
             resp,
             matchers.DictMatches(
-                {'vpnConnectionSet': [fakes.EC2_VPN_CONNECTION_1,
-                                      fakes.EC2_VPN_CONNECTION_2]},
+                {'vpnConnectionSet': vpns},
                 orderless_lists=True))
+        for vpn in (fakes.EC2_VPN_CONNECTION_1, fakes.EC2_VPN_CONNECTION_2):
+            config = next(v['customerGatewayConfiguration']
+                          for v in resp['vpnConnectionSet']
+                          if v['vpnConnectionId'] == vpn['vpnConnectionId'])
+            self.assertThat(
+                config,
+                matchers.XMLMatches(vpn['customerGatewayConfiguration'],
+                                    orderless_sequence=True))
+            self.assertTrue(config.startswith(
+                '<?xml version=\'1.0\' encoding=\'UTF-8\'?>'))
+        self.neutron.list_ikepolicies.assert_called_once_with(
+            tenant_id=fakes.ID_OS_PROJECT)
+        self.neutron.list_ipsecpolicies.assert_called_once_with(
+            tenant_id=fakes.ID_OS_PROJECT)
+        self.neutron.list_ipsec_site_connections.assert_called_once_with(
+            tenant_id=fakes.ID_OS_PROJECT)
+        self.neutron.list_routers.assert_called_once_with(
+            tenant_id=fakes.ID_OS_PROJECT)
 
         resp = self.execute(
             'DescribeVpnConnections',
@@ -301,12 +342,14 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertThat(
             resp,
             matchers.DictMatches(
-                {'vpnConnectionSet': [fakes.EC2_VPN_CONNECTION_1]},
+                {'vpnConnectionSet': [vpns[0]]},
                 orderless_lists=True))
 
         self.check_filtering(
             'DescribeVpnConnections', 'vpnConnectionSet',
-            [('customer-gateway-id', fakes.ID_EC2_CUSTOMER_GATEWAY_1),
+            [('customer-gateway-configuration',
+              '*' + fakes.PRE_SHARED_KEY_1 + '*'),
+             ('customer-gateway-id', fakes.ID_EC2_CUSTOMER_GATEWAY_1),
              ('state', 'available'),
              ('option.static-routes-only', True),
              ('route.destination-cidr-block', fakes.CIDR_VPN_2_PROPAGATED_1),
@@ -321,12 +364,66 @@ class VpnConnectionTestCase(base.ApiTestCase):
     def test_format_vpn_connection(self):
         db_vpn_connection_1 = tools.update_dict(fakes.DB_VPN_CONNECTION_1,
                                                 {'cidrs': []})
-        ec2_vpn_connection_1 = tools.update_dict(fakes.EC2_VPN_CONNECTION_1,
-                                                 {'routes': [],
-                                                  'vgwTelemetry': []})
+        ec2_vpn_connection_1 = tools.patch_dict(
+            fakes.EC2_VPN_CONNECTION_1,
+            {'routes': [], 'vgwTelemetry': []},
+            ('customerGatewayConfiguration',))
         formatted = vpn_connection_api._format_vpn_connection(
-            db_vpn_connection_1)
+            db_vpn_connection_1,
+            {fakes.ID_EC2_CUSTOMER_GATEWAY_1: fakes.DB_CUSTOMER_GATEWAY_1},
+            {}, {}, {}, {})
+        formatted.pop('customerGatewayConfiguration')
         self.assertThat(ec2_vpn_connection_1, matchers.DictMatches(formatted))
+
+    def test_format_customer_config(self):
+        ikepolicy = {
+            'auth_algorithm': 'sha1-fake',
+            'encryption_algorithm': '3des',
+            'lifetime': {'value': 1111},
+            'pfs': 'group5',
+            'phase1_negotiation_mode': 'main-fake',
+        }
+        ipsecpolicy = {
+            'transform_protocol': 'ah-esp',
+            'auth_algorithm': 'sha1-fake',
+            'encryption_algorithm': 'aes-256',
+            'lifetime': {'value': 2222},
+            'pfs': 'group14',
+            'encapsulation_mode': 'transport',
+        }
+        ipsec_site_connection = {
+            'peer_address': '1.2.3.4',
+            'psk': 'password',
+            'mtu': 1400,
+        }
+        conf = vpn_connection_api._format_customer_config(
+            fakes.DB_VPN_CONNECTION_1,
+            {fakes.ID_EC2_CUSTOMER_GATEWAY_1: fakes.DB_CUSTOMER_GATEWAY_1},
+            {fakes.ID_OS_IKEPOLICY_1: ikepolicy},
+            {fakes.ID_OS_IPSECPOLICY_1: ipsecpolicy},
+            {fakes.ID_OS_IPSEC_SITE_CONNECTION_2: ipsec_site_connection},
+            {fakes.ID_EC2_VPN_GATEWAY_1: '5.6.7.8'})
+
+        self.assertThat(
+            {'ipsec_tunnel': {
+                'customer_gateway': {
+                    'tunnel_outside_address': {'ip_address': '1.2.3.4'}},
+                'vpn_gateway': {
+                    'tunnel_outside_address': {'ip_address': '5.6.7.8'}},
+                'ike': {'authentication_protocol': 'sha1-fake',
+                        'encryption_protocol': '3des',
+                        'lifetime': 1111,
+                        'perfect_forward_secrecy': 'group5',
+                        'mode': 'main-fake',
+                        'pre_shared_key': 'password'},
+                'ipsec': {'protocol': 'ah-esp',
+                          'authentication_protocol': 'sha1-fake',
+                          'encryption_protocol': 'aes-256',
+                          'lifetime': 2222,
+                          'perfect_forward_secrecy': 'group14',
+                          'mode': 'transport',
+                          'tcp_mss_adjustment': 1400 - 40}}},
+            matchers.IsSubDictOf(conf))
 
     def test_stop_vpn_connection(self):
         # delete several connections

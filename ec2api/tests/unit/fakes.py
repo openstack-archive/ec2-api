@@ -18,6 +18,7 @@ import json
 import random
 import uuid
 
+from lxml import etree
 from oslo_utils import timeutils
 
 from ec2api.tests.unit import tools
@@ -60,6 +61,8 @@ CIDR_VPC_1 = '10.10.0.0/16'
 CIDR_VPC_2 = '10.20.0.0/16'
 ID_OS_PUBLIC_NETWORK = random_os_id()
 NAME_OS_PUBLIC_NETWORK = 'public_external'
+IP_ROUTER_1_EXTERNAL_V4 = '172.20.12.25'
+IP_ROUTER_1_EXTERNAL_V6 = '::ffff:172.20.12.25'
 
 
 # internet gateway constants
@@ -270,6 +273,92 @@ CIDR_VPN_1_PROPAGATED_1 = '192.168.110.0/24'
 CIDR_VPN_2_PROPAGATED_1 = '192.168.210.0/24'
 CIDR_VPN_2_PROPAGATED_2 = '192.168.220.0/24'
 
+CUSTOMER_GATEWAY_CONFIGURATION_1 = etree.tostring(etree.fromstring(
+    '<?xml version=\'1.0\' encoding=\'UTF-8\'?>'
+    '<vpn_connection id="' + ID_EC2_VPN_CONNECTION_1 + '">'
+    '  <customer_gateway_id>' + (ID_EC2_CUSTOMER_GATEWAY_1 +
+                                 '</customer_gateway_id>') +
+    '  <vpn_gateway_id>' + (ID_EC2_VPN_GATEWAY_1 +
+                            '</vpn_gateway_id>') +
+    '  <vpn_connection_type>ipsec.1</vpn_connection_type>'
+    '  <vpn_connection_attributes>' + ('NoBGPVPNConnection'
+                                       '</vpn_connection_attributes>') +
+    '  <ipsec_tunnel>'
+    '    <customer_gateway>'
+    '      <tunnel_outside_address>'
+    '        <ip_address>' + IP_CUSTOMER_GATEWAY_ADDRESS_1 + '</ip_address>'
+    '      </tunnel_outside_address>'
+    '    </customer_gateway>'
+    '    <vpn_gateway>'
+    '      <tunnel_outside_address>'
+    '        <ip_address>' + IP_ROUTER_1_EXTERNAL_V4 + '</ip_address>'
+    '      </tunnel_outside_address>'
+    '    </vpn_gateway>'
+    '    <ike>'
+    '      <authentication_protocol>sha1</authentication_protocol>'
+    '      <encryption_protocol>aes-128</encryption_protocol>'
+    '      <lifetime>28800</lifetime>'
+    '      <perfect_forward_secrecy>group2</perfect_forward_secrecy>'
+    '      <mode>main</mode>'
+    '      <pre_shared_key>' + PRE_SHARED_KEY_1 + '</pre_shared_key>'
+    '    </ike>'
+    '    <ipsec>'
+    '      <protocol>esp</protocol>'
+    '      <authentication_protocol>sha1</authentication_protocol>'
+    '      <encryption_protocol>aes-128</encryption_protocol>'
+    '      <lifetime>3600</lifetime>'
+    '      <perfect_forward_secrecy>group2</perfect_forward_secrecy>'
+    '      <mode>tunnel</mode>'
+    '      <tcp_mss_adjustment>1387</tcp_mss_adjustment>'
+    '    </ipsec>'
+    '  </ipsec_tunnel>'
+    '</vpn_connection>',
+    parser=etree.XMLParser(remove_blank_text=True)
+), xml_declaration=True, encoding='UTF-8', pretty_print=True)
+CUSTOMER_GATEWAY_CONFIGURATION_2 = etree.tostring(etree.fromstring(
+    '<?xml version=\'1.0\' encoding=\'UTF-8\'?>'
+    '<vpn_connection id="' + ID_EC2_VPN_CONNECTION_2 + '">'
+    '  <customer_gateway_id>' + (ID_EC2_CUSTOMER_GATEWAY_2 +
+                                 '</customer_gateway_id>') +
+    '  <vpn_gateway_id>' + (ID_EC2_VPN_GATEWAY_2 +
+                            '</vpn_gateway_id>') +
+    '  <vpn_connection_type>ipsec.1</vpn_connection_type>'
+    '  <vpn_connection_attributes>' + ('NoBGPVPNConnection'
+                                       '</vpn_connection_attributes>') +
+    '  <ipsec_tunnel>'
+    '    <customer_gateway>'
+    '      <tunnel_outside_address>'
+    '        <ip_address>' + IP_CUSTOMER_GATEWAY_ADDRESS_2 + '</ip_address>'
+    '      </tunnel_outside_address>'
+    '    </customer_gateway>'
+    '    <vpn_gateway>'
+    '      <tunnel_outside_address>'
+    '        <ip_address/>'
+    '      </tunnel_outside_address>'
+    '    </vpn_gateway>'
+    '    <ike>'
+    '      <authentication_protocol>sha1</authentication_protocol>'
+    '      <encryption_protocol>aes-128</encryption_protocol>'
+    '      <lifetime>28800</lifetime>'
+    '      <perfect_forward_secrecy>group2</perfect_forward_secrecy>'
+    '      <mode>main</mode>'
+    '      <pre_shared_key>' + PRE_SHARED_KEY_2 + '</pre_shared_key>'
+    '    </ike>'
+    '    <ipsec>'
+    '      <protocol>esp</protocol>'
+    '      <authentication_protocol>sha1</authentication_protocol>'
+    '      <encryption_protocol>aes-128</encryption_protocol>'
+    '      <lifetime>3600</lifetime>'
+    '      <perfect_forward_secrecy>group2</perfect_forward_secrecy>'
+    '      <mode>tunnel</mode>'
+    '      <tcp_mss_adjustment>1387</tcp_mss_adjustment>'
+    '    </ipsec>'
+    '  </ipsec_tunnel>'
+    '</vpn_connection>',
+    parser=etree.XMLParser(remove_blank_text=True)
+), xml_declaration=True, encoding='UTF-8', pretty_print=True)
+
+
 # Object constants section
 # Constant name notation:
 # [<subtype>]<object_name>
@@ -305,9 +394,14 @@ EC2_VPC_2 = {'vpcId': ID_EC2_VPC_2,
              'dhcpOptionsId': 'default'}
 
 OS_ROUTER_1 = {'id': ID_OS_ROUTER_1,
-               'name': ID_EC2_VPC_1}
+               'name': ID_EC2_VPC_1,
+               'external_gateway_info': {
+                    'external_fixed_ips': [
+                        {'ip_address': IP_ROUTER_1_EXTERNAL_V6},
+                        {'ip_address': IP_ROUTER_1_EXTERNAL_V4}]}}
 OS_ROUTER_2 = {'id': ID_OS_ROUTER_2,
-               'name': ID_EC2_VPC_2}
+               'name': ID_EC2_VPC_2,
+               'external_gateway_info': None}
 
 
 # internet gateway objects
@@ -1666,6 +1760,7 @@ EC2_VPN_CONNECTION_1 = {
                 'state': 'available'}],
     'vgwTelemetry': None,
     'options': {'staticRoutesOnly': True},
+    'customerGatewayConfiguration': CUSTOMER_GATEWAY_CONFIGURATION_1,
 }
 EC2_VPN_CONNECTION_2 = {
     'vpnConnectionId': ID_EC2_VPN_CONNECTION_2,
@@ -1679,6 +1774,7 @@ EC2_VPN_CONNECTION_2 = {
                 'state': 'available'}],
     'vgwTelemetry': None,
     'options': {'staticRoutesOnly': True},
+    'customerGatewayConfiguration': CUSTOMER_GATEWAY_CONFIGURATION_2,
 }
 
 OS_IKEPOLICY_1 = {
