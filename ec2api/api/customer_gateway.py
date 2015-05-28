@@ -19,6 +19,10 @@ from ec2api import exception
 from ec2api.i18n import _
 
 
+"""Customer gateways related API implementation
+"""
+
+
 Validator = common.Validator
 
 
