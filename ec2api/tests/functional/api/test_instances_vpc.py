@@ -66,7 +66,6 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.assertTrue(instance['SourceDestCheck'])
         self.assertEqual(1, len(instance['NetworkInterfaces']))
         ni = instance['NetworkInterfaces'][0]
-        self.assertIsNone(ni['Description'])
         self.assertEqual(1, len(ni['Groups']))
         self.assertIsNotNone(ni['MacAddress'])
         self.assertIsNotNone(ni['PrivateIpAddress'])
