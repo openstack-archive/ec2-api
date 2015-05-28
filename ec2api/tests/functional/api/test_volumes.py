@@ -40,8 +40,6 @@ class VolumeTest(base.EC2TestCase):
         self.assertEqual(1, data['Size'])
         if 'Encrypted' in data:
             self.assertFalse(data['Encrypted'])
-        if 'SnapshotId' in data:
-            self.assertIsNone(data['SnapshotId'])
         self.assertIsNotNone(data['CreateTime'])
         self.assertEqual(CONF.aws.aws_zone, data['AvailabilityZone'])
 
@@ -105,8 +103,6 @@ class VolumeTest(base.EC2TestCase):
         self.assertEqual(1, volume['Size'])
         if 'Encrypted' in volume:
             self.assertFalse(volume['Encrypted'])
-        if 'SnapshotId' in volume:
-            self.assertIsNone(volume['SnapshotId'])
 
         self.client.delete_volume(VolumeId=volume_id_ext)
         self.cancelResourceCleanUp(res_clean_ext)
