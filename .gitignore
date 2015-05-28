@@ -7,3 +7,4 @@ ec2_api.egg-info
 .testrepository
 /functional_tests.conf
 /buckets
+.venv

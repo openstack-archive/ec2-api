@@ -226,6 +226,17 @@ EC2 API supports Nova client (>=2.16.0) with no microversion support.
 Additional limitations are the same, except network interfaces'
 deleteOnTermination.
 
+Preferred way to run EC2 API in these releases is to run it in virtual environment:
+- create virtual environment by running command 'python tools/install_venv.py'
+- run install inside venv 'tools/with_venv.sh ./install.sh'
+- and then you need to run EC2 API services: 'ec2-api', 'ec2-api-metadata'
+  and 'ec2-api-s3'
+Also you need to reconfigure metadata ports in nova(and neutron) config files
+if you want metadata to work correctly. (See 'Installation' section).
+After these steps you will have working EC2 API services at ports:
+8788 for EC2 API and 3334 for S3 API. Don't forget to change keystone endpoints
+if you want to run some automated scripts relying on keystone information.
+
 References
 ==========
 

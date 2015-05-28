@@ -277,6 +277,8 @@ args=(sys.stdout,)
 format=%(name)s - %(levelname)s - %(message)s
 EOF
 
+pip install MySQL-python
+
 ec2-api-manage --log-config=$log_conf db_sync
 rm $log_conf
 

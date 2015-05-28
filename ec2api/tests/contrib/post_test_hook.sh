@@ -29,7 +29,7 @@ OLD_OS_PASSWORD=$OS_PASSWORD
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
-  openstack catalog list
+  openstack endpoint list --long
   if [[ "$?" -ne "0" ]]; then
     echo "Looks like credentials are absent."
     exit 1
@@ -57,7 +57,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   eval $(openstack user create "$user_name" --project "$tenant_id" --password "password" --email "$user_name@example.com" -f shell -c id)
   user_id=$id
   # create network
-  if [[ -n $(openstack catalog list | grep neutron) ]]; then
+  if [[ -n $(openstack endpoint list | grep neutron) ]]; then
     net_id=$(neutron net-create --tenant-id $tenant_id "private" | grep ' id ' | awk '{print $4}')
     subnet_id=$(neutron subnet-create --tenant-id $tenant_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
     router_id=$(neutron router-create --tenant-id $tenant_id "private_router" | grep ' id ' | awk '{print $4}')
@@ -84,7 +84,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   volume_status() { cinder show $1|awk '/ status / {print $4}'; }
   instance_status() { nova show $1|awk '/ status / {print $4}'; }
 
-  openstack_image_id=$(openstack image list --long | grep "cirros" | grep " ami " | awk '{print $2}')
+  openstack_image_id=$(openstack image list --long | grep "cirros" | grep " ami " | head -1 | awk '{print $2}')
   volume_id=$(cinder create --image-id $openstack_image_id 1 | awk '/ id / {print $4}')
   fail=0
   until [[ $(volume_status $volume_id) == "available" ]]; do

@@ -308,9 +308,12 @@ sudo rm -f $AUTH_CACHE_DIR/*
 
 #install it
 echo Installing package
-sudo python setup.py develop
-sudo rm -rf build ec2_api.egg-info
+if [[ -z "$VIRTUAL_ENV" ]]; then
+  SUDO_PREFIX="sudo"
+fi
+$SUDO_PREFIX python setup.py develop
+$SUDO_PREFIX rm -rf build ec2_api.egg-info
 
 #recreate database
 echo Setuping database
-sudo tools/db/ec2api-db-setup deb
+$SUDO_PREFIX tools/db/ec2api-db-setup deb
