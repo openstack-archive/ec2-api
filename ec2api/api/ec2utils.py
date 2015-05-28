@@ -159,7 +159,7 @@ def _database_to_isoformat(datetimeobj):
     return datetimeobj.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z'
 
 
-def dict_to_lxml(data_dict, root_tag):
+def dict_to_xml(data_dict, root_tag):
     xml = minidom.Document()
 
     response_el = xml.createElement(root_tag)
