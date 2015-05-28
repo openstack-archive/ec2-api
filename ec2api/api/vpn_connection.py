@@ -235,7 +235,7 @@ def _format_vpn_connection(vpn_connection, customer_gateways, os_ikepolicies,
     config_dict = _format_customer_config(
         vpn_connection, customer_gateways, os_ikepolicies, os_ipsecpolicies,
         os_ipsec_site_connections, external_ips)
-    config = ec2utils.dict_to_lxml(config_dict, 'vpn_connection')
+    config = ec2utils.dict_to_xml(config_dict, 'vpn_connection')
     config.attrib['id'] = vpn_connection['id']
     config_str = etree.tostring(config, xml_declaration=True, encoding='UTF-8',
                                 pretty_print=True)

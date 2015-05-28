@@ -83,7 +83,7 @@ class APIRequest(object):
         return self._render_response(result, context.request_id)
 
     def _render_response(self, response_data, request_id):
-        response_el = ec2utils.dict_to_lxml(
+        response_el = ec2utils.dict_to_xml(
             {'return': 'true'} if response_data is True else response_data,
             self.action + 'Response')
         response_el.attrib['xmlns'] = ('http://ec2.amazonaws.com/doc/%s/'
