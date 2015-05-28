@@ -100,7 +100,6 @@ General:
 - Some exceptions are not exactly the same as reported by AWS.
 
 Not supported functionality features:
-- VPN
 - Network ACL
 - VPC Peering connection
 - Classic Link
@@ -185,6 +184,19 @@ DescribeAccountAttributes result properties:
 - pc-max-security-groups-per-interface AccountAttribute property
 - max-elastic-ips AccountAttribute property
 - vpc-max-elastic-ips AccountAttribute property
+
+VpnGateway related:
+- availabilityZone property
+
+CustomerGateway related:
+- bgpAsn property
+
+VpnConnection related:
+- vgwTelemetry property
+- tunnel_inside_address CustomerGatewayConfiguration tag
+- clear_df_bit CustomerGatewayConfiguration tag
+- fragmentation_before_encryption CustomerGatewayConfiguration tag
+- dead_peer_detection CustomerGatewayConfiguration tag
 
 Supported Features
 ==================
