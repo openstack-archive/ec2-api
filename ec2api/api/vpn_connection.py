@@ -31,6 +31,10 @@ from ec2api.i18n import _
 LOG = logging.getLogger(__name__)
 
 
+"""VPN connections related API implementation
+"""
+
+
 Validator = common.Validator
 
 

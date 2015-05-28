@@ -75,7 +75,7 @@ rpcapi_opts = [
 CONF.register_opts(rpcapi_opts)
 
 
-"""Volume related API implementation
+"""Images related API implementation
 """
 
 
