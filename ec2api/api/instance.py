@@ -18,6 +18,7 @@ import copy
 import itertools
 import random
 import re
+import time
 
 from novaclient import exceptions as nova_exception
 from oslo_config import cfg
@@ -108,14 +109,7 @@ def run_instances(context, image_id, min_count, max_count,
             context, image_id, kernel_id, ramdisk_id)
 
     nova = clients.nova(context)
-    try:
-        if instance_type is None:
-            instance_type = CONF.default_flavor
-        os_flavor = next(f for f in nova.flavors.list()
-                         if f.name == instance_type)
-    except StopIteration:
-        raise exception.InvalidParameterValue(value=instance_type,
-                                              parameter='InstanceType')
+    os_flavor = _get_os_flavor(instance_type, nova)
 
     bdm = _parse_block_device_mapping(context, block_device_mapping)
     availability_zone = (placement or {}).get('availability_zone')
@@ -602,6 +596,9 @@ def modify_instance_attribute(context, instance_id, attribute=None,
         elif attribute == 'sourceDestCheck':
             if source_dest_check is not None:
                 raise exception.InvalidParameterCombination()
+        elif attribute == 'instanceType':
+            if instance_type is not None:
+                raise exception.InvalidParameterCombination()
         else:
             raise exception.InvalidParameterValue(value=attribute,
                                                   parameter='attribute',
@@ -622,57 +619,92 @@ def modify_instance_attribute(context, instance_id, attribute=None,
         disable_api_termination = value
     elif attribute == 'sourceDestCheck':
         source_dest_check = value
+    elif attribute == 'instanceType':
+        instance_type = value
 
     instance = ec2utils.get_db_item(context, instance_id)
     if disable_api_termination is not None:
-        instance = ec2utils.get_db_item(context, instance_id)
         instance['disable_api_termination'] = value
         db_api.update_item(context, instance)
         return True
     elif group_id is not None:
-        if not instance.get('vpc_id'):
-            raise exception.InvalidParameterCombination(message=_('You may '
-                'only modify the groupSet attribute for VPC instances'))
-        enis = network_interface_api.describe_network_interfaces(
-            context, filter=[{'name': 'attachment.instance-id',
-                              'value': [instance_id]}]
-            )['networkInterfaceSet']
-        if len(enis) != 1:
-            raise exception.InvalidInstanceId(instance_id=instance_id)
-        network_interface_api.modify_network_interface_attribute(context,
-            enis[0]['networkInterfaceId'], security_group_id=group_id)
+        _modify_group(context, instance, group_id)
         return True
     elif source_dest_check is not None:
-        if not instance.get('vpc_id'):
-            raise exception.InvalidParameterCombination(message=_('You may '
-                'only modify the sourceDestCheck attribute for VPC instances'))
-        enis = network_interface_api.describe_network_interfaces(
-            context, filter=[{'name': 'attachment.instance-id',
-                              'value': [instance_id]}]
-            )['networkInterfaceSet']
-        if len(enis) != 1:
-            raise exception.InvalidInstanceId(instance_id=instance_id)
-        network_interface_api.modify_network_interface_attribute(context,
-            enis[0]['networkInterfaceId'], source_dest_check=source_dest_check)
+        _modify_source_dest_check(context, instance, source_dest_check)
+        return True
+    elif instance_type:
+        _modify_instance_type(context, instance, instance_type)
         return True
 
     raise exception.InvalidParameterCombination()
 
 
+def _modify_group(context, instance, group_id):
+    if not instance.get('vpc_id'):
+        raise exception.InvalidParameterCombination(message=_('You may '
+            'only modify the groupSet attribute for VPC instances'))
+    enis = network_interface_api.describe_network_interfaces(
+        context, filter=[{'name': 'attachment.instance-id',
+                          'value': [instance['id']]}]
+        )['networkInterfaceSet']
+    if len(enis) != 1:
+        raise exception.InvalidInstanceId(instance_id=instance['id'])
+    network_interface_api.modify_network_interface_attribute(context,
+        enis[0]['networkInterfaceId'], security_group_id=group_id)
+
+
+def _modify_source_dest_check(context, instance, source_dest_check):
+    if not instance.get('vpc_id'):
+        raise exception.InvalidParameterCombination(message=_('You may '
+            'only modify the sourceDestCheck attribute for VPC instances'))
+    enis = network_interface_api.describe_network_interfaces(
+        context, filter=[{'name': 'attachment.instance-id',
+                          'value': [instance['id']]}]
+        )['networkInterfaceSet']
+    if len(enis) != 1:
+        raise exception.InvalidInstanceId(instance_id=instance['id'])
+    network_interface_api.modify_network_interface_attribute(context,
+        enis[0]['networkInterfaceId'], source_dest_check=source_dest_check)
+
+
+def _modify_instance_type(context, instance, instance_type):
+    nova = clients.nova(context)
+    os_instance = nova.servers.get(instance['os_id'])
+    os_flavor = _get_os_flavor(instance_type, nova)
+    vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
+    if vm_state != vm_states_STOPPED:
+        msg = (_("The instance %s is not in the 'stopped' state.")
+               % instance['id'])
+        raise exception.IncorrectInstanceState(message=msg)
+
+    if os_instance.flavor['id'] == os_flavor.id:
+        return True
+
+    os_instance.resize(os_flavor)
+    # NOTE(andrey-mp): if this operation will be too long (more than
+    # timeout) then we can add more code. For example:
+    # 1. current code returns HTTP 500 code if time is out. client retries
+    # query. code can detect that resizing in progress and wait again.
+    # 2. make this operation async by some way...
+    for dummy in xrange(60):
+        os_instance = nova.servers.get(os_instance)
+        vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
+        if vm_state == vm_states_RESIZED:
+            break
+        time.sleep(1)
+    os_instance = nova.servers.get(os_instance)
+    vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
+    if vm_state != vm_states_RESIZED:
+        raise exception.EC2APIException(
+            message=_('Time is out for instance resizing'))
+    os_instance.confirm_resize()
+
+
 def reset_instance_attribute(context, instance_id, attribute):
     if attribute == 'sourceDestCheck':
         instance = ec2utils.get_db_item(context, instance_id)
-        if not instance.get('vpc_id'):
-            raise exception.InvalidParameterCombination(message=_('You may '
-                'only reset the sourceDestCheck attribute for VPC instances'))
-        enis = network_interface_api.describe_network_interfaces(
-            context, filter=[{'name': 'attachment.instance-id',
-                              'value': [instance_id]}]
-            )['networkInterfaceSet']
-        if len(enis) != 1:
-            raise exception.InvalidInstanceId(instance_id=instance_id)
-        network_interface_api.modify_network_interface_attribute(context,
-            enis[0]['networkInterfaceId'], source_dest_check=True)
+        _modify_source_dest_check(context, instance, True)
         return True
 
     raise exception.InvalidParameterValue(value=attribute,
@@ -949,6 +981,18 @@ def _get_os_volumes(context):
         if os_instance_id:
             os_volumes[os_instance_id].append(os_volume)
     return os_volumes
+
+
+def _get_os_flavor(instance_type, nova):
+    try:
+        if instance_type is None:
+            instance_type = CONF.default_flavor
+        os_flavor = next(f for f in nova.flavors.list()
+                         if f.name == instance_type)
+    except StopIteration:
+        raise exception.InvalidParameterValue(value=instance_type,
+                                              parameter='InstanceType')
+    return os_flavor
 
 
 def _is_ebs_instance(context, os_instance_id):

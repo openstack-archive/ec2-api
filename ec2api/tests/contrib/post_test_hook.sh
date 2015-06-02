@@ -35,8 +35,9 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
     exit 1
   fi
 
-  # prepare flavor
+  # prepare flavors
   nova flavor-create --is-public True m1.ec2api 16 512 0 1
+  nova flavor-create --is-public True m1.ec2api-alt 17 256 0 1
 
   REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
   REGULAR_IMAGE_FNAME="precise"
@@ -132,6 +133,7 @@ image_id_ubuntu = $image_id_ubuntu
 ebs_image_id = $ebs_image_id
 build_timeout = 300
 instance_type = m1.ec2api
+instance_type_alt = m1.ec2api-alt
 EOF"
 
   # local workaround for LP#1439819. it doesn't work in gating because glance check isatty property.

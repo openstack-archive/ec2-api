@@ -163,10 +163,22 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.assertRaises('InvalidParameterValue',
             self.client.reset_instance_attribute,
             InstanceId=instance_id, Attribute='groupSet')
+        self.assertRaises('InvalidParameterValue',
+            self.client.reset_instance_attribute,
+            InstanceId=instance_id, Attribute='instanceType')
 
         self.assertRaises('InvalidParameterCombination',
             self.client.reset_instance_attribute,
             InstanceId=instance_id, Attribute='sourceDestCheck')
+
+        self.assertRaises('IncorrectInstanceState',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id, Attribute='instanceType',
+            Value=CONF.aws.instance_type)
+        self.assertRaises('IncorrectInstanceState',
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id,
+            InstanceType={'Value': CONF.aws.instance_type})
 
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
@@ -295,6 +307,42 @@ class InstanceAttributeTest(base.EC2TestCase):
             InstanceId=instance_id, Attribute='sourceDestCheck',
             Value='False')
         do_check(False)
+
+        self.client.terminate_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_delete(instance_id)
+
+    @testtools.skipUnless(CONF.aws.image_id, "EBS image id is not defined")
+    @testtools.skipUnless(CONF.aws.instance_type_alt,
+                          "Alternative instance type is not defined")
+    @testtools.skipUnless(CONF.aws.instance_type_alt != CONF.aws.instance_type,
+                          "Alternative instance type is not defined")
+    def test_instance_type_attribute(self):
+        instance_id = self.run_instance()
+
+        self.client.stop_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('stopped'))
+        instance = self.get_instance(instance_id)
+        self.assertEqual(CONF.aws.instance_type, instance['InstanceType'])
+
+        self.client.modify_instance_attribute(
+            InstanceId=instance_id, Attribute='instanceType',
+            Value=CONF.aws.instance_type)
+        instance = self.get_instance(instance_id)
+        self.assertEqual(CONF.aws.instance_type, instance['InstanceType'])
+
+        self.client.modify_instance_attribute(
+            InstanceId=instance_id,
+            InstanceType={'Value': CONF.aws.instance_type_alt})
+        instance = self.get_instance(instance_id)
+        self.assertEqual(CONF.aws.instance_type_alt, instance['InstanceType'])
+
+        self.client.start_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('running'))
+
+        instance = self.get_instance(instance_id)
+        self.assertEqual(CONF.aws.instance_type_alt, instance['InstanceType'])
 
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
