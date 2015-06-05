@@ -462,9 +462,9 @@ class EC2TestCase(base.BaseTestCase):
         return EC2Waiter(cls._volume_attachment_get_state)
 
     @classmethod
-    def _snapshot_get_state(cls, volume_id):
+    def _snapshot_get_state(cls, snapshot_id):
         try:
-            data = cls.client.describe_snapshots(SnapshotIds=[volume_id])
+            data = cls.client.describe_snapshots(SnapshotIds=[snapshot_id])
             if not data['Snapshots']:
                 raise exceptions.NotFound()
             return data['Snapshots'][0]['State']

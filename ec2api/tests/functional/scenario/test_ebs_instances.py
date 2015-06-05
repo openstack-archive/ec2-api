@@ -332,15 +332,15 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('stopped'))
 
-        self.client.terminate_instances(InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_delete(instance_id)
-
         data = self.client.create_snapshot(VolumeId=volume_id)
         snapshot_id = data['SnapshotId']
         clean_s = self.addResourceCleanUp(self.client.delete_snapshot,
                                           SnapshotId=snapshot_id)
         self.get_snapshot_waiter().wait_available(snapshot_id,
                                                   final_set=('completed'))
+
+        self.client.terminate_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_delete(instance_id)
 
         kwargs = {
             'Name': data_utils.rand_name('ebs-ami'),
