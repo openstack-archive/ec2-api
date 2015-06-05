@@ -13,24 +13,28 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from rally.benchmark.context import base
-from rally.benchmark.wrappers import network as network_wrapper
 from rally.common.i18n import _
 from rally.common import log as logging
 from rally.common import utils as rutils
 from rally import consts
 from rally import osclients
+from rally.plugins.openstack.wrappers import network as network_wrapper
+
+try:
+    from rally.benchmark.context import base as context
+except ImportError:
+    from rally.benchmark import context
 
 LOG = logging.getLogger(__name__)
 
 
-@base.context(name="prepare_ec2_client", order=110)
-class PrepareEC2ClientContext(base.Context):
+@context.context(name="prepare_ec2_client", order=110)
+class PrepareEC2ClientContext(context.Context):
 
-    def __init__(self, context):
-        super(PrepareEC2ClientContext, self).__init__(context)
+    def __init__(self, ctx):
+        super(PrepareEC2ClientContext, self).__init__(ctx)
         self.net_wrapper = network_wrapper.wrap(
-            osclients.Clients(context["admin"]["endpoint"]),
+            osclients.Clients(self.context["admin"]["endpoint"]),
             self.config)
         self.net_wrapper.start_cidr = '10.0.0.0/16'
 
