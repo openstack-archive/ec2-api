@@ -83,7 +83,7 @@ def model_query(context, model, *args, **kwargs):
     return session.query(model, *args)
 
 
-def _new_id(kind, os_id):
+def _new_id(kind):
     obj_id = "%(kind)s-%(id)08x" % {"kind": kind,
                                     "id": random.randint(1, 0xffffffff)}
     return obj_id
@@ -96,7 +96,7 @@ def add_item(context, kind, data, project_id=None):
     item_ref = models.Item()
     item_ref.update({
         "project_id": project_id,
-        "id": _new_id(kind, data.get("os_id")),
+        "id": _new_id(kind),
     })
     item_ref.update(_pack_item_data(data))
     try:
@@ -123,7 +123,7 @@ def add_item(context, kind, data, project_id=None):
 def add_item_id(context, kind, os_id, project_id=None):
     item_ref = models.Item()
     item_ref.update({
-        "id": _new_id(kind, os_id),
+        "id": _new_id(kind),
         "os_id": os_id,
     })
     if project_id:
