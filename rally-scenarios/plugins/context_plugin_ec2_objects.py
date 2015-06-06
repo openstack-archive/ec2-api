@@ -14,7 +14,6 @@
 
 import time
 
-from rally.benchmark.context import base
 from rally.common.i18n import _
 from rally.common import log as logging
 from rally.common import utils as rutils
@@ -22,11 +21,16 @@ from rally import consts
 
 from ec2api.tests.functional import botocoreclient
 
+try:
+    from rally.benchmark.context import base as context
+except ImportError:
+    from rally.benchmark import context
+
 
 LOG = logging.getLogger(__name__)
 
 
-class EC2Objects(base.Context):
+class EC2Objects(context.Context):
 
     CIDR = "10.0.0.0/16"
     AWS_ZONE = "nova"
@@ -214,7 +218,7 @@ class EC2Objects(base.Context):
                     LOG.exception('')
 
 
-@base.context(name="ec2_networks", order=451)
+@context.context(name="ec2_networks", order=451)
 class FakeNetworkGenerator(EC2Objects):
     """Context class for adding temporary networks for benchmarks.
 
@@ -269,7 +273,7 @@ class FakeNetworkGenerator(EC2Objects):
             self.cleanup_networks(tenant_id, client)
 
 
-@base.context(name="ec2_servers", order=450)
+@context.context(name="ec2_servers", order=450)
 class FakeServerGenerator(EC2Objects):
     """Context class for adding temporary servers for benchmarks.
 
