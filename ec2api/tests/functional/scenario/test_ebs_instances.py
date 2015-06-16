@@ -332,10 +332,12 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('stopped'))
 
+        self.addResourceCleanUp(self.client.delete_volume,
+                                VolumeId=volume_id)
         data = self.client.create_snapshot(VolumeId=volume_id)
         snapshot_id = data['SnapshotId']
-        clean_s = self.addResourceCleanUp(self.client.delete_snapshot,
-                                          SnapshotId=snapshot_id)
+        self.addResourceCleanUp(self.client.delete_snapshot,
+                                SnapshotId=snapshot_id)
         self.get_snapshot_waiter().wait_available(snapshot_id,
                                                   final_set=('completed'))
 
@@ -370,9 +372,6 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
 
         self.client.deregister_image(ImageId=image_id)
         self.cancelResourceCleanUp(clean_i)
-
-        self.client.delete_snapshot(SnapshotId=snapshot_id)
-        self.cancelResourceCleanUp(clean_s)
 
 
 class EC2_EBSInstanceResizeRootDevice(base.EC2TestCase):

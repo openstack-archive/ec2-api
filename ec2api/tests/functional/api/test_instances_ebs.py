@@ -81,9 +81,9 @@ class InstanceWithEBSTest(base.EC2TestCase):
         self.get_snapshot_waiter().wait_available(snapshot_id,
                                                   final_set=('completed'))
 
-        data = self.client.terminate_instances(InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_delete(instance_id)
-
         data = self.client.delete_snapshot(SnapshotId=snapshot_id)
         self.cancelResourceCleanUp(res_clean_s)
         self.get_snapshot_waiter().wait_delete(snapshot_id)
+
+        data = self.client.terminate_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_delete(instance_id)

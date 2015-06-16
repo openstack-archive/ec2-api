@@ -553,28 +553,6 @@ class EC2TestCase(base.BaseTestCase):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
-        # NOTE(andrey-mp): openstack has a bug - it doesn't delete volume
-        # that is created from EBS image
-        volume_ids = list()
-        instance = self.get_instance(instance_id)
-        bdms = instance.get('BlockDeviceMappings')
-        if bdms is None:
-            return instance_id
-        for bdm in bdms:
-            if 'Ebs' not in bdm:
-                continue
-            if not bdm['Ebs'].get('DeleteOnTermination', False):
-                volume_id = bdm['Ebs'].get('VolumeId')
-                volume_ids.append(volume_id)
-        if volume_ids:
-            # NOTE(andrey-mp): instance must be deleted first.
-            self.cancelResourceCleanUp(res_clean)
-            for volume_id in volume_ids:
-                self.addResourceCleanUp(self.client.delete_volume,
-                                        VolumeId=volume_id)
-            res_clean = self.addResourceCleanUp(
-                self.client.terminate_instances, InstanceIds=[instance_id])
-
         if clean_dict is not None:
             clean_dict['instance'] = res_clean
 
