@@ -503,10 +503,7 @@ def describe_instance_attribute(context, instance_id, attribute):
                                  'OS-EXT-SRV-ATTR:root_device_name', None)}
 
     def _format_attr_user_data(result):
-        if not hasattr(os_instance, 'OS-EXT-SRV-ATTR:user_data'):
-            # NOTE(ft): partial compatibility with pre Kilo OS releases
-            raise exception.InvalidAttribute(attr=attribute)
-        user_data = getattr(os_instance, 'OS-EXT-SRV-ATTR:user_data')
+        user_data = getattr(os_instance, 'OS-EXT-SRV-ATTR:user_data', None)
         if user_data:
             result['userData'] = {'value': user_data}
 
