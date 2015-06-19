@@ -196,9 +196,9 @@ def _build_metadata(context, ec2_instance, ec2_reservation,
 
 
 def _build_block_device_mappings(context, ec2_instance, os_instance_id):
-    mappings = {'root': ec2_instance['rootDeviceName'],
+    mappings = {'root': ec2_instance.get('rootDeviceName', ''),
                 'ami': instance_api._block_device_strip_dev(
-                            ec2_instance['rootDeviceName'])}
+                            ec2_instance.get('rootDeviceName', ''))}
     if 'blockDeviceMapping' in ec2_instance:
         # NOTE(yamahata): I'm not sure how ebs device should be numbered.
         #                 Right now sort by device name for deterministic
