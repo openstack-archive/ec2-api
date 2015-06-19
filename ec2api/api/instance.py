@@ -380,8 +380,8 @@ class ReservationDescriber(common.NonOpenstackItemsDescriber):
         if not formatted_instances:
             return None
         return _format_reservation(self.context, reservation,
-            formatted_instances,
-            self.groups.get(reservation['id']))
+                                   formatted_instances,
+                                   self.groups.get(reservation['id'], []))
 
     def get_db_items(self):
         return self.reservations
@@ -502,12 +502,13 @@ def describe_instance_attribute(context, instance_id, attribute):
 
     def _format_source_dest_check(result):
         if not instance.get('vpc_id'):
-            raise exception.InvalidParameterCombination(_('You may only '
-                'describe the sourceDestCheck attribute for VPC instances'))
+            raise exception.InvalidParameterCombination(
+                _('You may only describe the sourceDestCheck attribute for '
+                  'VPC instances'))
         enis = network_interface_api.describe_network_interfaces(
             context, filter=[{'name': 'attachment.instance-id',
                               'value': [instance_id]}]
-            )['networkInterfaceSet']
+        )['networkInterfaceSet']
         if len(enis) != 1:
             raise exception.InvalidInstanceId(instance_id=instance_id)
         result['sourceDestCheck'] = {'value': enis[0]['sourceDestCheck']}
@@ -517,7 +518,7 @@ def describe_instance_attribute(context, instance_id, attribute):
             enis = network_interface_api.describe_network_interfaces(
                 context, filter=[{'name': 'attachment.instance-id',
                                   'value': [instance_id]}]
-                )['networkInterfaceSet']
+            )['networkInterfaceSet']
             if len(enis) != 1:
                 raise exception.InvalidInstanceId(instance_id=instance_id)
             result['groupSet'] = enis[0]['groupSet']
@@ -607,9 +608,9 @@ def modify_instance_attribute(context, instance_id, attribute=None,
         int(source_dest_check is not None) +
         int(group_id is not None) + int(instance_type is not None) +
         int(disable_api_termination is not None))
-    if (params_count > 1
-            or (attribute is not None and params_count == 1)
-            or (params_count == 0 and attribute is None)):
+    if (params_count > 1 or
+            (attribute is not None and params_count == 1) or
+            (params_count == 0 and attribute is None)):
         raise exception.InvalidParameterCombination()
 
     if attribute == 'disableApiTermination':
@@ -639,30 +640,32 @@ def modify_instance_attribute(context, instance_id, attribute=None,
 
 def _modify_group(context, instance, group_id):
     if not instance.get('vpc_id'):
-        raise exception.InvalidParameterCombination(message=_('You may '
-            'only modify the groupSet attribute for VPC instances'))
+        raise exception.InvalidParameterCombination(
+            _('You may only modify the groupSet attribute for VPC instances'))
     enis = network_interface_api.describe_network_interfaces(
         context, filter=[{'name': 'attachment.instance-id',
                           'value': [instance['id']]}]
-        )['networkInterfaceSet']
+    )['networkInterfaceSet']
     if len(enis) != 1:
         raise exception.InvalidInstanceId(instance_id=instance['id'])
-    network_interface_api.modify_network_interface_attribute(context,
-        enis[0]['networkInterfaceId'], security_group_id=group_id)
+    network_interface_api.modify_network_interface_attribute(
+        context, enis[0]['networkInterfaceId'], security_group_id=group_id)
 
 
 def _modify_source_dest_check(context, instance, source_dest_check):
     if not instance.get('vpc_id'):
-        raise exception.InvalidParameterCombination(message=_('You may '
-            'only modify the sourceDestCheck attribute for VPC instances'))
+        raise exception.InvalidParameterCombination(
+            _('You may  only modify the sourceDestCheck attribute for '
+              'VPC instances'))
     enis = network_interface_api.describe_network_interfaces(
         context, filter=[{'name': 'attachment.instance-id',
                           'value': [instance['id']]}]
-        )['networkInterfaceSet']
+    )['networkInterfaceSet']
     if len(enis) != 1:
         raise exception.InvalidInstanceId(instance_id=instance['id'])
-    network_interface_api.modify_network_interface_attribute(context,
-        enis[0]['networkInterfaceId'], source_dest_check=source_dest_check)
+    network_interface_api.modify_network_interface_attribute(
+        context, enis[0]['networkInterfaceId'],
+        source_dest_check=source_dest_check)
 
 
 def _modify_instance_type(context, instance, instance_type):
@@ -909,10 +912,10 @@ def _format_group_set(context, os_security_groups, groups):
 def _get_groups_name_to_id(context):
     # TODO(andrey-mp): remove filtering by vpcId=None when fitering
     # by None will be implemented
-    return {g['groupName']: g['groupId'] for g in
-        security_group_api.describe_security_groups(context)
-        ['securityGroupInfo']
-        if not g.get('vpcId')}
+    return {g['groupName']: g['groupId']
+            for g in (security_group_api.describe_security_groups(context)
+                      ['securityGroupInfo'])
+            if not g.get('vpcId')}
 
 
 def _get_ip_info_for_instance(os_instance):
@@ -1123,8 +1126,9 @@ class InstanceEngineNeutron(object):
                  # associate_public_ip_address in all other code
                  len(network_interfaces) == 1 and
                  (len(network_interfaces[0]) != 2 or
-                     'associate_public_ip_address' not in network_interfaces[0]
-                     or network_interfaces[0].get('device_index') != 0))):
+                     ('associate_public_ip_address' not in
+                      network_interfaces[0]) or
+                     network_interfaces[0].get('device_index') != 0))):
             msg = _(' Network interfaces and an instance-level subnet ID or '
                     'private IP address or security groups may not be '
                     'specified on the same request')
