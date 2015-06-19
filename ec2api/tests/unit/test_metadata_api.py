@@ -13,15 +13,18 @@
 # limitations under the License.
 
 import base64
+import copy
 
 import mock
 from novaclient import exceptions as nova_exception
 
+from ec2api import context
 from ec2api import exception
 from ec2api.metadata import api
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
+from ec2api.tests.unit import tools
 
 
 class MetadataApiTestCase(base.ApiTestCase):
@@ -230,3 +233,60 @@ class MetadataApiTestCase(base.ApiTestCase):
                         matchers.DictMatches(expected))
         self.instance_api._block_device_strip_dev.assert_called_with(
                 fakes.EC2_INSTANCE_2['rootDeviceName'])
+
+
+class MetadataApiIntegralTestCase(base.ApiTestCase):
+    # TODO(ft): 'execute' feature isn't used here, but some mocks and
+    # fake context are. ApiTestCase should be split to some classes to use
+    # its feature optimally
+
+    @mock.patch('ec2api.api.instance.security_group_api')
+    @mock.patch('ec2api.api.instance.network_interface_api')
+    @mock.patch('keystoneclient.v2_0.client.Client')
+    def test_get_metadata_integral(self, keystone, network_interface_api,
+                                   security_group_api):
+        service_catalog = mock.MagicMock()
+        service_catalog.get_data.return_value = []
+        keystone.return_value = mock.Mock(auth_user_id='fake_user_id',
+                                          auth_tenant_id=fakes.ID_OS_PROJECT,
+                                          auth_token='fake_token',
+                                          service_catalog=service_catalog)
+        fake_context = context.get_os_admin_context()
+
+        self.set_mock_db_items(
+            fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
+            fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
+            fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
+            fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
+            fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
+        self.nova.servers.list.return_value = [
+            fakes.OSInstance_full(fakes.OS_INSTANCE_1),
+            fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
+        self.nova.servers.get.side_effect = tools.get_by_1st_arg_getter({
+            fakes.ID_OS_INSTANCE_1: fakes.OSInstance_full(fakes.OS_INSTANCE_1),
+            fakes.ID_OS_INSTANCE_2: fakes.OSInstance_full(fakes.OS_INSTANCE_2)
+        })
+        keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)
+        keypair.configure_mock(name=fakes.NAME_KEY_PAIR)
+        self.nova.keypairs.get.return_value = keypair
+        self.cinder.volumes.list.return_value = [
+            fakes.OSVolume(fakes.OS_VOLUME_1),
+            fakes.OSVolume(fakes.OS_VOLUME_2),
+            fakes.OSVolume(fakes.OS_VOLUME_3)]
+        network_interface_api.describe_network_interfaces.side_effect = (
+            lambda *args, **kwargs: copy.deepcopy({
+                'networkInterfaceSet': [fakes.EC2_NETWORK_INTERFACE_1,
+                                        fakes.EC2_NETWORK_INTERFACE_2]}))
+        security_group_api.describe_security_groups.return_value = {
+            'securityGroupInfo': [fakes.EC2_SECURITY_GROUP_1,
+                                  fakes.EC2_SECURITY_GROUP_3]}
+
+        retval = api.get_metadata_item(
+               fake_context, ['latest', 'meta-data', 'instance-id'],
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+        self.assertEqual(fakes.ID_EC2_INSTANCE_1, retval)
+
+        retval = api.get_metadata_item(
+               fake_context, ['latest', 'meta-data', 'instance-id'],
+               fakes.ID_OS_INSTANCE_2, '10.200.1.15')
+        self.assertEqual(fakes.ID_EC2_INSTANCE_2, retval)
