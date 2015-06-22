@@ -267,6 +267,8 @@ class AddressTest(base.EC2TestCase):
             VpcId=vpc_id,
             InternetGatewayId=gw_id)
 
+        self.prepare_route(vpc_id, gw_id)
+
         data = self.client.associate_address(InstanceId=instance_id,
                                              AllocationId=alloc_id)
         assoc_id = data['AssociationId']
@@ -329,7 +331,7 @@ class AddressTest(base.EC2TestCase):
         time.sleep(2)
 
         data = self.client.describe_addresses(*[], **{})
-        self.assertIsNone(data['Addresses'][0].get('InstanceId'))
+        self.assertFalse(data['Addresses'][0].get('InstanceId'))
 
         time.sleep(3)
 
@@ -393,3 +395,26 @@ class AddressTest(base.EC2TestCase):
 
         data = self.client.release_address(PublicIp=ip)
         self.cancelResourceCleanUp(clean_a)
+
+    @base.skip_without_vpc()
+    def test_preliminary_associate_address(self):
+        # NOTE(ft): AWS can associate an address to a subnet IP if the subnet
+        # has no internet access
+        vpc_id, subnet_id = self.create_vpc_and_subnet('10.3.0.0/20')
+        self.create_and_attach_internet_gateway(vpc_id)
+        data = self.client.allocate_address(Domain='vpc')
+        alloc_id = data['AllocationId']
+        self.addResourceCleanUp(self.client.release_address,
+                                AllocationId=alloc_id)
+
+        data = self.client.create_network_interface(SubnetId=subnet_id)
+        ni_id = data['NetworkInterface']['NetworkInterfaceId']
+        self.addResourceCleanUp(self.client.delete_network_interface,
+                                NetworkInterfaceId=ni_id)
+        self.get_network_interface_waiter().wait_available(ni_id)
+
+        data = self.client.associate_address(
+            AllocationId=alloc_id, NetworkInterfaceId=ni_id)
+        assoc_id = data['AssociationId']
+        self.addResourceCleanUp(self.client.disassociate_address,
+                                AssociationId=assoc_id)

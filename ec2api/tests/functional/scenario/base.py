@@ -120,18 +120,6 @@ class BaseScenarioTest(base.EC2TestCase):
         }
         self.client.authorize_security_group_ingress(*[], **kwargs)
 
-    def prepare_route(self, vpc_id, gw_id):
-        data = self.client.describe_route_tables(
-            Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])
-        self.assertEqual(1, len(data['RouteTables']))
-
-        kwargs = {
-            'DestinationCidrBlock': '0.0.0.0/0',
-            'RouteTableId': data['RouteTables'][0]['RouteTableId'],
-            'GatewayId': gw_id
-        }
-        self.client.create_route(*[], **kwargs)
-
     def create_network_interface(self, subnet_id):
         data = self.client.create_network_interface(SubnetId=subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
@@ -140,16 +128,3 @@ class BaseScenarioTest(base.EC2TestCase):
         self.get_network_interface_waiter().wait_available(ni_id)
 
         return ni_id
-
-    def create_and_attach_internet_gateway(self, vpc_id):
-        data = self.client.create_internet_gateway()
-        gw_id = data['InternetGateway']['InternetGatewayId']
-        self.addResourceCleanUp(self.client.delete_internet_gateway,
-                                InternetGatewayId=gw_id)
-        data = self.client.attach_internet_gateway(VpcId=vpc_id,
-                                                   InternetGatewayId=gw_id)
-        self.addResourceCleanUp(self.client.detach_internet_gateway,
-                                VpcId=vpc_id,
-                                InternetGatewayId=gw_id)
-
-        return gw_id
