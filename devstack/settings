@@ -9,10 +9,12 @@ enable_service ec2-api-s3
 # but related changes are not done in the client release.
 # So we temporary use a not commited patch
 # https://review.openstack.org/#/c/152569/
+# Since this patch become obsolete we temporary use our own maintained
+# separate repository https://github.com/ftersin/python-novaclient
 LIBS_FROM_GIT=python-novaclient
 # Since legal way to set git repository do not work for a plugin,
 # we set internal DevStack's variables directly
 # NOVACLIENT_REPO=https://review.openstack.org/openstack/python-novaclient
 # NOVACLIENT_BRANCH=refs/changes/69/152569/14
-GITREPO["python-novaclient"]=https://review.openstack.org/openstack/python-novaclient
-GITBRANCH["python-novaclient"]=refs/changes/69/152569/14
+GITREPO["python-novaclient"]=https://github.com/ftersin/python-novaclient
+GITBRANCH["python-novaclient"]=refs/2.26.0_microversions

@@ -18,8 +18,8 @@ import botocore.session
 
 def _get_ec2_client(url, region, access, secret):
     connection_data = {
-        'config_file': (None, 'AWS_CONFIG_FILE', None),
-        'region': ('region', 'BOTO_DEFAULT_REGION', region),
+        'config_file': (None, 'AWS_CONFIG_FILE', None, None),
+        'region': ('region', 'BOTO_DEFAULT_REGION', region, None),
     }
     session = botocore.session.get_session(connection_data)
     return session.create_client(
