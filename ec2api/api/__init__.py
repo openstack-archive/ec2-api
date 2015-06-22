@@ -248,6 +248,7 @@ class EC2KeystoneAuth(wsgi.Middleware):
 
         catalog = result['access']['serviceCatalog']
         ctxt = context.RequestContext(user_id, project_id,
+                                      request_id=request_id,
                                       user_name=user_name,
                                       project_name=project_name,
                                       roles=roles,

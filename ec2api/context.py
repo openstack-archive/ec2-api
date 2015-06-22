@@ -18,13 +18,13 @@ import uuid
 
 from keystoneclient.v2_0 import client as keystone_client
 from oslo_config import cfg
+from oslo_context import context
 from oslo_log import log as logging
 from oslo_utils import timeutils
 import six
 
 from ec2api import exception
-from ec2api.i18n import _
-from ec2api.openstack.common import local
+from ec2api.i18n import _, _LW
 
 
 ec2_opts = [
@@ -47,14 +47,14 @@ def generate_request_id():
     return 'req-' + str(uuid.uuid4())
 
 
-class RequestContext(object):
+class RequestContext(context.RequestContext):
     """Security context and request information.
 
     Represents the user taking a given action within the system.
 
     """
 
-    def __init__(self, user_id, project_id,
+    def __init__(self, user_id, project_id, request_id=None,
                  is_admin=None, roles=None, remote_address=None,
                  auth_token=None, user_name=None, project_name=None,
                  overwrite=True, service_catalog=None, api_version=None,
@@ -68,21 +68,31 @@ class RequestContext(object):
             :param kwargs: Extra arguments that might be present, but we ignore
                 because they possibly came in from older rpc messages.
         """
+        user = kwargs.pop('user', None)
+        tenant = kwargs.pop('tenant', None)
+        super(RequestContext, self).__init__(
+            auth_token=auth_token,
+            user=user_id or user,
+            tenant=project_id or tenant,
+            is_admin=is_admin,
+            request_id=request_id,
+            resource_uuid=kwargs.pop('resource_uuid', None),
+            overwrite=overwrite)
+        # oslo_context's RequestContext.to_dict() generates this field, we can
+        # safely ignore this as we don't use it.
+        kwargs.pop('user_identity', None)
         if kwargs:
-            LOG.warn(_('Arguments dropped when creating context: %s') %
-                     str(kwargs))
+            LOG.warning(_LW('Arguments dropped when creating context: %s') %
+                        str(kwargs))
 
         self.user_id = user_id
         self.project_id = project_id
-        self.cached_secret_key = None
         self.roles = roles or []
         self.remote_address = remote_address
         timestamp = timeutils.utcnow()
         if isinstance(timestamp, six.string_types):
             timestamp = timeutils.parse_strtime(timestamp)
         self.timestamp = timestamp
-        self.request_id = generate_request_id()
-        self.auth_token = auth_token
 
         self.service_catalog = service_catalog
         if self.service_catalog is None:
@@ -95,45 +105,33 @@ class RequestContext(object):
         # TODO(ft): call policy.check_is_admin if is_admin is None
         self.is_os_admin = is_os_admin
         self.api_version = api_version
-        if overwrite or not hasattr(local.store, 'context'):
-            self.update_store()
-
-    def update_store(self):
-        local.store.context = self
 
     def to_dict(self):
-        return {'user_id': self.user_id,
-                'project_id': self.project_id,
-                'is_admin': self.is_admin,
-                'roles': self.roles,
-                'remote_address': self.remote_address,
-                'timestamp': timeutils.strtime(self.timestamp),
-                'request_id': self.request_id,
-                'auth_token': self.auth_token,
-                'user_name': self.user_name,
-                'service_catalog': self.service_catalog,
-                'project_name': self.project_name,
-                'tenant': self.tenant,
-                'user': self.user}
+        values = super(RequestContext, self).to_dict()
+        # FIXME(dims): defensive hasattr() checks need to be
+        # removed once we figure out why we are seeing stack
+        # traces
+        values.update({
+            'user_id': getattr(self, 'user_id', None),
+            'project_id': getattr(self, 'project_id', None),
+            'is_admin': getattr(self, 'is_admin', None),
+            'roles': getattr(self, 'roles', None),
+            'remote_address': getattr(self, 'remote_address', None),
+            'timestamp': timeutils.strtime(self.timestamp) if hasattr(
+                self, 'timestamp') else None,
+            'request_id': getattr(self, 'request_id', None),
+            'quota_class': getattr(self, 'quota_class', None),
+            'user_name': getattr(self, 'user_name', None),
+            'service_catalog': getattr(self, 'service_catalog', None),
+            'project_name': getattr(self, 'project_name', None),
+            'is_os_admin': getattr(self, 'is_os_admin', None),
+            'api_version': getattr(self, 'api_version', None),
+        })
+        return values
 
     @classmethod
     def from_dict(cls, values):
-        values.pop('user', None)
-        values.pop('tenant', None)
         return cls(**values)
-
-    # NOTE(sirp): the openstack/common version of RequestContext uses
-    # tenant/user whereas the ec2 version uses project_id/user_id. We need
-    # this shim in order to use context-aware code from openstack/common, like
-    # logging, until we make the switch to using openstack/common's version of
-    # RequestContext.
-    @property
-    def tenant(self):
-        return self.project_id
-
-    @property
-    def user(self):
-        return self.user_id
 
 
 def is_user_context(context):
@@ -149,9 +147,9 @@ def is_user_context(context):
 
 def get_os_admin_context():
     """Create a context to interact with OpenStack as an administrator."""
-    if (getattr(local.store, 'context', None) and
-            local.store.context.is_os_admin):
-        return local.store.context
+    current_context = context.get_current()
+    if (current_context and current_context.is_os_admin):
+        return current_context
     # TODO(ft): make an authentification token reusable
     keystone = keystone_client.Client(
         username=CONF.admin_user,
