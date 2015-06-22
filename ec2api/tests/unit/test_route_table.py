@@ -924,7 +924,7 @@ class RouteTableTestCase(base.ApiTestCase):
             matchers.DictMatches(ec2_route_table_1, orderless_lists=True),
             verbose=True)
 
-    def test_get_subnet_host_routes(self):
+    def test_get_subnet_host_routes_and_gateway_ip(self):
         self.set_mock_db_items(
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
             fakes.DB_IGW_1, fakes.DB_VPN_GATEWAY_1)
@@ -936,18 +936,20 @@ class RouteTableTestCase(base.ApiTestCase):
         route_table_1['routes'].append(
             {'destination_cidr_block': '192.168.222.0/24',
              'gateway_id': fakes.ID_EC2_VPN_GATEWAY_2})
-        host_routes = route_table_api._get_subnet_host_routes(
-            mock.ANY, route_table_1, fakes.IP_GATEWAY_SUBNET_1)
+        host_routes, gateway_ip = (
+            route_table_api._get_subnet_host_routes_and_gateway_ip(
+                mock.ANY, route_table_1, fakes.CIDR_SUBNET_1))
 
         self.assertThat(host_routes,
                         matchers.ListMatches([
                             {'destination': fakes.CIDR_VPC_1,
-                             'nexthop': fakes.IP_GATEWAY_SUBNET_1},
-                            {'destination': '0.0.0.0/0',
-                             'nexthop': '127.0.0.1'}]))
+                             'nexthop': fakes.IP_GATEWAY_SUBNET_1}]))
+        self.assertEqual(None, gateway_ip)
 
-        host_routes = route_table_api._get_subnet_host_routes(
-            mock.ANY, fakes.DB_ROUTE_TABLE_2, fakes.IP_GATEWAY_SUBNET_1)
+        host_routes, gateway_ip = (
+            route_table_api._get_subnet_host_routes_and_gateway_ip(
+                mock.ANY, fakes.DB_ROUTE_TABLE_2, fakes.CIDR_SUBNET_1))
+        self.assertEqual(fakes.IP_GATEWAY_SUBNET_1, gateway_ip)
 
         self.assertThat(host_routes,
                         matchers.ListMatches([
@@ -958,13 +960,16 @@ class RouteTableTestCase(base.ApiTestCase):
                             {'destination': '0.0.0.0/0',
                              'nexthop': fakes.IP_GATEWAY_SUBNET_1}]))
 
-    @mock.patch('ec2api.api.route_table._get_subnet_host_routes')
+    @mock.patch('ec2api.api.route_table.'
+                '_get_subnet_host_routes_and_gateway_ip')
     @mock.patch('ec2api.api.route_table._get_router_destinations')
     def test_update_host_routes(self, destinations_getter, routes_getter):
         self.neutron.show_subnet.side_effect = tools.get_by_1st_arg_getter(
             {fakes.ID_OS_SUBNET_1: {'subnet': fakes.OS_SUBNET_1},
              fakes.ID_OS_SUBNET_2: {'subnet': fakes.OS_SUBNET_2}})
-        routes_getter.return_value = 'fake_routes'
+        routes_getter.side_effect = [
+            ('fake_routes', fakes.IP_GATEWAY_SUBNET_1),
+            ('fake_routes', None)]
         destinations_getter.return_value = {'fake': 'objects'}
 
         route_table_api._update_host_routes(
@@ -975,21 +980,25 @@ class RouteTableTestCase(base.ApiTestCase):
             mock.ANY, fakes.DB_ROUTE_TABLE_1)
         self.assertEqual(2, routes_getter.call_count)
         routes_getter.assert_any_call(
-            mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.IP_GATEWAY_SUBNET_1,
+            mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.CIDR_SUBNET_1,
             {'fake': 'objects'})
         routes_getter.assert_any_call(
-            mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.IP_GATEWAY_SUBNET_2,
+            mock.ANY, fakes.DB_ROUTE_TABLE_1, fakes.CIDR_SUBNET_2,
             {'fake': 'objects'})
         self.assertEqual(2, self.neutron.update_subnet.call_count)
         self.neutron.update_subnet.assert_any_call(
             fakes.ID_OS_SUBNET_1,
-            {'subnet': {'host_routes': 'fake_routes'}})
+            {'subnet': {'host_routes': 'fake_routes',
+                        'gateway_ip': fakes.IP_GATEWAY_SUBNET_1}})
         self.neutron.update_subnet.assert_any_call(
             fakes.ID_OS_SUBNET_2,
-            {'subnet': {'host_routes': 'fake_routes'}})
+            {'subnet': {'host_routes': 'fake_routes',
+                        'gateway_ip': None}})
 
         self.neutron.reset_mock()
 
+        routes_getter.side_effect = None
+        routes_getter.return_value = ('fake_routes', fakes.IP_GATEWAY_SUBNET_2)
         try:
             with common.OnCrashCleaner() as cleaner:
                 route_table_api._update_host_routes(
@@ -1002,12 +1011,13 @@ class RouteTableTestCase(base.ApiTestCase):
 
         self.neutron.update_subnet.assert_any_call(
             fakes.ID_OS_SUBNET_1,
-            {'subnet': {'host_routes': fakes.OS_SUBNET_1['host_routes']}})
+            {'subnet': {'host_routes': fakes.OS_SUBNET_1['host_routes'],
+                        'gateway_ip': fakes.IP_GATEWAY_SUBNET_1}})
 
     @mock.patch('ec2api.api.vpn_connection._update_vpn_routes')
     @mock.patch('ec2api.api.route_table._update_host_routes')
     def test_update_routes_in_associated_subnets(self, routes_updater,
-                                  update_vpn_routes):
+                                                 update_vpn_routes):
         subnet_default_rtb = {'id': fakes.random_ec2_id('subnet'),
                               'vpc_id': fakes.ID_EC2_VPC_1}
         subnet_rtb_1 = {'id': fakes.random_ec2_id('subnet'),

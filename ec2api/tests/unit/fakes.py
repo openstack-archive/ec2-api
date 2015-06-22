@@ -453,15 +453,15 @@ OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
                'ip_version': '4',
                'cidr': CIDR_SUBNET_1,
                'host_routes': [{'nexthop': IP_GATEWAY_SUBNET_1,
-                                'destination': '10.10.0.0/16'},
-                               {'nexthop': '127.0.0.1',
-                                'destination': '0.0.0.0/0'}]}
+                                'destination': '10.10.0.0/16'}],
+               'gateway_ip': IP_GATEWAY_SUBNET_1}
 OS_SUBNET_2 = {'id': ID_OS_SUBNET_2,
                'network_id': ID_OS_NETWORK_2,
                'name': ID_EC2_SUBNET_2,
                'ip_version': '4',
                'cidr': CIDR_SUBNET_2,
-               'host_routes': []}
+               'host_routes': [],
+               'gateway_ip': None}
 OS_NETWORK_1 = {'id': ID_OS_NETWORK_1,
                 'name': ID_EC2_SUBNET_1,
                 'status': 'available'}

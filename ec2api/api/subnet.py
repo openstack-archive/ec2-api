@@ -47,10 +47,10 @@ def create_subnet(context, vpc_id, cidr_block,
     if subnet_ipnet not in vpc_ipnet:
         raise exception.InvalidSubnetRange(cidr_block=cidr_block)
 
-    gateway_ip = str(netaddr.IPAddress(subnet_ipnet.first + 1))
     main_route_table = db_api.get_item_by_id(context, vpc['route_table_id'])
-    host_routes = route_table_api._get_subnet_host_routes(
-            context, main_route_table, gateway_ip)
+    (host_routes,
+     gateway_ip) = route_table_api._get_subnet_host_routes_and_gateway_ip(
+            context, main_route_table, cidr_block)
     neutron = clients.neutron(context)
     with common.OnCrashCleaner() as cleaner:
         os_network_body = {'network': {}}
@@ -82,8 +82,13 @@ def create_subnet(context, vpc_id, cidr_block,
                                              subnet, vpc, main_route_table)
         neutron.update_network(os_network['id'],
                                {'network': {'name': subnet['id']}})
+        # NOTE(ft): In some cases we need gateway_ip to be None (see
+        # _get_subnet_host_routes_and_gateway_ip). It's not set during subnet
+        # creation to allow automatic configuration of the default port by
+        # which subnet is attached to the router.
         neutron.update_subnet(os_subnet['id'],
-                              {'subnet': {'name': subnet['id']}})
+                              {'subnet': {'name': subnet['id'],
+                                          'gateway_ip': gateway_ip}})
     os_ports = neutron.list_ports(tenant_id=context.project_id)['ports']
     return {'subnet': _format_subnet(context, subnet, os_subnet,
                                      os_network, os_ports)}

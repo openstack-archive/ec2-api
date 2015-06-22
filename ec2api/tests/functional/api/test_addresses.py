@@ -397,6 +397,8 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_a)
 
     @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
+                          'preliminary address association is not supported')
     def test_preliminary_associate_address(self):
         # NOTE(ft): AWS can associate an address to a subnet IP if the subnet
         # has no internet access

@@ -56,10 +56,11 @@ class SubnetTestCase(base.ApiTestCase):
                     {'network': {'name': fakes.ID_EC2_SUBNET_1}})
             self.neutron.create_subnet.assert_called_once_with(
                     {'subnet': tools.purge_dict(fakes.OS_SUBNET_1,
-                                                ('id', 'name'))})
+                                                ('id', 'name', 'gateway_ip'))})
             self.neutron.update_subnet.assert_called_once_with(
                     fakes.ID_OS_SUBNET_1,
-                    {'subnet': {'name': fakes.ID_EC2_SUBNET_1}})
+                    {'subnet': {'name': fakes.ID_EC2_SUBNET_1,
+                                'gateway_ip': None}})
             self.neutron.add_interface_router.assert_called_once_with(
                     fakes.ID_OS_ROUTER_1,
                     {'subnet_id': fakes.ID_OS_SUBNET_1})
