@@ -45,7 +45,7 @@ class InstanceWithEBSTest(base.EC2TestCase):
         self.assertEqual('attached', ebs.get('Status'))
         if CONF.aws.run_incompatible_tests:
             self.assertTrue(ebs.get('AttachTime'))
-            self.assertTrue(ebs.get('DeleteOnTermination'))
+        self.assertTrue(ebs.get('DeleteOnTermination'))
 
         data = self.client.describe_volumes(VolumeIds=[volume_id])
         self.assertEqual(1, len(data['Volumes']))
