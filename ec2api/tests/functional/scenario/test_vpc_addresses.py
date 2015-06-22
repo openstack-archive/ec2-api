@@ -33,7 +33,8 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
     def test_auto_diassociate_address(self):
         vpc_id, subnet_id = self.create_vpc_and_subnet('10.3.0.0/20')
         ni_id1 = self.create_network_interface(subnet_id)
-        self.create_and_attach_internet_gateway(vpc_id)
+        gw_id = self.create_and_attach_internet_gateway(vpc_id)
+        self.prepare_route(vpc_id, gw_id)
         alloc_id1, public_ip1 = self.allocate_address(True)
         alloc_id2, _ = self.allocate_address(True)
 
