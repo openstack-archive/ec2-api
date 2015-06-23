@@ -172,7 +172,9 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.neutron.delete_ikepolicy.assert_called_once_with(
             fakes.ID_OS_IKEPOLICY_1)
 
-    def test_create_vpn_connection_route(self):
+    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections',
+                wraps=vpn_connection_api._reset_vpn_connections)
+    def test_create_vpn_connection_route(self, reset_vpn_connections):
         self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2,
                                fakes.DB_VPN_GATEWAY_2)
 
@@ -185,6 +187,9 @@ class VpnConnectionTestCase(base.ApiTestCase):
         vpn = copy.deepcopy(fakes.DB_VPN_CONNECTION_2)
         vpn['cidrs'].append('192.168.123.0/24')
         self.db_api.update_item.assert_called_once_with(mock.ANY, vpn)
+        reset_vpn_connections.assert_called_once_with(
+            mock.ANY, self.neutron, mock.ANY, fakes.DB_VPN_GATEWAY_2,
+            vpn_connections=[vpn])
 
     def test_create_vpn_connection_route_idempotent(self):
         self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2)
@@ -217,7 +222,9 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.db_api.update_item.assert_called_with(
             mock.ANY, fakes.DB_VPN_CONNECTION_2)
 
-    def test_delete_vpn_connection_route(self):
+    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections',
+                wraps=vpn_connection_api._reset_vpn_connections)
+    def test_delete_vpn_connection_route(self, reset_vpn_connections):
         self.set_mock_db_items(fakes.DB_VPN_CONNECTION_2,
                                fakes.DB_VPN_GATEWAY_2)
 
@@ -229,6 +236,9 @@ class VpnConnectionTestCase(base.ApiTestCase):
         vpn = tools.update_dict(fakes.DB_VPN_CONNECTION_2,
                                 {'cidrs': [fakes.CIDR_VPN_2_PROPAGATED_2]})
         self.db_api.update_item.assert_called_once_with(mock.ANY, vpn)
+        reset_vpn_connections.assert_called_once_with(
+            mock.ANY, self.neutron, mock.ANY, fakes.DB_VPN_GATEWAY_2,
+            vpn_connections=[vpn])
 
     def test_delete_vpn_connection_route_invalid_parameters(self):
         self.set_mock_db_items()
