@@ -14,6 +14,7 @@
 
 from cinderclient import exceptions as cinder_exception
 from novaclient import exceptions as nova_exception
+from oslo_log import log as logging
 
 from ec2api.api import clients
 from ec2api.api import common
@@ -21,6 +22,9 @@ from ec2api.api import ec2utils
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
+
+
+LOG = logging.getLogger(__name__)
 
 
 """Volume related API implementation
@@ -63,6 +67,7 @@ def attach_volume(context, volume_id, instance_id, device):
                                           device)
     except (nova_exception.Conflict, nova_exception.BadRequest):
         # TODO(andrey-mp): raise correct errors for different cases
+        LOG.exception(_('Attach has failed.'))
         raise exception.UnsupportedOperation()
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
