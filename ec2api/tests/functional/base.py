@@ -286,6 +286,9 @@ class EC2TestCase(base.BaseTestCase):
         'detach_vpn_gateway': (
             'get_vpn_gateway_attachment_waiter',
             lambda kwargs: kwargs['VpnGatewayId']),
+        'delete_vpn_connection': (
+            'get_vpn_connection_waiter',
+            lambda kwargs: kwargs['VpnConnectionId']),
     }
 
     @classmethod
@@ -517,6 +520,53 @@ class EC2TestCase(base.BaseTestCase):
     @classmethod
     def get_vpn_gateway_attachment_waiter(cls):
         return EC2Waiter(cls._vpn_gateway_get_attachment_state)
+
+    @classmethod
+    def _vpn_connection_get_state(cls, vpn_connection_id):
+        try:
+            data = cls.client.describe_vpn_connections(
+                VpnConnectionIds=[vpn_connection_id])
+            if not data['VpnConnections']:
+                raise exceptions.NotFound()
+            if data['VpnConnections'][0]['State'] == 'deleted':
+                raise exceptions.NotFound()
+            return data['VpnConnections'][0]['State']
+        except botocore.exceptions.ClientError as ex:
+            error_code = ex.response['Error']['Code']
+            if error_code == 'InvalidVpnConnectionID.NotFound':
+                raise exceptions.NotFound()
+            raise
+
+    @classmethod
+    def get_vpn_connection_waiter(cls):
+        return EC2Waiter(cls._vpn_connection_get_state)
+
+    @classmethod
+    def _vpn_connection_get_route_state(cls, vpn_connection_id,
+                                        destination_cidr_block=None):
+        try:
+            data = cls.client.describe_vpn_connections(
+                VpnConnectionIds=[vpn_connection_id])
+            try:
+                route = next(
+                    r for r in data['VpnConnections'][0]['Routes']
+                    if r['DestinationCidrBlock'] == destination_cidr_block)
+            except StopIteration:
+                raise exceptions.NotFound()
+            if route['State'] == 'deleted':
+                raise exceptions.NotFound()
+            return route['State']
+        except botocore.exceptions.ClientError as ex:
+            error_code = ex.response['Error']['Code']
+            if error_code == 'InvalidVpnGatewayID.NotFound':
+                raise exceptions.NotFound()
+            raise
+
+    @classmethod
+    def get_vpn_connection_route_waiter(cls, destination_cidr_block):
+        return EC2Waiter(
+            functools.partial(cls._vpn_connection_get_route_state,
+                              destination_cidr_block=destination_cidr_block))
 
     def assertEmpty(self, list_obj, msg=None):
         self.assertTrue(len(list_obj) == 0, msg)
