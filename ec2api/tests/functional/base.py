@@ -283,6 +283,9 @@ class EC2TestCase(base.BaseTestCase):
         'deregister_image': (
             'get_image_waiter',
             lambda kwargs: kwargs['ImageId']),
+        'detach_vpn_gateway': (
+            'get_vpn_gateway_attachment_waiter',
+            lambda kwargs: kwargs['VpnGatewayId']),
     }
 
     @classmethod
@@ -494,6 +497,26 @@ class EC2TestCase(base.BaseTestCase):
     @classmethod
     def get_image_waiter(cls):
         return EC2Waiter(cls._image_get_state)
+
+    @classmethod
+    def _vpn_gateway_get_attachment_state(cls, vpn_gateway_id):
+        try:
+            data = cls.client.describe_vpn_gateways(
+                VpnGatewayIds=[vpn_gateway_id])
+            attachments = data['VpnGateways'][0].get('VpcAttachments')
+            if (not attachments or
+                    attachments[0]['State'] == 'detached'):
+                raise exceptions.NotFound()
+            return attachments[0]['State']
+        except botocore.exceptions.ClientError as ex:
+            error_code = ex.response['Error']['Code']
+            if error_code == 'InvalidVpnGatewayID.NotFound':
+                raise exceptions.NotFound()
+            raise
+
+    @classmethod
+    def get_vpn_gateway_attachment_waiter(cls):
+        return EC2Waiter(cls._vpn_gateway_get_attachment_state)
 
     def assertEmpty(self, list_obj, msg=None):
         self.assertTrue(len(list_obj) == 0, msg)
