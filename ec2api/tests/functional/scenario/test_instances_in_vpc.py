@@ -154,11 +154,10 @@ class InstancesInVPCTest(scenario_base.BaseScenarioTest):
              'user': CONF.aws.image_user,
              'ip': ip_private_address_2})
         ssh_client.exec_command(remote_ping_template % ip_private_address_1)
-        if CONF.aws.run_incompatible_tests:
-            try:
-                resp = ssh_client.exec_command(remote_ping_template %
-                                               ping_destination)
-            except exceptions.SSHExecCommandFailed:
-                pass
-            else:
-                self.assertEqual('', resp)
+        try:
+            resp = ssh_client.exec_command(remote_ping_template %
+                                           ping_destination)
+        except exceptions.SSHExecCommandFailed:
+            pass
+        else:
+            self.assertEqual('', resp)

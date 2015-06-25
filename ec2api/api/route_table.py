@@ -569,15 +569,15 @@ def _update_host_routes(context, neutron, cleaner, route_table, subnets):
     for subnet in subnets:
         # TODO(ft): do list subnet w/ filters instead of show one by one
         os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
-        gateway_ip = str(netaddr.IPAddress(
-            netaddr.IPNetwork(os_subnet['cidr']).first + 1))
-        host_routes = _get_subnet_host_routes(context, route_table, gateway_ip,
-                                              destinations)
+        host_routes, gateway_ip = _get_subnet_host_routes_and_gateway_ip(
+            context, route_table, os_subnet['cidr'], destinations)
         neutron.update_subnet(subnet['os_id'],
-                              {'subnet': {'host_routes': host_routes}})
+                              {'subnet': {'host_routes': host_routes,
+                                          'gateway_ip': gateway_ip}})
         cleaner.addCleanup(
             neutron.update_subnet, subnet['os_id'],
-            {'subnet': {'host_routes': os_subnet['host_routes']}})
+            {'subnet': {'host_routes': os_subnet['host_routes'],
+                        'gateway_ip': os_subnet['gateway_ip']}})
 
 
 def _get_router_destinations(context, route_table):
@@ -589,10 +589,12 @@ def _get_router_destinations(context, route_table):
             for item in db_api.get_items_by_ids(context, dst_ids)}
 
 
-def _get_subnet_host_routes(context, route_table, gateway_ip,
-                            destinations=None):
+def _get_subnet_host_routes_and_gateway_ip(context, route_table, cidr_block,
+                                           destinations=None):
     if not destinations:
         destinations = _get_router_destinations(context, route_table)
+    gateway_ip = str(netaddr.IPAddress(
+        netaddr.IPNetwork(cidr_block).first + 1))
 
     def get_nexthop(route):
         if 'gateway_id' in route:
@@ -608,22 +610,32 @@ def _get_subnet_host_routes(context, route_table, gateway_ip,
             return '127.0.0.1'
         return network_interface['private_ip_address']
 
-    # TODO(ft): perhaps we should consider vpn routes here.
-    # For example if no internet gateway is attached, but vpn gateway is,
-    # a host should route trafic related to vpn gateways to Neutron router.
-    # Otherwise if internet gateway is attached, but vpn gateway is dead,
-    # vpn related trafic should be terminated to 127.0.0.1.
-    # Next question is route precedence in overlapping case.
-    host_routes = [{'destination': route['destination_cidr_block'],
-                    'nexthop': get_nexthop(route)}
-                   for route in route_table['routes']
-                   if (not route.get('gateway_id') or
-                       ec2utils.get_ec2_id_kind(route['gateway_id']) == 'igw')]
-    if not any(r['destination'] == '0.0.0.0/0' for r in host_routes):
-        host_routes.append({'destination': '0.0.0.0/0',
-                            'nexthop': '127.0.0.1'})
+    host_routes = []
+    subnet_gateway_is_used = False
+    for route in route_table['routes']:
+        # TODO(ft): perhaps we should consider vpn routes here.
+        # For example if no internet gateway is attached, but vpn gateway is,
+        # a host should route trafic related to vpn gateways to Neutron router.
+        # Otherwise if internet gateway is attached, but vpn gateway is dead,
+        # vpn related trafic should be terminated to 127.0.0.1.
+        # Next question is route precedence in overlapping case.
+        if (route.get('gateway_id') and
+                ec2utils.get_ec2_id_kind(route['gateway_id']) == 'vgw'):
+            continue
+        nexthop = get_nexthop(route)
+        if route['destination_cidr_block'] == '0.0.0.0/0':
+            if nexthop == '127.0.0.1':
+                continue
+            elif nexthop == gateway_ip:
+                subnet_gateway_is_used = True
+        host_routes.append({'destination': route['destination_cidr_block'],
+                            'nexthop': nexthop})
 
-    return host_routes
+    if not subnet_gateway_is_used:
+        # NOTE(ft): gateway_ip is set to None to allow correct handling
+        # of 0.0.0.0/0 route by Neutron.
+        gateway_ip = None
+    return host_routes, gateway_ip
 
 
 def _get_route_target(route):
