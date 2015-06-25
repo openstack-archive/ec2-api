@@ -118,7 +118,8 @@ def create_vpn_connection_route(context, vpn_connection_id,
     if destination_cidr_block in vpn_connection['cidrs']:
         return True
     neutron = clients.neutron(context)
-    vpn_gateway = db_api.get_item_by_id(context, vpn_connection_id)
+    vpn_gateway = db_api.get_item_by_id(context,
+                                        vpn_connection['vpn_gateway_id'])
     with common.OnCrashCleaner() as cleaner:
         _add_cidr_to_vpn_connection_item(context, vpn_connection,
                                          destination_cidr_block)
@@ -126,7 +127,7 @@ def create_vpn_connection_route(context, vpn_connection_id,
                            context, vpn_connection, destination_cidr_block)
 
         _reset_vpn_connections(context, neutron, cleaner,
-                               vpn_gateway, [vpn_connection])
+                               vpn_gateway, vpn_connections=[vpn_connection])
 
     return True
 
@@ -139,7 +140,8 @@ def delete_vpn_connection_route(context, vpn_connection_id,
             _('The specified route %(destination_cidr_block)s does not exist')
             % {'destination_cidr_block': destination_cidr_block})
     neutron = clients.neutron(context)
-    vpn_gateway = db_api.get_item_by_id(context, vpn_connection_id)
+    vpn_gateway = db_api.get_item_by_id(context,
+                                        vpn_connection['vpn_gateway_id'])
     with common.OnCrashCleaner() as cleaner:
         _remove_cidr_from_vpn_connection_item(context, vpn_connection,
                                               destination_cidr_block)
@@ -147,7 +149,7 @@ def delete_vpn_connection_route(context, vpn_connection_id,
                            context, vpn_connection, destination_cidr_block)
 
         _reset_vpn_connections(context, neutron, cleaner,
-                               vpn_gateway, [vpn_connection])
+                               vpn_gateway, vpn_connections=[vpn_connection])
 
     return True
 
