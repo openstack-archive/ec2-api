@@ -37,6 +37,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
     @classmethod
     @base.safe_setup
     def setUpClass(cls):
+        raise cls.skipException('aws EBS image does not provided')
         super(EC2_EBSInstanceTuneBDM, cls).setUpClass()
         if not CONF.aws.ebs_image_id:
             raise cls.skipException('aws EBS image does not provided')
@@ -118,10 +119,6 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
-    @testtools.skipUnless(
-        CONF.aws.run_incompatible_tests,
-        "Error from nova: "
-        "Invalid input for field/attribute 0. ...")
     def test_launch_ebs_instance_with_creating_blank_volume(self):
         """Launch instance with creating blank volume."""
         device_name_prefix = _get_device_name_prefix(self.root_device_name)
@@ -163,6 +160,7 @@ class EC2_EBSInstanceAttaching(base.EC2TestCase):
     @classmethod
     @base.safe_setup
     def setUpClass(cls):
+        raise cls.skipException('aws EBS image does not provided')
         super(EC2_EBSInstanceAttaching, cls).setUpClass()
 
         if not CONF.aws.run_incompatible_tests:

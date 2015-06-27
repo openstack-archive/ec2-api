@@ -217,10 +217,14 @@ class ImageTestCase(base.ApiTestCase):
              'properties': {
                  'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
                  'kernel_id': fakes.ID_OS_IMAGE_AKI_1,
-                 'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1}},
+                 'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1,
+                 'bdm_v2': True}},
             self.glance.images.create.call_args[1])
-        self.assertEqual([{'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+        self.assertEqual([{'boot_index': -1,
                            'delete_on_termination': True,
+                           'destination_type': 'volume',
+                           'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+                           'source_type': 'snapshot',
                            'snapshot_id': fakes.ID_OS_SNAPSHOT_1}],
                          json.loads(bdm))
         get_os_image.assert_has_calls(

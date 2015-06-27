@@ -147,7 +147,7 @@ class InstanceTestCase(base.ApiTestCase):
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
-                block_device_mapping={},
+                block_device_mapping_v2=[],
                 security_groups=None,
                 nics=[{'port-id': fakes.ID_OS_PORT_1}],
                 key_name=None, userdata=None)
@@ -276,7 +276,7 @@ class InstanceTestCase(base.ApiTestCase):
                 min_count=1, max_count=1,
                 kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
-                block_device_mapping={},
+                block_device_mapping_v2=[],
                 security_groups=None,
                 nics=[{'port-id': port_id}
                       for port_id in port_ids],
@@ -343,7 +343,7 @@ class InstanceTestCase(base.ApiTestCase):
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
                 userdata=user_data, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
                 ramdisk_id=fakes.ID_OS_IMAGE_ARI_1, key_name=None,
-                block_device_mapping='fake_bdm',
+                block_device_mapping_v2='fake_bdm',
                 availability_zone='fake_zone', security_groups=['default'],
                 **extra_kwargs)
             self.nova.servers.reset_mock()
@@ -1409,7 +1409,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2)
 
         res = instance_api._parse_block_device_mapping(fake_context, [])
-        self.assertEqual({}, res)
+        self.assertEqual([], res)
 
         res = instance_api._parse_block_device_mapping(
             fake_context, [{'device_name': '/dev/vdf',
@@ -1425,15 +1425,41 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                     'delete_on_termination': True}},
                            {'device_name': '/dev/sdb1',
                             'ebs': {'volume_size': 55}}])
-        self.assertThat(
-            res,
-            matchers.DictMatches(
-                {'/dev/vdf': fakes.ID_OS_SNAPSHOT_1 + ':snap::True',
-                 '/dev/vdg': fakes.ID_OS_SNAPSHOT_2 + ':snap:111:False',
-                 '/dev/vdh': fakes.ID_OS_VOLUME_1 + ':vol::True',
-                 '/dev/vdi': fakes.ID_OS_VOLUME_2 + ':vol::True',
-                 '/dev/sdb1': '::55:'},
-                orderless_lists=True))
+
+        expected = [{'boot_index': -1,
+                     'uuid': fakes.ID_OS_SNAPSHOT_1,
+                     'device_name': '/dev/vdf',
+                     'source_type': 'snapshot',
+                     'destination_type': 'volume',
+                     'delete_on_termination': True},
+                    {'boot_index': -1,
+                     'uuid': fakes.ID_OS_SNAPSHOT_2,
+                     'volume_size': 111,
+                     'device_name': '/dev/vdg',
+                     'source_type': 'snapshot',
+                     'destination_type': 'volume',
+                     'delete_on_termination': False},
+                    {'boot_index': -1,
+                     'uuid': fakes.ID_OS_VOLUME_1,
+                     'device_name': '/dev/vdh',
+                     'source_type': 'volume',
+                     'destination_type': 'volume',
+                     'delete_on_termination': True},
+                    {'boot_index': -1,
+                     'uuid': fakes.ID_OS_VOLUME_2,
+                     'device_name': '/dev/vdi',
+                     'source_type': 'volume',
+                     'destination_type': 'volume',
+                     'delete_on_termination': True},
+                    {'boot_index': -1,
+                     'volume_size': 55,
+                     'device_name': '/dev/sdb1',
+                     'source_type': 'blank',
+                     'destination_type': 'volume',
+                     'delete_on_termination': True}]
+
+        self.assertThat(expected, matchers.ListMatches(res,
+                                                       orderless_lists=True))
 
     @mock.patch('cinderclient.client.Client')
     @mock.patch('novaclient.client.Client')

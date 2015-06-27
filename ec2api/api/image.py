@@ -187,9 +187,15 @@ def register_image(context, name=None, image_location=None,
     if root_device_name:
         properties['root_device_name'] = root_device_name
     if block_device_mapping:
-        mappings = [instance_api._cloud_parse_block_device_mapping(context,
-                                                                   bdm)
-                    for bdm in block_device_mapping]
+        mappings = instance_api._parse_block_device_mapping(
+            context, block_device_mapping)
+        # NOTE(andrey-mp): image BDM doesn't require resource_id instead 'uuid'
+        for bdm in mappings:
+            uuid = bdm.pop('uuid', None)
+            if uuid:
+                resource = bdm['source_type'] + '_id'
+                bdm[resource] = uuid
+        properties['bdm_v2'] = True
         properties['block_device_mapping'] = json.dumps(mappings)
     if architecture is not None:
         properties['architecture'] = architecture

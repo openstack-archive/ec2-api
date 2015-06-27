@@ -236,9 +236,6 @@ class InstanceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
-        "Error from nova: "
-        "Invalid input for field/attribute 0. ...")
     def test_launch_instance_with_creating_blank_volume(self):
         """Launch instance with creating blank volume."""
         device_name = '/dev/xvdh'

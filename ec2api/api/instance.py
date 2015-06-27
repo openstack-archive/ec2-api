@@ -150,7 +150,7 @@ def run_instances(context, image_id, min_count, max_count,
                 min_count=1, max_count=1,
                 kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
                 availability_zone=availability_zone,
-                block_device_mapping=bdm,
+                block_device_mapping_v2=bdm,
                 key_name=key_name, userdata=user_data,
                 **extra_params)
             cleaner.addCleanup(nova.servers.delete, os_instance.id)
@@ -888,16 +888,41 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
 
 def _parse_block_device_mapping(context, block_device_mapping):
     # TODO(ft): check block_device_mapping structure
-    bdm = {}
+    bdms = []
     for args_bd in (block_device_mapping or []):
-        _cloud_parse_block_device_mapping(context, args_bd)
-        bdm[args_bd['device_name']] = ':'.join(
-            [args_bd.get('snapshot_id', args_bd.get('volume_id', '')),
-             ('snap' if 'snapshot_id' in args_bd else
-              'vol' if 'volume_id' in args_bd else ''),
-             str(args_bd.get('volume_size', '')),
-             str(args_bd.get('delete_on_termination', ''))])
-    return bdm
+        bdm = {
+            'device_name': args_bd['device_name'],
+            'destination_type': 'volume',
+            'boot_index': -1,
+            'source_type': 'blank',
+            'delete_on_termination': True
+        }
+
+        ebs = args_bd.get('ebs')
+        if ebs:
+            bdm['delete_on_termination'] = ebs.get('delete_on_termination',
+                                                   True)
+            ec2_id = ebs.get('snapshot_id')
+            if ec2_id:
+                if ec2_id.startswith('snap-'):
+                    bdm['source_type'] = 'snapshot'
+                    snapshot = ec2utils.get_db_item(context, ec2_id)
+                    bdm['uuid'] = snapshot['os_id']
+                elif ec2_id.startswith('vol-'):
+                    bdm['source_type'] = 'volume'
+                    volume = ec2utils.get_db_item(context, ec2_id)
+                    bdm['uuid'] = volume['os_id']
+                else:
+                    # NOTE(ft): AWS returns undocumented
+                    # InvalidSnapshotID.NotFound
+                    raise exception.InvalidSnapshotIDMalformed(
+                        snapshot_id=ec2_id)
+            if 'volume_size' in ebs:
+                bdm['volume_size'] = ebs['volume_size']
+
+        bdms.append(bdm)
+
+    return bdms
 
 
 def _format_group_set(context, os_security_groups, groups):
@@ -1348,35 +1373,6 @@ ec2utils.register_auto_create_db_item_extension(
 
 
 # NOTE(ft): following functions are copied from various parts of Nova
-
-def _cloud_parse_block_device_mapping(context, bdm):
-    """Parse BlockDeviceMappingItemType into flat hash
-
-    BlockDevicedMapping.<N>.DeviceName
-    BlockDevicedMapping.<N>.Ebs.SnapshotId
-    BlockDevicedMapping.<N>.Ebs.VolumeSize
-    BlockDevicedMapping.<N>.Ebs.DeleteOnTermination
-    BlockDevicedMapping.<N>.Ebs.NoDevice
-    BlockDevicedMapping.<N>.VirtualName
-    => remove .Ebs and allow volume id in SnapshotId
-    """
-    ebs = bdm.pop('ebs', None)
-    if ebs:
-        ec2_id = ebs.pop('snapshot_id', None)
-        if ec2_id:
-            if ec2_id.startswith('snap-'):
-                snapshot = ec2utils.get_db_item(context, ec2_id)
-                bdm['snapshot_id'] = snapshot['os_id']
-            elif ec2_id.startswith('vol-'):
-                volume = ec2utils.get_db_item(context, ec2_id)
-                bdm['volume_id'] = volume['os_id']
-            else:
-                # NOTE(ft): AWS returns undocumented InvalidSnapshotID.NotFound
-                raise exception.InvalidSnapshotIDMalformed(snapshot_id=ec2_id)
-            ebs.setdefault('delete_on_termination', True)
-        bdm.update(ebs)
-    return bdm
-
 
 def _cloud_get_image_state(image):
     state = image.status
