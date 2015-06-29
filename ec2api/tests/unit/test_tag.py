@@ -55,9 +55,9 @@ class TagTestCase(base.ApiTestCase):
 
         # NOTE(ft): check a tag can be created for all valid resource types
         resource_ids = [fakes.random_ec2_id(r_t)
-                        for r_t in ['dopt', 'ami', 'aki', 'ari', 'i', 'igw',
-                                    'eni', 'rtb', 'snap', 'subnet', 'sg',
-                                    'vol', 'vpc']]
+                        for r_t in ['dopt', 'ami', 'aki', 'ari', 'cgw', 'i',
+                                    'igw', 'eni', 'rtb', 'snap', 'subnet',
+                                    'sg', 'vgw', 'vol', 'vpc', 'vpn']]
         self.assertEqual(len(resource_ids), len(tag_api.RESOURCE_TYPES))
 
         params = {'ResourceId.%s' % num: r_id
@@ -183,6 +183,7 @@ class TagTestCase(base.ApiTestCase):
                              ('ami', 'image'),
                              ('aki', 'image'),
                              ('ari', 'image'),
+                             ('cgw', 'customer-gateway'),
                              ('i', 'instance'),
                              ('igw', 'internet-gateway'),
                              ('eni', 'network-interface'),
@@ -190,8 +191,10 @@ class TagTestCase(base.ApiTestCase):
                              ('snap', 'snapshot'),
                              ('subnet', 'subnet'),
                              ('sg', 'security-group'),
+                             ('vgw', 'vpn-gateway'),
                              ('vol', 'volume'),
-                             ('vpc', 'vpc')]:
+                             ('vpc', 'vpc'),
+                             ('vpn', 'vpn-connection')]:
             item_id = fakes.random_ec2_id(r_id)
             self.db_api.get_tags.return_value = [{'item_id': item_id,
                                                   'key': 'fake-key',

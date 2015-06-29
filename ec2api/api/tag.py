@@ -31,6 +31,7 @@ RESOURCE_TYPES = {
     'ami': 'image',
     'aki': 'image',
     'ari': 'image',
+    'cgw': 'customer-gateway',
     'i': 'instance',
     'igw': 'internet-gateway',
     'eni': 'network-interface',
@@ -38,8 +39,10 @@ RESOURCE_TYPES = {
     'snap': 'snapshot',
     'subnet': 'subnet',
     'sg': 'security-group',
+    'vgw': 'vpn-gateway',
     'vol': 'volume',
     'vpc': 'vpc',
+    'vpn': 'vpn-connection',
 }
 
 
