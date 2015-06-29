@@ -423,3 +423,67 @@ class TagTest(base.EC2TestCase):
         self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)
+
+    @base.skip_without_vpc()
+    def test_tag_customer_gateway(self):
+        data = self.client.create_customer_gateway(
+            Type='ipsec.1', PublicIp='198.51.100.77', BgpAsn=65000)
+        cgw_id = data['CustomerGateway']['CustomerGatewayId']
+        self.addResourceCleanUp(self.client.delete_customer_gateway,
+                                CustomerGatewayId=cgw_id)
+
+        def describe_func(*args, **kwargs):
+            data = self.client.describe_customer_gateways(*args, **kwargs)
+            self.assertEqual(1, len(data['CustomerGateways']))
+            self.assertEqual(cgw_id,
+                             data['CustomerGateways'][0]['CustomerGatewayId'])
+
+        self._test_tag_resource(cgw_id, 'customer-gateway', describe_func)
+
+    @base.skip_without_vpc()
+    def test_tag_vpn_gateway(self):
+        data = self.client.create_vpn_gateway(Type='ipsec.1')
+        vgw_id = data['VpnGateway']['VpnGatewayId']
+        self.addResourceCleanUp(self.client.delete_vpn_gateway,
+                                VpnGatewayId=vgw_id)
+
+        def describe_func(*args, **kwargs):
+            data = self.client.describe_vpn_gateways(*args, **kwargs)
+            self.assertEqual(1, len(data['VpnGateways']))
+            self.assertEqual(vgw_id,
+                             data['VpnGateways'][0]['VpnGatewayId'])
+
+        self._test_tag_resource(vgw_id, 'vpn-gateway', describe_func)
+
+    @base.skip_without_vpc()
+    def test_tag_vpn_connection(self):
+        data = self.client.create_customer_gateway(
+            Type='ipsec.1', PublicIp='198.51.100.77', BgpAsn=65000)
+        cgw_id = data['CustomerGateway']['CustomerGatewayId']
+        self.addResourceCleanUp(self.client.delete_customer_gateway,
+                                CustomerGatewayId=cgw_id)
+
+        data = self.client.create_vpn_gateway(Type='ipsec.1')
+        vgw_id = data['VpnGateway']['VpnGatewayId']
+        self.addResourceCleanUp(self.client.delete_vpn_gateway,
+                                VpnGatewayId=vgw_id)
+
+        data = self.client.create_vpn_connection(
+            CustomerGatewayId=cgw_id, VpnGatewayId=vgw_id,
+            Options={'StaticRoutesOnly': True}, Type='ipsec.1')
+        vpn_id = data['VpnConnection']['VpnConnectionId']
+        vpn_clean = self.addResourceCleanUp(self.client.delete_vpn_connection,
+                                            VpnConnectionId=vpn_id)
+
+        def describe_func(*args, **kwargs):
+            data = self.client.describe_vpn_connections(*args, **kwargs)
+            self.assertEqual(1, len(data['VpnConnections']))
+            self.assertEqual(vpn_id,
+                             data['VpnConnections'][0]['VpnConnectionId'])
+
+        self._test_tag_resource(vpn_id, 'vpn-connection', describe_func)
+
+        self.client.delete_vpn_connection(VpnConnectionId=vpn_id)
+        vpn_waiter = self.get_vpn_connection_waiter()
+        self.cancelResourceCleanUp(vpn_clean)
+        vpn_waiter.wait_delete(vpn_id)
