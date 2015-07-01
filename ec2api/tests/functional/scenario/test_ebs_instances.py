@@ -37,7 +37,6 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
     @classmethod
     @base.safe_setup
     def setUpClass(cls):
-        raise cls.skipException('aws EBS image does not provided')
         super(EC2_EBSInstanceTuneBDM, cls).setUpClass()
         if not CONF.aws.ebs_image_id:
             raise cls.skipException('aws EBS image does not provided')
@@ -160,7 +159,6 @@ class EC2_EBSInstanceAttaching(base.EC2TestCase):
     @classmethod
     @base.safe_setup
     def setUpClass(cls):
-        raise cls.skipException('aws EBS image does not provided')
         super(EC2_EBSInstanceAttaching, cls).setUpClass()
 
         if not CONF.aws.run_incompatible_tests:

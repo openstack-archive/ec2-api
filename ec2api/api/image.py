@@ -189,7 +189,7 @@ def register_image(context, name=None, image_location=None,
     if block_device_mapping:
         mappings = instance_api._parse_block_device_mapping(
             context, block_device_mapping)
-        # NOTE(andrey-mp): image BDM doesn't require resource_id instead 'uuid'
+        # NOTE(andrey-mp): image BDM requires resource_id instead of 'uuid'
         for bdm in mappings:
             uuid = bdm.pop('uuid', None)
             if uuid:
