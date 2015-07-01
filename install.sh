@@ -310,8 +310,11 @@ sudo rm -f $AUTH_CACHE_DIR/*
 echo Installing package
 if [[ -z "$VIRTUAL_ENV" ]]; then
   SUDO_PREFIX="sudo"
+  if ! command -v pip >/dev/null; then
+    sudo apt-get install python-pip
+  fi
 fi
-$SUDO_PREFIX python setup.py develop
+$SUDO_PREFIX pip install -e ./
 $SUDO_PREFIX rm -rf build ec2_api.egg-info
 
 #recreate database
