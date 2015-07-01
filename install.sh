@@ -106,17 +106,18 @@ get_id () {
 get_user() {
     local username=$1
 
-    local user_id=$(get_data 2 $username 1 keystone user-list)
+    local user_id=$(openstack user show $username -f value -c id 2>/dev/null)
 
     if [ -n "$user_id" ]; then
         echo "Found existing $username user" >&2
         echo $user_id
     else
         echo "Creating $username user..." >&2
-        get_id keystone user-create --name=$username \
-                                    --pass="$SERVICE_PASSWORD" \
-                                    --tenant $SERVICE_TENANT \
-                                    --email=$username@example.com
+        openstack user create -f value -c id \
+                              $username \
+                              --password "$SERVICE_PASSWORD" \
+                              --project $SERVICE_TENANT \
+                              --email $username@example.com
     fi
 }
 
@@ -126,19 +127,19 @@ add_role() {
     local role_id=$3
     local username=$4
 
-    user_roles=$(keystone user-role-list \
-                          --user_id $user_id\
-                          --tenant $tenant 2>/dev/null)
+    user_roles=$(openstack user role list -f value -c ID \
+                                          $user_id \
+                                          --project $tenant 2>/dev/null)
     die_if_not_set $LINENO user_roles "Fail to get user_roles for tenant($tenant) and user_id($user_id)"
-    existing_role=$(get_data 1 $role_id 1 echo "$user_roles")
+    existing_role=$(echo "$user_roles" | grep $role_id || true)
     if [ -n "$existing_role" ]
     then
         echo "User $username already has role $role_id" >&2
         return
     fi
-    keystone user-role-add --tenant $tenant \
-             --user_id $user_id \
-             --role_id $role_id
+    openstack role add $role_id \
+                       --user $user_id \
+                       --project $tenant
 }
 
 
@@ -202,7 +203,7 @@ function copynovaopt() {
     iniset $CONF_FILE DEFAULT $option_name $option
 }
 
-if [[ -n $(keystone catalog --service network) ]]; then
+if [[ -n $(openstack catalog show network) ]]; then
     VPC_SUPPORT="True"
 else
     VPC_SUPPORT="False"
@@ -221,10 +222,10 @@ if [[ "$VPC_SUPPORT" == "True" && -z "$EXTERNAL_NETWORK" ]]; then
 fi
 
 #create keystone user with admin privileges
-ADMIN_ROLE=$(get_data 2 admin 1 keystone role-list)
-die_if_not_set $LINENO ADMIN_ROLE "Fail to get ADMIN_ROLE by 'keystone role-list' "
-SERVICE_TENANT_ID=$(get_data 2 service 1 keystone tenant-list)
-die_if_not_set $LINENO SERVICE_TENANT_ID "Fail to get service tenant 'keystone tenant-list' "
+ADMIN_ROLE=$(openstack role show admin -c id -f value)
+die_if_not_set $LINENO ADMIN_ROLE "Fail to get ADMIN_ROLE by 'openstack role show' "
+SERVICE_TENANT_ID=$(openstack project show service -c id -f value)
+die_if_not_set $LINENO SERVICE_TENANT_ID "Fail to get service tenant 'openstack project show' "
 
 echo ADMIN_ROLE $ADMIN_ROLE
 echo SERVICE_TENANT $SERVICE_TENANT
@@ -253,7 +254,7 @@ fi
 AUTH_HOST=${OS_AUTH_URL#*//}
 AUTH_HOST=${AUTH_HOST%:*}
 AUTH_CACHE_DIR=${AUTH_CACHE_DIR:-/var/cache/ec2api}
-AUTH_PORT=`keystone catalog|grep -A 9 identity|grep adminURL|awk '{print $4}'`
+AUTH_PORT=`openstack catalog show identity -f value|grep adminURL|awk '{print $2}'`
 AUTH_PORT=${AUTH_PORT##*:}
 AUTH_PORT=${AUTH_PORT%%/*}
 AUTH_PROTO=${OS_AUTH_URL%%:*}
@@ -283,8 +284,8 @@ iniset $CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT
 
 if [[ -f "$NOVA_CONF" ]]; then
     # NOTE(ft): use swift instead internal s3 server if enabled
-    if [[ -n $(keystone catalog --service object-store) ]] &&
-            [[ -n $(keystone catalog --service s3) ]]; then
+    if [[ -n $(openstack catalog show object-store 2>/dev/null) ]] &&
+            [[ -n $(openstack catalog show s3 2>/dev/null) ]]; then
         copynovaopt s3_host
         copynovaopt s3_port
         copynovaopt s3_affix_tenant
