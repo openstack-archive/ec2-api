@@ -927,15 +927,19 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_get_subnet_host_routes_and_gateway_ip(self):
         self.set_mock_db_items(
             fakes.DB_NETWORK_INTERFACE_1, fakes.DB_NETWORK_INTERFACE_2,
-            fakes.DB_IGW_1, fakes.DB_VPN_GATEWAY_1)
+            fakes.DB_IGW_1, fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2,
+            fakes.DB_VPN_CONNECTION_1)
 
         route_table_1 = copy.deepcopy(fakes.DB_ROUTE_TABLE_1)
-        route_table_1['routes'].append(
+        route_table_1['routes'].extend([
             {'destination_cidr_block': '192.168.111.0/24',
-             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1})
-        route_table_1['routes'].append(
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_1},
             {'destination_cidr_block': '192.168.222.0/24',
-             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_2})
+             'gateway_id': fakes.ID_EC2_VPN_GATEWAY_2},
+            {'destination_cidr_block': '0.0.0.0/0',
+             'gateway_id': fakes.random_ec2_id('igw')},
+            {'destination_cidr_block': '192.168.200.0/24',
+             'gateway_id': fakes.random_ec2_id('vgw')}])
         host_routes, gateway_ip = (
             route_table_api._get_subnet_host_routes_and_gateway_ip(
                 mock.ANY, route_table_1, fakes.CIDR_SUBNET_1))
@@ -943,7 +947,13 @@ class RouteTableTestCase(base.ApiTestCase):
         self.assertThat(host_routes,
                         matchers.ListMatches([
                             {'destination': fakes.CIDR_VPC_1,
-                             'nexthop': fakes.IP_GATEWAY_SUBNET_1}]))
+                             'nexthop': fakes.IP_GATEWAY_SUBNET_1},
+                            {'destination': '192.168.111.0/24',
+                             'nexthop': fakes.IP_GATEWAY_SUBNET_1},
+                            {'destination': '192.168.222.0/24',
+                             'nexthop': '127.0.0.1'},
+                            {'destination': '192.168.200.0/24',
+                             'nexthop': '127.0.0.1'}]))
         self.assertEqual(None, gateway_ip)
 
         host_routes, gateway_ip = (
@@ -958,11 +968,14 @@ class RouteTableTestCase(base.ApiTestCase):
                             {'destination': fakes.CIDR_EXTERNAL_NETWORK,
                              'nexthop': fakes.IP_NETWORK_INTERFACE_2},
                             {'destination': '0.0.0.0/0',
+                             'nexthop': fakes.IP_GATEWAY_SUBNET_1},
+                            {'destination': fakes.CIDR_VPN_1_PROPAGATED_1,
                              'nexthop': fakes.IP_GATEWAY_SUBNET_1}]))
+        self.assertEqual(fakes.IP_GATEWAY_SUBNET_1, gateway_ip)
 
     @mock.patch('ec2api.api.route_table.'
                 '_get_subnet_host_routes_and_gateway_ip')
-    @mock.patch('ec2api.api.route_table._get_router_destinations')
+    @mock.patch('ec2api.api.route_table._get_active_route_destinations')
     def test_update_host_routes(self, destinations_getter, routes_getter):
         self.neutron.show_subnet.side_effect = tools.get_by_1st_arg_getter(
             {fakes.ID_OS_SUBNET_1: {'subnet': fakes.OS_SUBNET_1},
@@ -1070,7 +1083,9 @@ class RouteTableTestCase(base.ApiTestCase):
         route_table_api._update_routes_in_associated_subnets(
             mock.MagicMock(), 'fake_cleaner', fakes.DB_ROUTE_TABLE_1,
             update_target=route_table_api.VPN_TARGET)
-        self.assertFalse(routes_updater.called)
+        routes_updater.assert_called_once_with(
+            mock.ANY, self.neutron, 'fake_cleaner',
+            fakes.DB_ROUTE_TABLE_1, [subnet_default_rtb, subnet_rtb_1])
         update_vpn_routes.assert_called_once_with(
             mock.ANY, self.neutron, 'fake_cleaner',
             fakes.DB_ROUTE_TABLE_1, [subnet_default_rtb, subnet_rtb_1])
@@ -1088,15 +1103,16 @@ class RouteTableTestCase(base.ApiTestCase):
              'destination_cidr_block': 'fake'},
             {'network_interface_id': fake_eni_id,
              'destination_cidr_block': 'fake'}])
-        host_routes = route_table_api._get_router_destinations('fake_context',
-                                                               route_table_2)
+        host_routes = route_table_api._get_active_route_destinations(
+            'fake_context', route_table_2)
         self.assertThat(host_routes, matchers.DictMatches({
             fakes.ID_EC2_IGW_1: fakes.DB_IGW_1,
             fakes.ID_EC2_NETWORK_INTERFACE_2:
                         fakes.DB_NETWORK_INTERFACE_2}))
         self.db_api.get_items_by_ids.assert_called_once_with(
             mock.ANY, [fakes.ID_EC2_NETWORK_INTERFACE_2, fakes.ID_EC2_IGW_1,
-                       fake_igw_id, fake_vgw_id, fake_eni_id])
+                       fake_igw_id, fake_vgw_id, fake_eni_id,
+                       fakes.ID_EC2_VPN_GATEWAY_1])
 
     @mock.patch('ec2api.api.vpn_connection._update_vpn_routes')
     @mock.patch('ec2api.api.route_table._update_host_routes')
