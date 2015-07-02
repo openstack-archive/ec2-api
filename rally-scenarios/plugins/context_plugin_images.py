@@ -12,17 +12,13 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from rally.benchmark.scenarios import base as scenario_base
 from rally.common.i18n import _
 from rally.common import log as logging
 from rally.common import utils as rutils
 from rally import consts
 from rally import osclients
-
-try:
-    from rally.benchmark.context import base as context
-except ImportError:
-    from rally.benchmark import context
+from rally.task import context
+from rally.task.scenarios import base as scenario_base
 
 
 LOG = logging.getLogger(__name__)

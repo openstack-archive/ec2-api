@@ -12,8 +12,8 @@
 
 import functools
 
-from rally.benchmark.scenarios import base
 from rally.common import log as logging
+from rally.task.scenarios import base
 
 from ec2api.tests.functional import botocoreclient
 
