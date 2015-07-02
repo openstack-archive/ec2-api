@@ -732,6 +732,7 @@ class InstanceTestCase(base.ApiTestCase):
                          'project_id': fakes.ID_OS_PROJECT})
         self.cinder.volumes.list.assert_called_once_with(search_opts=None)
 
+        self.nova_admin.reset_mock()
         self.db_api.get_items_by_ids = tools.CopyingMock(
             return_value=[fakes.DB_INSTANCE_1])
         resp = self.execute('DescribeInstances',
@@ -743,6 +744,9 @@ class InstanceTestCase(base.ApiTestCase):
             mock.ANY, set([fakes.ID_EC2_INSTANCE_1]))
         (self.network_interface_api.describe_network_interfaces.
          assert_called_with(mock.ANY))
+        self.assertFalse(self.nova_admin.servers.list.called)
+        self.nova_admin.servers.get.assert_called_once_with(
+            fakes.ID_OS_INSTANCE_1)
 
         self.check_filtering(
             'DescribeInstances', 'reservationSet',
@@ -860,11 +864,11 @@ class InstanceTestCase(base.ApiTestCase):
                 fakes.OSInstance_full({
                     'id': os_id,
                     'flavor': {'id': 'fakeFlavorId'},
-                    'addresses': {subnet_name:
-                                   [{'addr': addr,
-                                     'version': 4,
-                                     'OS-EXT-IPS:type': 'fixed'}]
-                                   for subnet_name, addr in ips},
+                    'addresses': {
+                        subnet_name: [{'addr': addr,
+                                       'version': 4,
+                                       'OS-EXT-IPS:type': 'fixed'}]
+                        for subnet_name, addr in ips},
                     'root_device_name': '/dev/vda',
                     'hostname': '%s-%s' % (fakes.ID_EC2_RESERVATION_1, l_i)})
                 for l_i, (os_id, ips) in enumerate(zip(
