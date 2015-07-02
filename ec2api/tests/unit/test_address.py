@@ -25,6 +25,13 @@ from ec2api.tests.unit import tools
 
 class AddressTestCase(base.ApiTestCase):
 
+    def setUp(self):
+        super(AddressTestCase, self).setUp()
+        self.addCleanup(self._reset_engine)
+
+    def _reset_engine(self):
+        address.address_engine = address.AddressEngineNeutron()
+
     def test_allocate_ec2_classic_address(self):
         address.address_engine = (
             address.AddressEngineNeutron())

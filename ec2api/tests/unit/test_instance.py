@@ -35,6 +35,7 @@ class InstanceTestCase(base.ApiTestCase):
 
     def setUp(self):
         super(InstanceTestCase, self).setUp()
+        self.addCleanup(self._reset_engine)
         network_interface_api_patcher = mock.patch(
             'ec2api.api.instance.network_interface_api')
         self.network_interface_api = network_interface_api_patcher.start()
@@ -76,6 +77,9 @@ class InstanceTestCase(base.ApiTestCase):
                                         id='fakeFlavorId')
         self.nova.flavors.get.return_value = self.fake_flavor
         self.nova.flavors.list.return_value = [self.fake_flavor]
+
+    def _reset_engine(self):
+        instance_api.instance_engine = instance_api.InstanceEngineNeutron()
 
     @mock.patch('ec2api.api.instance.describe_instances')
     @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'

@@ -22,6 +22,14 @@ from ec2api.tests.unit import matchers
 
 class AvailabilityZoneCase(base.ApiTestCase):
 
+    def setUp(self):
+        super(AvailabilityZoneCase, self).setUp()
+        self.addCleanup(self._reset_engine)
+
+    def _reset_engine(self):
+        availability_zone.account_attribute_engine = (
+            availability_zone.AccountAttributeEngineNeutron())
+
     def test_describe_availability_zones(self):
         self.nova.availability_zones.list.return_value = [
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),
