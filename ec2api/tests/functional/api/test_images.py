@@ -50,10 +50,10 @@ class ImageTest(base.EC2TestCase):
         ebs = bdm['Ebs']
         self.assertIsNotNone(ebs.get('SnapshotId'))
         self.assertIsNotNone(ebs.get('DeleteOnTermination'))
+        self.assertIsNotNone(ebs.get('VolumeSize'))
         if CONF.aws.run_incompatible_tests:
             self.assertIsNotNone(ebs.get('Encrypted'))
             self.assertFalse(ebs.get('Encrypted'))
-            self.assertIsNotNone(ebs.get('VolumeSize'))
             self.assertIsNotNone(ebs.get('VolumeType'))
 
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
