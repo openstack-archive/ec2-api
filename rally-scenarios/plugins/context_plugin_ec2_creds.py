@@ -19,11 +19,8 @@ from rally.common import utils as rutils
 from rally import consts
 from rally import osclients
 from rally.plugins.openstack.wrappers import network as network_wrapper
+from rally.task import context
 
-try:
-    from rally.benchmark.context import base as context
-except ImportError:
-    from rally.benchmark import context
 
 LOG = logging.getLogger(__name__)
 
