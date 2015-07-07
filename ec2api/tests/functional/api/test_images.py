@@ -177,12 +177,10 @@ class ImageTest(base.EC2TestCase):
 
         return image_id, image_clean
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
-                          'skip due to bug #1439819')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_create_image_from_ebs_instance(self):
         name = data_utils.rand_name('image')
-        desc = data_utils.rand_name('')
+        desc = data_utils.rand_name('description')
         image_id, image_clean = self._create_image(name, desc)
 
         data = self.client.describe_images(ImageIds=[image_id])
@@ -202,8 +200,6 @@ class ImageTest(base.EC2TestCase):
         data = self.client.deregister_image(ImageId=image_id)
         self.cancelResourceCleanUp(image_clean)
 
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
-                          'skip due to bug #1439819')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_check_simple_image_attributes(self):
         name = data_utils.rand_name('image')
