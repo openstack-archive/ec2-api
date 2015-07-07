@@ -213,17 +213,13 @@ class MetadataApiTestCase(base.ApiTestCase):
               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
 
     def test_format_instance_mapping(self):
-        self.instance_api._block_device_strip_dev.return_value = 'vda'
         retval = api._build_block_device_mappings(
                 'fake_context', fakes.EC2_INSTANCE_1, fakes.ID_OS_INSTANCE_1)
         self.assertThat(retval,
                         matchers.DictMatches(
                              {'ami': 'vda',
                               'root': fakes.ROOT_DEVICE_NAME_INSTANCE_1}))
-        self.instance_api._block_device_strip_dev.assert_called_with(
-                fakes.EC2_INSTANCE_1['rootDeviceName'])
 
-        self.instance_api._block_device_strip_dev.return_value = 'sdb1'
         retval = api._build_block_device_mappings(
                 'fake_context', fakes.EC2_INSTANCE_2, fakes.ID_OS_INSTANCE_2)
         expected = {'ami': 'sdb1',
@@ -231,8 +227,6 @@ class MetadataApiTestCase(base.ApiTestCase):
         expected.update(fakes.EC2_BDM_METADATA_INSTANCE_2)
         self.assertThat(retval,
                         matchers.DictMatches(expected))
-        self.instance_api._block_device_strip_dev.assert_called_with(
-                fakes.EC2_INSTANCE_2['rootDeviceName'])
 
 
 class MetadataApiIntegralTestCase(base.ApiTestCase):

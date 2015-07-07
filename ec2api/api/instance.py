@@ -17,7 +17,6 @@ import collections
 import copy
 import itertools
 import random
-import re
 import time
 
 from novaclient import exceptions as nova_exception
@@ -1027,9 +1026,11 @@ def _is_ebs_instance(context, os_instance_id):
                                'OS-EXT-SRV-ATTR:root_device_name', None)
     if not root_device_name:
         return False
-    root_device_short_name = _block_device_strip_dev(root_device_name)
+    root_device_short_name = ec2utils.block_device_strip_dev(
+        root_device_name)
     if root_device_name == root_device_short_name:
-        root_device_name = _block_device_prepend_dev(root_device_name)
+        root_device_name = ec2utils.block_device_prepend_dev(
+            root_device_name)
     for os_volume in _get_os_volumes(context)[os_instance_id]:
         os_attachment = next(iter(os_volume.attachments), {})
         device_name = os_attachment.get('device')
@@ -1421,9 +1422,11 @@ def _cloud_format_instance_bdm(context, os_instance, result,
         root_device_short_name = root_device_type = None
     else:
         root_device_type = 'instance-store'
-        root_device_short_name = _block_device_strip_dev(root_device_name)
+        root_device_short_name = ec2utils.block_device_strip_dev(
+            root_device_name)
         if root_device_name == root_device_short_name:
-            root_device_name = _block_device_prepend_dev(root_device_name)
+            root_device_name = ec2utils.block_device_prepend_dev(
+                root_device_name)
     mapping = []
     if os_volumes is None:
         os_volumes = _get_os_volumes(context)
@@ -1468,19 +1471,6 @@ def _cloud_get_volume_attach_status(volume):
         return 'attached'
     else:
         return 'detached'
-
-
-_dev = re.compile('^/dev/')
-
-
-def _block_device_strip_dev(device_name):
-    """remove leading '/dev/'."""
-    return _dev.sub('', device_name) if device_name else device_name
-
-
-def _block_device_prepend_dev(device_name):
-    """Make sure there is a leading '/dev/'."""
-    return device_name and '/dev/' + _block_device_strip_dev(device_name)
 
 
 def _utils_generate_uid(topic, size=8):
