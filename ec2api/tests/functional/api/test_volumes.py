@@ -169,8 +169,7 @@ class VolumeTest(base.EC2TestCase):
         self.assertEqual('in-use', volume['State'])
         self.assertEqual(1, len(volume['Attachments']))
         attachment = volume['Attachments'][0]
-        if CONF.aws.run_incompatible_tests:
-            self.assertFalse(attachment['DeleteOnTermination'])
+        self.assertFalse(attachment['DeleteOnTermination'])
         self.assertIsNotNone(attachment['Device'])
         self.assertEqual(instance_id, attachment['InstanceId'])
         self.assertEqual(volume_id, attachment['VolumeId'])

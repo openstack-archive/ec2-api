@@ -19,6 +19,7 @@ from oslo_log import log as logging
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
+from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
@@ -71,8 +72,11 @@ def attach_volume(context, volume_id, instance_id, device):
         raise exception.UnsupportedOperation()
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
-    return _format_attachment(context, volume, os_volume,
-                              instance_id=instance_id)
+    attachment = _format_attachment(context, volume, os_volume,
+                                    instance_id=instance_id)
+    # NOTE(andrey-mp): nova sets deleteOnTermination=False for attached volume
+    attachment['deleteOnTermination'] = False
+    return attachment
 
 
 def detach_volume(context, volume_id, instance_id=None, device=None,
@@ -129,7 +133,8 @@ class VolumeDescriber(common.TaggableItemsDescriber):
 
     def format(self, volume, os_volume):
         return _format_volume(self.context, volume, os_volume,
-                              self.instances, self.snapshots)
+                              self.instances, self.os_instances,
+                              self.snapshots)
 
     def get_db_items(self):
         self.instances = {i['os_id']: i
@@ -139,6 +144,11 @@ class VolumeDescriber(common.TaggableItemsDescriber):
         return super(VolumeDescriber, self).get_db_items()
 
     def get_os_items(self):
+        nova = clients.nova(ec2_context.get_os_admin_context())
+        os_instances = nova.servers.list(
+            search_opts={'all_tenants': True,
+                         'project_id': self.context.project_id})
+        self.os_instances = {i.id: i for i in os_instances}
         return clients.cinder(self.context).volumes.list()
 
     def get_name(self, os_item):
@@ -162,7 +172,7 @@ def describe_volumes(context, volume_id=None, filter=None,
     return result
 
 
-def _format_volume(context, volume, os_volume, instances={},
+def _format_volume(context, volume, os_volume, instances={}, os_instances={},
                    snapshots={}, snapshot_id=None):
     valid_ec2_api_volume_status_map = {
         'attaching': 'in-use',
@@ -180,7 +190,8 @@ def _format_volume(context, volume, os_volume, instances={},
     }
     if ec2_volume['status'] == 'in-use':
         ec2_volume['attachmentSet'] = (
-                [_format_attachment(context, volume, os_volume, instances)])
+                [_format_attachment(context, volume, os_volume, instances,
+                                    os_instances)])
     else:
         ec2_volume['attachmentSet'] = {}
     if snapshot_id is None and os_volume.snapshot_id:
@@ -193,7 +204,7 @@ def _format_volume(context, volume, os_volume, instances={},
 
 
 def _format_attachment(context, volume, os_volume, instances={},
-                       instance_id=None):
+                       os_instances={}, instance_id=None):
     os_attachment = next(iter(os_volume.attachments), {})
     os_instance_id = os_attachment.get('server_id')
     if not instance_id and os_instance_id:
@@ -207,4 +218,13 @@ def _format_attachment(context, volume, os_volume, instances={},
                        if os_volume.status in ('attaching', 'detaching') else
                        'attached' if os_attachment else 'detached'),
             'volumeId': volume['id']}
+    if os_instance_id in os_instances:
+        os_instance = os_instances[os_instance_id]
+        volumes_attached = getattr(os_instance,
+                                   'os-extended-volumes:volumes_attached', [])
+        volume_attached = next((va for va in volumes_attached
+                                if va['id'] == volume['os_id']), None)
+        if volume_attached and 'delete_on_termination' in volume_attached:
+            ec2_attachment['deleteOnTermination'] = (
+                volume_attached['delete_on_termination'])
     return ec2_attachment

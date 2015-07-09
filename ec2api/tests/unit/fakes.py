@@ -1540,7 +1540,8 @@ EC2_VOLUME_2 = {
     'attachmentSet': [{'status': 'attached',
                        'instanceId': ID_EC2_INSTANCE_2,
                        'volumeId': ID_EC2_VOLUME_2,
-                       'device': ROOT_DEVICE_NAME_INSTANCE_2}],
+                       'device': ROOT_DEVICE_NAME_INSTANCE_2,
+                       'deleteOnTermination': False}],
     'encrypted': False,
     'volumeType': None,
 }

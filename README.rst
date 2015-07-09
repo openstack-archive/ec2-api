@@ -172,7 +172,6 @@ Volume related:
 - ModifyVolumeAttribute
 - kmsKeyId Volume property
 - iops Volume property
-- deleteOnTermination property (supported for describing instances only)
 - volumeType (current implementation isn't AWS compatible) Volume property
 
 VPC related:

@@ -14,6 +14,7 @@
 
 import mock
 
+import ec2api.api.clients
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -22,11 +23,24 @@ from ec2api.tests.unit import tools
 
 class VolumeTestCase(base.ApiTestCase):
 
-    def test_describe_volumes(self):
+    def setUp(self):
+        super(VolumeTestCase, self).setUp()
+        get_os_admin_context_patcher = (
+            mock.patch('ec2api.context.get_os_admin_context'))
+        self.get_os_admin_context = get_os_admin_context_patcher.start()
+        self.addCleanup(get_os_admin_context_patcher.stop)
+        self.get_os_admin_context.return_value = (
+            self._create_context(auth_token='admin_token'))
+
+    @mock.patch('ec2api.api.clients.nova', wraps=ec2api.api.clients.nova)
+    def test_describe_volumes(self, nova_client_getter):
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2),
             fakes.OSVolume(fakes.OS_VOLUME_3)]
+        self.nova.servers.list.return_value = [
+            fakes.OSInstance_full(fakes.OS_INSTANCE_1),
+            fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
 
         self.set_mock_db_items(fakes.DB_VOLUME_1, fakes.DB_VOLUME_2,
                                fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
@@ -40,6 +54,8 @@ class VolumeTestCase(base.ApiTestCase):
                            fakes.EC2_VOLUME_3]},
             orderless_lists=True))
 
+        nova_client_getter.assert_called_with(
+            self.get_os_admin_context.return_value)
         self.db_api.get_items.assert_any_call(mock.ANY, 'vol')
 
         self.db_api.get_items_by_ids = tools.CopyingMock(
@@ -49,6 +65,8 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertThat(resp, matchers.DictMatches(
             {'volumeSet': [fakes.EC2_VOLUME_1]},
             orderless_lists=True))
+        nova_client_getter.assert_called_with(
+            self.get_os_admin_context.return_value)
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, set([fakes.ID_EC2_VOLUME_1]))
 
@@ -73,6 +91,7 @@ class VolumeTestCase(base.ApiTestCase):
 
     def test_describe_volumes_auto_remove(self):
         self.cinder.volumes.list.return_value = []
+        self.nova.servers.list.return_value = []
         self.set_mock_db_items(fakes.DB_VOLUME_1, fakes.DB_VOLUME_2)
         resp = self.execute('DescribeVolumes', {})
         self.assertThat(resp, matchers.DictMatches(
@@ -87,6 +106,8 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2)]
+        self.nova.servers.list.return_value = [
+            fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
 
         self.assert_execution_error(
             'InvalidVolume.NotFound', 'DescribeVolumes',
@@ -150,6 +171,7 @@ class VolumeTestCase(base.ApiTestCase):
     def test_format_volume_maps_status(self):
         fake_volume = fakes.OSVolume(fakes.OS_VOLUME_1)
         self.cinder.volumes.list.return_value = [fake_volume]
+        self.nova.servers.list.return_value = []
         self.set_mock_db_items(fakes.DB_VOLUME_1)
 
         fake_volume.status = 'creating'
@@ -180,7 +202,8 @@ class VolumeTestCase(base.ApiTestCase):
                             {'VolumeId': fakes.ID_EC2_VOLUME_3,
                              'InstanceId': fakes.ID_EC2_INSTANCE_2,
                              'Device': '/dev/vdf'})
-        self.assertEqual({'device': '/dev/vdf',
+        self.assertEqual({'deleteOnTermination': False,
+                          'device': '/dev/vdf',
                           'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'status': 'attaching',
                           'volumeId': fakes.ID_EC2_VOLUME_3},
