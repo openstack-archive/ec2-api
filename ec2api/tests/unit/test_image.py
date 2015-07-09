@@ -105,6 +105,8 @@ class ImageTestCase(base.ApiTestCase):
                                                if next(stop_called) else None)
         image_id = fakes.random_ec2_id('ami')
         os_instance.create_image.return_value = image_id
+        self.glance.images.get.return_value = fakes.OSImage({'id': image_id},
+                                                            from_get=True)
         self.nova.servers.get.return_value = os_instance
         is_ebs_instance.return_value = True
         self.db_api.add_item.side_effect = tools.get_db_api_add_item(image_id)
@@ -375,9 +377,9 @@ class ImageTestCase(base.ApiTestCase):
             lambda: [fakes.OSImage(fakes.OS_IMAGE_1),
                      fakes.OSImage(fakes.OS_IMAGE_2)])
         self.glance.images.get.side_effect = (
-            lambda os_id: (fakes.OSImage(fakes.OS_IMAGE_1)
+            lambda os_id: (fakes.OSImage(fakes.OS_IMAGE_1, from_get=True)
                            if os_id == fakes.ID_OS_IMAGE_1 else
-                           fakes.OSImage(fakes.OS_IMAGE_2)
+                           fakes.OSImage(fakes.OS_IMAGE_2, from_get=True)
                            if os_id == fakes.ID_OS_IMAGE_2 else
                            None))
 

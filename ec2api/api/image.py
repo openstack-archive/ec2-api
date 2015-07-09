@@ -559,6 +559,11 @@ def _prepare_mappings(os_image):
 
 
 def _get_os_image_kind(os_image):
+    # NOTE(ft): for 'get' operation Glance image doesn't have an attribute
+    # if it isn't sent by Glance. But Glance doesn't send null-value
+    # attributes, and the attributes above are null for volume-backed images.
+    if not hasattr(os_image, 'container_format'):
+        return 'ami'
     return CONTAINER_TO_KIND.get(os_image.container_format, 'ami')
 
 
