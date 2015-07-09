@@ -152,6 +152,11 @@ class ImageTest(base.EC2TestCase):
                         and 'ebs' in image['RootDeviceType'])
 
         instance_id = self.run_instance(ImageId=image_id)
+        instance = self.get_instance(instance_id)
+        for bdm in instance.get('BlockDeviceMappings', []):
+            if 'Ebs' in bdm:
+                self.addResourceCleanUp(self.client.delete_volume,
+                                        VolumeId=bdm['Ebs']['VolumeId'])
 
         data = self.client.create_image(InstanceId=instance_id,
                                              Name=name, Description=desc)
