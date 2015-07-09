@@ -1240,14 +1240,19 @@ EC2_ROUTE_TABLE_3 = {
 # image objects
 class OSImage(object):
 
-    def __init__(self, image_dict):
+    def __init__(self, image_dict, from_get=False):
+
+        def set_attr(attr):
+            if not from_get or image_dict.get(attr) is not None:
+                setattr(self, attr, image_dict.get(attr))
+
         self.id = image_dict['id']
-        self.owner = image_dict.get('owner')
-        self.created_at = image_dict.get('created_at')
-        self.is_public = image_dict.get('is_public')
-        self.status = image_dict.get('status')
-        self.container_format = image_dict.get('container_format')
-        self.name = image_dict.get('name')
+        set_attr('owner')
+        set_attr('created_at')
+        set_attr('is_public')
+        set_attr('status')
+        set_attr('container_format')
+        set_attr('name')
         self.properties = copy.deepcopy(image_dict.get('properties', {}))
         for complex_attr in ('mappings', 'block_device_mapping'):
             if complex_attr in self.properties:
@@ -1388,7 +1393,7 @@ OS_IMAGE_2 = {
     'created_at': TIME_CREATE_IMAGE,
     'is_public': True,
     'status': 'active',
-    'container_format': 'ami',
+    'container_format': None,
     'name': None,
     'properties': {
         'type': 'machine',
