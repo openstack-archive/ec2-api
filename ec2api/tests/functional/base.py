@@ -150,6 +150,18 @@ def safe_setup(f):
     return decorator
 
 
+def get_device_name_prefix(device_name):
+    """Return device name without device number.
+
+    /dev/sda1 -> /dev/sd
+    /dev/vda -> /dev/vd
+    """
+    dev_num_pos = 0
+    while '0' <= device_name[dev_num_pos - 1] <= '9':
+        dev_num_pos -= 1
+    return device_name[:dev_num_pos - 1]
+
+
 class TesterStateHolder(object):
 
     ec2_client = None

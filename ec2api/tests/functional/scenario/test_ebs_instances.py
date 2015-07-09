@@ -25,13 +25,6 @@ CONF = config.CONF
 LOG = log.getLogger(__name__)
 
 
-def _get_device_name_prefix(device_name):
-    dev_num_pos = 0
-    while '0' <= device_name[dev_num_pos - 1] <= '9':
-        dev_num_pos -= 1
-    return device_name[:dev_num_pos - 1]
-
-
 class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
     """Test change root device attributes at instance launch."""
     @classmethod
@@ -120,7 +113,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
 
     def test_launch_ebs_instance_with_creating_blank_volume(self):
         """Launch instance with creating blank volume."""
-        device_name_prefix = _get_device_name_prefix(self.root_device_name)
+        device_name_prefix = base.get_device_name_prefix(self.root_device_name)
         device_name = device_name_prefix + 'd'
 
         instance_id = self.run_instance(ImageId=self.image_id,
@@ -175,7 +168,7 @@ class EC2_EBSInstanceAttaching(base.EC2TestCase):
         image = data['Images'][0]
         root_device_name = image['RootDeviceName']
 
-        device_name_prefix = _get_device_name_prefix(root_device_name)
+        device_name_prefix = base.get_device_name_prefix(root_device_name)
         cls.full_device_name_prefix = device_name_prefix
         cls.short_device_name_prefix = device_name_prefix[len("/dev/"):]
 
