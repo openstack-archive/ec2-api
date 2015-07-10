@@ -23,9 +23,15 @@ export TEST_CONFIG_DIR=$(readlink -f .)
 export TEST_CONFIG="functional_tests.conf"
 
 # save original creds(admin) for later usage
-OLD_OS_TENANT_NAME=$OS_TENANT_NAME
+OLD_OS_PROJECT_NAME=$OS_PROJECT_NAME
 OLD_OS_USERNAME=$OS_USERNAME
 OLD_OS_PASSWORD=$OS_PASSWORD
+
+# neutron CLI can parse only OS_TENANT_NAME variable
+export OS_TENANT_NAME=$OS_PROJECT_NAME
+# nova CLI fails with these variables
+unset OS_USER_DOMAIN_ID
+unset OS_PROJECT_DOMAIN_ID
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
@@ -41,7 +47,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
   REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
   REGULAR_IMAGE_FNAME="precise"
-  glance image-create --disk-format raw --container-format bare --is-public True --name $REGULAR_IMAGE_FNAME --location $REGULAR_IMAGE_URL
+  openstack image create --disk-format raw --container-format bare --public --location $REGULAR_IMAGE_URL $REGULAR_IMAGE_FNAME
   if [[ "$?" -ne "0" ]]; then
     echo "Creation precise image failed"
     exit 1
@@ -51,28 +57,29 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "precise" | grep "ami-" | head -n 1 | awk '{print $2}')
 
   # create separate user/project
-  tenant_name="tenant-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
-  eval $(openstack project create -f shell -c id $tenant_name)
-  tenant_id=$id
+  project_name="project-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
+  eval $(openstack project create -f shell -c id $project_name)
+  project_id=$id
   user_name="user-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
-  eval $(openstack user create "$user_name" --project "$tenant_id" --password "password" --email "$user_name@example.com" -f shell -c id)
+  eval $(openstack user create "$user_name" --project "$project_id" --password "password" --email "$user_name@example.com" -f shell -c id)
   user_id=$id
   # create network
   if [[ -n $(openstack endpoint list | grep neutron) ]]; then
-    net_id=$(neutron net-create --tenant-id $tenant_id "private" | grep ' id ' | awk '{print $4}')
-    subnet_id=$(neutron subnet-create --tenant-id $tenant_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
-    router_id=$(neutron router-create --tenant-id $tenant_id "private_router" | grep ' id ' | awk '{print $4}')
+    net_id=$(neutron net-create --tenant-id $project_id "private" | grep ' id ' | awk '{print $4}')
+    subnet_id=$(neutron subnet-create --tenant-id $project_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
+    router_id=$(neutron router-create --tenant-id $project_id "private_router" | grep ' id ' | awk '{print $4}')
     neutron router-interface-add $router_id $subnet_id
     public_net_id=$(neutron net-list | grep public | awk '{print $2}')
     neutron router-gateway-set $router_id $public_net_id
   fi
   # populate credentials
-  openstack ec2 credentials create --user $user_id --project $tenant_id 1>&2
-  line=`openstack ec2 credentials list --user $user_id | grep " $tenant_id "`
+  openstack ec2 credentials create --user $user_id --project $project_id 1>&2
+  line=`openstack ec2 credentials list --user $user_id | grep " $project_id "`
   read EC2_ACCESS_KEY EC2_SECRET_KEY <<<  `echo $line | awk '{print $2 " " $4 }'`
   export EC2_ACCESS_KEY
   export EC2_SECRET_KEY
-  export OS_TENANT_NAME=$tenant_name
+  export OS_PROJECT_NAME=$project_name
+  export OS_TENANT_NAME=$project_name
   export OS_USERNAME=$user_name
   export OS_PASSWORD="password"
 
@@ -152,7 +159,8 @@ euca-describe-instances
 euca-describe-images
 euca-describe-volumes
 euca-describe-snapshots
-export OS_TENANT_NAME=$OLD_OS_TENANT_NAME
+export OS_PROJECT_NAME=$OLD_OS_PROJECT_NAME
+export OS_TENANT_NAME=$OLD_OS_PROJECT_NAME
 export OS_USERNAME=$OLD_OS_USERNAME
 export OS_PASSWORD=$OLD_OS_PASSWORD
 nova list --all-tenants
