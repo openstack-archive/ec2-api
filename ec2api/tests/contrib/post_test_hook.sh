@@ -35,7 +35,8 @@ unset OS_PROJECT_DOMAIN_ID
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
-  openstack endpoint list --long
+  openstack endpoint list --os-identity-api-version=3 --long
+  openstack service list --long
   if [[ "$?" -ne "0" ]]; then
     echo "Looks like credentials are absent."
     exit 1
@@ -64,7 +65,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   eval $(openstack user create "$user_name" --project "$project_id" --password "password" --email "$user_name@example.com" -f shell -c id)
   user_id=$id
   # create network
-  if [[ -n $(openstack endpoint list | grep neutron) ]]; then
+  if [[ -n $(openstack service list | grep neutron) ]]; then
     net_id=$(neutron net-create --tenant-id $project_id "private" | grep ' id ' | awk '{print $4}')
     subnet_id=$(neutron subnet-create --tenant-id $project_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
     router_id=$(neutron router-create --tenant-id $project_id "private_router" | grep ' id ' | awk '{print $4}')
