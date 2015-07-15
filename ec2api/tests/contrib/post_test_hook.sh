@@ -35,7 +35,7 @@ unset OS_PROJECT_DOMAIN_ID
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
-  openstack endpoint list --os-identity-api-version=3 --long
+  openstack endpoint list --os-identity-api-version=3
   openstack service list --long
   if [[ "$?" -ne "0" ]]; then
     echo "Looks like credentials are absent."
@@ -46,16 +46,18 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   nova flavor-create --is-public True m1.ec2api 16 512 0 1
   nova flavor-create --is-public True m1.ec2api-alt 17 256 0 1
 
-  REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
-  REGULAR_IMAGE_FNAME="precise"
-  openstack image create --disk-format raw --container-format bare --public --location $REGULAR_IMAGE_URL $REGULAR_IMAGE_FNAME
-  if [[ "$?" -ne "0" ]]; then
-    echo "Creation precise image failed"
-    exit 1
+  if [[ $RUN_LONG_TESTS == "1" ]]; then
+    REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
+    REGULAR_IMAGE_FNAME="precise"
+    openstack image create --disk-format raw --container-format bare --public --location $REGULAR_IMAGE_URL $REGULAR_IMAGE_FNAME
+    if [[ "$?" -ne "0" ]]; then
+      echo "Creation precise image failed"
+      exit 1
+    fi
+    sleep 60
+    # find this image
+    image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "precise" | grep "ami-" | head -n 1 | awk '{print $2}')
   fi
-  sleep 60
-  # find this image
-  image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "precise" | grep "ami-" | head -n 1 | awk '{print $2}')
 
   # create separate user/project
   project_name="project-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
@@ -131,6 +133,16 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   ebs_image_id=$(euca-describe-images --show-empty-fields | grep $image_name | awk '{print $2}')
   nova delete $instance_id
 
+  timeout="180"
+  run_long_tests="False"
+  if [[ $RUN_LONG_TESTS == "1" ]]; then
+    timeout="600"
+    run_long_tests="True"
+  else
+    timeout="180"
+    run_long_tests="False"
+  fi
+
   sudo bash -c "cat > $TEST_CONFIG_DIR/$TEST_CONFIG <<EOF
 [aws]
 ec2_url = $EC2_URL
@@ -139,13 +151,11 @@ aws_secret = $EC2_SECRET_KEY
 image_id = $image_id
 image_id_ubuntu = $image_id_ubuntu
 ebs_image_id = $ebs_image_id
-build_timeout = 300
+build_timeout = $timeout
+run_long_tests = $run_long_tests
 instance_type = m1.ec2api
 instance_type_alt = m1.ec2api-alt
 EOF"
-
-  # local workaround for LP#1439819. it doesn't work in gating because glance check isatty property.
-  #glance image-update $image_name --container-format ami --disk-format ami
 fi
 
 sudo pip install -r test-requirements.txt
