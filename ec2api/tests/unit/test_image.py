@@ -256,9 +256,12 @@ class ImageTestCase(base.ApiTestCase):
         self._setup_model()
 
         resp = self.execute('DescribeImages', {})
-        self.assertThat(resp, matchers.DictMatches(
-            {'imagesSet': [fakes.EC2_IMAGE_1, fakes.EC2_IMAGE_2]},
-            orderless_lists=True))
+        self.assertThat(
+            resp,
+            matchers.DictMatches(
+                {'imagesSet': [fakes.EC2_IMAGE_1, fakes.EC2_IMAGE_2]},
+                orderless_lists=True),
+            verbose=True)
 
         self.db_api.get_items.assert_any_call(mock.ANY, 'ami')
         self.db_api.get_items.assert_any_call(mock.ANY, 'aki')
@@ -269,9 +272,10 @@ class ImageTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeImages',
                             {'ImageId.1': fakes.ID_EC2_IMAGE_1})
-        self.assertThat(resp, matchers.DictMatches(
-            {'imagesSet': [fakes.EC2_IMAGE_1]},
-            orderless_lists=True))
+        self.assertThat(resp,
+                        matchers.DictMatches(
+                            {'imagesSet': [fakes.EC2_IMAGE_1]},
+                            orderless_lists=True))
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, set([fakes.ID_EC2_IMAGE_1]))
 
@@ -316,8 +320,10 @@ class ImageTestCase(base.ApiTestCase):
                                 {'ImageId': ec2_image_id,
                                  'Attribute': attr})
             response['imageId'] = ec2_image_id
-            self.assertThat(resp, matchers.DictMatches(response,
-                                                       orderless_lists=True))
+            self.assertThat(resp,
+                            matchers.DictMatches(response,
+                                                 orderless_lists=True),
+                            verbose=True)
 
         do_check('launchPermission',
                  fakes.ID_EC2_IMAGE_2,
@@ -388,8 +394,9 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         image_ids = {fakes.ID_OS_IMAGE_1: fakes.ID_EC2_IMAGE_1,
                      fakes.ID_OS_IMAGE_AKI_1: fakes.ID_EC2_IMAGE_AKI_1,
                      fakes.ID_OS_IMAGE_ARI_1: fakes.ID_EC2_IMAGE_ARI_1}
-
         os_image = copy.deepcopy(fakes.OS_IMAGE_1)
+
+        # check name and location attributes for an unnamed image
         os_image['properties'] = {'image_location': 'location'}
         os_image['name'] = None
 
@@ -400,6 +407,7 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual('location', image['imageLocation'])
         self.assertEqual('location', image['name'])
 
+        # check name and location attributes for complete image
         os_image['properties'] = {}
         os_image['name'] = 'fake_name'
 
@@ -410,12 +418,15 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual('None (fake_name)', image['imageLocation'])
         self.assertEqual('fake_name', image['name'])
 
+        # check ebs image type for bdm_v2 mapping type
         os_image['properties'] = {
             'bdm_v2': True,
             'root_device_name': '/dev/vda',
             'block_device_mapping': [
                 {'boot_index': 0,
-                 'snapshot_id': fakes.ID_OS_SNAPSHOT_2}]}
+                 'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'}]}
 
         image = image_api._format_image(
                 'fake_context', fakes.DB_IMAGE_1, fakes.OSImage(os_image),
@@ -424,7 +435,18 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
 
         self.assertEqual('ebs', image['rootDeviceType'])
 
-    def test_cloud_format_mappings(self):
+        # check instance-store image attributes with no any device mappings
+        os_image['properties'] = {'root_device_name': '/dev/vda'}
+        image = image_api._format_image(
+                'fake_context', fakes.DB_IMAGE_1, fakes.OSImage(os_image),
+                None, None)
+
+        self.assertEqual('instance-store', image['rootDeviceType'])
+        self.assertNotIn('blockDeviceMapping', image)
+
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_format_mappings(self, db_api):
+        # check virtual mapping formatting
         properties = {
             'mappings': [
                 {'virtual': 'ami', 'device': '/dev/sda'},
@@ -436,37 +458,100 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
                 {'virtual': 'ephemeral', 'device': 'sdf'},
                 {'virtual': '/dev/sdf1', 'device': 'root'}],
         }
-        expected = {
-            'blockDeviceMapping': [
-                {'virtualName': 'ephemeral0', 'deviceName': '/dev/sdb'},
-                {'virtualName': 'swap', 'deviceName': '/dev/sdc'},
-                {'virtualName': 'ephemeral1', 'deviceName': '/dev/sdd'},
-                {'virtualName': 'ephemeral2', 'deviceName': '/dev/sde'},
-            ]
-        }
+        expected = [
+            {'virtualName': 'ephemeral0', 'deviceName': '/dev/sdb'},
+            {'virtualName': 'swap', 'deviceName': '/dev/sdc'},
+            {'virtualName': 'ephemeral1', 'deviceName': '/dev/sdd'},
+            {'virtualName': 'ephemeral2', 'deviceName': '/dev/sde'},
+        ]
 
-        result = {}
-        image_api._cloud_format_mappings('fake_context', properties, result)
+        result = image_api._format_mappings('fake_context', properties)
+        self.assertEqual(expected, result)
 
-        self.assertThat(result,
-                        matchers.DictMatches(expected, orderless_lists=True))
-
+        # check bdm v2 formatting
+        db_api.get_items_ids.side_effect = (
+            tools.get_db_api_get_items_ids(fakes.DB_IMAGE_2,
+                                           fakes.DB_VOLUME_3))
         properties = {
-            'block_device_mapping':
-                [{'boot_index': 0,
-                  'snapshot_id': fakes.ID_OS_SNAPSHOT_1},
-                 {'boot_index': None,
-                  'snapshot_id': fakes.ID_OS_SNAPSHOT_2}],
+            'bdm_v2': True,
+            'block_device_mapping': [
+                {'boot_index': 0,
+                 'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'},
+                {'boot_index': None,
+                 'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'},
+                {'device_name': 'vdi',
+                 'boot_index': -1,
+                 'image_id': fakes.ID_OS_IMAGE_2,
+                 'source_type': 'image',
+                 'destination_type': 'volume',
+                 'volume_size': 20},
+                {'device_name': 'vdv',
+                 'boot_index': -1,
+                 'volume_id': fakes.ID_OS_VOLUME_3,
+                 'source_type': 'volume',
+                 'destination_type': 'volume'},
+                {'device_name': 'vdb',
+                 'boot_index': -1,
+                 'source_type': 'blank',
+                 'destination_type': 'volume',
+                 'volume_size': 100,
+                 'delete_on_termination': True},
+            ],
         }
-        result = {}
-        image_api._cloud_format_mappings('fake_context', properties, result,
-            root_device_name='vdx',
+        expected = [
+            {'deviceName': 'vdx',
+             'ebs': {'snapshotId': fakes.ID_EC2_SNAPSHOT_1,
+                     'deleteOnTermination': False}},
+            {'ebs': {'snapshotId': fakes.ID_EC2_SNAPSHOT_2,
+                     'deleteOnTermination': False}},
+            {'deviceName': 'vdi',
+             'ebs': {'snapshotId': fakes.ID_EC2_IMAGE_2,
+                     'volumeSize': 20,
+                     'deleteOnTermination': False}},
+            {'deviceName': 'vdv',
+             'ebs': {'snapshotId': fakes.ID_EC2_VOLUME_3,
+                     'deleteOnTermination': False}},
+            {'deviceName': 'vdb',
+             'ebs': {'volumeSize': 100,
+                     'deleteOnTermination': True}},
+        ]
+        result = image_api._format_mappings(
+            'fake_context', properties, root_device_name='vdx',
             snapshot_ids={fakes.ID_OS_SNAPSHOT_1: fakes.ID_EC2_SNAPSHOT_1,
                           fakes.ID_OS_SNAPSHOT_2: fakes.ID_EC2_SNAPSHOT_2})
-        expected = {'blockDeviceMapping':
-                    [{'deviceName': 'vdx',
-                      'ebs': {'snapshotId': fakes.ID_EC2_SNAPSHOT_1}},
-                     {'ebs': {'snapshotId': fakes.ID_EC2_SNAPSHOT_2}}]}
+        self.assertEqual(expected, result)
+
+        # check inheritance and generation of virtual name
+        properties = {
+            'mappings': [
+                {'device': 'vdd', 'virtual': 'ephemeral1'},
+            ],
+            'bdm_v2': True,
+            'block_device_mapping': [
+                {'device_name': '/dev/vdb',
+                 'source_type': 'blank',
+                 'destination_type': 'local',
+                 'guest_format': 'swap'},
+                {'device_name': 'vdc',
+                 'source_type': 'blank',
+                 'destination_type': 'local',
+                 'volume_size': 5},
+                {'device_name': 'vde',
+                 'source_type': 'blank',
+                 'destination_type': 'local'},
+            ],
+        }
+        expected = [
+            {'deviceName': '/dev/vdd', 'virtualName': 'ephemeral1'},
+            {'deviceName': '/dev/vdb', 'virtualName': 'swap'},
+            {'deviceName': 'vdc', 'virtualName': 'ephemeral0'},
+            {'deviceName': 'vde', 'virtualName': 'ephemeral2'},
+        ]
+        result = image_api._format_mappings('fake_context', properties)
         self.assertEqual(expected, result)
 
     @mock.patch('ec2api.db.api.IMPL')
