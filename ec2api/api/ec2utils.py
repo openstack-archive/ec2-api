@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import datetime
+import json
 import re
 # TODO(termie): replace minidom with etree
 from xml.dom import minidom
@@ -41,6 +43,9 @@ ec2_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
+
+LEGACY_BDM_FIELDS = set(['device_name', 'delete_on_termination', 'snapshot_id',
+                         'volume_id', 'volume_size', 'no_device'])
 
 _c2u = re.compile('(((?<=[a-z])[A-Z])|([A-Z](?![A-Z]|$)))')
 
@@ -385,6 +390,89 @@ def get_os_image(context, ec2_image_id):
         raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
 
 
+def deserialize_os_image_properties(os_image):
+    def prepare_property(property_name):
+        if property_name in properties:
+            properties[property_name] = json.loads(properties[property_name])
+
+    properties = copy.copy(os_image.properties)
+    prepare_property('mappings')
+    prepare_property('block_device_mapping')
+    return properties
+
+
+def create_virtual_bdm(device_name, virtual_name):
+    bdm = {'device_name': device_name,
+           'source_type': 'blank',
+           'destination_type': 'local',
+           'device_type': 'disk',
+           'delete_on_termination': True,
+           'boot_index': -1,
+           'virtual_name': virtual_name}
+    if virtual_name == 'swap':
+        bdm['guest_format'] = 'swap'
+    return bdm
+
+
+def get_os_image_mappings(os_image_properties):
+    mappings = []
+    names = set()
+    # TODO(ft): validate device names for both virtual and block device
+    # mappings
+
+    def is_virtual(virtual_name):
+        return virtual_name == 'swap' or (virtual_name and
+                                          _ephemeral.match(virtual_name))
+
+    # NOTE(ft): substitute mapping if only device name is specified
+    def add_mapping(mapping):
+        device_name = block_device_strip_dev(mapping.get('device_name'))
+        if device_name in names:
+            for i, m in enumerate(mappings):
+                if (device_name ==
+                        block_device_strip_dev(m.get('device_name'))):
+                    mappings[i] = mapping
+                    break
+        else:
+            if device_name:
+                names.add(device_name)
+            mappings.append(mapping)
+
+    # TODO(ft): From Juno virtual device mapping has precedence of block one
+    # in boot logic. This function should do the same, despite Nova EC2
+    # behavior.
+
+    # TODO(ft): Nova EC2 prepended device names for virtual device mappings.
+    # But AWS doesn't do it.
+    for vdm in os_image_properties.get('mappings', []):
+        if is_virtual(vdm.get('virtual')):
+            add_mapping(create_virtual_bdm(
+                block_device_prepend_dev(vdm.get('device')), vdm['virtual']))
+
+    legacy_mapping = not os_image_properties.get('bdm_v2', False)
+    for bdm in os_image_properties.get('block_device_mapping', []):
+        if legacy_mapping:
+            virtual_name = bdm.get('virtual_name')
+            if is_virtual(virtual_name):
+                new_bdm = create_virtual_bdm(bdm.get('device_name'),
+                                             virtual_name)
+            else:
+                new_bdm = {key: val for key, val in bdm.iteritems()
+                           if key in LEGACY_BDM_FIELDS}
+                if bdm.get('snapshot_id'):
+                    new_bdm.update({'source_type': 'snapshot',
+                                    'destination_type': 'volume'})
+                elif bdm.get('volume_id'):
+                    new_bdm.update({'source_type': 'volume',
+                                    'destination_type': 'volume'})
+            bdm = new_bdm
+
+        bdm.setdefault('delete_on_termination', False)
+        add_mapping(bdm)
+
+    return mappings
+
+
 def get_os_public_network(context):
     neutron = clients.neutron(context)
     search_opts = {'router:external': True, 'name': CONF.external_network}
@@ -414,6 +502,8 @@ def get_attached_gateway(context, vpc_id, gateway_kind):
 
 
 # NOTE(ft): following functions are copied from various parts of Nova
+
+_ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
 
 _dev = re.compile('^/dev/')
 

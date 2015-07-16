@@ -315,6 +315,272 @@ class EC2UtilsTestCase(testtools.TestCase):
         self.assertNotEqual(0, len(log.output))
         self.assertNotIn('None', log.output)
 
+    def test_get_os_image_mappings(self):
+        # check virtual device mapping transformation with substitution
+        properties = {
+            'mappings': [
+                {'device': '/dev/vda', 'virtual': 'root'},
+                {'device': 'vda', 'virtual': 'ami'},
+                {'device': 'vdb', 'virtual': 'ephemeral0'},
+                {'device': '/dev/vdb', 'virtual': 'swap'},
+                {'device': '/dev/vdc', 'virtual': 'swap'},
+                {'device': 'vdc', 'virtual': 'ephemeral0'},
+                {'device': 'vdd'},
+                {'device': '/dev/vdd', 'virtual': None},
+                {'device': 'vdd', 'virtual': ''},
+                {'device': '/dev/vdd', 'virtual': 'swamp'},
+                {'virtual': 'ephemeral2'},
+                {'device': None, 'virtual': 'ephemeral3'},
+                {'device': '', 'virtual': 'ephemeral4'},
+            ],
+        }
+        expected = [
+            {'device_name': '/dev/vdb',
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'guest_format': 'swap',
+             'virtual_name': 'swap'},
+            {'device_name': '/dev/vdc',
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'virtual_name': 'ephemeral0'},
+            {'device_name': None,
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'virtual_name': 'ephemeral2'},
+            {'device_name': None,
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'virtual_name': 'ephemeral3'},
+            {'device_name': '',
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'virtual_name': 'ephemeral4'},
+        ]
+        result = ec2utils.get_os_image_mappings(properties)
+        self.assertThat(expected, matchers.ListMatches(result), verbose=True)
+
+        # check legacy block device mapping transformation with substitution
+        properties = {
+            'block_device_mapping': [
+                {'device_name': '/dev/vdb',
+                 'virtual_name': 'ephemeral0'},
+                {'device_name': 'vdc',
+                 'virtual_name': 'swap',
+                 'snapshot_id': 'fake_snapshot_id_0'},
+                {'device_name': '/dev/vda',
+                 'snapshot_id': 'fake_snapshot_id_1',
+                 'delete_on_termination': True,
+                 'volume_size': 100},
+                {'snapshot_id': 'fake_snapshot_id_2'},
+                {'device_name': '/dev/vdd',
+                 'virtual_name': 'ephemeral2'},
+                {'device_name': 'vdd',
+                 'volume_id': 'fake_volume_id_3',
+                 'delete_on_termination': False},
+                {'device_name': 'vde',
+                 'volume_id': 'fake_volume_id_4'},
+                {'device_name': '/dev/vde',
+                 'snapshot_id': 'fake_snapshot_id_4',
+                 'no_device': True},
+                {'snapshot_id': 'fake_snapshot_id_5',
+                 'volume_id': 'fake_volume_id_5',
+                 'volume_size': 50},
+            ],
+        }
+        expected = [
+            {'device_name': '/dev/vdb',
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'virtual_name': 'ephemeral0'},
+            {'device_name': 'vdc',
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'guest_format': 'swap',
+             'virtual_name': 'swap'},
+            {'device_name': '/dev/vda',
+             'snapshot_id': 'fake_snapshot_id_1',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'delete_on_termination': True,
+             'volume_size': 100},
+            {'snapshot_id': 'fake_snapshot_id_2',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'delete_on_termination': False},
+            {'device_name': 'vdd',
+             'volume_id': 'fake_volume_id_3',
+             'source_type': 'volume',
+             'destination_type': 'volume',
+             'delete_on_termination': False},
+            {'device_name': '/dev/vde',
+             'snapshot_id': 'fake_snapshot_id_4',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'no_device': True,
+             'delete_on_termination': False},
+            {'snapshot_id': 'fake_snapshot_id_5',
+             'volume_id': 'fake_volume_id_5',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'volume_size': 50,
+             'delete_on_termination': False},
+        ]
+        result = ec2utils.get_os_image_mappings(properties)
+        self.assertThat(expected, matchers.ListMatches(result), verbose=True)
+
+        # check bdm v2 with substitution
+        properties = {
+            'bdm_v2': True,
+            'block_device_mapping': [
+                {'device_name': '/dev/vdb',
+                 'snapshot_id': 'fake_snapshot_id_1',
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume',
+                 'volume_size': 20,
+                 'delete_on_termination': True},
+                {'device_name': '/dev/vdb',
+                 'source_type': 'blank',
+                 'destination_type': 'volume',
+                 'volume_size': 10,
+                 'delete_on_termination': True},
+                {'device_name': '/dev/vdc',
+                 'snapshot_id': 'fake_snapshot_id_2',
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'},
+                {'device_name': 'vdc',
+                 'volume_id': 'fake_volume_id_2',
+                 'source_type': 'volume',
+                 'destination_type': 'volume'},
+                {'device_name': 'vdd',
+                 'snapshot_id': 'fake_snapshot_id_3',
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'},
+                {'device_name': '/dev/vdd',
+                 'image_id': 'fake_image_id_1',
+                 'source_type': 'image',
+                 'destination_type': 'volume',
+                 'volume_size': 30},
+            ],
+        }
+        expected = [
+            {'device_name': '/dev/vdb',
+             'source_type': 'blank',
+             'destination_type': 'volume',
+             'volume_size': 10,
+             'delete_on_termination': True},
+            {'device_name': 'vdc',
+             'volume_id': 'fake_volume_id_2',
+             'source_type': 'volume',
+             'destination_type': 'volume',
+             'delete_on_termination': False},
+            {'device_name': '/dev/vdd',
+             'image_id': 'fake_image_id_1',
+             'source_type': 'image',
+             'destination_type': 'volume',
+             'volume_size': 30,
+             'delete_on_termination': False},
+        ]
+        result = ec2utils.get_os_image_mappings(properties)
+        self.assertThat(expected, matchers.ListMatches(result), verbose=True)
+
+        # check bdm v2 vs vdm susbtitution
+        properties = {
+            'mappings': [
+                {'device': 'vdb', 'virtual': 'ephemeral0'},
+                {'device': 'vdc', 'virtual': 'ephemeral1'},
+                {'device': 'vdh', 'virtual': 'ephemeral2'},
+            ],
+            'bdm_v2': True,
+            'block_device_mapping': [
+                {'device_name': '/dev/vda',
+                 'snapshot_id': 'fake_snapshot_id_1',
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'},
+                {'device_name': '/dev/vdc',
+                 'snapshot_id': 'fake_snapshot_id_2',
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'},
+                {'device_name': '/dev/vdd',
+                 'snapshot_id': 'fake_snapshot_id_3',
+                 'source_type': 'snapshot',
+                 'destination_type': 'volume'}
+            ],
+        }
+        expected = [
+            {'device_name': '/dev/vdb',
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'virtual_name': 'ephemeral0'},
+            {'device_name': '/dev/vdc',
+             'snapshot_id': 'fake_snapshot_id_2',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'delete_on_termination': False},
+            {'device_name': '/dev/vdh',
+             'source_type': 'blank',
+             'destination_type': 'local',
+             'device_type': 'disk',
+             'delete_on_termination': True,
+             'boot_index': -1,
+             'virtual_name': 'ephemeral2'},
+            {'device_name': '/dev/vda',
+             'snapshot_id': 'fake_snapshot_id_1',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'delete_on_termination': False},
+            {'device_name': '/dev/vdd',
+             'snapshot_id': 'fake_snapshot_id_3',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'delete_on_termination': False},
+        ]
+        result = ec2utils.get_os_image_mappings(properties)
+        self.assertThat(expected, matchers.ListMatches(result), verbose=True)
+
+        # check legacy bdm vs vdm susbtitution
+        properties = {
+            'mappings': [
+                {'device': 'vdb', 'virtual': 'ephemeral0'},
+                {'device': 'vdc', 'virtual': 'ephemeral1'},
+                {'device': 'vdh', 'virtual': 'ephemeral2'},
+            ],
+            'block_device_mapping': [
+                {'device_name': '/dev/vda',
+                 'snapshot_id': 'fake_snapshot_id_1'},
+                {'device_name': '/dev/vdc',
+                 'snapshot_id': 'fake_snapshot_id_2'},
+                {'device_name': '/dev/vdd',
+                 'snapshot_id': 'fake_snapshot_id_3'}
+            ],
+        }
+        result = ec2utils.get_os_image_mappings(properties)
+        self.assertThat(expected, matchers.ListMatches(result), verbose=True)
+
     def test_block_device_strip_dev(self):
         self.assertEqual(ec2utils.block_device_strip_dev('/dev/sda'), 'sda')
         self.assertEqual(ec2utils.block_device_strip_dev('sda'), 'sda')
