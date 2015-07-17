@@ -110,7 +110,7 @@ def run_instances(context, image_id, min_count, max_count,
     nova = clients.nova(context)
     os_flavor = _get_os_flavor(instance_type, nova)
 
-    bdm = _parse_block_device_mapping(context, block_device_mapping)
+    bdm = _build_block_device_mapping(context, block_device_mapping, os_image)
     availability_zone = (placement or {}).get('availability_zone')
     if user_data:
         user_data = base64.b64decode(user_data)
@@ -887,30 +887,28 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
 
 def _parse_block_device_mapping(context, block_device_mapping):
     # TODO(ft): check block_device_mapping structure
+    # TODO(ft): support virtual devices
+    # TODO(ft): support no_device
     bdms = []
     for args_bd in (block_device_mapping or []):
         bdm = {
             'device_name': args_bd['device_name'],
             'destination_type': 'volume',
-            'boot_index': -1,
-            'source_type': 'blank',
-            'delete_on_termination': True
         }
 
         ebs = args_bd.get('ebs')
         if ebs:
-            bdm['delete_on_termination'] = ebs.get('delete_on_termination',
-                                                   True)
             ec2_id = ebs.get('snapshot_id')
             if ec2_id:
                 if ec2_id.startswith('snap-'):
                     bdm['source_type'] = 'snapshot'
                     snapshot = ec2utils.get_db_item(context, ec2_id)
-                    bdm['uuid'] = snapshot['os_id']
+                    bdm['snapshot_id'] = snapshot['os_id']
+                # NOTE(ft): OpenStack extension, AWS incompatibility
                 elif ec2_id.startswith('vol-'):
                     bdm['source_type'] = 'volume'
                     volume = ec2utils.get_db_item(context, ec2_id)
-                    bdm['uuid'] = volume['os_id']
+                    bdm['volume_id'] = volume['os_id']
                 else:
                     # NOTE(ft): AWS returns undocumented
                     # InvalidSnapshotID.NotFound
@@ -918,10 +916,40 @@ def _parse_block_device_mapping(context, block_device_mapping):
                         snapshot_id=ec2_id)
             if 'volume_size' in ebs:
                 bdm['volume_size'] = ebs['volume_size']
+            if 'delete_on_termination' in ebs:
+                bdm['delete_on_termination'] = ebs['delete_on_termination']
 
         bdms.append(bdm)
 
     return bdms
+
+
+def _build_block_device_mapping(context, block_device_mapping, os_image):
+    mappings = _parse_block_device_mapping(context, block_device_mapping)
+    properties = ec2utils.deserialize_os_image_properties(os_image)
+    root_device_name = (
+        ec2utils.block_device_properties_root_device_name(properties))
+    short_root_device_name = ec2utils.block_device_strip_dev(root_device_name)
+    result = []
+    for bdm in mappings:
+        _populate_parsed_bdm_parameter(bdm, short_root_device_name)
+        source_type = bdm.get('source_type')
+        if source_type:
+            uuid = bdm.pop('_'.join([source_type, 'id']), None)
+            if uuid:
+                bdm['uuid'] = uuid
+        result.append(bdm)
+    return result
+
+
+def _populate_parsed_bdm_parameter(bdm, short_root_device_name):
+    bdm.setdefault('delete_on_termination', True)
+    bdm.setdefault('source_type', 'blank')
+    if (short_root_device_name ==
+            ec2utils.block_device_strip_dev(bdm['device_name'])):
+        bdm['boot_index'] = 0
+    else:
+        bdm['boot_index'] = -1
 
 
 def _format_group_set(context, os_security_groups, groups):

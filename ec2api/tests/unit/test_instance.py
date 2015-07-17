@@ -318,7 +318,7 @@ class InstanceTestCase(base.ApiTestCase):
                 fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
         get_ec2_classic_os_network.return_value = {'id': fakes.random_os_id()}
         user_data = base64.b64decode(fakes.USER_DATA_INSTANCE_2)
-        parse_block_device_mapping.return_value = 'fake_bdm'
+        parse_block_device_mapping.return_value = []
 
         def do_check(engine, extra_kwargs={}, extra_db_instance={}):
             instance_api.instance_engine = engine
@@ -347,7 +347,7 @@ class InstanceTestCase(base.ApiTestCase):
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
                 userdata=user_data, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
                 ramdisk_id=fakes.ID_OS_IMAGE_ARI_1, key_name=None,
-                block_device_mapping_v2='fake_bdm',
+                block_device_mapping_v2=[],
                 availability_zone='fake_zone', security_groups=['default'],
                 **extra_kwargs)
             self.nova.servers.reset_mock()
@@ -1434,40 +1434,72 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                            {'device_name': '/dev/sdb1',
                             'ebs': {'volume_size': 55}}])
 
-        expected = [{'boot_index': -1,
-                     'uuid': fakes.ID_OS_SNAPSHOT_1,
+        expected = [{'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
                      'device_name': '/dev/vdf',
                      'source_type': 'snapshot',
-                     'destination_type': 'volume',
-                     'delete_on_termination': True},
-                    {'boot_index': -1,
-                     'uuid': fakes.ID_OS_SNAPSHOT_2,
+                     'destination_type': 'volume'},
+                    {'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
                      'volume_size': 111,
                      'device_name': '/dev/vdg',
                      'source_type': 'snapshot',
                      'destination_type': 'volume',
                      'delete_on_termination': False},
-                    {'boot_index': -1,
-                     'uuid': fakes.ID_OS_VOLUME_1,
+                    {'volume_id': fakes.ID_OS_VOLUME_1,
                      'device_name': '/dev/vdh',
                      'source_type': 'volume',
-                     'destination_type': 'volume',
-                     'delete_on_termination': True},
-                    {'boot_index': -1,
-                     'uuid': fakes.ID_OS_VOLUME_2,
+                     'destination_type': 'volume'},
+                    {'volume_id': fakes.ID_OS_VOLUME_2,
                      'device_name': '/dev/vdi',
                      'source_type': 'volume',
                      'destination_type': 'volume',
                      'delete_on_termination': True},
-                    {'boot_index': -1,
-                     'volume_size': 55,
+                    {'volume_size': 55,
                      'device_name': '/dev/sdb1',
-                     'source_type': 'blank',
-                     'destination_type': 'volume',
-                     'delete_on_termination': True}]
+                     'destination_type': 'volume'}]
 
-        self.assertThat(expected, matchers.ListMatches(res,
-                                                       orderless_lists=True))
+        self.assertThat(expected,
+                        matchers.ListMatches(res, orderless_lists=True),
+                        verbose=True)
+
+    @mock.patch('ec2api.db.api.IMPL')
+    def test_build_block_device_mapping(self, db_api):
+        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        db_api.get_item_by_id.side_effect = tools.get_db_api_get_item_by_id(
+            fakes.DB_SNAPSHOT_1, fakes.DB_VOLUME_1)
+
+        bdms = [
+            {'device_name': '/dev/sda1',
+             'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1}},
+            {'device_name': '/dev/vdb',
+             'ebs': {'snapshot_id': fakes.ID_EC2_VOLUME_1,
+                     'delete_on_termination': False}},
+            {'device_name': 'vdc',
+             'ebs': {'volume_size': 100}},
+        ]
+        expected = [
+            {'device_name': '/dev/sda1',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'uuid': fakes.ID_OS_SNAPSHOT_1,
+             'delete_on_termination': True,
+             'boot_index': 0},
+            {'device_name': '/dev/vdb',
+             'source_type': 'volume',
+             'destination_type': 'volume',
+             'uuid': fakes.ID_OS_VOLUME_1,
+             'delete_on_termination': False,
+             'boot_index': -1},
+            {'device_name': 'vdc',
+             'source_type': 'blank',
+             'destination_type': 'volume',
+             'volume_size': 100,
+             'delete_on_termination': True,
+             'boot_index': -1},
+        ]
+
+        result = instance_api._build_block_device_mapping(
+            fake_context, bdms, fakes.OSImage(fakes.OS_IMAGE_1))
+        self.assertEqual(expected, result)
 
     @mock.patch('cinderclient.client.Client')
     @mock.patch('novaclient.client.Client')

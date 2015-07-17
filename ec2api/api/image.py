@@ -189,12 +189,12 @@ def register_image(context, name=None, image_location=None,
     if block_device_mapping:
         mappings = instance_api._parse_block_device_mapping(
             context, block_device_mapping)
-        # NOTE(andrey-mp): image BDM requires resource_id instead of 'uuid'
+        # TODO(ft): merge with image manifets's virtual device mappings
+        short_root_device_name = (
+            ec2utils.block_device_strip_dev(root_device_name))
         for bdm in mappings:
-            uuid = bdm.pop('uuid', None)
-            if uuid:
-                resource = bdm['source_type'] + '_id'
-                bdm[resource] = uuid
+            instance_api._populate_parsed_bdm_parameter(bdm,
+                                                        short_root_device_name)
         properties['bdm_v2'] = True
         properties['block_device_mapping'] = json.dumps(mappings)
     if architecture is not None:
