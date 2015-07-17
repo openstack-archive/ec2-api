@@ -411,3 +411,18 @@ def get_attached_gateway(context, vpc_id, gateway_kind):
     # TODO(ft): move search by vpc_id to DB api
     return next((gw for gw in db_api.get_items(context, gateway_kind)
                  if gw['vpc_id'] == vpc_id), None)
+
+
+# NOTE(ft): following functions are copied from various parts of Nova
+
+_dev = re.compile('^/dev/')
+
+
+def block_device_strip_dev(device_name):
+    """remove leading '/dev/'."""
+    return _dev.sub('', device_name) if device_name else device_name
+
+
+def block_device_prepend_dev(device_name):
+    """Make sure there is a leading '/dev/'."""
+    return device_name and '/dev/' + block_device_strip_dev(device_name)

@@ -1828,16 +1828,3 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                   'server_id': os_instance.id}]})]
         self.assertTrue(instance_api._is_ebs_instance(context,
                                                       os_instance.id))
-
-    def test_block_device_strip_dev(self):
-        self.assertEqual(
-            instance_api._block_device_strip_dev('/dev/sda'), 'sda')
-        self.assertEqual(instance_api._block_device_strip_dev('sda'), 'sda')
-
-    def test_block_device_prepend_dev(self):
-        mapping = ['/dev/sda', 'sdb', 'sdc', 'sdd', 'sde']
-        expected = ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd', '/dev/sde']
-
-        for m, e in zip(mapping, expected):
-            prepended = instance_api._block_device_prepend_dev(m)
-            self.assertEqual(e, prepended)

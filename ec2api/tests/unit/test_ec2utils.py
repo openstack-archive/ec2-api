@@ -314,3 +314,15 @@ class EC2UtilsTestCase(testtools.TestCase):
                               ec2utils.get_os_public_network, context)
         self.assertNotEqual(0, len(log.output))
         self.assertNotIn('None', log.output)
+
+    def test_block_device_strip_dev(self):
+        self.assertEqual(ec2utils.block_device_strip_dev('/dev/sda'), 'sda')
+        self.assertEqual(ec2utils.block_device_strip_dev('sda'), 'sda')
+
+    def test_block_device_prepend_dev(self):
+        mapping = ['/dev/sda', 'sdb', 'sdc', 'sdd', 'sde']
+        expected = ['/dev/sda', '/dev/sdb', '/dev/sdc', '/dev/sdd', '/dev/sde']
+
+        for m, e in zip(mapping, expected):
+            prepended = ec2utils.block_device_prepend_dev(m)
+            self.assertEqual(e, prepended)

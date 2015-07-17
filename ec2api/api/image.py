@@ -530,14 +530,14 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
         ec2_image['rootDeviceName'] = root_device_name
 
         root_device_type = 'instance-store'
-        short_root_device_name = instance_api._block_device_strip_dev(
+        short_root_device_name = ec2utils.block_device_strip_dev(
                 root_device_name)
         for bdm in properties.get('block_device_mapping', []):
             if (('snapshot_id' in bdm or 'volume_id' in bdm) and
                     not bdm.get('no_device') and
                     (bdm.get('boot_index') == 0 or
                      short_root_device_name ==
-                        instance_api._block_device_strip_dev(
+                        ec2utils.block_device_strip_dev(
                             bdm.get('device_name')))):
                 root_device_type = 'ebs'
                 break
@@ -589,7 +589,7 @@ def _cloud_format_mappings(context, properties, result, root_device_name=None,
     """Format multiple BlockDeviceMappingItemType."""
     mappings = [
         {'virtualName': m['virtual'],
-         'deviceName': instance_api._block_device_prepend_dev(m['device'])}
+         'deviceName': ec2utils.block_device_prepend_dev(m['device'])}
         for m in properties.get('mappings', [])
         if (m['virtual'] and
             (m['virtual'] == 'swap' or _ephemeral.match(m['virtual'])))]
