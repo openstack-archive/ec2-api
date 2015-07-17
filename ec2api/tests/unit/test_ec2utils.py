@@ -592,3 +592,22 @@ class EC2UtilsTestCase(testtools.TestCase):
         for m, e in zip(mapping, expected):
             prepended = ec2utils.block_device_prepend_dev(m)
             self.assertEqual(e, prepended)
+
+    def test_block_device_properties_root_device_name(self):
+        root_device0 = '/dev/sda'
+        root_device1 = '/dev/sdb'
+        mappings = [{'virtual': 'root',
+                     'device': root_device0}]
+
+        properties0 = {'mappings': mappings}
+        properties1 = {'mappings': mappings,
+                       'root_device_name': root_device1}
+
+        self.assertIsNone(
+            ec2utils.block_device_properties_root_device_name({}))
+        self.assertEqual(
+            root_device0,
+            ec2utils.block_device_properties_root_device_name(properties0))
+        self.assertEqual(
+            root_device1,
+            ec2utils.block_device_properties_root_device_name(properties1))

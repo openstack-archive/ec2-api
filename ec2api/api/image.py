@@ -359,7 +359,7 @@ def describe_image_attribute(context, image_id, attribute):
     def _root_device_name_attribute(os_image, image, result):
         properties = ec2utils.deserialize_os_image_properties(os_image)
         result['rootDeviceName'] = (
-            _block_device_properties_root_device_name(properties))
+            ec2utils.block_device_properties_root_device_name(properties))
 
     supported_attributes = {
         'blockDeviceMapping': _block_device_mapping_attribute,
@@ -528,7 +528,8 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
         ec2_image['name'] = name
 
     properties = ec2utils.deserialize_os_image_properties(os_image)
-    root_device_name = _block_device_properties_root_device_name(properties)
+    root_device_name = (
+        ec2utils.block_device_properties_root_device_name(properties))
     mappings = _format_mappings(context, properties, root_device_name,
                                 snapshot_ids, os_image.owner)
     if mappings:
@@ -650,20 +651,6 @@ ec2utils.register_auto_create_db_item_extension(
 
 
 # NOTE(ft): following functions are copied from various parts of Nova
-
-def _block_device_properties_root_device_name(properties):
-    """get root device name from image meta data.
-
-    If it isn't specified, return None.
-    """
-    if 'root_device_name' in properties:
-        return properties.get('root_device_name')
-    elif 'mappings' in properties:
-        return next((bdm['device'] for bdm in properties['mappings']
-                     if bdm['virtual'] == 'root'), None)
-    else:
-        return None
-
 
 def _s3_create(context, metadata):
     """Gets a manifest from s3 and makes an image."""
