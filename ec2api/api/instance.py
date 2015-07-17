@@ -887,6 +887,10 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
 
 def _parse_block_device_mapping(context, block_device_mapping):
     # TODO(ft): check block_device_mapping structure
+    # TODO(ft): leave only the last bdm if several bdms are occured with
+    # the same device name. If names differ in /dev/ prefix occurence,
+    # raise InvalidBlockDeviceMapping with the message
+    # The device '<short_name>' is used in more than one block-device mapping
     # TODO(ft): support virtual devices
     # TODO(ft): support no_device
     bdms = []
@@ -927,18 +931,67 @@ def _parse_block_device_mapping(context, block_device_mapping):
 def _build_block_device_mapping(context, block_device_mapping, os_image):
     mappings = _parse_block_device_mapping(context, block_device_mapping)
     properties = ec2utils.deserialize_os_image_properties(os_image)
+    image_bdms = ec2utils.get_os_image_mappings(properties)
     root_device_name = (
         ec2utils.block_device_properties_root_device_name(properties))
     short_root_device_name = ec2utils.block_device_strip_dev(root_device_name)
+    image_bdm_dict = {}
+    for bdm in image_bdms:
+        if bdm.get('device_name'):
+            key = ec2utils.block_device_strip_dev(bdm['device_name'])
+            if key == short_root_device_name:
+                bdm.setdefault('boot_index', 0)
+        elif bdm.get('boot_index') == 0:
+            key = short_root_device_name
+            bdm.setdefault('device_name', root_device_name)
+        else:
+            continue
+        image_bdm_dict[key] = bdm
     result = []
+    # NOTE(ft): only the last device definition in the list is considered
+    # by AWS. So get only the last definitions, despite Nova can do the same.
+    # Because this is not contracted in Nova.
     for bdm in mappings:
-        _populate_parsed_bdm_parameter(bdm, short_root_device_name)
+        short_device_name = ec2utils.block_device_strip_dev(bdm['device_name'])
+        if short_device_name not in image_bdm_dict:
+            _populate_parsed_bdm_parameter(bdm, short_root_device_name)
+        else:
+            image_bdm = image_bdm_dict[short_device_name]
+            if bdm['device_name'] != image_bdm['device_name']:
+                raise exception.InvalidBlockDeviceMapping(
+                    _("The device '%s' is used in more than one "
+                      "block-device mapping") % short_device_name)
+            if (image_bdm.get('boot_index') == 0 and 'snapshot_id' in bdm and
+                    bdm['snapshot_id'] != image_bdm.get('snapshot_id')):
+                raise exception.InvalidBlockDeviceMapping(
+                    _('snapshotId cannot be modified on root device'))
+            if ('volume_size' in bdm and 'volume_size' in image_bdm and
+                    bdm['volume_size'] < image_bdm['volume_size']):
+                raise exception.InvalidBlockDeviceMapping(
+                    _("Volume of size %(bdm_size)dGB is smaller than expected "
+                      "size %(image_bdm_size)dGB for '(device_name)s'") %
+                    {'bdm_size': bdm['volume_size'],
+                     'image_bdm_size': image_bdm['volume_size'],
+                     'device_name': bdm['device_name']})
+
+            if bdm.get('snapshot_id'):
+                if 'snapshot_id' not in image_bdm:
+                    raise exception.InvalidBlockDeviceMapping(
+                        _('snapshotId can only be modified on EBS devices'))
+
+                _populate_parsed_bdm_parameter(bdm, short_root_device_name)
+            else:
+                image_bdm.update(bdm)
+                bdm = image_bdm
+
         source_type = bdm.get('source_type')
         if source_type:
             uuid = bdm.pop('_'.join([source_type, 'id']), None)
             if uuid:
                 bdm['uuid'] = uuid
+
         result.append(bdm)
+
     return result
 
 

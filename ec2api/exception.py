@@ -239,6 +239,10 @@ class InvalidSnapshotIDMalformed(EC2InvalidException):
     msg_fmg = _('The snapshot %(id)s ID is not valid')
 
 
+class InvalidBlockDeviceMapping(EC2InvalidException):
+    pass
+
+
 class IncorrectState(EC2IncorrectStateException):
     msg_fmt = _("The resource is in incorrect state for the request - reason: "
                 "'%(reason)s'")

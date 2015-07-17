@@ -1465,8 +1465,10 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     def test_build_block_device_mapping(self, db_api):
         fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
         db_api.get_item_by_id.side_effect = tools.get_db_api_get_item_by_id(
-            fakes.DB_SNAPSHOT_1, fakes.DB_VOLUME_1)
+            fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
+            fakes.DB_VOLUME_1, fakes.DB_VOLUME_2)
 
+        # check bdm attributes' population
         bdms = [
             {'device_name': '/dev/sda1',
              'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1}},
@@ -1496,10 +1498,216 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
              'delete_on_termination': True,
              'boot_index': -1},
         ]
-
         result = instance_api._build_block_device_mapping(
             fake_context, bdms, fakes.OSImage(fakes.OS_IMAGE_1))
         self.assertEqual(expected, result)
+
+        fake_image_template = {
+            'id': fakes.random_os_id(),
+            'properties': {'root_device_name': '/dev/vda',
+                           'bdm_v2': True,
+                           'block_device_mapping': []}}
+
+        # check merging with image bdms
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'boot_index': 0,
+             'device_name': '/dev/vda',
+             'source_type': 'snapshot',
+             'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+             'delete_on_termination': True},
+            {'device_name': 'vdb',
+             'source_type': 'snapshot',
+             'snapshot_id': fakes.random_os_id(),
+             'volume_size': 50},
+            {'device_name': '/dev/vdc',
+             'source_type': 'blank',
+             'volume_size': 10},
+        ]
+        bdms = [
+            {'device_name': '/dev/vda',
+             'ebs': {'volume_size': 15}},
+            {'device_name': 'vdb',
+             'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2,
+                     'delete_on_termination': False}},
+            {'device_name': '/dev/vdc',
+             'ebs': {'volume_size': 20}},
+        ]
+        expected = [
+            {'device_name': '/dev/vda',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'uuid': fakes.ID_OS_SNAPSHOT_1,
+             'delete_on_termination': True,
+             'volume_size': 15,
+             'boot_index': 0},
+            {'device_name': 'vdb',
+             'source_type': 'snapshot',
+             'destination_type': 'volume',
+             'uuid': fakes.ID_OS_SNAPSHOT_2,
+             'delete_on_termination': False,
+             'boot_index': -1},
+            {'device_name': '/dev/vdc',
+             'source_type': 'blank',
+             'destination_type': 'volume',
+             'volume_size': 20,
+             'delete_on_termination': False},
+        ]
+        result = instance_api._build_block_device_mapping(
+            fake_context, bdms, fakes.OSImage(fake_image_template))
+        self.assertEqual(expected, result)
+
+        # check result order for adjusting some bdm of all
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'device_name': '/dev/vdc',
+             'source_type': 'blank',
+             'volume_size': 10},
+            {'device_name': '/dev/vde',
+             'source_type': 'blank',
+             'volume_size': 10},
+            {'device_name': '/dev/vdf',
+             'source_type': 'blank',
+             'volume_size': 10},
+            {'boot_index': -1,
+             'source_type': 'blank',
+             'volume_size': 10},
+        ]
+        bdms = [
+            {'device_name': '/dev/vdh',
+             'ebs': {'volume_size': 15}},
+            {'device_name': '/dev/vde',
+             'ebs': {'volume_size': 15}},
+            {'device_name': '/dev/vdb',
+             'ebs': {'volume_size': 15}},
+        ]
+        expected = [
+            {'device_name': '/dev/vdh',
+             'source_type': 'blank',
+             'destination_type': 'volume',
+             'volume_size': 15,
+             'delete_on_termination': True,
+             'boot_index': -1},
+            {'device_name': '/dev/vde',
+             'source_type': 'blank',
+             'destination_type': 'volume',
+             'volume_size': 15,
+             'delete_on_termination': False},
+            {'device_name': '/dev/vdb',
+             'source_type': 'blank',
+             'destination_type': 'volume',
+             'volume_size': 15,
+             'delete_on_termination': True,
+             'boot_index': -1},
+        ]
+        result = instance_api._build_block_device_mapping(
+            fake_context, bdms, fakes.OSImage(fake_image_template))
+        self.assertEqual(expected, result)
+
+        # check conflict of short and full device names
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'device_name': '/dev/vdc',
+             'source_type': 'blank',
+             'volume_size': 10},
+        ]
+        bdms = [
+            {'device_name': 'vdc',
+             'ebs': {'volume_size': 15}},
+        ]
+        self.assertRaises(exception.InvalidBlockDeviceMapping,
+                          instance_api._build_block_device_mapping,
+                          fake_context, bdms,
+                          fakes.OSImage(fake_image_template))
+
+        # opposit combination of the same case
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'device_name': 'vdc',
+             'source_type': 'blank',
+             'volume_size': 10},
+        ]
+        bdms = [
+            {'device_name': '/dev/vdc',
+             'ebs': {'volume_size': 15}},
+        ]
+        self.assertRaises(exception.InvalidBlockDeviceMapping,
+                          instance_api._build_block_device_mapping,
+                          fake_context, bdms,
+                          fakes.OSImage(fake_image_template))
+
+        # check fault on root device snapshot changing
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'boot_index': 0,
+             'source_type': 'snapshot',
+             'snapshot_id': fakes.ID_EC2_SNAPSHOT_1},
+        ]
+        bdms = [
+            {'device_name': '/dev/vda',
+             'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2}},
+        ]
+        self.assertRaises(exception.InvalidBlockDeviceMapping,
+                          instance_api._build_block_device_mapping,
+                          fake_context, bdms,
+                          fakes.OSImage(fake_image_template))
+
+        # same case for legacy bdm
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'device_name': '/dev/vda',
+             'snapshot_id': fakes.ID_EC2_SNAPSHOT_1},
+        ]
+        fake_image_template['properties']['bdm_v2'] = False
+        bdms = [
+            {'device_name': '/dev/vda',
+             'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2}},
+        ]
+        self.assertRaises(exception.InvalidBlockDeviceMapping,
+                          instance_api._build_block_device_mapping,
+                          fake_context, bdms,
+                          fakes.OSImage(fake_image_template))
+
+        # same case for legacy bdm with short names
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'device_name': 'vda',
+             'snapshot_id': fakes.ID_EC2_SNAPSHOT_1},
+        ]
+        fake_image_template['properties']['bdm_v2'] = False
+        bdms = [
+            {'device_name': 'vda',
+             'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2}},
+        ]
+        self.assertRaises(exception.InvalidBlockDeviceMapping,
+                          instance_api._build_block_device_mapping,
+                          fake_context, bdms,
+                          fakes.OSImage(fake_image_template))
+
+        fake_image_template['properties']['bdm_v2'] = True
+
+        # check fault on reduce volume size
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'device_name': 'vdc',
+             'source_type': 'blank',
+             'volume_size': 15},
+        ]
+        bdms = [
+            {'device_name': '/dev/vdc',
+             'ebs': {'volume_size': 10}},
+        ]
+        self.assertRaises(exception.InvalidBlockDeviceMapping,
+                          instance_api._build_block_device_mapping,
+                          fake_context, bdms,
+                          fakes.OSImage(fake_image_template))
+
+        # check fault on set snapshot id if bdm doesn't have one
+        fake_image_template['properties']['block_device_mapping'] = [
+            {'device_name': 'vdc',
+             'source_type': 'blank',
+             'volume_size': 10},
+        ]
+        bdms = [
+            {'device_name': '/dev/vdc',
+             'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1}},
+        ]
+        self.assertRaises(exception.InvalidBlockDeviceMapping,
+                          instance_api._build_block_device_mapping,
+                          fake_context, bdms,
+                          fakes.OSImage(fake_image_template))
 
     @mock.patch('cinderclient.client.Client')
     @mock.patch('novaclient.client.Client')
