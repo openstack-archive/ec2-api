@@ -516,3 +516,17 @@ def block_device_strip_dev(device_name):
 def block_device_prepend_dev(device_name):
     """Make sure there is a leading '/dev/'."""
     return device_name and '/dev/' + block_device_strip_dev(device_name)
+
+
+def block_device_properties_root_device_name(properties):
+    """get root device name from image meta data.
+
+    If it isn't specified, return None.
+    """
+    if 'root_device_name' in properties:
+        return properties.get('root_device_name')
+    elif 'mappings' in properties:
+        return next((bdm['device'] for bdm in properties['mappings']
+                     if bdm['virtual'] == 'root'), None)
+    else:
+        return None

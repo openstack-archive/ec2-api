@@ -574,25 +574,6 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertRaises(exception.InvalidAMIIDNotFound,
                           describer.get_db_items)
 
-    def test_block_device_properties_root_device_name(self):
-        root_device0 = '/dev/sda'
-        root_device1 = '/dev/sdb'
-        mappings = [{'virtual': 'root',
-                     'device': root_device0}]
-
-        properties0 = {'mappings': mappings}
-        properties1 = {'mappings': mappings,
-                       'root_device_name': root_device1}
-
-        self.assertIsNone(
-            image_api._block_device_properties_root_device_name({}))
-        self.assertEqual(
-            image_api._block_device_properties_root_device_name(properties0),
-            root_device0)
-        self.assertEqual(
-            image_api._block_device_properties_root_device_name(properties1),
-            root_device1)
-
 
 class S3TestCase(base.ApiTestCase):
     # TODO(ft): 'execute' feature isn't used here, but some mocks and
