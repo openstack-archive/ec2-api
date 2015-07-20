@@ -196,7 +196,10 @@ class ImageTestCase(base.ApiTestCase):
              'KernelId': fakes.ID_EC2_IMAGE_AKI_1,
              'RamdiskId': fakes.ID_EC2_IMAGE_ARI_1,
              'BlockDeviceMapping.1.DeviceName': fakes.ROOT_DEVICE_NAME_IMAGE_2,
-             'BlockDeviceMapping.1.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1})
+             'BlockDeviceMapping.1.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1,
+             'BlockDeviceMapping.2.DeviceName': '/dev/vdf',
+             'BlockDeviceMapping.2.Ebs.VolumeSize': '100',
+             'BlockDeviceMapping.2.Ebs.DeleteOnTermination': 'False'})
         self.assertThat(resp, matchers.DictMatches(
             {'imageId': fakes.ID_EC2_IMAGE_2}))
         self.db_api.add_item.assert_called_once_with(
@@ -211,7 +214,7 @@ class ImageTestCase(base.ApiTestCase):
             self.glance.images.create.call_args[1]['properties'],
             dict)
         bdm = self.glance.images.create.call_args[1]['properties'].pop(
-            'block_device_mapping', None)
+            'block_device_mapping', 'null')
         self.assertEqual(
             {'is_public': False,
              'size': 0,
@@ -222,12 +225,18 @@ class ImageTestCase(base.ApiTestCase):
                  'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1,
                  'bdm_v2': True}},
             self.glance.images.create.call_args[1])
-        self.assertEqual([{'boot_index': -1,
+        self.assertEqual([{'boot_index': 0,
                            'delete_on_termination': True,
                            'destination_type': 'volume',
                            'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
                            'source_type': 'snapshot',
-                           'snapshot_id': fakes.ID_OS_SNAPSHOT_1}],
+                           'snapshot_id': fakes.ID_OS_SNAPSHOT_1},
+                          {'boot_index': -1,
+                           'delete_on_termination': False,
+                           'destination_type': 'volume',
+                           'device_name': '/dev/vdf',
+                           'source_type': 'blank',
+                           'volume_size': 100}],
                          json.loads(bdm))
         get_os_image.assert_has_calls(
             [mock.call(mock.ANY, fakes.ID_EC2_IMAGE_AKI_1),
