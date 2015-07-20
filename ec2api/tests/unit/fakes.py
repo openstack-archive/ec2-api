@@ -1289,17 +1289,21 @@ EC2_IMAGE_1 = {
          'virtualName': 'ephemeral0'},
         {'deviceName': '/dev/sdb1',
          'ebs': {'snapshotId': ID_EC2_SNAPSHOT_1,
-                 'volumeSize': 22}},
+                 'volumeSize': 22,
+                 'deleteOnTermination': False}},
         {'deviceName': '/dev/sdb2',
-         'ebs': {'snapshotId': ID_EC2_VOLUME_1}},
+         'ebs': {'snapshotId': ID_EC2_VOLUME_1,
+                 'deleteOnTermination': False}},
         {'deviceName': '/dev/sdb3',
          'virtualName': 'ephemeral5'},
         {'deviceName': '/dev/sdc0',
          'virtualName': 'swap'},
         {'deviceName': '/dev/sdc1',
-         'ebs': {'snapshotId': ID_EC2_SNAPSHOT_2}},
+         'ebs': {'snapshotId': ID_EC2_SNAPSHOT_2,
+                 'deleteOnTermination': False}},
         {'deviceName': '/dev/sdc2',
-         'ebs': {'snapshotId': ID_EC2_VOLUME_2}},
+         'ebs': {'snapshotId': ID_EC2_VOLUME_2,
+                 'deleteOnTermination': False}},
         {'deviceName': '/dev/sdc3',
          'virtualName': 'ephemeral6'}],
 }
@@ -1319,7 +1323,8 @@ EC2_IMAGE_2 = {
     'architecture': 'x86_64',
     'blockDeviceMapping': [
         {'deviceName': '/dev/sdb1',
-         'ebs': {'snapshotId': ID_EC2_SNAPSHOT_1}}],
+         'ebs': {'snapshotId': ID_EC2_SNAPSHOT_1,
+                 'deleteOnTermination': True}}],
 }
 
 
@@ -1403,7 +1408,8 @@ OS_IMAGE_2 = {
                       'virtual': 'root'}],
         'block_device_mapping': [
             {'device_name': '/dev/sdb1',
-             'snapshot_id': ID_OS_SNAPSHOT_1}],
+             'snapshot_id': ID_OS_SNAPSHOT_1,
+             'delete_on_termination': True}],
     }
 }
 OS_IMAGE_AKI_1 = {

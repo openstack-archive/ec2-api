@@ -17,7 +17,6 @@ import binascii
 import itertools
 import json
 import os
-import re
 import shutil
 import tarfile
 import tempfile
@@ -92,6 +91,7 @@ CONTAINER_TO_KIND = {'aki': 'aki',
 IMAGE_TYPES = {'aki': 'kernel',
                'ari': 'ramdisk',
                'ami': 'machine'}
+EPHEMERAL_PREFIX_LEN = len('ephemeral')
 
 
 # TODO(yamahata): race condition
@@ -328,7 +328,10 @@ def describe_images(context, executable_by=None, image_id=None,
 
 def describe_image_attribute(context, image_id, attribute):
     def _block_device_mapping_attribute(os_image, image, result):
-        _cloud_format_mappings(context, os_image.properties, result)
+        properties = ec2utils.deserialize_os_image_properties(os_image)
+        mappings = _format_mappings(context, properties)
+        if mappings:
+            result['blockDeviceMapping'] = mappings
 
     def _description_attribute(os_image, image, result):
         result['description'] = {'value': image.get('description')}
@@ -354,8 +357,9 @@ def describe_image_attribute(context, image_id, attribute):
 
     # NOTE(ft): Openstack extension, AWS-incompability
     def _root_device_name_attribute(os_image, image, result):
+        properties = ec2utils.deserialize_os_image_properties(os_image)
         result['rootDeviceName'] = (
-            _block_device_properties_root_device_name(os_image.properties))
+            _block_device_properties_root_device_name(properties))
 
     supported_attributes = {
         'blockDeviceMapping': _block_device_mapping_attribute,
@@ -373,7 +377,6 @@ def describe_image_attribute(context, image_id, attribute):
 
     os_image = ec2utils.get_os_image(context, image_id)
     _check_owner(context, os_image)
-    _prepare_mappings(os_image)
     image = ec2utils.get_db_item(context, image_id)
 
     result = {'imageId': image_id}
@@ -423,8 +426,9 @@ def modify_image_attribute(context, image_id, attribute=None,
             attribute = 'productCodes'
         if attribute in ['kernel', 'ramdisk', 'productCodes',
                          'blockDeviceMapping']:
-            raise exception.InvalidParameter(_('Parameter %s is invalid. '
-                'The attribute is not supported.') % attribute)
+            raise exception.InvalidParameter(
+                _('Parameter %s is invalid. '
+                  'The attribute is not supported.') % attribute)
         raise exception.InvalidParameterCombination('No attributes specified.')
     if len(attributes) > 1:
         raise exception.InvalidParameterCombination(
@@ -523,39 +527,110 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
     else:
         ec2_image['name'] = name
 
-    _prepare_mappings(os_image)
-    properties = os_image.properties
+    properties = ec2utils.deserialize_os_image_properties(os_image)
     root_device_name = _block_device_properties_root_device_name(properties)
+    mappings = _format_mappings(context, properties, root_device_name,
+                                snapshot_ids, os_image.owner)
+    if mappings:
+        ec2_image['blockDeviceMapping'] = mappings
+
+    root_device_type = 'instance-store'
     if root_device_name:
         ec2_image['rootDeviceName'] = root_device_name
 
-        root_device_type = 'instance-store'
         short_root_device_name = ec2utils.block_device_strip_dev(
                 root_device_name)
-        for bdm in properties.get('block_device_mapping', []):
-            if (('snapshot_id' in bdm or 'volume_id' in bdm) and
-                    not bdm.get('no_device') and
-                    (bdm.get('boot_index') == 0 or
-                     short_root_device_name ==
-                        ec2utils.block_device_strip_dev(
-                            bdm.get('device_name')))):
-                root_device_type = 'ebs'
-                break
-        ec2_image['rootDeviceType'] = root_device_type
-
-    _cloud_format_mappings(context, properties, ec2_image,
-                           root_device_name, snapshot_ids, os_image.owner)
+        if any((short_root_device_name ==
+                ec2utils.block_device_strip_dev(bdm.get('deviceName')))
+               for bdm in mappings):
+            root_device_type = 'ebs'
+    ec2_image['rootDeviceType'] = root_device_type
 
     return ec2_image
 
 
-def _prepare_mappings(os_image):
-    def prepare_property(property_name):
-        if property_name in os_image.properties:
-            os_image.properties[property_name] = json.loads(
-                    os_image.properties[property_name])
-    prepare_property('mappings')
-    prepare_property('block_device_mapping')
+def _format_mappings(context, os_image_properties, root_device_name=None,
+                     snapshot_ids=None, project_id=None):
+    formatted_mappings = []
+    bdms = ec2utils.get_os_image_mappings(os_image_properties)
+    ephemeral_numbers = _ephemeral_free_number_generator(bdms)
+    for bdm in bdms:
+        # NOTE(yamahata): trim ebs.no_device == true. Is this necessary?
+        # TODO(ft): figure out AWS and Nova behaviors
+        if bdm.get('no_device'):
+            continue
+        item = {}
+        if bdm.get('boot_index') == 0 and root_device_name:
+            item['deviceName'] = root_device_name
+        elif 'device_name' in bdm:
+            item['deviceName'] = bdm['device_name']
+        if bdm.get('destination_type') == 'volume':
+            ebs = _format_volume_mapping(
+                context, bdm, snapshot_ids=snapshot_ids, project_id=project_id)
+            if not ebs:
+                # TODO(ft): what to do with the wrong bdm?
+                continue
+            item['ebs'] = ebs
+        elif bdm.get('destination_type') == 'local':
+            virtual_name = _format_virtual_name(bdm, ephemeral_numbers)
+            if not virtual_name:
+                # TODO(ft): what to do with the wrong bdm?
+                continue
+            item['virtualName'] = virtual_name
+        else:
+            # TODO(ft): what to do with the wrong bdm?
+            continue
+        formatted_mappings.append(item)
+
+    return formatted_mappings
+
+
+def _format_volume_mapping(context, bdm, snapshot_ids=None, project_id=None):
+    ebs = {'deleteOnTermination': bdm['delete_on_termination']}
+    # TODO(ft): set default volumeSize from the source
+    if bdm.get('volume_size') is not None:
+        ebs['volumeSize'] = bdm['volume_size']
+    if bdm.get('source_type') == 'snapshot':
+        if bdm.get('snapshot_id'):
+            ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
+                context, 'snap', bdm['snapshot_id'],
+                ids_by_os_id=snapshot_ids, project_id=project_id)
+    # NOTE(ft): Openstack extension, AWS-incompability
+    elif bdm.get('source_type') == 'volume':
+        if bdm.get('volume_id'):
+            ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
+                context, 'vol', bdm['volume_id'], project_id=project_id)
+    # NOTE(ft): extension, AWS-incompability
+    elif bdm.get('source_type') == 'image':
+        if bdm.get('image_id'):
+            ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
+                context, 'ami', bdm['image_id'], project_id=project_id)
+    if ebs.get('snapshotId') or bdm.get('source_type') == 'blank':
+        return ebs
+
+
+def _format_virtual_name(bdm, ephemeral_numbers):
+    if bdm.get('source_type') == 'blank':
+        if bdm.get('guest_format') == 'swap':
+            return 'swap'
+        else:
+            return (bdm.get('virtual_name') or
+                    'ephemeral%s' % next(ephemeral_numbers))
+
+
+def _ephemeral_free_number_generator(bdms):
+    named_ephemeral_nums = set(
+        int(bdm['virtual_name'][EPHEMERAL_PREFIX_LEN:])
+        for bdm in bdms
+        if (bdm.get('destination_type') == 'local' and
+            bdm.get('source_type') == 'blank' and
+            bdm.get('guest_format') != 'swap' and
+            bdm.get('virtual_name')))
+    ephemeral_free_num = 0
+    while True:
+        if ephemeral_free_num not in named_ephemeral_nums:
+            yield ephemeral_free_num
+        ephemeral_free_num += 1
 
 
 def _get_os_image_kind(os_image):
@@ -580,64 +655,6 @@ ec2utils.register_auto_create_db_item_extension(
 
 
 # NOTE(ft): following functions are copied from various parts of Nova
-
-_ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
-
-
-def _cloud_format_mappings(context, properties, result, root_device_name=None,
-                           snapshot_ids=None, project_id=None):
-    """Format multiple BlockDeviceMappingItemType."""
-    mappings = [
-        {'virtualName': m['virtual'],
-         'deviceName': ec2utils.block_device_prepend_dev(m['device'])}
-        for m in properties.get('mappings', [])
-        if (m['virtual'] and
-            (m['virtual'] == 'swap' or _ephemeral.match(m['virtual'])))]
-
-    for bdm in properties.get('block_device_mapping', []):
-        formatted_bdm = _cloud_format_block_device_mapping(
-                context, bdm, root_device_name, snapshot_ids, project_id)
-        # NOTE(yamahata): overwrite mappings with block_device_mapping
-        for i in range(len(mappings)):
-            if (formatted_bdm.get('deviceName')
-                    == mappings[i].get('deviceName')):
-                del mappings[i]
-                break
-        mappings.append(formatted_bdm)
-
-    # NOTE(yamahata): trim ebs.no_device == true. Is this necessary?
-    mappings = [bdm for bdm in mappings if not (bdm.get('noDevice', False))]
-
-    if mappings:
-        result['blockDeviceMapping'] = mappings
-
-
-def _cloud_format_block_device_mapping(context, bdm, root_device_name=None,
-                                       snapshot_ids=None, project_id=None):
-    """Construct BlockDeviceMappingItemType."""
-    keys = (('deviceName', 'device_name'),
-            ('virtualName', 'virtual_name'))
-    item = {name: bdm[k] for name, k in keys if k in bdm}
-    if bdm.get('no_device'):
-        item['noDevice'] = True
-    if bdm.get('boot_index') == 0 and root_device_name:
-        item['deviceName'] = root_device_name
-    if ('snapshot_id' in bdm) or ('volume_id' in bdm):
-        ebs_keys = (('volumeSize', 'volume_size'),
-                    ('deleteOnTermination', 'delete_on_termination'))
-        ebs = {name: bdm[k] for name, k in ebs_keys if bdm.get(k) is not None}
-        if bdm.get('snapshot_id'):
-            ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
-                context, 'snap', bdm['snapshot_id'], ids_by_os_id=snapshot_ids,
-                project_id=project_id)
-        # NOTE(ft): Openstack extension, AWS-incompability
-        elif bdm.get('volume_id'):
-            ebs['snapshotId'] = ec2utils.os_id_to_ec2_id(
-                context, 'vol', bdm['volume_id'], project_id=project_id)
-        assert 'snapshotId' in ebs
-        item['ebs'] = ebs
-    return item
-
 
 def _block_device_properties_root_device_name(properties):
     """get root device name from image meta data.
