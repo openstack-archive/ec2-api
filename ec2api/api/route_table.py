@@ -550,8 +550,9 @@ def _update_routes_in_associated_subnets(context, cleaner, route_table,
     subnets = [subnet for subnet in db_api.get_items(context, 'subnet')
                if (subnet['vpc_id'] == route_table['vpc_id'] and
                    subnet.get('route_table_id') in appropriate_rtb_ids)]
-    if not update_target or update_target == HOST_TARGET:
-        _update_host_routes(context, neutron, cleaner, route_table, subnets)
+    # NOTE(ft): we need to update host routes for both host and vpn target
+    # because vpn-related routes are present in host routes as well
+    _update_host_routes(context, neutron, cleaner, route_table, subnets)
     if not update_target or update_target == VPN_TARGET:
         vpn_connection_api._update_vpn_routes(context, neutron, cleaner,
                                               route_table, subnets)
@@ -565,7 +566,7 @@ def _update_subnet_routes(context, cleaner, subnet, route_table):
 
 
 def _update_host_routes(context, neutron, cleaner, route_table, subnets):
-    destinations = _get_router_destinations(context, route_table)
+    destinations = _get_active_route_destinations(context, route_table)
     for subnet in subnets:
         # TODO(ft): do list subnet w/ filters instead of show one by one
         os_subnet = neutron.show_subnet(subnet['os_id'])['subnet']
@@ -580,29 +581,36 @@ def _update_host_routes(context, neutron, cleaner, route_table, subnets):
                         'gateway_ip': os_subnet['gateway_ip']}})
 
 
-def _get_router_destinations(context, route_table):
+def _get_active_route_destinations(context, route_table):
+    vpn_connections = {vpn['vpn_gateway_id']: vpn
+                       for vpn in db_api.get_items(context, 'vpn')}
     dst_ids = [route[id_key]
                for route in route_table['routes']
                for id_key in ('gateway_id', 'network_interface_id')
                if route.get(id_key) is not None]
-    return {item['id']: item
-            for item in db_api.get_items_by_ids(context, dst_ids)}
+    dst_ids.extend(route_table.get('propagating_gateways', []))
+    destinations = {item['id']: item
+                    for item in db_api.get_items_by_ids(context, dst_ids)
+                    if (item['vpc_id'] == route_table['vpc_id'] and
+                        (ec2utils.get_ec2_id_kind(item['id']) != 'vgw' or
+                         item['id'] in vpn_connections))}
+    for vpn in vpn_connections.itervalues():
+        if vpn['vpn_gateway_id'] in destinations:
+            destinations[vpn['vpn_gateway_id']]['vpn_connection'] = vpn
+    return destinations
 
 
 def _get_subnet_host_routes_and_gateway_ip(context, route_table, cidr_block,
                                            destinations=None):
     if not destinations:
-        destinations = _get_router_destinations(context, route_table)
+        destinations = _get_active_route_destinations(context, route_table)
     gateway_ip = str(netaddr.IPAddress(
         netaddr.IPNetwork(cidr_block).first + 1))
 
     def get_nexthop(route):
         if 'gateway_id' in route:
             gateway_id = route['gateway_id']
-            if gateway_id:
-                gateway = destinations.get(gateway_id)
-                if (not gateway or
-                        gateway['vpc_id'] != route_table['vpc_id']):
+            if gateway_id and gateway_id not in destinations:
                     return '127.0.0.1'
             return gateway_ip
         network_interface = destinations.get(route['network_interface_id'])
@@ -613,23 +621,21 @@ def _get_subnet_host_routes_and_gateway_ip(context, route_table, cidr_block,
     host_routes = []
     subnet_gateway_is_used = False
     for route in route_table['routes']:
-        # TODO(ft): perhaps we should consider vpn routes here.
-        # For example if no internet gateway is attached, but vpn gateway is,
-        # a host should route trafic related to vpn gateways to Neutron router.
-        # Otherwise if internet gateway is attached, but vpn gateway is dead,
-        # vpn related trafic should be terminated to 127.0.0.1.
-        # Next question is route precedence in overlapping case.
-        if (route.get('gateway_id') and
-                ec2utils.get_ec2_id_kind(route['gateway_id']) == 'vgw'):
-            continue
         nexthop = get_nexthop(route)
-        if route['destination_cidr_block'] == '0.0.0.0/0':
+        cidr = route['destination_cidr_block']
+        if cidr == '0.0.0.0/0':
             if nexthop == '127.0.0.1':
                 continue
             elif nexthop == gateway_ip:
                 subnet_gateway_is_used = True
-        host_routes.append({'destination': route['destination_cidr_block'],
+        host_routes.append({'destination': cidr,
                             'nexthop': nexthop})
+    host_routes.extend(
+        {'destination': cidr,
+         'nexthop': gateway_ip}
+        for vgw_id in route_table.get('propagating_gateways', [])
+        for cidr in (destinations.get(vgw_id, {}).get('vpn_connection', {}).
+                     get('cidrs', [])))
 
     if not subnet_gateway_is_used:
         # NOTE(ft): gateway_ip is set to None to allow correct handling
