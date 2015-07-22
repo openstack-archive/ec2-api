@@ -12,48 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from oslo_config import cfg
-from oslotest import base as test_base
 from sqlalchemy.orm import exc as orm_exception
 
 from ec2api.api import validator
-from ec2api import config
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
-from ec2api.db import migration
-from ec2api.db.sqlalchemy import api as session
+from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 
 
-class DbApiTestCase(test_base.BaseTestCase):
-
-    DB_SCHEMA = None
-
-    @classmethod
-    def setUpClass(cls):
-        super(DbApiTestCase, cls).setUpClass()
-        conf = cfg.CONF
-        try:
-            config.parse_args([], default_config_files=[])
-            conf.set_override('connection', 'sqlite://', group='database')
-            conf.set_override('sqlite_synchronous', False, group='database')
-
-            engine = session.get_engine()
-            conn = engine.connect()
-            migration.db_sync()
-            cls.DB_SCHEMA = "".join(line
-                                    for line in conn.connection.iterdump())
-            engine.dispose()
-        finally:
-            conf.reset()
+class DbApiTestCase(base.DbTestCase):
 
     def setUp(self):
         super(DbApiTestCase, self).setUp()
-        engine = session.get_engine()
-        engine.dispose()
-        conn = engine.connect()
-        conn.connection.executescript(self.DB_SCHEMA)
         self.context = ec2_context.RequestContext(fakes.ID_OS_USER,
                                                   fakes.ID_OS_PROJECT)
         self.other_context = ec2_context.RequestContext(

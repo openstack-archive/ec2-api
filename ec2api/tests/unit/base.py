@@ -19,12 +19,15 @@ from cinderclient import client as cinderclient
 from glanceclient import client as glanceclient
 import mock
 from novaclient import client as novaclient
+from oslo_config import cfg
 from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 
 import ec2api.api.apirequest
 from ec2api.api import ec2utils
-import ec2api.db.sqlalchemy.api
+from ec2api import config
+from ec2api.db import migration
+from ec2api.db.sqlalchemy import api as db_backend
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
@@ -67,8 +70,7 @@ class ApiTestCase(test_base.BaseTestCase):
         cinder_patcher.start().return_value = self.cinder
         self.addCleanup(cinder_patcher.stop)
 
-        db_api_patcher = mock.patch('ec2api.db.api.IMPL',
-                                    autospec=ec2api.db.sqlalchemy.api)
+        db_api_patcher = mock.patch('ec2api.db.api.IMPL', autospec=db_backend)
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)
 
@@ -231,3 +233,33 @@ class ApiTestCase(test_base.BaseTestCase):
                                response['Error']['Message'])
         else:
             return ''
+
+
+class DbTestCase(test_base.BaseTestCase):
+
+    DB_SCHEMA = None
+
+    @classmethod
+    def setUpClass(cls):
+        super(DbTestCase, cls).setUpClass()
+        conf = cfg.CONF
+        try:
+            config.parse_args([], default_config_files=[])
+            conf.set_override('connection', 'sqlite://', group='database')
+            conf.set_override('sqlite_synchronous', False, group='database')
+
+            engine = db_backend.get_engine()
+            conn = engine.connect()
+            migration.db_sync()
+            cls.DB_SCHEMA = "".join(line
+                                    for line in conn.connection.iterdump())
+            engine.dispose()
+        finally:
+            conf.reset()
+
+    def setUp(self):
+        super(DbTestCase, self).setUp()
+        engine = db_backend.get_engine()
+        engine.dispose()
+        conn = engine.connect()
+        conn.connection.executescript(self.DB_SCHEMA)
