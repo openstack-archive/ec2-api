@@ -34,7 +34,7 @@ class ClientsTestCase(test_base.BaseTestCase):
         reload(clients)
 
         # test normal flow
-        context = mock.Mock(
+        context = mock.NonCallableMock(
             auth_token='fake_token',
             service_catalog=[{'type': 'computev21',
                               'endpoints': [{'publicURL': 'novav21_url'}]}])
@@ -87,7 +87,7 @@ class ClientsTestCase(test_base.BaseTestCase):
 
     @mock.patch('neutronclient.v2_0.client.Client')
     def test_neutron(self, neutron):
-        context = mock.Mock(
+        context = mock.NonCallableMock(
             auth_token='fake_token',
             service_catalog=[{'type': 'network',
                               'endpoints': [{'publicURL': 'neutron_url'}]}])
@@ -99,7 +99,7 @@ class ClientsTestCase(test_base.BaseTestCase):
 
     @mock.patch('glanceclient.client.Client')
     def test_glance(self, glance):
-        context = mock.Mock(
+        context = mock.NonCallableMock(
             auth_token='fake_token',
             service_catalog=[{'type': 'image',
                               'endpoints': [{'publicURL': 'glance_url'}]}])
@@ -111,7 +111,7 @@ class ClientsTestCase(test_base.BaseTestCase):
 
     @mock.patch('cinderclient.client.Client')
     def test_cinder(self, cinder):
-        context = mock.Mock(
+        context = mock.NonCallableMock(
             auth_token='fake_token',
             service_catalog=[{'type': 'volume',
                               'endpoints': [{'publicURL': 'cinder_url'}]}])
@@ -125,7 +125,7 @@ class ClientsTestCase(test_base.BaseTestCase):
 
     @mock.patch('keystoneclient.v2_0.client.Client')
     def test_keystone(self, keystone):
-        context = mock.Mock(
+        context = mock.NonCallableMock(
             auth_token='fake_token',
             project_id='fake_project')
         res = clients.keystone(context)
