@@ -26,10 +26,7 @@ class SubnetTestCase(base.ApiTestCase):
 
     def setUp(self):
         super(SubnetTestCase, self).setUp()
-        vpn_gateway_api_patcher = (
-            mock.patch('ec2api.api.subnet.vpn_gateway_api'))
-        self.vpn_gateway_api = vpn_gateway_api_patcher.start()
-        self.addCleanup(vpn_gateway_api_patcher.stop)
+        self.vpn_gateway_api = self.mock('ec2api.api.subnet.vpn_gateway_api')
 
     def test_create_subnet(self):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)

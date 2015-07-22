@@ -14,7 +14,6 @@
 
 import mock
 
-import ec2api.api.clients
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -25,20 +24,17 @@ class VolumeTestCase(base.ApiTestCase):
 
     def setUp(self):
         super(VolumeTestCase, self).setUp()
-        get_os_admin_context_patcher = (
-            mock.patch('ec2api.context.get_os_admin_context'))
-        self.get_os_admin_context = get_os_admin_context_patcher.start()
-        self.addCleanup(get_os_admin_context_patcher.stop)
+        self.get_os_admin_context = self.mock(
+            'ec2api.context.get_os_admin_context')
         self.get_os_admin_context.return_value = (
             base.create_context(is_os_admin=True))
 
-    @mock.patch('ec2api.api.clients.nova', wraps=ec2api.api.clients.nova)
-    def test_describe_volumes(self, nova_client_getter):
+    def test_describe_volumes(self):
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2),
             fakes.OSVolume(fakes.OS_VOLUME_3)]
-        self.nova.servers.list.return_value = [
+        self.nova_admin.servers.list.return_value = [
             fakes.OSInstance_full(fakes.OS_INSTANCE_1),
             fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
 
@@ -54,8 +50,6 @@ class VolumeTestCase(base.ApiTestCase):
                            fakes.EC2_VOLUME_3]},
             orderless_lists=True))
 
-        nova_client_getter.assert_called_with(
-            self.get_os_admin_context.return_value)
         self.db_api.get_items.assert_any_call(mock.ANY, 'vol')
 
         self.db_api.get_items_by_ids = tools.CopyingMock(
@@ -65,8 +59,6 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertThat(resp, matchers.DictMatches(
             {'volumeSet': [fakes.EC2_VOLUME_1]},
             orderless_lists=True))
-        nova_client_getter.assert_called_with(
-            self.get_os_admin_context.return_value)
         self.db_api.get_items_by_ids.assert_any_call(
             mock.ANY, set([fakes.ID_EC2_VOLUME_1]))
 

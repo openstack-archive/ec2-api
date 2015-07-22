@@ -50,43 +50,80 @@ def create_context(is_os_admin=False):
         service_catalog=mock.NonCallableMagicMock())
 
 
-class ApiTestCase(test_base.BaseTestCase):
+class MockOSMixin(object):
+
+    def mock(self, object_name):
+        patcher = mock.patch(object_name)
+        result = patcher.start()
+        self.addCleanup(patcher.stop)
+        return result
+
+    def mock_all_os(self):
+        self.neutron = self.mock_neutron()
+        self.nova, self.nova_admin = self.mock_nova()
+        self.glance = self.mock_glance()
+        self.cinder = self.mock_cinder()
+
+    def mock_neutron(self):
+        neutron_patcher = mock.patch('neutronclient.v2_0.client.Client',
+                                     autospec=True)
+        neutron = neutron_patcher.start().return_value
+        self.addCleanup(neutron_patcher.stop)
+        return neutron
+
+    def mock_nova(self):
+        # NOTE(ft): create an extra mock for Nova calls with an admin account.
+        # Also make sure that the admin account is used only for this calls.
+        # The special mock is needed to validate tested function to retrieve
+        # appropriate data, as long as only calls with admin account return
+        # some specific data.
+        novaclient_spec = novaclient.Client('2')
+        nova = mock.create_autospec(novaclient_spec)
+        nova_admin = mock.create_autospec(novaclient_spec)
+        nova_patcher = mock.patch('novaclient.client.Client')
+        novaclient_getter = nova_patcher.start()
+        self.addCleanup(nova_patcher.stop)
+        novaclient_getter.side_effect = (
+            lambda *args, **kwargs: (
+                nova_admin
+                if (kwargs.get('auth_token') == ADMIN_TOKEN) else
+                nova
+                if (kwargs.get('auth_token') != ADMIN_TOKEN) else
+                None))
+        return nova, nova_admin
+
+    def mock_glance(self):
+        glance_patcher = mock.patch('glanceclient.client.Client')
+        glance = mock.create_autospec(glanceclient.Client(endpoint='/v1'))
+        glance_patcher.start().return_value = glance
+        self.addCleanup(glance_patcher.stop)
+        return glance
+
+    def mock_cinder(self):
+        cinder_patcher = mock.patch('cinderclient.client.Client')
+        cinder = mock.create_autospec(cinderclient.Client('1'))
+        cinder_patcher.start().return_value = cinder
+        self.addCleanup(cinder_patcher.stop)
+        return cinder
+
+
+class BaseTestCase(MockOSMixin, test_base.BaseTestCase):
+    pass
+
+
+class ApiTestCase(BaseTestCase):
 
     ANY_EXECUTE_ERROR = object()
-    NOVACLIENT_SPEC_OBJ = novaclient.Client('2')
 
     def setUp(self):
         super(ApiTestCase, self).setUp()
-
-        neutron_patcher = mock.patch('neutronclient.v2_0.client.Client',
-                                     autospec=True)
-        self.neutron = neutron_patcher.start().return_value
-        self.addCleanup(neutron_patcher.stop)
-
-        nova_patcher = mock.patch('novaclient.client.Client')
-        self.nova = mock.create_autospec(self.NOVACLIENT_SPEC_OBJ)
-        self.novaclient_getter = nova_patcher.start()
-        self.novaclient_getter.return_value = self.nova
-        self.addCleanup(nova_patcher.stop)
-
-        glance_patcher = mock.patch('glanceclient.client.Client')
-        self.glance = mock.create_autospec(
-            glanceclient.Client(endpoint='/v1'))
-        glance_patcher.start().return_value = self.glance
-        self.addCleanup(glance_patcher.stop)
-
-        cinder_patcher = mock.patch('cinderclient.client.Client')
-        self.cinder = mock.create_autospec(cinderclient.Client('1'))
-        cinder_patcher.start().return_value = self.cinder
-        self.addCleanup(cinder_patcher.stop)
+        self.mock_all_os()
 
         db_api_patcher = mock.patch('ec2api.db.api.IMPL', autospec=db_backend)
         self.db_api = db_api_patcher.start()
         self.addCleanup(db_api_patcher.stop)
 
-        isotime_patcher = mock.patch('oslo_utils.timeutils.isotime')
-        self.isotime = isotime_patcher.start()
-        self.addCleanup(isotime_patcher.stop)
+        self.isotime = self.mock('oslo_utils.timeutils.isotime')
 
         self._conf = self.useFixture(config_fixture.Config())
         self.configure(fatal_exception_format_errors=True)

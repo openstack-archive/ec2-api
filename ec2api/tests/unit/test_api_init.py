@@ -21,27 +21,23 @@ from keystoneclient import exceptions as keystone_exception
 import mock
 from neutronclient.common import exceptions as neutron_exception
 from novaclient import exceptions as nova_exception
-from oslotest import base as test_base
 
 from ec2api import api
 from ec2api.api import apirequest
 from ec2api import exception
+from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes_request_response as fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
 from ec2api import wsgi
 
 
-class ApiInitTestCase(test_base.BaseTestCase):
+class ApiInitTestCase(base.BaseTestCase):
 
     def setUp(self):
         super(ApiInitTestCase, self).setUp()
-
-        controller_patcher = mock.patch('ec2api.api.cloud.VpcCloudController')
-        self.controller_class = controller_patcher.start()
-        self.controller = self.controller_class.return_value
-        self.addCleanup(controller_patcher.stop)
-
+        self.controller = self.mock(
+            'ec2api.api.cloud.VpcCloudController').return_value
         self.fake_context = mock.NonCallableMock(request_id=str(uuid.uuid4()))
 
         ec2_request = apirequest.APIRequest('FakeAction', 'fake_v1',

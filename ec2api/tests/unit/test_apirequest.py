@@ -17,23 +17,20 @@ import uuid
 from lxml import etree
 import mock
 from oslo_utils import timeutils
-from oslotest import base as test_base
 
 from ec2api.api import apirequest
+from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes_request_response as fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
 
 
-class EC2RequesterTestCase(test_base.BaseTestCase):
+class EC2RequesterTestCase(base.BaseTestCase):
 
     def setUp(self):
         super(EC2RequesterTestCase, self).setUp()
-
-        controller_patcher = mock.patch('ec2api.api.cloud.VpcCloudController')
-        self.controller = controller_patcher.start().return_value
-        self.addCleanup(controller_patcher.stop)
-
+        self.controller = self.mock(
+            'ec2api.api.cloud.VpcCloudController').return_value
         self.fake_context = mock.NonCallableMock(request_id=str(uuid.uuid4()))
 
     def test_invoke_returns_data(self):

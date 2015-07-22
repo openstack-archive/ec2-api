@@ -34,10 +34,7 @@ class MetadataApiTestCase(base.ApiTestCase):
 
     def setUp(self):
         super(MetadataApiTestCase, self).setUp()
-
-        instance_api_patcher = mock.patch('ec2api.metadata.api.instance_api')
-        self.instance_api = instance_api_patcher.start()
-        self.addCleanup(instance_api_patcher.stop)
+        self.instance_api = self.mock('ec2api.metadata.api.instance_api')
 
         self.set_mock_db_items(fakes.DB_INSTANCE_1)
         self.instance_api.describe_instances.return_value = {

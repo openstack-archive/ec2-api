@@ -36,41 +36,18 @@ class InstanceTestCase(base.ApiTestCase):
     def setUp(self):
         super(InstanceTestCase, self).setUp()
         self.addCleanup(self._reset_engine)
-        network_interface_api_patcher = mock.patch(
+        self.network_interface_api = self.mock(
             'ec2api.api.instance.network_interface_api')
-        self.network_interface_api = network_interface_api_patcher.start()
-        self.addCleanup(network_interface_api_patcher.stop)
-        address_api_patcher = mock.patch('ec2api.api.address')
-        self.address_api = address_api_patcher.start()
-        self.addCleanup(address_api_patcher.stop)
-        security_group_api_patcher = mock.patch(
+        self.address_api = self.mock('ec2api.api.address')
+        self.security_group_api = self.mock(
             'ec2api.api.instance.security_group_api')
-        self.security_group_api = security_group_api_patcher.start()
-        self.addCleanup(security_group_api_patcher.stop)
-        utils_generate_uid_patcher = (
-            mock.patch('ec2api.api.instance._utils_generate_uid'))
-        self.utils_generate_uid = utils_generate_uid_patcher.start()
-        self.addCleanup(utils_generate_uid_patcher.stop)
-        get_os_admin_context_patcher = (
-            mock.patch('ec2api.context.get_os_admin_context'))
-        self.get_os_admin_context = get_os_admin_context_patcher.start()
-        self.addCleanup(get_os_admin_context_patcher.stop)
+        self.utils_generate_uid = self.mock(
+            'ec2api.api.instance._utils_generate_uid')
+        self.get_os_admin_context = self.mock(
+            'ec2api.context.get_os_admin_context')
+
         self.get_os_admin_context.return_value = (
             base.create_context(is_os_admin=True))
-
-        # NOTE(ft): create a special mock for Nova calls with admin account.
-        # Also make sure that an admin account is used only for this calls.
-        # The special mock is needed to validate tested function to retrieve
-        # appropriate data, as long as only calls with admin account return
-        # some specific data.
-        self.nova_admin = mock.create_autospec(self.NOVACLIENT_SPEC_OBJ)
-        self.novaclient_getter.side_effect = (
-            lambda *args, **kwargs: (
-                self.nova_admin
-                if (kwargs.get('auth_token') == base.ADMIN_TOKEN) else
-                self.nova
-                if (kwargs.get('auth_token') != base.ADMIN_TOKEN) else
-                None))
 
         self.fake_flavor = mock.Mock()
         self.fake_flavor.configure_mock(name='fake_flavor',
