@@ -599,9 +599,8 @@ class S3TestCase(base.ApiTestCase):
                 fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
                 fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
 
-        fake_context = self._create_context()
         metadata, image_parts, key, iv = image_api._s3_parse_manifest(
-            fake_context, AMI_MANIFEST_XML)
+            base.create_context(), AMI_MANIFEST_XML)
 
         expected_metadata = {
             'disk_format': 'ami',
@@ -630,7 +629,7 @@ class S3TestCase(base.ApiTestCase):
     def test_s3_create_image_locations(self, osimage_update):
         self.configure(image_decryption_dir=None)
         _handle, tempf = tempfile.mkstemp()
-        fake_context = self._create_context()
+        fake_context = base.create_context()
         with mock.patch(
                 'ec2api.api.image._s3_conn') as s3_conn, mock.patch(
                 'ec2api.api.image._s3_download_file'
@@ -690,7 +689,7 @@ class S3TestCase(base.ApiTestCase):
                              'virtual_name': 'ephemeral0'},
                             {'device_name': '/dev/sdb0',
                              'no_device': True}]}}
-        fake_context = self._create_context()
+        fake_context = base.create_context()
         with mock.patch(
                 'ec2api.api.image._s3_conn') as s3_conn:
 

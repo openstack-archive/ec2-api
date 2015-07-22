@@ -34,10 +34,20 @@ from ec2api.tests.unit import tools
 import ec2api.wsgi
 
 
+ADMIN_TOKEN = 'admin_token'
+
+
 def skip_not_implemented(test_item):
     def decorator(test_item):
         test_item.skip('The feature is not yet implemented')
     return decorator
+
+
+def create_context(is_os_admin=False):
+    auth_token = ADMIN_TOKEN if is_os_admin else None
+    return ec2api.context.RequestContext(
+        fakes.ID_OS_USER, fakes.ID_OS_PROJECT, auth_token=auth_token,
+        service_catalog=mock.NonCallableMagicMock())
 
 
 class ApiTestCase(test_base.BaseTestCase):
@@ -188,16 +198,9 @@ class ApiTestCase(test_base.BaseTestCase):
               ('tag-value', 'fake_value'),
               ('tag:fake_key', 'fake_value')])
 
-    def _create_context(self, auth_token=None):
-        return ec2api.context.RequestContext(
-            fakes.ID_OS_USER, fakes.ID_OS_PROJECT,
-            auth_token=auth_token,
-            service_catalog=[{'type': 'network',
-                              'endpoints': [{'publicUrl': 'fake_url'}]}])
-
     def _execute(self, action, args):
         ec2_request = ec2api.api.apirequest.APIRequest(action, 'fake_v1', args)
-        ec2_context = self._create_context()
+        ec2_context = create_context()
         environ = {'REQUEST_METHOD': 'FAKE',
                    'ec2.request': ec2_request,
                    'ec2api.context': ec2_context}

@@ -30,7 +30,7 @@ class VolumeTestCase(base.ApiTestCase):
         self.get_os_admin_context = get_os_admin_context_patcher.start()
         self.addCleanup(get_os_admin_context_patcher.stop)
         self.get_os_admin_context.return_value = (
-            self._create_context(auth_token='admin_token'))
+            base.create_context(is_os_admin=True))
 
     @mock.patch('ec2api.api.clients.nova', wraps=ec2api.api.clients.nova)
     def test_describe_volumes(self, nova_client_getter):

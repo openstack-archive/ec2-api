@@ -912,7 +912,7 @@ class RouteTableTestCase(base.ApiTestCase):
 
         self.assertThat(
             route_table_api._format_route_table(
-                self._create_context(), db_route_table_1,
+                base.create_context(), db_route_table_1,
                 gateways={gw['id']: gw
                           for gw in (fakes.DB_VPN_GATEWAY_1,
                                      fakes.DB_VPN_GATEWAY_2,
@@ -986,7 +986,7 @@ class RouteTableTestCase(base.ApiTestCase):
         destinations_getter.return_value = {'fake': 'objects'}
 
         route_table_api._update_host_routes(
-            self._create_context(), self.neutron, common.OnCrashCleaner(),
+            base.create_context(), self.neutron, common.OnCrashCleaner(),
             fakes.DB_ROUTE_TABLE_1, [fakes.DB_SUBNET_1, fakes.DB_SUBNET_2])
 
         destinations_getter.assert_called_once_with(
@@ -1015,7 +1015,7 @@ class RouteTableTestCase(base.ApiTestCase):
         try:
             with common.OnCrashCleaner() as cleaner:
                 route_table_api._update_host_routes(
-                    self._create_context(), self.neutron, cleaner,
+                    base.create_context(), self.neutron, cleaner,
                     fakes.DB_ROUTE_TABLE_1, [fakes.DB_SUBNET_1])
                 raise Exception('fake_exception')
         except Exception as ex:
@@ -1050,7 +1050,7 @@ class RouteTableTestCase(base.ApiTestCase):
             routes_updater.reset_mock()
             update_vpn_routes.reset_mock()
             route_table_api._update_routes_in_associated_subnets(
-                self._create_context(), 'fake_cleaner', rtb,
+                base.create_context(), 'fake_cleaner', rtb,
                 default_associations_only=default_associations_only,
                 update_target=(route_table_api.HOST_TARGET
                                if host_only else
@@ -1119,7 +1119,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_update_subnet_routes(self, host_routes_updater,
                                   update_vpn_routes):
         route_table_api._update_subnet_routes(
-            self._create_context(), 'fake_cleaner', fakes.DB_SUBNET_1,
+            base.create_context(), 'fake_cleaner', fakes.DB_SUBNET_1,
             fakes.DB_ROUTE_TABLE_1)
         host_routes_updater.assert_called_once_with(
             mock.ANY, self.neutron, 'fake_cleaner', fakes.DB_ROUTE_TABLE_1,

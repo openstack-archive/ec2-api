@@ -46,7 +46,7 @@ class MetadataApiTestCase(base.ApiTestCase):
                 'instanceId': fakes.ID_EC2_INSTANCE_1,
                 'userData': {'value': base64.b64encode('fake_user_data')}}
 
-        self.fake_context = self._create_context()
+        self.fake_context = base.create_context()
 
     def test_get_version_list(self):
         retval = api.get_version_list()

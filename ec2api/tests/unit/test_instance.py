@@ -56,7 +56,7 @@ class InstanceTestCase(base.ApiTestCase):
         self.get_os_admin_context = get_os_admin_context_patcher.start()
         self.addCleanup(get_os_admin_context_patcher.stop)
         self.get_os_admin_context.return_value = (
-            self._create_context(auth_token='admin_token'))
+            base.create_context(is_os_admin=True))
 
         # NOTE(ft): create a special mock for Nova calls with admin account.
         # Also make sure that an admin account is used only for this calls.
@@ -67,9 +67,9 @@ class InstanceTestCase(base.ApiTestCase):
         self.novaclient_getter.side_effect = (
             lambda *args, **kwargs: (
                 self.nova_admin
-                if (kwargs.get('auth_token') == 'admin_token') else
+                if (kwargs.get('auth_token') == base.ADMIN_TOKEN) else
                 self.nova
-                if (kwargs.get('auth_token') != 'admin_token') else
+                if (kwargs.get('auth_token') != base.ADMIN_TOKEN) else
                 None))
 
         self.fake_flavor = mock.Mock()
