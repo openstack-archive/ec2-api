@@ -43,11 +43,6 @@ class InstanceTestCase(base.ApiTestCase):
             'ec2api.api.instance.security_group_api')
         self.utils_generate_uid = self.mock(
             'ec2api.api.instance._utils_generate_uid')
-        self.get_os_admin_context = self.mock(
-            'ec2api.context.get_os_admin_context')
-
-        self.get_os_admin_context.return_value = (
-            base.create_context(is_os_admin=True))
 
         self.fake_flavor = mock.Mock()
         self.fake_flavor.configure_mock(name='fake_flavor',

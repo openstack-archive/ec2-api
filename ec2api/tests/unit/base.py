@@ -64,6 +64,11 @@ class MockOSMixin(object):
         self.glance = self.mock_glance()
         self.cinder = self.mock_cinder()
 
+        self.get_os_admin_context = self.mock(
+            'ec2api.context.get_os_admin_context')
+        self.get_os_admin_context.return_value = (
+            create_context(is_os_admin=True))
+
     def mock_neutron(self):
         neutron_patcher = mock.patch('neutronclient.v2_0.client.Client',
                                      autospec=True)

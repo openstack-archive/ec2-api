@@ -250,10 +250,10 @@ class MetadataApiIntegralTestCase(base.ApiTestCase):
             fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
             fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1,
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)
-        self.nova.servers.list.return_value = [
+        self.nova_admin.servers.list.return_value = [
             fakes.OSInstance_full(fakes.OS_INSTANCE_1),
             fakes.OSInstance_full(fakes.OS_INSTANCE_2)]
-        self.nova.servers.get.side_effect = tools.get_by_1st_arg_getter({
+        self.nova_admin.servers.get.side_effect = tools.get_by_1st_arg_getter({
             fakes.ID_OS_INSTANCE_1: fakes.OSInstance_full(fakes.OS_INSTANCE_1),
             fakes.ID_OS_INSTANCE_2: fakes.OSInstance_full(fakes.OS_INSTANCE_2)
         })

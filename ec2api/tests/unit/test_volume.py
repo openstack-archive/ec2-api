@@ -22,13 +22,6 @@ from ec2api.tests.unit import tools
 
 class VolumeTestCase(base.ApiTestCase):
 
-    def setUp(self):
-        super(VolumeTestCase, self).setUp()
-        self.get_os_admin_context = self.mock(
-            'ec2api.context.get_os_admin_context')
-        self.get_os_admin_context.return_value = (
-            base.create_context(is_os_admin=True))
-
     def test_describe_volumes(self):
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
