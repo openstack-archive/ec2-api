@@ -41,11 +41,14 @@ class VpnConnectionTest(base.EC2TestCase):
         cls.cgw_id = data['CustomerGateway']['CustomerGatewayId']
         cls.addResourceCleanUpStatic(
             cls.client.delete_customer_gateway, CustomerGatewayId=cls.cgw_id)
+        cls.get_customer_gateway_waiter().wait_available(cls.cgw_id)
 
-        data = cls.client.create_vpn_gateway(Type='ipsec.1')
+        data = cls.client.create_vpn_gateway(
+            Type='ipsec.1', AvailabilityZone=CONF.aws.aws_zone)
         cls.vgw_id = data['VpnGateway']['VpnGatewayId']
         cls.addResourceCleanUpStatic(
             cls.client.delete_vpn_gateway, VpnGatewayId=cls.vgw_id)
+        cls.get_vpn_gateway_waiter().wait_available(cls.vgw_id)
 
     def test_create_delete_vpn_connection(self):
         data = self.client.create_vpn_connection(
