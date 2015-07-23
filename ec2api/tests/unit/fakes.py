@@ -1425,13 +1425,13 @@ class OSSnapshot(object):
 
     def __init__(self, snapshot):
         self.id = snapshot['id']
-        self.status = snapshot['status']
-        self.volume_id = snapshot['volume_id']
-        self.created_at = snapshot['created_at']
-        self.progress = snapshot['progress']
+        self.status = snapshot.get('status')
+        self.volume_id = snapshot.get('volume_id')
+        self.created_at = snapshot.get('created_at')
+        self.progress = snapshot.get('progress')
         self.project_id = ID_OS_PROJECT
-        self.size = snapshot['size']
-        self.display_description = snapshot['description']
+        self.size = snapshot.get('size')
+        self.display_description = snapshot.get('description')
 
     def get(self):
         pass
