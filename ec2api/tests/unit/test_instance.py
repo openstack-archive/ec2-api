@@ -1290,7 +1290,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_network_interface_parameters(self, db_api):
         engine = instance_api.InstanceEngineNeutron()
-        context = mock.Mock()
+        context = base.create_context()
         db_api.get_item_by_id.side_effect = tools.get_db_api_get_item_by_id(
             fakes.DB_SUBNET_1,
             tools.update_dict(fakes.DB_SUBNET_2,
@@ -1360,7 +1360,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
 
     @mock.patch('ec2api.api.ec2utils.get_os_image')
     def test_parse_image_parameters(self, get_os_image):
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
 
         # NOTE(ft): check normal flow
         os_image = fakes.OSImage(fakes.OS_IMAGE_1)
@@ -1410,7 +1410,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_block_device_mapping(self, db_api):
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
 
         db_api.get_item_by_id.side_effect = tools.get_db_api_get_item_by_id(
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3,
@@ -1463,7 +1463,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_build_block_device_mapping(self, db_api):
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
         db_api.get_item_by_id.side_effect = tools.get_db_api_get_item_by_id(
             fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2)
@@ -1714,7 +1714,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.db.api.IMPL')
     def test_format_instance(self, db_api, nova, cinder):
         nova = nova.return_value
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
         fake_flavors = {'fakeFlavorId': 'fake_flavor'}
 
         instance = {'id': fakes.random_ec2_id('i'),
@@ -1789,7 +1789,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         db_volumes_1 = {'2': {'id': 'vol-00000002'},
                         '5': {'id': 'vol-00000005'}}
 
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
 
         result = {}
         instance_api._cloud_format_instance_bdm(
@@ -1842,7 +1842,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             'volumes_attached': [{'id': '2',
                                   'delete_on_termination': False}],
             'root_device_name': '/dev/vda'})
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
 
         result = {}
         instance_api._cloud_format_instance_bdm(
@@ -1860,7 +1860,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                                  }}]}))
 
     def test_format_instance_bdm_no_bdm(self):
-        context = mock.Mock()
+        context = base.create_context()
         os_instance_id = fakes.random_os_id()
         os_instance = fakes.OSInstance_full({'id': os_instance_id})
 
@@ -1886,7 +1886,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('novaclient.client.Client')
     def test_get_os_instances_by_instances(self, nova, remove_instances):
         nova = nova.return_value
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
         os_instance_1 = fakes.OSInstance(fakes.OS_INSTANCE_1)
         os_instance_2 = fakes.OSInstance(fakes.OS_INSTANCE_2)
 
@@ -1924,7 +1924,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.db.api.IMPL')
     def test_remove_instances(self, db_api, detach_network_interface_item,
                               delete_network_interface):
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
 
         instances = [{'id': fakes.random_ec2_id('i')}
                      for dummy in range(4)]
@@ -1957,8 +1957,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('cinderclient.client.Client')
     def test_get_os_volumes(self, cinder):
         cinder = cinder.return_value
-        context = mock.Mock(service_catalog=[{'type': 'fake'}],
-                            is_os_admin=False)
+        context = base.create_context()
         os_volume_ids = [fakes.random_os_id() for _i in range(5)]
         os_instance_ids = [fakes.random_os_id() for _i in range(2)]
         os_volumes = [
@@ -2006,8 +2005,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                              nova_client_getter):
         nova = nova.return_value
         cinder = cinder.return_value
-        context = mock.Mock(service_catalog=[{'type': 'fake'}],
-                            is_os_admin=False)
+        context = base.create_context()
         os_instance = fakes.OSInstance_full({'id': fakes.random_os_id()})
 
         nova.servers.get.return_value = os_instance

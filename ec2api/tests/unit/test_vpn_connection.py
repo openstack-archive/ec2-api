@@ -459,7 +459,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
     @mock.patch('ec2api.api.vpn_connection._stop_vpn_connection',
                 new_callable=tools.CopyingMock)
     def test_stop_gateway_vpn_connections(self, stop_vpn_connection):
-        context = mock.Mock
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
         vpn_connection_3 = tools.update_dict(
             fakes.DB_VPN_CONNECTION_1,
@@ -499,7 +499,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections')
     def test_update_vpn_routes(self, reset_vpn_connections):
-        context = mock.Mock
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
 
         self.set_mock_db_items()
@@ -522,7 +522,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
                 wraps=vpn_connection_api._get_route_table_vpn_cidrs)
     def test_reset_vpn_connections(self, get_route_table_vpn_cidrs,
                                    set_subnet_vpn, delete_subnet_vpn):
-        context = mock.Mock
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
 
         vpn_gateway_3 = {'id': fakes.random_ec2_id('vpn'),
@@ -621,7 +621,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
                          self.db_api.get_items.mock_calls)
 
     def test_set_subnet_vpn(self):
-        context = mock.Mock
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
         cidrs = [fakes.CIDR_VPN_1_STATIC, fakes.CIDR_VPN_1_PROPAGATED_1]
 
@@ -703,7 +703,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
         self.assertFalse(self.db_api.update_item.called)
 
     def test_delete_subnet_vpn(self):
-        context = mock.Mock
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
 
         # subnet is not connected to the vpn

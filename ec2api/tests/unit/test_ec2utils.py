@@ -21,6 +21,7 @@ import testtools
 
 from ec2api.api import ec2utils
 from ec2api import exception
+from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 
@@ -159,7 +160,7 @@ class EC2UtilsTestCase(testtools.TestCase):
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_os_id_to_ec2_id(self, db_api):
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
         fake_id = fakes.random_ec2_id('fake')
         fake_os_id = fakes.random_os_id()
 
@@ -235,7 +236,7 @@ class EC2UtilsTestCase(testtools.TestCase):
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_os_image(self, db_api, glance):
         glance = glance.return_value
-        fake_context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        fake_context = base.create_context()
 
         os_image = fakes.OSImage(fakes.OS_IMAGE_1)
         glance.images.get.return_value = os_image
@@ -277,7 +278,7 @@ class EC2UtilsTestCase(testtools.TestCase):
     @mock.patch('neutronclient.v2_0.client.Client')
     def test_get_os_public_network(self, neutron):
         neutron = neutron.return_value
-        context = mock.Mock(service_catalog=[{'type': 'fake'}])
+        context = base.create_context()
         conf = self.useFixture(config_fixture.Config())
 
         conf.config(external_network='fake_public_network')

@@ -21,6 +21,7 @@ import webob
 
 from ec2api import exception
 from ec2api import metadata
+from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 
@@ -91,7 +92,7 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.context.get_os_admin_context')
     def test_get_metadata_by_ip(self, get_context, get_remote_ip, get_ids,
                                 get_metadata_item):
-        get_context.return_value = mock.Mock(project_id='fake_admin_project')
+        get_context.return_value = base.create_context(is_os_admin=True)
         get_remote_ip.return_value = 'fake_instance_ip'
         get_ids.return_value = ('fake_instance_id', 'fake_project_id')
         get_metadata_item.return_value = 'fake_item'
@@ -116,7 +117,7 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.context.get_os_admin_context')
     def test_get_metadata_by_instance_id(self, get_context, unpack_request,
                                          get_metadata_item):
-        get_context.return_value = mock.Mock(project_id='fake_admin_project')
+        get_context.return_value = base.create_context(is_os_admin=True)
         unpack_request.return_value = ('fake_instance_id', 'fake_project_id',
                                        'fake_instance_ip')
         get_metadata_item.return_value = 'fake_item'

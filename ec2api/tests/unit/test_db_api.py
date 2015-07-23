@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import mock
 from sqlalchemy.orm import exc as orm_exception
 
 from ec2api.api import validator
-from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
@@ -26,10 +26,10 @@ class DbApiTestCase(base.DbTestCase):
 
     def setUp(self):
         super(DbApiTestCase, self).setUp()
-        self.context = ec2_context.RequestContext(fakes.ID_OS_USER,
-                                                  fakes.ID_OS_PROJECT)
-        self.other_context = ec2_context.RequestContext(
-            fakes.random_os_id(), fakes.random_os_id())
+        self.context = mock.NonCallableMock(
+            project_id=fakes.random_os_id())
+        self.other_context = mock.NonCallableMock(
+            project_id=fakes.random_os_id())
 
     def test_add_item(self):
         new_item = {'os_id': fakes.random_os_id(),

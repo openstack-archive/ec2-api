@@ -568,7 +568,7 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.db.api.IMPL')
     def test_get_db_items(self, db_api):
         describer = image_api.ImageDescriber()
-        describer.context = mock.Mock()
+        describer.context = base.create_context()
 
         # NOTE(ft): the first requested image appears is user owend and public,
         # the second is absent

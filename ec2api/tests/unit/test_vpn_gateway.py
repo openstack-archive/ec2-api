@@ -371,7 +371,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
     @mock.patch('ec2api.api.vpn_gateway._create_subnet_vpnservice')
     def test_start_vpn_in_subnet(self, create_subnet_vpnservice,
                                  reset_vpn_connection):
-        context = mock.Mock()
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
         mock_manager = mock.Mock()
         mock_manager.attach_mock(create_subnet_vpnservice,
@@ -403,7 +403,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
     @mock.patch('ec2api.api.vpn_connection._delete_subnet_vpn')
     @mock.patch('ec2api.api.vpn_gateway._safe_delete_vpnservice')
     def test_stop_vpn_in_subnet(self, delete_vpnservice, delete_subnet_vpn):
-        context = mock.Mock()
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
         mock_manager = mock.Mock()
         mock_manager.attach_mock(delete_vpnservice, 'delete_vpnservice')
@@ -434,7 +434,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
     def test_create_subnet_vpnservice(self):
         self.neutron.create_vpnservice.side_effect = tools.get_neutron_create(
             'vpnservice', fakes.ID_OS_VPNSERVICE_1)
-        context = mock.Mock()
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
 
         vpn_gateway_api._create_subnet_vpnservice(
@@ -463,7 +463,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.vpn_gateway._safe_delete_vpnservice')
     def test_delete_subnet_vpnservice(self, delete_vpnservice):
-        context = mock.Mock()
+        context = base.create_context()
         cleaner = common.OnCrashCleaner()
 
         vpn_gateway_api._delete_subnet_vpnservice(
