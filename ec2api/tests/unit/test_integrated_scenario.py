@@ -125,7 +125,6 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
             aki_image_project_id=fakes.ID_OS_PROJECT,
             with_id_mapping=True)
 
-    @base.skip_not_implemented
     def test_describe_new_local_ami_alien_aki_images_with_mappings(self):
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
@@ -133,7 +132,6 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
             aki_image_project_id=alien_project_id,
             with_id_mapping=True)
 
-    @base.skip_not_implemented
     def test_describe_new_alien_ami_local_aki_images_with_mappings(self):
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
@@ -211,7 +209,6 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         image_id = self._find_snapshot_id_in_bdm(image, '/dev/vdi')
         image_api.describe_images(self.context, image_id=[image_id])
 
-    @base.skip_not_implemented
     def test_describe_new_alien_bdm_image_from_new_local_image(self):
         image = self._get_new_ebs_image(
             image_project_id=fakes.ID_OS_PROJECT,
@@ -219,7 +216,6 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         image_id = self._find_snapshot_id_in_bdm(image, '/dev/vdi')
         image_api.describe_images(self.context, image_id=[image_id])
 
-    @base.skip_not_implemented
     def test_describe_new_alien_bdm_image_from_new_alien_image(self):
         image = self._get_new_ebs_image(
             image_project_id=fakes.random_os_id(),
