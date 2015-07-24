@@ -494,14 +494,12 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
     if kernel_id:
         ec2_image['kernelId'] = ec2utils.os_id_to_ec2_id(
                 context, 'aki', kernel_id,
-                items_by_os_id=images_dict, ids_by_os_id=ids_dict,
-                project_id=os_image.owner)
+                items_by_os_id=images_dict, ids_by_os_id=ids_dict)
     ramdisk_id = os_image.properties.get('ramdisk_id')
     if ramdisk_id:
         ec2_image['ramdiskId'] = ec2utils.os_id_to_ec2_id(
                 context, 'ari', ramdisk_id,
-                items_by_os_id=images_dict, ids_by_os_id=ids_dict,
-                project_id=os_image.owner)
+                items_by_os_id=images_dict, ids_by_os_id=ids_dict)
 
     name = os_image.name
     img_loc = os_image.properties.get('image_location')
