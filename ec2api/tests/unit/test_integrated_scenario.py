@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import mock
+
 from ec2api.api import image as image_api
 from ec2api.api import instance as instance_api
 from ec2api.api import snapshot as snapshot_api
 from ec2api.api import volume as volume_api
+from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
@@ -27,6 +30,17 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         super(DBItemsAutoCreationTestCase, self).setUp()
         self.mock_all_os()
         self.context = base.create_context()
+
+    def assert_image_project(self, expected_project_id, image_id):
+        if expected_project_id:
+            context = mock.NonCallableMock(project_id=expected_project_id)
+        else:
+            context = self.context
+        image_item = db_api.get_item_by_id(context, image_id)
+        if expected_project_id:
+            self.assertIsNotNone(image_item)
+        else:
+            self.assertIsNone(image_item)
 
     def test_describe_new_instance_then_its_volume(self):
         os_instance_id = fakes.random_os_id()
@@ -83,7 +97,9 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         aki_image = next(i for i in images['imagesSet']
                          if i['imageType'] == 'kernel')
         self.assertEqual(image_project_id, image['imageOwnerId'])
+        self.assert_image_project(image_project_id, image['imageId'])
         self.assertEqual(aki_image_project_id, aki_image['imageOwnerId'])
+        self.assert_image_project(aki_image_project_id, aki_image['imageId'])
 
     def test_describe_new_alien_images(self):
         alien_project_id = fakes.random_os_id()
@@ -208,25 +224,29 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
             bdm_image_project_id=fakes.ID_OS_PROJECT)
         image_id = self._find_snapshot_id_in_bdm(image, '/dev/vdi')
         image_api.describe_images(self.context, image_id=[image_id])
+        self.assert_image_project(fakes.ID_OS_PROJECT, image_id)
 
     def test_describe_new_alien_bdm_image_from_new_local_image(self):
+        alien_project_id = fakes.random_os_id()
         image = self._get_new_ebs_image(
             image_project_id=fakes.ID_OS_PROJECT,
-            bdm_image_project_id=fakes.random_os_id())
+            bdm_image_project_id=alien_project_id)
         image_id = self._find_snapshot_id_in_bdm(image, '/dev/vdi')
         image_api.describe_images(self.context, image_id=[image_id])
+        self.assert_image_project(alien_project_id, image_id)
 
     def test_describe_new_alien_bdm_image_from_new_alien_image(self):
+        alien_project_id = fakes.random_os_id()
         image = self._get_new_ebs_image(
-            image_project_id=fakes.random_os_id(),
-            bdm_image_project_id=fakes.random_os_id())
+            image_project_id=alien_project_id,
+            bdm_image_project_id=alien_project_id)
         image_id = self._find_snapshot_id_in_bdm(image, '/dev/vdi')
         image_api.describe_images(self.context, image_id=[image_id])
+        self.assert_image_project(alien_project_id, image_id)
 
     def _test_describe_new_instance_then_its_image(self, image_project_id):
         os_instance_id = fakes.random_os_id()
         os_image_id = fakes.random_os_id()
-        alien_project_id = fakes.random_os_id()
         os_instance = {
             'id': os_instance_id,
             'flavor': {'id': 'fake'},
@@ -234,7 +254,7 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         }
         os_image = {
             'id': os_image_id,
-            'owner': alien_project_id,
+            'owner': image_project_id,
             'is_public': True,
         }
         self.nova_admin.servers.list.return_value = [
@@ -246,7 +266,11 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         image_id = instance['imageId']
         image = (image_api.describe_images(self.context, image_id=[image_id])
                  ['imagesSet'][0])
-        self.assertEqual(alien_project_id, image['imageOwnerId'])
+        self.assertEqual(image_project_id, image['imageOwnerId'])
+        expected_project_id = (fakes.ID_OS_PROJECT
+                               if image_project_id == fakes.ID_OS_PROJECT else
+                               None)
+        self.assert_image_project(expected_project_id, image['imageId'])
 
     @base.skip_not_implemented
     def test_describe_new_instance_then_its_local_image(self):
