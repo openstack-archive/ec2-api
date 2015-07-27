@@ -14,7 +14,6 @@
 
 import base64
 import binascii
-import itertools
 import json
 import os
 import re
@@ -264,13 +263,23 @@ class ImageDescriber(common.TaggableItemsDescriber):
         if self.ids:
             local_images = db_api.get_items_by_ids(self.context, self.ids)
         else:
-            local_images = list(itertools.chain(
-                *(db_api.get_items(self.context, kind)
-                  for kind in ('ami', 'ari', 'aki'))))
-        public_images = [db_api.get_public_items(self.context, kind, self.ids)
-                         for kind in ('ami', 'ari', 'aki')]
+            local_images = sum((db_api.get_items(self.context, kind)
+                                for kind in ('ami', 'ari', 'aki')), [])
+        public_images = sum((db_api.get_public_items(self.context, kind,
+                                                     self.ids)
+                             for kind in ('ami', 'ari', 'aki')), [])
 
-        images = list(itertools.chain(local_images, *public_images))
+        mapped_ids = []
+        if self.ids:
+            mapped_ids = [{'id': item_id,
+                           'os_id': os_id}
+                          for kind in ('ami', 'ari', 'aki')
+                          for item_id, os_id in db_api.get_items_ids(
+                              self.context, kind, item_ids=self.ids)]
+
+        # NOTE(ft): mapped_ids must be the first to let complete items from
+        # next lists to override mappings, which do not have item body data
+        images = sum((mapped_ids, local_images, public_images), [])
         if self.ids:
             # NOTE(ft): public images, owned by a current user, appear in both
             # local and public lists of images. Therefore it's not enough to
@@ -296,10 +305,18 @@ class ImageDescriber(common.TaggableItemsDescriber):
             image = ec2utils.get_db_item_by_os_id(
                 self.context, kind, os_image.id, self.items_dict,
                 os_image=os_image, project_id=os_image.owner)
-        elif (image['os_id'] in self.local_images_os_ids and
-                image['is_public'] != os_image.is_public):
+        elif (self.context.project_id == os_image.owner and
+                image.get('is_public') != os_image.is_public):
             image['is_public'] = os_image.is_public
-            db_api.update_item(self.context, image)
+            if image['id'] in self.local_images_os_ids:
+                db_api.update_item(self.context, image)
+            else:
+                # TODO(ft): currently update_item can not update id mapping,
+                # because its project_id is None. Instead of upgrade db_api,
+                # we use add_item. But its execution leads to a needless
+                # DB call. This should be reworked in the future.
+                kind = ec2utils.get_ec2_id_kind(image['id'])
+                db_api.add_item(self.context, kind, image)
         return image
 
     def get_name(self, os_item):
@@ -479,7 +496,7 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
                  'imageOwnerId': os_image.owner,
                  'imageType': IMAGE_TYPES[
                                    ec2utils.get_ec2_id_kind(image['id'])],
-                 'isPublic': image['is_public'],
+                 'isPublic': os_image.is_public,
                  'architecture': os_image.properties.get('architecture'),
                  }
     if 'description' in image:
