@@ -266,16 +266,15 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         image_id = instance['imageId']
         image = (image_api.describe_images(self.context, image_id=[image_id])
                  ['imagesSet'][0])
+        self.assertEqual(image_id, image['imageId'])
         self.assertEqual(image_project_id, image['imageOwnerId'])
         expected_project_id = (fakes.ID_OS_PROJECT
                                if image_project_id == fakes.ID_OS_PROJECT else
                                None)
         self.assert_image_project(expected_project_id, image['imageId'])
 
-    @base.skip_not_implemented
     def test_describe_new_instance_then_its_local_image(self):
         self._test_describe_new_instance_then_its_image(fakes.ID_OS_PROJECT)
 
-    @base.skip_not_implemented
     def test_describe_new_instance_then_its_alien_image(self):
         self._test_describe_new_instance_then_its_image(fakes.random_os_id())
