@@ -97,11 +97,12 @@ def get_db_api_get_items_by_ids(*items):
 def get_db_api_get_items_ids(*items):
     """Generate db_api.get_items_ids mock function."""
 
-    def db_api_get_items_ids(context, kind, item_os_ids):
+    def db_api_get_items_ids(context, kind, item_ids=None, item_os_ids=None):
         return [(item['id'], item['os_id'])
                 for item in items
-                if (item['os_id'] in item_os_ids and
-                    ec2utils.get_ec2_id_kind(item['id']) == kind)]
+                if (ec2utils.get_ec2_id_kind(item['id']) == kind and
+                    (not item_ids or item['id'] in item_ids) and
+                    (not item_os_ids or item['os_id'] in item_os_ids))]
     return db_api_get_items_ids
 
 

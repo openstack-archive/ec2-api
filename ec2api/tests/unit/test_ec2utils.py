@@ -162,7 +162,7 @@ class EC2UtilsTestCase(testtools.TestCase):
         item_id = ec2utils.os_id_to_ec2_id(fake_context, 'fake', fake_os_id)
         self.assertEqual(fake_id, item_id)
         db_api.get_items_ids.assert_called_once_with(
-            fake_context, 'fake', (fake_os_id,))
+            fake_context, 'fake', item_ids=None, item_os_ids=(fake_os_id,))
         self.assertFalse(db_api.add_item_id.called)
 
         # no cache, item isn't found
