@@ -367,7 +367,7 @@ def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
         item = items_by_os_id.get(os_id)
         if item:
             return item['id']
-    ids = db_api.get_items_ids(context, kind, (os_id,))
+    ids = db_api.get_items_ids(context, kind, item_os_ids=(os_id,))
     if len(ids):
         item_id, _os_id = ids[0]
     else:

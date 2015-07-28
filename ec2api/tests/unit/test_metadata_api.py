@@ -92,7 +92,8 @@ class MetadataApiTestCase(base.ApiTestCase):
               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
 
         self.db_api.get_items_ids.assert_called_with(
-            self.fake_context, 'i', (fakes.ID_OS_INSTANCE_1,))
+            self.fake_context, 'i', item_ids=None,
+            item_os_ids=(fakes.ID_OS_INSTANCE_1,))
         self.instance_api.describe_instances.assert_called_with(
             self.fake_context, [fakes.ID_EC2_INSTANCE_1])
         self.instance_api.describe_instance_attribute.assert_called_with(
