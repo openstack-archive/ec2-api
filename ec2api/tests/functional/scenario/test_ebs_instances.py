@@ -114,7 +114,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
     def test_launch_ebs_instance_with_creating_blank_volume(self):
         """Launch instance with creating blank volume."""
         device_name_prefix = base.get_device_name_prefix(self.root_device_name)
-        device_name = device_name_prefix + 'd'
+        device_name = device_name_prefix + 'b'
 
         instance_id = self.run_instance(ImageId=self.image_id,
             BlockDeviceMappings=[{'DeviceName': device_name,

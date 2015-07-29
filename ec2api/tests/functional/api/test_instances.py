@@ -238,7 +238,13 @@ class InstanceTest(base.EC2TestCase):
 
     def test_launch_instance_with_creating_blank_volume(self):
         """Launch instance with creating blank volume."""
-        device_name = '/dev/xvdh'
+        data = self.client.describe_images(ImageIds=[CONF.aws.image_id])
+        # NOTE(ft): ec2 api doesn't report root device name if it isn't
+        # explicity contained in an image. So we assume it is /dev/vda,
+        # which is true for only qemu hypervisor though.
+        device_name_prefix = base.get_device_name_prefix(
+            data['Images'][0].get('RootDeviceName', '/dev/vda'))
+        device_name = device_name_prefix + 'b'
         instance_type = CONF.aws.instance_type
         data = self.client.run_instances(
             ImageId=CONF.aws.image_id, InstanceType=instance_type,
