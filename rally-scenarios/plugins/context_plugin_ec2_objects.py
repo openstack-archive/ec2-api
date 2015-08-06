@@ -214,7 +214,7 @@ class EC2Objects(context.Context):
                     LOG.exception('')
 
 
-@context.context(name="ec2_networks", order=451)
+@context.configure(name="ec2_networks", order=451)
 class FakeNetworkGenerator(EC2Objects):
     """Context class for adding temporary networks for benchmarks.
 
@@ -269,7 +269,7 @@ class FakeNetworkGenerator(EC2Objects):
             self.cleanup_networks(tenant_id, client)
 
 
-@context.context(name="ec2_servers", order=450)
+@context.configure(name="ec2_servers", order=450)
 class FakeServerGenerator(EC2Objects):
     """Context class for adding temporary servers for benchmarks.
 

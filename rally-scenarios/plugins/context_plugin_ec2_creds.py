@@ -25,7 +25,7 @@ from rally.task import context
 LOG = logging.getLogger(__name__)
 
 
-@context.context(name="prepare_ec2_client", order=110)
+@context.configure(name="prepare_ec2_client", order=110)
 class PrepareEC2ClientContext(context.Context):
 
     def __init__(self, ctx):
