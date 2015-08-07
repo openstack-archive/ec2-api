@@ -143,9 +143,20 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
     run_long_tests="False"
   fi
 
+  # TODO(andey-mp): make own code
+  # copy some variables from tempest.conf
+  tempest_conf="../tempest/etc/tempest.conf"
+  if [[ -f $tempest_conf ]]; then
+    s3_materials_path=`grep ^s3_materials_path $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
+    aki_manifest=`grep ^aki_manifest $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
+    ami_manifest=`grep ^ami_manifest $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
+    ari_manifest=`grep ^ari_manifest $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
+  fi
+
   sudo bash -c "cat > $TEST_CONFIG_DIR/$TEST_CONFIG <<EOF
 [aws]
 ec2_url = $EC2_URL
+s3_url = $S3_URL
 aws_access = $EC2_ACCESS_KEY
 aws_secret = $EC2_SECRET_KEY
 image_id = $image_id
@@ -155,6 +166,10 @@ build_timeout = $timeout
 run_long_tests = $run_long_tests
 instance_type = m1.ec2api
 instance_type_alt = m1.ec2api-alt
+s3_materials_path=$s3_materials_path
+aki_manifest=$aki_manifest
+ami_manifest=$ami_manifest
+ari_manifest=$ari_manifest
 EOF"
 fi
 
