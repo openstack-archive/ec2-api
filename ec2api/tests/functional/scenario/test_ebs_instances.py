@@ -51,10 +51,6 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
             assert 1 == len(data['Snapshots'])
             cls.root_device_size = data['Snapshots'][0]['VolumeSize']
 
-    @testtools.skipUnless(
-        CONF.aws.run_incompatible_tests,
-        "Error from nova: "
-        "Invalid input for field/attribute 0. ...")
     def test_launch_ebs_instance_with_persistent_root_device(self):
         """
 
@@ -85,10 +81,6 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean_vol)
         self.get_volume_waiter().wait_delete(volume_id)
 
-    @testtools.skipUnless(
-        CONF.aws.run_incompatible_tests,
-        "Error from nova: "
-        "Invalid input for field/attribute 0. ...")
     def test_launch_ebs_instance_with_resized_root_device(self):
         """Launch EBS-backed instance with resizing root device."""
         new_size = int(math.ceil(self.root_device_size * 1.1))
