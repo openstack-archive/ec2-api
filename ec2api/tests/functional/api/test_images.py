@@ -13,6 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
+import re
+
 from tempest_lib.common.utils import data_utils
 import testtools
 
@@ -279,3 +282,75 @@ class ImageTest(base.EC2TestCase):
 
         data = self.client.deregister_image(ImageId=image_id)
         self.cancelResourceCleanUp(image_clean)
+
+
+class ImageRegisterTest(base.EC2TestCase):
+
+    @classmethod
+    @base.safe_setup
+    def setUpClass(cls):
+        super(ImageRegisterTest, cls).setUpClass()
+        cls.materials_path = CONF.aws.s3_materials_path
+        if not cls.materials_path:
+            raise cls.skipException('Image materials are not ready')
+
+        cls.bucket_name = data_utils.rand_name("bucket")
+        cls.ami_manifest = CONF.aws.ami_manifest
+        cls.aki_manifest = CONF.aws.aki_manifest
+        cls.ari_manifest = CONF.aws.ari_manifest
+
+        cls.ami_path = cls.materials_path + os.sep + cls.ami_manifest
+        cls.aki_path = cls.materials_path + os.sep + cls.aki_manifest
+        cls.ari_path = cls.materials_path + os.sep + cls.ari_manifest
+        cls.s3_client.create_bucket(Bucket=cls.bucket_name, ACL='public-read')
+        cls.addResourceCleanUpStatic(cls.s3_client.delete_bucket,
+                                     Bucket=cls.bucket_name)
+        cls._s3_upload_dir(cls.bucket_name, cls.materials_path)
+
+    @classmethod
+    def _s3_upload_dir(cls, bucket_name, path, prefix=""):
+        for root, _, files in os.walk(path):
+            for file in files:
+                source = root + os.sep + file
+                target = re.sub("^" + re.escape(path) + "?/", prefix, source)
+                if os.sep != '/':
+                    target = re.sub(re.escape(os.sep), '/', target)
+                hfile = open(source, 'r')
+                cls.s3_client.put_object(Bucket=bucket_name, Key=target,
+                                         Body=hfile)
+
+    valid_image_state = set(('available', 'pending', 'failed'))
+
+    def _register_get_deregister_image(self, image_type, manifest):
+        image_name = data_utils.rand_name(image_type + "-name")
+        image_location = self.bucket_name + "/" + manifest
+        data = self.client.register_image(
+            Name=image_name, ImageLocation=image_location)
+        image_id = data['ImageId']
+        image_clean = self.addResourceCleanUp(self.client.deregister_image,
+                                              ImageId=image_id)
+        self.assertEqual(image_id[0:3], image_type)
+
+        data = self.client.describe_images(ImageIds=[image_id])
+        self.assertEqual(1, len(data['Images']))
+        image = data['Images'][0]
+        self.assertEqual(image_name, image['Name'])
+        self.assertEqual(image_id, image['ImageId'])
+        self.assertIn(image['State'], self.valid_image_state)
+
+        self.get_image_waiter().wait_available(image_id)
+
+        self.client.deregister_image(ImageId=image_id)
+        self.assertRaises('InvalidAMIID.NotFound',
+                          self.client.describe_images,
+                          ImageIds=[image_id])
+        self.cancelResourceCleanUp(image_clean)
+
+    def test_register_get_deregister_ami_image(self):
+        self._register_get_deregister_image('ami', self.ami_manifest)
+
+    def test_register_get_deregister_aki_image(self):
+        self._register_get_deregister_image('aki', self.aki_manifest)
+
+    def test_register_get_deregister_ari_image(self):
+        self._register_get_deregister_image('ari', self.ari_manifest)

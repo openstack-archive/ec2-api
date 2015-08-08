@@ -218,6 +218,9 @@ class EC2TestCase(base.BaseTestCase):
         cls.client = botocoreclient._get_ec2_client(
             CONF.aws.ec2_url, CONF.aws.aws_region,
             CONF.aws.aws_access, CONF.aws.aws_secret)
+        cls.s3_client = botocoreclient._get_s3_client(
+            CONF.aws.s3_url, CONF.aws.aws_region,
+            CONF.aws.aws_access, CONF.aws.aws_secret)
         TesterStateHolder().ec2_client = cls.client
 
     @classmethod

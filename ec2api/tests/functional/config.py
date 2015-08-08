@@ -34,6 +34,9 @@ AWSGroup = [
     cfg.StrOpt('ec2_url',
                default="http://localhost:8788/",
                help="EC2 URL"),
+    cfg.StrOpt('s3_url',
+               default="http://localhost:3334/",
+               help="S3 URL"),
     cfg.StrOpt('aws_secret',
                default=None,
                help="AWS Secret Key",
@@ -80,6 +83,18 @@ AWSGroup = [
     cfg.BoolOpt('run_long_tests',
                 default=False,
                 help='Will run all long tests also.'),
+    cfg.StrOpt('s3_materials_path',
+               default=None,
+               help="S3 Materials Path"),
+    cfg.StrOpt('ari_manifest',
+               default=None,
+               help="ARI Ramdisk Image manifest"),
+    cfg.StrOpt('ami_manifest',
+               default=None,
+               help="AMI Machine Image manifest"),
+    cfg.StrOpt('aki_manifest',
+               default=None,
+               help="AKI Kernel Image manifest"),
 ]
 
 
