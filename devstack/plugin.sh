@@ -172,7 +172,7 @@ function configure_ec2api {
 
     iniset $EC2API_CONF_FILE DEFAULT debug $EC2API_DEBUG
     iniset $EC2API_CONF_FILE DEFAULT use_syslog $SYSLOG
-    iniset $EC2API_CONF_FILE DEFAULT state_path EC2API_STATE_PATH
+    iniset $EC2API_CONF_FILE DEFAULT state_path $EC2API_STATE_PATH
 
 
     # ec2api Api Configuration
