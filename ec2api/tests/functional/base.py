@@ -264,11 +264,19 @@ class EC2TestCase(base.BaseTestCase):
         """Cancel Clean up request."""
         del self._resource_trash_bin[key]
 
-    # NOTE(andrey-mp): if ERROR in responce_code then skip logging
+    # NOTE(andrey-mp): if ERROR in responce_code then treat object as deleted
     _VALID_CLEANUP_ERRORS = [
         'NotFound',
         'Gateway.NotAttached'
     ]
+
+    # NOTE(andrey-mp): function must return boolean - should we retry
+    # deleting or not
+    _HOOKED_CLEANUP_ERRORS = {
+        ('delete_vpc', 'DependencyViolation'): (
+            'delete_vpc_failed',
+            lambda kwargs: kwargs['VpcId'])
+    }
 
     _CLEANUP_WAITERS = {
         'delete_vpc': (
@@ -301,6 +309,12 @@ class EC2TestCase(base.BaseTestCase):
         'delete_vpn_connection': (
             'get_vpn_connection_waiter',
             lambda kwargs: kwargs['VpnConnectionId']),
+        'delete_customer_gateway': (
+            'get_customer_gateway_waiter',
+            lambda kwargs: kwargs['CustomerGatewayId']),
+        'delete_vpn_gateway': (
+            'get_vpn_gateway_waiter',
+            lambda kwargs: kwargs['VpnGatewayId']),
     }
 
     @classmethod
@@ -329,27 +343,48 @@ class EC2TestCase(base.BaseTestCase):
                 cls.cleanUpItem(function, pos_args, kw_args)
             except BaseException:
                 fail_count += 1
-                LOG.exception('Failure in cleanup')
+                LOG.exception('Failure in cleanup for: %s' % str(kw_args))
             finally:
                 del trash_bin[key]
         return fail_count
 
     @classmethod
     def cleanUpItem(cls, function, pos_args, kw_args):
-        try:
-            function(*pos_args, **kw_args)
-            if function.__name__ in cls._CLEANUP_WAITERS:
-                (waiter, obj_id) = cls._CLEANUP_WAITERS[function.__name__]
-                waiter = getattr(cls, waiter)
-                obj_id = obj_id(kw_args)
-                waiter().wait_delete(obj_id)
-        except botocore.exceptions.ClientError as e:
-            error_code = e.response['Error']['Code']
-            for err in cls._VALID_CLEANUP_ERRORS:
-                if err in error_code:
-                    break
-            else:
-                LOG.error("Cleanup failed: %s", e, exc_info=True)
+        attempts_left = 10
+        deleted = False
+        while not deleted and attempts_left > 0:
+            try:
+                function(*pos_args, **kw_args)
+                deleted = True
+
+                key = function.__name__
+                if key in cls._CLEANUP_WAITERS:
+                    (waiter, obj_id) = cls._CLEANUP_WAITERS[key]
+                    waiter = getattr(cls, waiter)
+                    obj_id = obj_id(kw_args)
+                    try:
+                        waiter().wait_delete(obj_id)
+                    except botocore.exceptions.ClientError as e:
+                        LOG.exception('Exception occured in cleanup waiting')
+            except botocore.exceptions.ClientError as e:
+                error_code = e.response['Error']['Code']
+                for err in cls._VALID_CLEANUP_ERRORS:
+                    if err in error_code:
+                        deleted = True
+                else:
+                    hook_res = False
+                    key = (function.__name__, error_code)
+                    if key in cls._HOOKED_CLEANUP_ERRORS:
+                        (hook, obj_id) = cls._HOOKED_CLEANUP_ERRORS[key]
+                        hook = getattr(cls, hook)
+                        obj_id = obj_id(kw_args)
+                        hook_res = hook(obj_id)
+                    if not hook_res:
+                        LOG.error('Cleanup failed: %s', e, exc_info=True)
+                        return
+                    LOG.error('Retrying cleanup due to: %s', e)
+                    time.sleep(1)
+                    attempts_left -= 1
 
     @classmethod
     def friendly_function_name_simple(cls, call_able):
@@ -534,24 +569,57 @@ class EC2TestCase(base.BaseTestCase):
         return EC2Waiter(cls._vpn_gateway_get_attachment_state)
 
     @classmethod
-    def _vpn_connection_get_state(cls, vpn_connection_id):
+    def _vpn_object_get_state(cls, func, kwargs, data_key, error_not_found):
+        # NOTE(andrey-mp): use this for vpn_connection, vpn_gateway,
+        # customer_gateway due to similar states
         try:
-            data = cls.client.describe_vpn_connections(
-                VpnConnectionIds=[vpn_connection_id])
-            if not data['VpnConnections']:
+            data = func(**kwargs)
+            if not data[data_key]:
                 raise exceptions.NotFound()
-            if data['VpnConnections'][0]['State'] == 'deleted':
+            if data[data_key][0]['State'] == 'deleted':
                 raise exceptions.NotFound()
-            return data['VpnConnections'][0]['State']
+            return data[data_key][0]['State']
         except botocore.exceptions.ClientError as ex:
             error_code = ex.response['Error']['Code']
-            if error_code == 'InvalidVpnConnectionID.NotFound':
+            if error_code == error_not_found:
                 raise exceptions.NotFound()
             raise
 
     @classmethod
+    def _vpn_connection_get_state(cls, vpn_connection_id):
+        return cls._vpn_object_get_state(
+            cls.client.describe_vpn_connections,
+            {'VpnConnectionIds': [vpn_connection_id]},
+            'VpnConnections',
+            'InvalidVpnConnectionID.NotFound')
+
+    @classmethod
     def get_vpn_connection_waiter(cls):
         return EC2Waiter(cls._vpn_connection_get_state)
+
+    @classmethod
+    def _customer_gateway_get_state(cls, customer_gateway_id):
+        return cls._vpn_object_get_state(
+            cls.client.describe_customer_gateways,
+            {'CustomerGatewayIds': [customer_gateway_id]},
+            'CustomerGateways',
+            'InvalidCustomerGatewayID.NotFound')
+
+    @classmethod
+    def get_customer_gateway_waiter(cls):
+        return EC2Waiter(cls._customer_gateway_get_state)
+
+    @classmethod
+    def _vpn_gateway_get_state(cls, vpn_gateway_id):
+        return cls._vpn_object_get_state(
+            cls.client.describe_vpn_gateways,
+            {'VpnGatewayIds': [vpn_gateway_id]},
+            'VpnGateways',
+            'InvalidVpnGatewayID.NotFound')
+
+    @classmethod
+    def get_vpn_gateway_waiter(cls):
+        return EC2Waiter(cls._vpn_gateway_get_state)
 
     @classmethod
     def _vpn_connection_get_route_state(cls, vpn_connection_id,
@@ -579,6 +647,35 @@ class EC2TestCase(base.BaseTestCase):
         return EC2Waiter(
             functools.partial(cls._vpn_connection_get_route_state,
                               destination_cidr_block=destination_cidr_block))
+
+    @classmethod
+    def _vpn_connection_get_tunnel_up_state(cls, vpn_connection_id):
+        data = cls.client.describe_vpn_connections(
+            VpnConnectionIds=[vpn_connection_id])
+        for item in data['VpnConnections'][0].get('VgwTelemetry', []):
+            if 'UP' == item['Status']:
+                return 'UP'
+        raise exceptions.NotFound()
+
+    @classmethod
+    def get_vpn_connection_tunnel_waiter(cls):
+        return EC2Waiter(cls._vpn_connection_get_tunnel_up_state)
+
+    @classmethod
+    def delete_vpc_failed(cls, vpc_id):
+        try:
+            LOG.warning('VpnGateways: ' +
+                str(cls.client.describe_vpn_gateways(
+                Filters=[{'Name': 'attachment.vpc-id', 'Values': [vpc_id]}]
+                )['VpnGateways']))
+            LOG.warning('RouteTables: ' +
+                str(cls.client.describe_route_tables(
+                Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}]
+                )['RouteTables']))
+            return True
+        except Exception:
+            LOG.exception('Error occured during "delete_vpc_failed" hook')
+        return False
 
     def assertEmpty(self, list_obj, msg=None):
         self.assertTrue(len(list_obj) == 0, msg)
@@ -660,13 +757,16 @@ class EC2TestCase(base.BaseTestCase):
         data = self.client.describe_route_tables(
             Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])
         self.assertEqual(1, len(data['RouteTables']))
+        route_table_id = data['RouteTables'][0]['RouteTableId']
 
         kwargs = {
             'DestinationCidrBlock': '0.0.0.0/0',
-            'RouteTableId': data['RouteTables'][0]['RouteTableId'],
+            'RouteTableId': route_table_id,
             'GatewayId': gw_id
         }
         self.client.create_route(*[], **kwargs)
+
+        return route_table_id
 
     def create_and_attach_internet_gateway(self, vpc_id):
         data = self.client.create_internet_gateway()

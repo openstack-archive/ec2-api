@@ -17,6 +17,7 @@ import time
 
 from oslo_log import log
 from tempest_lib.common.utils import data_utils
+from tempest_lib import exceptions
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -33,15 +34,16 @@ class BaseScenarioTest(base.EC2TestCase):
         if public_ip:
             return public_ip
 
-        alloc_id, public_ip = self.allocate_address('VpcId' in instance)
+        is_vpc = 'VpcId' in instance
+        alloc_id, public_ip = self.allocate_address(is_vpc)
 
         kwargs = {'InstanceId': instance_id}
-        if 'VpcId' in instance:
+        if is_vpc:
             kwargs['AllocationId'] = alloc_id
         else:
             kwargs['PublicIp'] = public_ip
         data = self.client.associate_address(*[], **kwargs)
-        if 'VpcId' in instance:
+        if is_vpc:
             self.addResourceCleanUp(self.client.disassociate_address,
                                     AssociationId=data['AssociationId'])
         else:
@@ -128,3 +130,15 @@ class BaseScenarioTest(base.EC2TestCase):
         self.get_network_interface_waiter().wait_available(ni_id)
 
         return ni_id
+
+    def correct_ns_if_needed(self, ssh_client):
+        try:
+            ssh_client.exec_command("host www.com")
+        except exceptions.SSHExecCommandFailed:
+            LOG.exception('Can`t resolve www.com. Fixing resolv.conf')
+            LOG.warning(ssh_client.exec_command("cat /etc/resolv.conf"))
+            LOG.warning(ssh_client.exec_command("ping -c 1 8.8.8.8 1>&2"))
+            # NOTE(apavlov) update nameservers (mandatory for local devstack)
+            ssh_client.exec_command("sudo su -c 'echo nameserver 8.8.8.8 "
+                             "> /etc/resolv.conf'")
+            ssh_client.exec_command("host www.com")

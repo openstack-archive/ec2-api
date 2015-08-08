@@ -39,13 +39,16 @@ class VpnGatewayTest(base.EC2TestCase):
         cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
 
     def test_create_delete_vpn_gateway(self):
-        data = self.client.create_vpn_gateway(Type='ipsec.1')
+        data = self.client.create_vpn_gateway(
+            Type='ipsec.1', AvailabilityZone=CONF.aws.aws_zone)
         vgw_id = data['VpnGateway']['VpnGatewayId']
         vgw_clean = self.addResourceCleanUp(
             self.client.delete_vpn_gateway, VpnGatewayId=vgw_id)
+        self.get_vpn_gateway_waiter().wait_available(vgw_id)
 
         self.client.delete_vpn_gateway(VpnGatewayId=vgw_id)
         self.cancelResourceCleanUp(vgw_clean)
+        self.get_vpn_gateway_waiter().wait_delete(vgw_id)
 
         try:
             data = self.client.describe_vpn_gateways(
@@ -57,10 +60,12 @@ class VpnGatewayTest(base.EC2TestCase):
                              ex.response['Error']['Code'])
 
     def test_attach_detach_vpn_gateway(self):
-        data = self.client.create_vpn_gateway(Type='ipsec.1')
+        data = self.client.create_vpn_gateway(
+            Type='ipsec.1', AvailabilityZone=CONF.aws.aws_zone)
         vgw_id = data['VpnGateway']['VpnGatewayId']
         self.addResourceCleanUp(self.client.delete_vpn_gateway,
                                 VpnGatewayId=vgw_id)
+        self.get_vpn_gateway_waiter().wait_available(vgw_id)
 
         data = self.client.attach_vpn_gateway(VpnGatewayId=vgw_id,
                                               VpcId=self.vpc_id)
