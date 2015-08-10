@@ -22,6 +22,11 @@ sudo apt-get install euca2ools -fy
 export TEST_CONFIG_DIR=$(readlink -f .)
 export TEST_CONFIG="functional_tests.conf"
 
+# save original creds(admin) for later usage
+OLD_OS_TENANT_NAME=$OS_TENANT_NAME
+OLD_OS_USERNAME=$OS_USERNAME
+OLD_OS_PASSWORD=$OS_PASSWORD
+
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
   openstack catalog list
@@ -65,7 +70,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   volume_status() { cinder show $1|awk '/ status / {print $4}'; }
   instance_status() { nova show $1|awk '/ status / {print $4}'; }
 
-  openstack_image_id=$(openstack image list --long | grep "cirros" | grep " ami " | awk '{print $2}')
+  openstack_image_id=$(openstack image list --long | grep "cirros" | grep " ami " | head -1 | awk '{print $2}')
   volume_id=$(cinder create --image-id $openstack_image_id 1 | awk '/ id / {print $4}')
   fail=0
   until [[ $(volume_status $volume_id) == "available" ]]; do
@@ -124,5 +129,18 @@ sudo OS_STDOUT_CAPTURE=-1 OS_STDERR_CAPTURE=-1 OS_TEST_TIMEOUT=500 OS_TEST_LOCK_
 RETVAL=$?
 
 # Here can be some commands for log archiving, etc...
+
+# list resources to check what left after tests
+euca-describe-instances
+euca-describe-images
+euca-describe-volumes
+euca-describe-snapshots
+export OS_TENANT_NAME=$OLD_OS_TENANT_NAME
+export OS_USERNAME=$OLD_OS_USERNAME
+export OS_PASSWORD=$OLD_OS_PASSWORD
+nova list --all-tenants
+cinder list --all-tenants
+cinder snapshot-list --all-tenants
+glance image-list --all-tenants
 
 exit $RETVAL
