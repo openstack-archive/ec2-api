@@ -16,7 +16,9 @@
 
 import uuid
 
-from keystoneclient.v2_0 import client as keystone_client
+from keystoneclient import client as keystone_client
+from keystoneclient.v2_0 import client as keystone_client_v2
+from keystoneclient.v3 import client as keystone_client_v3
 from oslo_config import cfg
 from oslo_context import context
 from oslo_log import log as logging
@@ -35,6 +37,8 @@ ec2_opts = [
                secret=True),
     cfg.StrOpt('admin_tenant_name',
                help=_("Admin tenant name")),
+    # TODO(andrey-mp): keystone v3 allows to pass domain_name
+    # or domain_id to auth. This code should support this feature.
 ]
 
 CONF = cfg.CONF
@@ -143,15 +147,33 @@ def is_user_context(context):
     return True
 
 
+_keystone_client_class = None
+
+
+def get_keystone_client_class():
+    global _keystone_client_class
+    if _keystone_client_class is None:
+        keystone = keystone_client.Client(auth_url=CONF.keystone_url)
+        if isinstance(keystone, keystone_client_v2.Client):
+            _keystone_client_class = keystone_client_v2.Client
+        elif isinstance(keystone, keystone_client_v3.Client):
+            _keystone_client_class = keystone_client_v3.Client
+        else:
+            raise exception.EC2KeystoneDiscoverFailure()
+    return _keystone_client_class
+
+
 def get_os_admin_context():
     """Create a context to interact with OpenStack as an administrator."""
     current_context = context.get_current()
     if (current_context and current_context.is_os_admin):
         return current_context
     # TODO(ft): make an authentification token reusable
-    keystone = keystone_client.Client(
+    keystone_client_class = get_keystone_client_class()
+    keystone = keystone_client_class(
         username=CONF.admin_user,
         password=CONF.admin_password,
+        project_name=CONF.admin_tenant_name,
         tenant_name=CONF.admin_tenant_name,
         auth_url=CONF.keystone_url,
     )

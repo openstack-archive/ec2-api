@@ -96,6 +96,10 @@ class EC2APIPasteAppNotFound(EC2APIException):
     msg_fmt = _("Could not load paste app '%(name)s' from %(path)s")
 
 
+class EC2KeystoneDiscoverFailure(EC2APIException):
+    msg_fmt = _("Could not discover keystone versions.")
+
+
 # Internal ec2api metadata exceptions
 
 class EC2MetadataException(EC2APIException):

@@ -213,7 +213,6 @@ Legacy OpenStack release notice
 
 EC2 API supports Havana, Icehouse, Juno with additional limitations:
 
-
 Instance related:
 - rootDeviceName Instance property
 - kernelId Instance property
@@ -237,7 +236,8 @@ EC2 API supports Nova client (>=2.16.0) with no microversion support.
 Additional limitations are the same, except network interfaces'
 deleteOnTermination.
 
-Preferred way to run EC2 API in these releases is to run it in virtual environment:
+
+Preferred way to run EC2 API in older releases is to run it in virtual environment:
 - create virtual environment by running command 'python tools/install_venv.py'
 - run install inside venv 'tools/with_venv.sh ./install.sh'
 - and then you need to run EC2 API services: 'ec2-api', 'ec2-api-metadata'

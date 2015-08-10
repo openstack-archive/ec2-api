@@ -123,13 +123,14 @@ class ClientsTestCase(test_base.BaseTestCase):
         self.assertEqual('fake_token', res.client.auth_token)
         self.assertEqual('cinder_url', res.client.management_url)
 
-    @mock.patch('keystoneclient.v2_0.client.Client')
-    def test_keystone(self, keystone):
+    @mock.patch('ec2api.context.get_keystone_client_class',
+                return_value=mock.Mock(return_value=mock.Mock()))
+    def test_keystone(self, keystone_client_class):
         context = mock.NonCallableMock(
             auth_token='fake_token',
             project_id='fake_project')
         res = clients.keystone(context)
-        self.assertEqual(keystone.return_value, res)
-        keystone.assert_called_with(
+        self.assertEqual(keystone_client_class.return_value.return_value, res)
+        keystone_client_class.return_value.assert_called_with(
             auth_url='keystone_url', token='fake_token',
-            tenant_id='fake_project')
+            tenant_id='fake_project', project_id='fake_project')
