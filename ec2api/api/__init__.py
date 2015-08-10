@@ -233,8 +233,6 @@ class EC2KeystoneAuth(wsgi.Middleware):
             project_id = result['access']['token']['tenant']['id']
             user_name = result['access']['user'].get('name')
             project_name = result['access']['token']['tenant'].get('name')
-            roles = [role['name'] for role
-                     in result['access']['user']['roles']]
         except (AttributeError, KeyError):
             LOG.exception(_("Keystone failure"))
             msg = _("Failure communicating with keystone")
@@ -251,7 +249,6 @@ class EC2KeystoneAuth(wsgi.Middleware):
                                       request_id=request_id,
                                       user_name=user_name,
                                       project_name=project_name,
-                                      roles=roles,
                                       auth_token=token_id,
                                       remote_address=remote_address,
                                       service_catalog=catalog,

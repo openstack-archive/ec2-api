@@ -55,7 +55,7 @@ class RequestContext(context.RequestContext):
     """
 
     def __init__(self, user_id, project_id, request_id=None,
-                 is_admin=None, roles=None, remote_address=None,
+                 is_admin=None, remote_address=None,
                  auth_token=None, user_name=None, project_name=None,
                  overwrite=True, service_catalog=None, api_version=None,
                  is_os_admin=None, **kwargs):
@@ -87,7 +87,6 @@ class RequestContext(context.RequestContext):
 
         self.user_id = user_id
         self.project_id = project_id
-        self.roles = roles or []
         self.remote_address = remote_address
         timestamp = timeutils.utcnow()
         if isinstance(timestamp, six.string_types):
@@ -115,7 +114,6 @@ class RequestContext(context.RequestContext):
             'user_id': getattr(self, 'user_id', None),
             'project_id': getattr(self, 'project_id', None),
             'is_admin': getattr(self, 'is_admin', None),
-            'roles': getattr(self, 'roles', None),
             'remote_address': getattr(self, 'remote_address', None),
             'timestamp': timeutils.strtime(self.timestamp) if hasattr(
                 self, 'timestamp') else None,
