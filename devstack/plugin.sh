@@ -161,8 +161,7 @@ function configure_ec2api {
     mkdir_chown_stack "$EC2API_CONF_DIR"
 
     # Generate ec2api configuration file and configure common parameters.
-    oslo-config-generator --namespace keystonemiddleware.auth_token \
-                          --namespace ec2api \
+    oslo-config-generator --namespace ec2api \
                           --namespace oslo.db \
                           --namespace oslo.messaging \
                           > $EC2API_CONF_FILE
@@ -177,17 +176,6 @@ function configure_ec2api {
 
     # ec2api Api Configuration
     #-------------------------
-
-    # Setup keystone_authtoken section
-    iniset $EC2API_CONF_FILE keystone_authtoken auth_uri "http://${KEYSTONE_AUTH_HOST}:5000/v2.0"
-    iniset $EC2API_CONF_FILE keystone_authtoken auth_host $KEYSTONE_AUTH_HOST
-    iniset $EC2API_CONF_FILE keystone_authtoken auth_port $KEYSTONE_AUTH_PORT
-    iniset $EC2API_CONF_FILE keystone_authtoken auth_protocol $KEYSTONE_AUTH_PROTOCOL
-    iniset $EC2API_CONF_FILE keystone_authtoken cafile $KEYSTONE_SSL_CA
-    iniset $EC2API_CONF_FILE keystone_authtoken admin_tenant_name $SERVICE_TENANT_NAME
-    iniset $EC2API_CONF_FILE keystone_authtoken admin_user $EC2API_ADMIN_USER
-    iniset $EC2API_CONF_FILE keystone_authtoken admin_password $SERVICE_PASSWORD
-    iniset $EC2API_CONF_FILE keystone_authtoken signing_dir $EC2API_KEYSTONE_SIGNING_DIR
 
     iniset $EC2API_CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT_NAME
     iniset $EC2API_CONF_FILE DEFAULT admin_user $EC2API_ADMIN_USER
