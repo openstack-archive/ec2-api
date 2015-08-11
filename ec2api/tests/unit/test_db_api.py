@@ -227,13 +227,27 @@ class DbApiTestCase(base.DbTestCase):
         item = db_api.get_items(self.context, 'fake1')[0]
         other_item = db_api.get_items(self.other_context, 'fake1')[0]
         items_ids = db_api.get_items_ids(self.context, 'fake1',
-                                         [item['os_id'], other_item['os_id']])
+                                         item_os_ids=[item['os_id'],
+                                                      other_item['os_id']])
         self.assertThat(items_ids,
                         matchers.ListMatches(
                             [(item['id'], item['os_id']),
                              (other_item['id'], other_item['os_id'])],
                             orderless_lists=True))
-        items_ids = db_api.get_items_ids(self.context, 'fake', [item['os_id']])
+        items_ids = db_api.get_items_ids(self.context, 'fake',
+                                         item_os_ids=[item['os_id']])
+        self.assertEqual(0, len(items_ids))
+
+        item_ids = db_api.get_items_ids(self.context, 'fake1',
+                                        item_ids=[item['id'],
+                                                  other_item['id']])
+        self.assertThat(item_ids,
+                        matchers.ListMatches(
+                            [(item['id'], item['os_id']),
+                             (other_item['id'], other_item['os_id'])],
+                            orderless_lists=True))
+        items_ids = db_api.get_items_ids(self.context, 'fake',
+                                         item_ids=[item['id']])
         self.assertEqual(0, len(items_ids))
 
     def test_get_public_items(self):
