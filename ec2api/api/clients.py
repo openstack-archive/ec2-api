@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-from keystoneclient.v2_0 import client as kc
 from novaclient import client as novaclient
 from novaclient import exceptions as nova_exception
 from oslo_config import cfg
@@ -135,12 +134,12 @@ def cinder(context):
 
 
 def keystone(context):
-    _keystone = kc.Client(
+    keystone_client_class = ec2_context.get_keystone_client_class()
+    return keystone_client_class(
         token=context.auth_token,
+        project_id=context.project_id,
         tenant_id=context.project_id,
         auth_url=CONF.keystone_url)
-
-    return _keystone
 
 
 def nova_cert(context):
@@ -162,6 +161,9 @@ def _url_for(context, **kwargs):
         for endpoint in service['endpoints']:
             if 'publicURL' in endpoint:
                 return endpoint['publicURL']
+            elif endpoint.get('interface') == 'public':
+                # NOTE(andrey-mp): keystone v3
+                return endpoint['url']
         else:
             return None
 

@@ -228,13 +228,24 @@ class EC2KeystoneAuth(wsgi.Middleware):
         result = response.json()
 
         try:
-            token_id = result['access']['token']['id']
-            user_id = result['access']['user']['id']
-            project_id = result['access']['token']['tenant']['id']
-            user_name = result['access']['user'].get('name')
-            project_name = result['access']['token']['tenant'].get('name')
-            roles = [role['name'] for role
-                     in result['access']['user']['roles']]
+            if 'token' in result:
+                # NOTE(andrey-mp): response from keystone v3
+                token_id = response.headers['x-subject-token']
+                user_id = result['token']['user']['id']
+                project_id = result['token']['project']['id']
+                user_name = result['token']['user'].get('name')
+                project_name = result['token']['project'].get('name')
+                roles = []
+                catalog = result['token']['catalog']
+            else:
+                token_id = result['access']['token']['id']
+                user_id = result['access']['user']['id']
+                project_id = result['access']['token']['tenant']['id']
+                user_name = result['access']['user'].get('name')
+                project_name = result['access']['token']['tenant'].get('name')
+                roles = [role['name'] for role
+                         in result['access']['user']['roles']]
+                catalog = result['access']['serviceCatalog']
         except (AttributeError, KeyError):
             LOG.exception(_("Keystone failure"))
             msg = _("Failure communicating with keystone")
@@ -246,7 +257,6 @@ class EC2KeystoneAuth(wsgi.Middleware):
             remote_address = req.headers.get('X-Forwarded-For',
                                              remote_address)
 
-        catalog = result['access']['serviceCatalog']
         ctxt = context.RequestContext(user_id, project_id,
                                       user_name=user_name,
                                       project_name=project_name,

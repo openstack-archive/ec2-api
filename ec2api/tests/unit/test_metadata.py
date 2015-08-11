@@ -332,17 +332,19 @@ class ProxyTestCase(test_base.BaseTestCase):
         self.handler._unpack_request_attributes(req)
         self.assertEqual(1, constant_time_compare.call_count)
 
-    @mock.patch('keystoneclient.v2_0.client.Client')
+    @mock.patch('ec2api.context.get_keystone_client_class')
     @mock.patch('novaclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     @mock.patch('ec2api.metadata.api.instance_api')
-    def test_get_metadata(self, instance_api, db_api, nova, keystone):
+    def test_get_metadata(self, instance_api, db_api, nova,
+                          keystone_client_class):
         service_catalog = mock.MagicMock()
         service_catalog.get_data.return_value = []
-        keystone.return_value = mock.Mock(auth_user_id='fake_user_id',
-                                          auth_tenant_id='fake_project_id',
-                                          auth_token='fake_token',
-                                          service_catalog=service_catalog)
+        keystone_client_class.return_value.return_value = mock.Mock(
+            auth_user_id='fake_user_id',
+            auth_tenant_id='fake_project_id',
+            auth_token='fake_token',
+            service_catalog=service_catalog)
         nova.return_value.fixed_ips.get.return_value = (
                 mock.Mock(hostname='fake_name'))
         nova.return_value.servers.list.return_value = [
