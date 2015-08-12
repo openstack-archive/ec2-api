@@ -113,8 +113,7 @@ class SnapshotTestCase(base.ApiTestCase):
         self.assertThat(fakes.EC2_SNAPSHOT_1, matchers.DictMatches(resp))
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'snap',
-            tools.purge_dict(fakes.DB_SNAPSHOT_1, ('id',)),
-            project_id=None)
+            tools.purge_dict(fakes.DB_SNAPSHOT_1, ('id',)))
 
         self.cinder.volume_snapshots.create.assert_called_once_with(
             fakes.ID_OS_VOLUME_2, force=True, display_description=None)

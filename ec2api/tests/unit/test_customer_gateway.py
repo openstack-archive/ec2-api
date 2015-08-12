@@ -34,8 +34,7 @@ class CustomerGatewayTestCase(base.ApiTestCase):
                          resp)
         self.db_api.add_item.assert_called_once_with(
                 mock.ANY, 'cgw',
-                {'ip_address': fakes.IP_CUSTOMER_GATEWAY_ADDRESS_2},
-                project_id=None)
+                {'ip_address': fakes.IP_CUSTOMER_GATEWAY_ADDRESS_2})
 
         resp = self.execute('CreateCustomerGateway',
                             {'IpAddress': fakes.IP_CUSTOMER_GATEWAY_ADDRESS_2,

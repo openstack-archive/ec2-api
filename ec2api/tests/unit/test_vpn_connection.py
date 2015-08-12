@@ -68,8 +68,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
                                         'os_ipsec_site_connections': {}})
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'vpn',
-            tools.purge_dict(new_vpn_connection_1, ('id', 'vpc_id', 'os_id')),
-            project_id=None)
+            tools.purge_dict(new_vpn_connection_1, ('id', 'vpc_id', 'os_id')))
         self.neutron.update_ikepolicy.assert_called_once_with(
             fakes.ID_OS_IKEPOLICY_1,
             {'ikepolicy': {'name': fakes.ID_EC2_VPN_CONNECTION_1}})

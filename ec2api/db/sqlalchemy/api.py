@@ -90,12 +90,10 @@ def _new_id(kind):
 
 
 @require_context
-def add_item(context, kind, data, project_id=None):
-    if not project_id:
-        project_id = context.project_id
+def add_item(context, kind, data):
     item_ref = models.Item()
     item_ref.update({
-        "project_id": project_id,
+        "project_id": context.project_id,
         "id": _new_id(kind),
     })
     item_ref.update(_pack_item_data(data))
@@ -107,14 +105,14 @@ def add_item(context, kind, data, project_id=None):
             raise
         item_ref = (model_query(context, models.Item).
                     filter_by(os_id=data["os_id"]).
-                    filter(or_(models.Item.project_id == project_id,
+                    filter(or_(models.Item.project_id == context.project_id,
                                models.Item.project_id.is_(None))).
                     filter(models.Item.id.like('%s-%%' % kind)).
                     one())
         item_data = _unpack_item_data(item_ref)
         item_data.update(data)
         item_ref.update(_pack_item_data(item_data))
-        item_ref.project_id = project_id
+        item_ref.project_id = context.project_id
         item_ref.save()
     return _unpack_item_data(item_ref)
 

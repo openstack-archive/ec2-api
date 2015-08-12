@@ -125,8 +125,7 @@ class ImageTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': image_id,
                               'is_public': False,
-                              'description': 'fake desc'},
-            project_id=None)
+                              'description': 'fake desc'})
         if not no_reboot:
             os_instance.stop.assert_called_once_with()
             os_instance.get.assert_called_once_with()
@@ -205,8 +204,7 @@ class ImageTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'ami', {'os_id': fakes.ID_OS_IMAGE_2,
                               'is_public': False,
-                              'description': None},
-            project_id=None)
+                              'description': None})
         self.assertEqual(1, self.glance.images.create.call_count)
         self.assertEqual((), self.glance.images.create.call_args[0])
         self.assertIn('properties', self.glance.images.create.call_args[1])

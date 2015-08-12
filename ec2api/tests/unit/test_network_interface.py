@@ -41,8 +41,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                             matchers.DictMatches(resp['networkInterface']))
             self.db_api.add_item.assert_called_once_with(
                 mock.ANY, 'eni',
-                tools.purge_dict(fakes.DB_NETWORK_INTERFACE_1, ('id',)),
-                project_id=None)
+                tools.purge_dict(fakes.DB_NETWORK_INTERFACE_1, ('id',)))
             if auto_ips:
                 self.neutron.create_port.assert_called_once_with(
                     {'port':
@@ -129,8 +128,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
                                   'device_index',
                                   'instance_id',
                                   'delete_on_termination',
-                                  'attach_time')),
-                project_id=None)
+                                  'attach_time')))
             self.neutron.update_port.assert_called_once_with(
                 fakes.ID_OS_PORT_2,
                 {'port': {'name':

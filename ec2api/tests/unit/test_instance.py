@@ -128,8 +128,7 @@ class InstanceTestCase(base.ApiTestCase):
                 nics=[{'port-id': fakes.ID_OS_PORT_1}],
                 key_name=None, userdata=None)
             self.db_api.add_item.assert_called_once_with(
-                mock.ANY, 'i', tools.purge_dict(fakes.DB_INSTANCE_1, ('id',)),
-                project_id=None)
+                mock.ANY, 'i', tools.purge_dict(fakes.DB_INSTANCE_1, ('id',)))
             (self.network_interface_api.
              _attach_network_interface_item.assert_called_once_with(
                  mock.ANY, fakes.DB_NETWORK_INTERFACE_1,
@@ -270,8 +269,7 @@ class InstanceTestCase(base.ApiTestCase):
                  [0, 1] * 2,
                  [True, False, True, False])]))
         self.db_api.add_item.assert_has_calls([
-            mock.call(mock.ANY, 'i', tools.purge_dict(db_instance, ['id']),
-                      project_id=None)
+            mock.call(mock.ANY, 'i', tools.purge_dict(db_instance, ['id']))
             for db_instance in self.DB_INSTANCES])
 
     @mock.patch('ec2api.api.instance._parse_block_device_mapping')
@@ -330,7 +328,7 @@ class InstanceTestCase(base.ApiTestCase):
                            'client_token': 'fake_client_token'}
             db_instance.update(extra_db_instance)
             self.db_api.add_item.assert_called_once_with(
-                mock.ANY, 'i', db_instance, project_id=None)
+                mock.ANY, 'i', db_instance)
             self.db_api.reset_mock()
             parse_block_device_mapping.assert_called_once_with(
                 mock.ANY,
@@ -1720,10 +1718,9 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             fake_context, instance, os_instance, [], {},
             None, None, fake_flavors, [])
         db_api.add_item_id.assert_has_calls(
-            [mock.call(mock.ANY, 'ami', os_instance.image['id'],
-                       project_id=None),
-             mock.call(mock.ANY, 'aki', kernel_id, project_id=None),
-             mock.call(mock.ANY, 'ari', ramdisk_id, project_id=None)],
+            [mock.call(mock.ANY, 'ami', os_instance.image['id'], None),
+             mock.call(mock.ANY, 'aki', kernel_id, None),
+             mock.call(mock.ANY, 'ari', ramdisk_id, None)],
             any_order=True)
 
     @mock.patch('cinderclient.client.Client')
