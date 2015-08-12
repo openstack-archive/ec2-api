@@ -308,9 +308,16 @@ class ImageDescriber(common.TaggableItemsDescriber):
     def auto_update_db(self, image, os_image):
         if not image:
             kind = _get_os_image_kind(os_image)
-            image = ec2utils.get_db_item_by_os_id(
-                self.context, kind, os_image.id, self.items_dict,
-                os_image=os_image, project_id=os_image.owner)
+            if self.context.project_id == os_image.owner:
+                image = ec2utils.get_db_item_by_os_id(
+                    self.context, kind, os_image.id, self.items_dict,
+                    os_image=os_image)
+            else:
+                image_id = ec2utils.os_id_to_ec2_id(
+                    self.context, kind, os_image.id,
+                    items_by_os_id=self.items_dict, ids_by_os_id=self.ids_dict)
+                image = {'id': image_id,
+                         'os_id': os_image.id}
         elif (self.context.project_id == os_image.owner and
                 image.get('is_public') != os_image.is_public):
             image['is_public'] = os_image.is_public
