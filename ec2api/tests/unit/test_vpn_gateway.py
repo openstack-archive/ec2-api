@@ -45,8 +45,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
         resp = self.execute('CreateVpnGateway',
                             {'Type': 'ipsec.1'})
         self.assertEqual({'vpnGateway': fakes.EC2_VPN_GATEWAY_2}, resp)
-        self.db_api.add_item.assert_called_once_with(
-            mock.ANY, 'vgw', {}, project_id=None)
+        self.db_api.add_item.assert_called_once_with(mock.ANY, 'vgw', {})
 
     @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections',
                 wraps=vpn_connection_api._reset_vpn_connections)

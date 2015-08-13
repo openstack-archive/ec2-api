@@ -64,8 +64,7 @@ class AddressTestCase(base.ApiTestCase):
         self.db_api.add_item.assert_called_once_with(
             mock.ANY, 'eipalloc',
             tools.purge_dict(fakes.DB_ADDRESS_1,
-                             ('id', 'vpc_id')),
-            project_id=None)
+                             ('id', 'vpc_id')))
         self.neutron.create_floatingip.assert_called_once_with(
             {'floatingip': {
                 'floating_network_id':

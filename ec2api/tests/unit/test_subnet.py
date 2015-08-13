@@ -44,8 +44,7 @@ class SubnetTestCase(base.ApiTestCase):
                     resp['subnet']))
             self.db_api.add_item.assert_called_once_with(
                     mock.ANY, 'subnet',
-                    tools.purge_dict(subnet_1, ('id',)),
-                    project_id=None)
+                    tools.purge_dict(subnet_1, ('id',)))
             self.neutron.create_network.assert_called_once_with(
                     {'network': {}})
             self.neutron.update_network.assert_called_once_with(
