@@ -240,36 +240,26 @@ class EC2UtilsTestCase(testtools.TestCase):
 
         os_image = fakes.OSImage(fakes.OS_IMAGE_1)
         glance.images.get.return_value = os_image
-        # NOTE(ft): check normal flow for an user owned image
-        db_api.get_public_items.return_value = []
-        db_api.get_item_by_id.return_value = fakes.DB_IMAGE_1
+        # check normal flow
+        db_api.get_items_ids.return_value = [
+            (fakes.ID_EC2_IMAGE_1, fakes.ID_OS_IMAGE_1)]
         self.assertEqual(
             os_image,
             ec2utils.get_os_image(fake_context, fakes.ID_EC2_IMAGE_1))
-        db_api.get_item_by_id.assert_called_with(
-            mock.ANY, fakes.ID_EC2_IMAGE_1)
+        db_api.get_items_ids.assert_called_with(
+            mock.ANY, 'ami', item_ids=(fakes.ID_EC2_IMAGE_1,),
+            item_os_ids=None)
         glance.images.get.assert_called_with(fakes.ID_OS_IMAGE_1)
 
-        # NOTE(ft): check normal flow for a public image
-        db_api.get_public_items.return_value = [fakes.DB_IMAGE_1]
-        db_api.get_item_by_id.return_value = None
-        self.assertEqual(
-            os_image,
-            ec2utils.get_os_image(fake_context, fakes.ID_EC2_IMAGE_1))
-        db_api.get_public_items.assert_called_with(
-            mock.ANY, 'ami', (fakes.ID_EC2_IMAGE_1,))
-        glance.images.get.assert_called_with(fakes.ID_OS_IMAGE_1)
-
-        # NOTE(ft): check case of absence of an image in OS
+        # check case of absence of an image in OS
         glance.images.get.side_effect = glance_exception.HTTPNotFound()
         self.assertRaises(
             exception.InvalidAMIIDNotFound,
             ec2utils.get_os_image,
             fake_context, fakes.ID_EC2_IMAGE_1)
 
-        # NOTE(ft): check case of an unknown image id
-        db_api.get_public_items.return_value = []
-        db_api.get_item_by_id.return_value = None
+        # check case of an unknown image id
+        db_api.get_items_ids.return_value = []
         self.assertRaises(
             exception.InvalidAMIIDNotFound,
             ec2utils.get_os_image,

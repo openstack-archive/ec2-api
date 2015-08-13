@@ -278,3 +278,30 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
 
     def test_describe_new_instance_then_its_alien_image(self):
         self._test_describe_new_instance_then_its_image(fakes.random_os_id())
+
+    def test_describe_new_instance_then_its_alien_image_attribute(self):
+        os_instance_id = fakes.random_os_id()
+        os_image_id = fakes.random_os_id()
+        alien_project_id = fakes.random_os_id()
+        os_instance = {
+            'id': os_instance_id,
+            'flavor': {'id': 'fake'},
+            'image': {'id': os_image_id},
+        }
+        os_image = {
+            'id': os_image_id,
+            'owner': alien_project_id,
+            'is_public': True,
+        }
+        self.nova_admin.servers.list.return_value = [
+            fakes.OSInstance_full(os_instance)]
+        self.glance.images.get.return_value = fakes.OSImage(os_image)
+
+        reservations = instance_api.describe_instances(self.context)
+        instance = reservations['reservationSet'][0]['instancesSet'][0]
+        image_id = instance['imageId']
+
+        # NOTE(ft): ensure that InvalidAMIID.NotFound is not raised
+        self.assertRaises(exception.AuthFailure,
+                          image_api.describe_image_attribute,
+                          self.context, image_id, 'description')
