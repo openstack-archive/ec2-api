@@ -14,11 +14,11 @@
 
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_utils import netutils
 
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api import exception
-from ec2api import utils
 
 
 availability_zone_opts = [
@@ -26,7 +26,7 @@ availability_zone_opts = [
                default='internal',
                help='The availability_zone to show internal services under'),
     cfg.StrOpt('my_ip',
-               default=utils._get_my_ip(),
+               default=netutils.get_my_ipv4(),
                help='IP address of this host'),
     cfg.StrOpt('ec2_host',
                default='$my_ip',
