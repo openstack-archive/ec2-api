@@ -97,9 +97,17 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
         aki_image = next(i for i in images['imagesSet']
                          if i['imageType'] == 'kernel')
         self.assertEqual(image_project_id, image['imageOwnerId'])
-        self.assert_image_project(image_project_id, image['imageId'])
+        self.assert_image_project(
+            (image_project_id
+             if image_project_id == fakes.ID_OS_PROJECT else
+             None),
+            image['imageId'])
         self.assertEqual(aki_image_project_id, aki_image['imageOwnerId'])
-        self.assert_image_project(aki_image_project_id, aki_image['imageId'])
+        self.assert_image_project(
+            (aki_image_project_id
+             if aki_image_project_id == fakes.ID_OS_PROJECT else
+             None),
+            aki_image['imageId'])
 
     def test_describe_new_alien_images(self):
         alien_project_id = fakes.random_os_id()
@@ -233,7 +241,7 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
             bdm_image_project_id=alien_project_id)
         image_id = self._find_snapshot_id_in_bdm(image, '/dev/vdi')
         image_api.describe_images(self.context, image_id=[image_id])
-        self.assert_image_project(alien_project_id, image_id)
+        self.assert_image_project(None, image_id)
 
     def test_describe_new_alien_bdm_image_from_new_alien_image(self):
         alien_project_id = fakes.random_os_id()
@@ -242,7 +250,7 @@ class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
             bdm_image_project_id=alien_project_id)
         image_id = self._find_snapshot_id_in_bdm(image, '/dev/vdi')
         image_api.describe_images(self.context, image_id=[image_id])
-        self.assert_image_project(alien_project_id, image_id)
+        self.assert_image_project(None, image_id)
 
     def _test_describe_new_instance_then_its_image(self, image_project_id):
         os_instance_id = fakes.random_os_id()
