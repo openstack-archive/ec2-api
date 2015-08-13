@@ -590,9 +590,7 @@ class S3TestCase(base.ApiTestCase):
     # its feature optimally
 
     def test_s3_parse_manifest(self):
-        self.db_api.get_public_items.side_effect = [
-                [fakes.DB_IMAGE_AKI_1],
-                [fakes.DB_IMAGE_ARI_1]]
+        self.set_mock_db_items(fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
         self.db_api.get_item_by_id.return_value = None
         self.glance.images.get.side_effect = (
             tools.get_by_1st_arg_getter({
@@ -620,10 +618,12 @@ class S3TestCase(base.ApiTestCase):
                         matchers.ListMatches(['foo']))
         self.assertEqual('foo', key)
         self.assertEqual('foo', iv)
-        self.db_api.get_public_items.assert_any_call(
-            mock.ANY, 'aki', (fakes.ID_EC2_IMAGE_AKI_1,))
-        self.db_api.get_public_items.assert_any_call(
-            mock.ANY, 'ari', (fakes.ID_EC2_IMAGE_ARI_1,))
+        self.db_api.get_items_ids.assert_any_call(
+            mock.ANY, 'aki', item_ids=(fakes.ID_EC2_IMAGE_AKI_1,),
+            item_os_ids=None)
+        self.db_api.get_items_ids.assert_any_call(
+            mock.ANY, 'ari', item_ids=(fakes.ID_EC2_IMAGE_ARI_1,),
+            item_os_ids=None)
 
     @mock.patch.object(fakes.OSImage, 'update', autospec=True)
     def test_s3_create_image_locations(self, osimage_update):

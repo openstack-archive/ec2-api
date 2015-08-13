@@ -380,12 +380,13 @@ def os_id_to_ec2_id(context, kind, os_id, items_by_os_id=None,
 
 def get_os_image(context, ec2_image_id):
     kind = get_ec2_id_kind(ec2_image_id)
-    images = db_api.get_public_items(context, kind, (ec2_image_id,))
-    image = (images[0] if len(images) else
-             get_db_item(context, ec2_image_id))
+    ids = db_api.get_items_ids(context, kind, item_ids=(ec2_image_id,))
+    if not ids:
+        raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
+    _id, os_id = ids[0]
     glance = clients.glance(context)
     try:
-        return glance.images.get(image['os_id'])
+        return glance.images.get(os_id)
     except glance_exception.HTTPNotFound:
         raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
 
