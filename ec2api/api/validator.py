@@ -209,11 +209,7 @@ def validate_security_group_str(value, parameter_name, vpc_id=None):
                parameter_name)
     if not val:
         msg = _("Security group %s cannot be empty.") % parameter_name
-    elif allowed and not re.match(allowed, val):
-        # Some validation to ensure that values match API spec.
-        # - Alphanumeric characters, spaces, dashes, and underscores.
-        # TODO(Daviey): LP: #813685 extend beyond group_name checking, and
-        #  probably create a param validator that can be used elsewhere.
+    elif not re.match(allowed, val):
         msg = (_("Specified value for parameter Group%(property)s is "
                  "invalid. Content limited to '%(allowed)s'.") %
                {'allowed': 'allowed',
