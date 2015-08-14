@@ -18,6 +18,7 @@ import json
 import os
 import tempfile
 
+from cinderclient import exceptions as cinder_exception
 import eventlet
 import mock
 from oslotest import base as test_base
@@ -182,9 +183,14 @@ class ImageTestCase(base.ApiTestCase):
     def test_register_image_by_bdm(self, get_os_image):
         self.glance.images.create.return_value = (
             fakes.OSImage(fakes.OS_IMAGE_2))
+        self.cinder.volume_snapshots.get.side_effect = (
+            tools.get_by_1st_arg_getter(
+                {fakes.ID_OS_SNAPSHOT_1: (
+                    fakes.OSSnapshot(fakes.OS_SNAPSHOT_1))},
+                notfound_exception=cinder_exception.NotFound(404)))
         self.db_api.add_item.side_effect = (
             tools.get_db_api_add_item(fakes.ID_EC2_IMAGE_2))
-        self.set_mock_db_items(fakes.DB_SNAPSHOT_1,
+        self.set_mock_db_items(fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
                                fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
         get_os_image.side_effect = [fakes.OSImage(fakes.OS_IMAGE_AKI_1),
                                     fakes.OSImage(fakes.OS_IMAGE_ARI_1)]
@@ -199,7 +205,13 @@ class ImageTestCase(base.ApiTestCase):
              'BlockDeviceMapping.1.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1,
              'BlockDeviceMapping.2.DeviceName': '/dev/vdf',
              'BlockDeviceMapping.2.Ebs.VolumeSize': '100',
-             'BlockDeviceMapping.2.Ebs.DeleteOnTermination': 'False'})
+             'BlockDeviceMapping.2.Ebs.DeleteOnTermination': 'False',
+             'BlockDeviceMapping.3.DeviceName': '/dev/vdg',
+             'BlockDeviceMapping.3.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_1,
+             'BlockDeviceMapping.3.Ebs.VolumeSize': '55',
+             'BlockDeviceMapping.3.Ebs.DeleteOnTermination': 'True',
+             'BlockDeviceMapping.4.DeviceName': '/dev/vdh',
+             'BlockDeviceMapping.4.Ebs.SnapshotId': fakes.ID_EC2_SNAPSHOT_2})
         self.assertThat(resp, matchers.DictMatches(
             {'imageId': fakes.ID_EC2_IMAGE_2}))
         self.db_api.add_item.assert_called_once_with(
@@ -229,17 +241,33 @@ class ImageTestCase(base.ApiTestCase):
                            'destination_type': 'volume',
                            'device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
                            'source_type': 'snapshot',
-                           'snapshot_id': fakes.ID_OS_SNAPSHOT_1},
+                           'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                           'volume_size': 1},
                           {'boot_index': -1,
                            'delete_on_termination': False,
                            'destination_type': 'volume',
                            'device_name': '/dev/vdf',
                            'source_type': 'blank',
-                           'volume_size': 100}],
+                           'volume_size': 100},
+                          {'boot_index': -1,
+                           'delete_on_termination': True,
+                           'destination_type': 'volume',
+                           'device_name': '/dev/vdg',
+                           'source_type': 'snapshot',
+                           'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                           'volume_size': 55},
+                          {'boot_index': -1,
+                           'delete_on_termination': True,
+                           'destination_type': 'volume',
+                           'device_name': '/dev/vdh',
+                           'source_type': 'snapshot',
+                           'snapshot_id': fakes.ID_OS_SNAPSHOT_2}],
                          json.loads(bdm))
         get_os_image.assert_has_calls(
             [mock.call(mock.ANY, fakes.ID_EC2_IMAGE_AKI_1),
              mock.call(mock.ANY, fakes.ID_EC2_IMAGE_ARI_1)])
+        self.cinder.volume_snapshots.get.assert_any_call(
+            fakes.ID_OS_SNAPSHOT_1)
 
     def test_register_image_invalid_parameters(self):
         self.assert_execution_error(

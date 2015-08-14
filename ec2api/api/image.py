@@ -22,6 +22,7 @@ import tempfile
 import time
 
 import boto.s3.connection
+from cinderclient import exceptions as cinder_exception
 import eventlet
 from glanceclient.common import exceptions as glance_exception
 from lxml import etree
@@ -185,6 +186,7 @@ def register_image(context, name=None, image_location=None,
             metadata['name'] = image_location
     if root_device_name:
         properties['root_device_name'] = root_device_name
+    cinder = clients.cinder(context)
     if block_device_mapping:
         mappings = instance_api._parse_block_device_mapping(
             context, block_device_mapping)
@@ -192,8 +194,19 @@ def register_image(context, name=None, image_location=None,
         short_root_device_name = (
             ec2utils.block_device_strip_dev(root_device_name))
         for bdm in mappings:
-            instance_api._populate_parsed_bdm_parameter(bdm,
-                                                        short_root_device_name)
+            instance_api._populate_parsed_bdm_parameter(
+                bdm, short_root_device_name)
+            if 'volume_size' in bdm:
+                continue
+            try:
+                if bdm['source_type'] == 'snapshot':
+                    snapshot = cinder.volume_snapshots.get(bdm['snapshot_id'])
+                    bdm['volume_size'] = snapshot.size
+                elif bdm['source_type'] == 'volume':
+                    volume = cinder.volumes.get(bdm['volume_id'])
+                    bdm['volume_size'] = volume.size
+            except cinder_exception.NotFound:
+                pass
         properties['bdm_v2'] = True
         properties['block_device_mapping'] = json.dumps(mappings)
     if architecture is not None:
