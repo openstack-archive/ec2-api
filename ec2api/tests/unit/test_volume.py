@@ -67,6 +67,7 @@ class VolumeTestCase(base.ApiTestCase):
              ('volume-id', fakes.ID_EC2_VOLUME_1),
              # TODO(ft): support filtering by none/empty value
              # ('volume-type', ''),
+             ('attachment.delete-on-termination', False),
              ('attachment.device', fakes.ROOT_DEVICE_NAME_INSTANCE_2),
              ('attachment.instance-id', fakes.ID_EC2_INSTANCE_2),
              ('attachment.status', 'attached')])

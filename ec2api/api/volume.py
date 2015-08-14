@@ -119,17 +119,20 @@ class VolumeDescriber(common.TaggableItemsDescriber):
 
     KIND = 'vol'
     SORT_KEY = 'volumeId'
-    FILTER_MAP = {'availability-zone': 'availabilityZone',
-                  'create-time': 'createTime',
-                  'encrypted': 'encrypted',
-                  'size': 'size',
-                  'snapshot-id': 'snapshotId',
-                  'status': 'status',
-                  'volume-id': 'volumeId',
-                  'volume-type': 'volumeType',
-                  'attachment.device': ['attachmentSet', 'device'],
-                  'attachment.instance-id': ['attachmentSet', 'instanceId'],
-                  'attachment.status': ['attachmentSet', 'status']}
+    FILTER_MAP = {
+        'availability-zone': 'availabilityZone',
+        'create-time': 'createTime',
+        'encrypted': 'encrypted',
+        'size': 'size',
+        'snapshot-id': 'snapshotId',
+        'status': 'status',
+        'volume-id': 'volumeId',
+        'volume-type': 'volumeType',
+        'attachment.delete-on-termination':
+            ['attachmentSet', 'deleteOnTermination'],
+        'attachment.device': ['attachmentSet', 'device'],
+        'attachment.instance-id': ['attachmentSet', 'instanceId'],
+        'attachment.status': ['attachmentSet', 'status']}
 
     def format(self, volume, os_volume):
         return _format_volume(self.context, volume, os_volume,
