@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import copy
 import json
 import os
@@ -628,14 +629,12 @@ class S3TestCase(base.ApiTestCase):
         self.configure(image_decryption_dir=None)
         _handle, tempf = tempfile.mkstemp()
         fake_context = base.create_context()
-        with mock.patch(
-                'ec2api.api.image._s3_conn') as s3_conn, mock.patch(
-                'ec2api.api.image._s3_download_file'
-                     ) as s3_download_file, mock.patch(
-                'ec2api.api.image._s3_decrypt_image'
-                     ) as s3_decrypt_image, mock.patch(
-                'ec2api.api.image._s3_untarzip_image'
-                     ) as s3_untarzip_image:
+        with contextlib.nested(
+            mock.patch('ec2api.api.image._s3_conn'),
+            mock.patch('ec2api.api.image._s3_download_file'),
+            mock.patch('ec2api.api.image._s3_decrypt_image'),
+            mock.patch('ec2api.api.image._s3_untarzip_image')
+        ) as (s3_conn, s3_download_file, s3_decrypt_image, s3_untarzip_image):
 
             (s3_conn.return_value.
              get_bucket.return_value.
@@ -688,8 +687,7 @@ class S3TestCase(base.ApiTestCase):
                             {'device_name': '/dev/sdb0',
                              'no_device': True}]}}
         fake_context = base.create_context()
-        with mock.patch(
-                'ec2api.api.image._s3_conn') as s3_conn:
+        with mock.patch('ec2api.api.image._s3_conn') as s3_conn:
 
             (s3_conn.return_value.
              get_bucket.return_value.
