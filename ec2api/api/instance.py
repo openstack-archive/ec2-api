@@ -686,7 +686,7 @@ def _modify_instance_type(context, instance, instance_type):
     # 1. current code returns HTTP 500 code if time is out. client retries
     # query. code can detect that resizing in progress and wait again.
     # 2. make this operation async by some way...
-    for dummy in xrange(60):
+    for dummy in xrange(45):
         os_instance = nova.servers.get(os_instance)
         vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
         if vm_state == vm_states_RESIZED:
@@ -698,6 +698,12 @@ def _modify_instance_type(context, instance, instance_type):
         raise exception.EC2APIException(
             message=_('Time is out for instance resizing'))
     os_instance.confirm_resize()
+    for dummy in xrange(15):
+        os_instance = nova.servers.get(os_instance)
+        vm_state = getattr(os_instance, 'OS-EXT-STS:vm_state')
+        if vm_state != vm_states_RESIZED:
+            break
+        time.sleep(1)
 
 
 def reset_instance_attribute(context, instance_id, attribute):
