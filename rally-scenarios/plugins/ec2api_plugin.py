@@ -13,29 +13,36 @@
 import functools
 
 from rally.common import log as logging
-from rally.task.scenarios import base
+from rally.plugins.openstack import scenario
+from rally.task import atomic
 
 from ec2api.tests.functional import botocoreclient
 
 LOG = logging.getLogger(__name__)
 
 
-class AtomicActionWithoutFirst(base.AtomicAction):
+_count_args = dict()
+
+
+class ActionTimerWithoutFirst(atomic.ActionTimer):
 
     def __init__(self, scenario_instance, name):
-        super(AtomicActionWithoutFirst, self).__init__(scenario_instance, name)
+        super(ActionTimerWithoutFirst, self).__init__(scenario_instance, name)
         self.scenario_instance = scenario_instance
         self.name = name
 
     def __exit__(self, type, value, tb):
-        args = self.scenario_instance.context['user']['ec2args']
-        if self.name in args:
-            super(AtomicActionWithoutFirst, self).__exit__(type, value, tb)
+        if self.name in _count_args:
+            super(ActionTimerWithoutFirst, self).__exit__(type, value, tb)
         else:
-            args[self.name] = True
+            _count_args[self.name] = True
 
 
-class EC2APIPlugin(base.Scenario):
+class EC2APIPlugin(scenario.OpenStackScenario):
+
+    def __init__(self, *args, **kwargs):
+        super(EC2APIPlugin, self).__init__(*args, **kwargs)
+        count_args = dict()
 
     def _get_client(self, is_nova):
         args = self.context['user']['ec2args']
@@ -46,15 +53,15 @@ class EC2APIPlugin(base.Scenario):
 
     def _run_both(self, base_name, func):
         client = self._get_client(True)
-        with AtomicActionWithoutFirst(self, base_name + '_nova'):
+        with ActionTimerWithoutFirst(self, base_name + '_nova'):
             func(self, client)
         client = self._get_client(False)
-        with AtomicActionWithoutFirst(self, base_name + '_ec2api'):
+        with ActionTimerWithoutFirst(self, base_name + '_ec2api'):
             func(self, client)
 
     def _run_ec2(self, base_name, func):
         client = self._get_client(False)
-        with AtomicActionWithoutFirst(self, base_name + '_ec2api'):
+        with ActionTimerWithoutFirst(self, base_name + '_ec2api'):
             func(self, client)
 
     def _runner(run_func):
@@ -65,54 +72,54 @@ class EC2APIPlugin(base.Scenario):
             return runner
         return wrap
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_both)
     def describe_instances(self, client):
         data = client.describe_instances()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_both)
     def describe_addresses(self, client):
         data = client.describe_addresses()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_both)
     def describe_security_groups(self, client):
         data = client.describe_security_groups()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_both)
     def describe_regions(self, client):
         data = client.describe_regions()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_both)
     def describe_images(self, client):
         data = client.describe_images()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_ec2)
     def describe_vpcs(self, client):
         data = client.describe_vpcs()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_ec2)
     def describe_subnets(self, client):
         data = client.describe_subnets()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_ec2)
     def describe_network_interfaces(self, client):
         data = client.describe_network_interfaces()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_ec2)
     def describe_route_tables(self, client):
         data = client.describe_route_tables()
 
     _instance_id_by_client = dict()
 
-    @base.scenario()
+    @scenario.configure()
     @_runner(_run_both)
     def describe_one_instance(self, client):
         client_id = str(client._endpoint)
@@ -128,7 +135,7 @@ class EC2APIPlugin(base.Scenario):
 
         data = client.describe_instances(InstanceIds=[instance_id])
 
-    @base.scenario()
+    @scenario.configure()
     def describe_all_in_one(self):
         self.describe_addresses()
         self.describe_instances()
@@ -139,7 +146,7 @@ class EC2APIPlugin(base.Scenario):
         self.describe_network_interfaces()
         self.describe_route_tables()
 
-    @base.scenario()
+    @scenario.configure()
     def describe_networks(self):
         self.describe_vpcs()
         self.describe_subnets()
