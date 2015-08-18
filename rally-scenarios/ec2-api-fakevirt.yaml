@@ -10,7 +10,7 @@
           tenants: 1
           users_per_tenant: 1
         prepare_ec2_client:
-        ec2_servers:
+        ec2api_servers:
           flavor: "m1.nano"
           image: "*cirros*"
           servers_per_tenant: 200
@@ -27,7 +27,7 @@
           tenants: 1
           users_per_tenant: 1
         prepare_ec2_client:
-        ec2_servers:
+        ec2api_servers:
           flavor: "m1.nano"
           image: "*cirros*"
           servers_per_tenant: 200
@@ -49,7 +49,7 @@
 #          tenants: 1
 #          users_per_tenant: 1
 #        prepare_ec2_client:
-#        ec2_networks:
+#        ec2api_networks:
 #          subnets_per_tenant: 50
 #          nis_per_subnet: 10
 

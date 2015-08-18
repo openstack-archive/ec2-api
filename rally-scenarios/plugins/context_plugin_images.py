@@ -18,7 +18,6 @@ from rally.common import utils as rutils
 from rally import consts
 from rally import osclients
 from rally.task import context
-from rally.task.scenarios import base as scenario_base
 
 
 LOG = logging.getLogger(__name__)
@@ -60,7 +59,7 @@ class FakeImageGenerator(context.Context):
             current_images = []
             for i in range(images_per_tenant):
                 kw = {
-                    "name": scenario_base.Scenario._generate_random_name(),
+                    "name": "image-" + tenant_id[0:8] + "-" + str(i),
                     "container_format": container_format,
                     "disk_format": disk_format,
                     "size": 1000000,

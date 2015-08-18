@@ -95,6 +95,17 @@ class EC2Objects(context.Context):
             data = client.attach_internet_gateway(VpcId=vpc_id,
                                                   InternetGatewayId=gw_id)
 
+            data = client.describe_route_tables(
+                Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])
+            # len(data['RouteTables']) should be 1
+            route_table_id = data['RouteTables'][0]['RouteTableId']
+            kwargs = {
+                'DestinationCidrBlock': '0.0.0.0/0',
+                'RouteTableId': route_table_id,
+                'GatewayId': gw_id
+            }
+            client.create_route(*[], **kwargs)
+
         return subnet_id
 
     def assign_floating_ips(self, tenant_id, client):
@@ -115,12 +126,6 @@ class EC2Objects(context.Context):
         data = client.allocate_address(*[], **kwargs)
         alloc_id = data.get('AllocationId')
         public_ip = data['PublicIp']
-        if is_vpc:
-            self.context["tenants"][tenant_id]["addresses"].append(
-                {'AllocationId': alloc_id})
-        else:
-            self.context["tenants"][tenant_id]["addresses"].append(
-                {'PublicIp': public_ip})
 
         kwargs = {'InstanceId': instance_id}
         if is_vpc:
@@ -129,12 +134,12 @@ class EC2Objects(context.Context):
             kwargs['PublicIp'] = public_ip
         try:
             data = client.associate_address(*[], **kwargs)
+            kwargs.pop('InstanceId')
+            self.context["tenants"][tenant_id]["addresses"].append(kwargs)
         except Exception:
             LOG.exception('')
-            if is_vpc:
-                data = client.release_address(AllocationId=alloc_id)
-            else:
-                data = client.release_address(PublicIp=public_ip)
+            kwargs.pop('InstanceId')
+            data = client.release_address(*[], **kwargs)
 
     def terminate_instances_and_wait(self, tenant_id, client):
         ids = self.context["tenants"][tenant_id].get("servers", [])
@@ -170,7 +175,10 @@ class EC2Objects(context.Context):
         LOG.info("Cleanup addresses")
         kwargss = self.context["tenants"][tenant_id].get("addresses", [])
         for kwargs in kwargss:
-            data = client.release_address(*[], **kwargs)
+            try:
+                data = client.release_address(*[], **kwargs)
+            except Exception:
+                LOG.exception('')
 
     def cleanup_networks(self, tenant_id, client):
         LOG.info("Cleanup networks")
@@ -214,7 +222,7 @@ class EC2Objects(context.Context):
                     LOG.exception('')
 
 
-@context.configure(name="ec2_networks", order=451)
+@context.configure(name="ec2api_networks", order=451)
 class FakeNetworkGenerator(EC2Objects):
     """Context class for adding temporary networks for benchmarks.
 
@@ -269,7 +277,7 @@ class FakeNetworkGenerator(EC2Objects):
             self.cleanup_networks(tenant_id, client)
 
 
-@context.configure(name="ec2_servers", order=450)
+@context.configure(name="ec2api_servers", order=450)
 class FakeServerGenerator(EC2Objects):
     """Context class for adding temporary servers for benchmarks.
 
