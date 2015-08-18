@@ -115,11 +115,17 @@ def get_neutron_create(kind, os_id, addon={}):
     return neutron_create
 
 
-def get_by_1st_arg_getter(results_dict_by_id):
+def get_by_1st_arg_getter(results_dict_by_id, notfound_exception=None):
     """Generate mock function for getter by 1st argurment."""
 
     def getter(obj_id):
-        return copy.deepcopy(results_dict_by_id.get(obj_id))
+        try:
+            return copy.deepcopy(results_dict_by_id[obj_id])
+        except KeyError:
+            if notfound_exception:
+                raise notfound_exception
+            else:
+                return None
     return getter
 
 
