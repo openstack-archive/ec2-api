@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
 #Parameters to configure
 SERVICE_USERNAME=ec2api
@@ -11,8 +11,12 @@ NOVA_CONF=/etc/nova/nova.conf
 SIGNING_DIR=/var/cache/ec2api
 
 #Check for environment
-if [[ -z "$OS_AUTH_URL" || -z "$OS_USERNAME" || -z "$OS_PASSWORD" || -z "$OS_TENANT_NAME" ]]; then
-    echo "Please set OS_AUTH_URL, OS_USERNAME, OS_PASSWORD and OS_TENANT_NAME"
+if [[ -z "$OS_AUTH_URL" || -z "$OS_USERNAME" || -z "$OS_PASSWORD" ]]; then
+    echo "Please set OS_AUTH_URL, OS_USERNAME, OS_PASSWORD"
+    exit 1
+fi
+if [[ -z "$OS_TENANT_NAME" && -z "$OS_PROJECT_NAME" ]]; then
+    echo "Please set OS_TENANT_NAME or OS_PROJECT_NAME"
     exit 1
 fi
 
@@ -190,17 +194,18 @@ function iniget() {
 # Copy an option from Nova INI file or from environment if it's set
 function copynovaopt() {
     local option_name=$1
+    local option_group=$2
     local env_var
     local option
     env_var=${option_name^^}
     if [ ${!env_var+x} ]; then
         option=${!env_var}
-    elif ini_has_option "$NOVA_CONF" DEFAULT $option_name; then
-        option=$(iniget $NOVA_CONF DEFAULT $option_name)
+    elif ini_has_option "$NOVA_CONF" $option_group $option_name; then
+        option=$(iniget $NOVA_CONF $option_group $option_name)
     else
         return 0
     fi
-    iniset $CONF_FILE DEFAULT $option_name $option
+    iniset $CONF_FILE $option_group $option_name $option
 }
 
 if [[ -n $(openstack catalog show network) ]]; then
@@ -210,7 +215,7 @@ else
 fi
 if [[ "$VPC_SUPPORT" == "True" && -z "$EXTERNAL_NETWORK" ]]; then
     declare -a newtron_output
-    readarray -s 3 -t newtron_output < <(neutron net-external-list)
+    readarray -s 3 -t newtron_output < <(openstack network list --external)
     if ((${#newtron_output[@]} < 2)); then
         reason="No external network is declared in Neutron."
     elif ((${#newtron_output[@]} > 2)); then
@@ -245,7 +250,7 @@ APIPASTE_FILE=$CONF_DIR/api-paste.ini
 echo Creating configs
 sudo mkdir -p /etc/ec2api > /dev/null
 if [ ! -s $CONF_FILE ]; then
-    sudo cp etc/ec2api/ec2api.conf.sample $CONF_FILE
+    sudo touch $CONF_FILE
 fi
 if [ ! -s $APIPASTE_FILE ]; then
     sudo cp etc/ec2api/api-paste.ini $APIPASTE_FILE
@@ -270,14 +275,6 @@ iniset $CONF_FILE database connection "$CONNECTION"
 iniset $CONF_FILE DEFAULT full_vpc_support "$VPC_SUPPORT"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
 
-iniset $CONF_FILE keystone_authtoken signing_dir $SIGNING_DIR
-iniset $CONF_FILE keystone_authtoken auth_host $AUTH_HOST
-iniset $CONF_FILE keystone_authtoken admin_user $SERVICE_USERNAME
-iniset $CONF_FILE keystone_authtoken admin_password $SERVICE_PASSWORD
-iniset $CONF_FILE keystone_authtoken admin_tenant_name $SERVICE_TENANT
-iniset $CONF_FILE keystone_authtoken auth_protocol $AUTH_PROTO
-iniset $CONF_FILE keystone_authtoken auth_port $AUTH_PORT
-
 iniset $CONF_FILE DEFAULT admin_user $SERVICE_USERNAME
 iniset $CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
 iniset $CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT
@@ -286,14 +283,15 @@ if [[ -f "$NOVA_CONF" ]]; then
     # NOTE(ft): use swift instead internal s3 server if enabled
     if [[ -n $(openstack catalog show object-store 2>/dev/null) ]] &&
             [[ -n $(openstack catalog show s3 2>/dev/null) ]]; then
-        copynovaopt s3_host
-        copynovaopt s3_port
-        copynovaopt s3_affix_tenant
-        copynovaopt s3_use_ssl
+        copynovaopt s3_host DEFAULT
+        copynovaopt s3_port DEFAULT
+        copynovaopt s3_affix_tenant DEFAULT
+        copynovaopt s3_use_ssl DEFAULT
     fi
-    copynovaopt cert_topic
-    copynovaopt rabbit_hosts
-    copynovaopt rabbit_password
+    copynovaopt cert_topic DEFAULT
+    copynovaopt rabbit_hosts oslo_messaging_rabbit
+    copynovaopt rabbit_password oslo_messaging_rabbit
+    copynovaopt rabbit_userid oslo_messaging_rabbit
     # TODO(ft): it's necessary to support other available messaging implementations
 
     nova_state_path=$(iniget $NOVA_CONF DEFAULT state_path)
