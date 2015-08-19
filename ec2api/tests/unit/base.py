@@ -19,7 +19,6 @@ from cinderclient import client as cinderclient
 from glanceclient import client as glanceclient
 import mock
 from novaclient import client as novaclient
-from oslo_config import cfg
 from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 
@@ -35,6 +34,10 @@ import ec2api.wsgi
 
 
 ADMIN_TOKEN = 'admin_token'
+DB_SCHEMA = None
+
+
+config.parse_args([], default_config_files=[])
 
 
 def skip_not_implemented(test_item):
@@ -281,31 +284,24 @@ class ApiTestCase(BaseTestCase):
             return ''
 
 
-class DbTestCase(test_base.BaseTestCase):
+class DbTestCase(BaseTestCase):
 
-    DB_SCHEMA = None
+    def setUp(self):
+        super(DbTestCase, self).setUp()
+        self.configure(connection='sqlite://', group='database')
+        self.configure(sqlite_synchronous=False, group='database')
+        self._init_db_schema()
+        engine = db_backend.get_engine()
+        conn = engine.connect()
+        conn.connection.executescript(DB_SCHEMA)
+        self.addCleanup(engine.dispose)
 
-    @classmethod
-    def setUpClass(cls):
-        super(DbTestCase, cls).setUpClass()
-        conf = cfg.CONF
-        try:
-            config.parse_args([], default_config_files=[])
-            conf.set_override('connection', 'sqlite://', group='database')
-            conf.set_override('sqlite_synchronous', False, group='database')
+    def _init_db_schema(self):
+        global DB_SCHEMA
+        if not DB_SCHEMA:
 
             engine = db_backend.get_engine()
             conn = engine.connect()
             migration.db_sync()
-            cls.DB_SCHEMA = "".join(line
-                                    for line in conn.connection.iterdump())
+            DB_SCHEMA = "".join(line for line in conn.connection.iterdump())
             engine.dispose()
-        finally:
-            conf.reset()
-
-    def setUp(self):
-        super(DbTestCase, self).setUp()
-        engine = db_backend.get_engine()
-        engine.dispose()
-        conn = engine.connect()
-        conn.connection.executescript(self.DB_SCHEMA)
