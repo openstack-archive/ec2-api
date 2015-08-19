@@ -113,7 +113,14 @@ class MockOSMixin(object):
 
 
 class BaseTestCase(MockOSMixin, test_base.BaseTestCase):
-    pass
+
+    def setUp(self):
+        super(BaseTestCase, self).setUp()
+        self._conf = self.useFixture(config_fixture.Config())
+        self.configure(fatal_exception_format_errors=True)
+
+    def configure(self, **kwargs):
+        self._conf.config(**kwargs)
 
 
 class ApiTestCase(BaseTestCase):
@@ -129,9 +136,6 @@ class ApiTestCase(BaseTestCase):
         self.addCleanup(db_api_patcher.stop)
 
         self.isotime = self.mock('oslo_utils.timeutils.isotime')
-
-        self._conf = self.useFixture(config_fixture.Config())
-        self.configure(fatal_exception_format_errors=True)
 
     def execute(self, action, args):
         status_code, response = self._execute(action, args)
@@ -172,9 +176,6 @@ class ApiTestCase(BaseTestCase):
                                      if all(i['id'] != item['id']
                                             for i in items))
         self.set_mock_db_items(*merged_items)
-
-    def configure(self, **kwargs):
-        self._conf.config(**kwargs)
 
     def check_filtering(self, operation, resultset_key, filters):
         for name, value in filters:
