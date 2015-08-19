@@ -24,7 +24,7 @@ from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 
 
-class DBItemsAutoCreationTestCase(base.MockOSMixin, base.DbTestCase):
+class DBItemsAutoCreationTestCase(base.DbTestCase):
 
     def setUp(self):
         super(DBItemsAutoCreationTestCase, self).setUp()
