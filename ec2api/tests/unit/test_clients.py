@@ -15,19 +15,16 @@
 import fixtures
 import mock
 from novaclient import exceptions as nova_exception
-from oslo_config import fixture as config_fixture
-from oslotest import base as test_base
 
 from ec2api.api import clients
+from ec2api.tests.unit import base
 
 
-class ClientsTestCase(test_base.BaseTestCase):
+class ClientsTestCase(base.BaseTestCase):
 
     def setUp(self):
         super(ClientsTestCase, self).setUp()
-
-        conf = self.useFixture(config_fixture.Config())
-        conf.config(keystone_url='keystone_url')
+        self.configure(keystone_url='keystone_url')
 
     @mock.patch('novaclient.client.Client')
     def test_nova(self, nova):
@@ -42,10 +39,19 @@ class ClientsTestCase(test_base.BaseTestCase):
             res = clients.nova(context)
         self.assertEqual(nova.return_value, res)
         nova.assert_called_with(
-            '2.3', bypass_url='novav21_url',
+            '2.3', bypass_url='novav21_url', http_log_debug=False,
             auth_url='keystone_url', auth_token='fake_token',
             username=None, api_key=None, project_id=None)
         self.assertEqual(0, len(logs.output))
+
+        # test logging with debug option
+        self.configure(debug=True)
+        clients.nova(context)
+        nova.assert_called_with(
+            '2.3', bypass_url='novav21_url', http_log_debug=True,
+            auth_url='keystone_url', auth_token='fake_token',
+            username=None, api_key=None, project_id=None)
+        self.configure(debug=False)
 
         # test switching to v2 client
         nova.side_effect = [nova_exception.UnsupportedVersion(), 'v2_client']
@@ -53,7 +59,7 @@ class ClientsTestCase(test_base.BaseTestCase):
             res = clients.nova(context)
         self.assertEqual('v2_client', res)
         nova.assert_called_with(
-            '2', bypass_url='novav21_url',
+            '2', bypass_url='novav21_url', http_log_debug=False,
             auth_url='keystone_url', auth_token='fake_token',
             username=None, api_key=None, project_id=None)
         self.assertNotEqual(0, len(logs.output))
@@ -72,7 +78,7 @@ class ClientsTestCase(test_base.BaseTestCase):
         with fixtures.LoggerFixture() as logs:
             res = clients.nova(context)
         nova.assert_called_with(
-            '2.3', bypass_url='nova_url',
+            '2.3', bypass_url='nova_url', http_log_debug=False,
             auth_url='keystone_url', auth_token='fake_token',
             username=None, api_key=None, project_id=None)
         self.assertNotEqual(0, len(logs.output))
@@ -81,7 +87,7 @@ class ClientsTestCase(test_base.BaseTestCase):
         context.service_catalog = [{'type': 'fake'}]
         clients.nova(context)
         nova.assert_called_with(
-            '2.3', bypass_url=None,
+            '2.3', bypass_url=None, http_log_debug=False,
             auth_url='keystone_url', auth_token='fake_token',
             username=None, api_key=None, project_id=None)
 
@@ -111,6 +117,7 @@ class ClientsTestCase(test_base.BaseTestCase):
 
     @mock.patch('cinderclient.client.Client')
     def test_cinder(self, cinder):
+        # test normal flow
         context = mock.NonCallableMock(
             auth_token='fake_token',
             service_catalog=[{'type': 'volume',
@@ -119,9 +126,16 @@ class ClientsTestCase(test_base.BaseTestCase):
         self.assertEqual(cinder.return_value, res)
         cinder.assert_called_with(
             '1', auth_url='keystone_url', service_type='volume',
-            username=None, api_key=None)
+            username=None, api_key=None, http_log_debug=False)
         self.assertEqual('fake_token', res.client.auth_token)
         self.assertEqual('cinder_url', res.client.management_url)
+
+        # test logging with debug option
+        self.configure(debug=True)
+        clients.cinder(context)
+        cinder.assert_called_with(
+            '1', auth_url='keystone_url', service_type='volume',
+            username=None, api_key=None, http_log_debug=True)
 
     @mock.patch('ec2api.context.get_keystone_client_class',
                 return_value=mock.Mock(return_value=mock.Mock()))

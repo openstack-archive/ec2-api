@@ -73,7 +73,7 @@ def nova(context):
         return nova(context)
     try:
         return novaclient.Client(_novaclient_vertion, bypass_url=bypass_url,
-                                 **args)
+                                 http_log_debug=CONF.debug, **args)
     except nova_exception.UnsupportedVersion:
         if _novaclient_vertion == '2':
             raise
@@ -125,7 +125,7 @@ def cinder(context):
         'api_key': None,
     }
 
-    _cinder = cinderclient.Client('1', **args)
+    _cinder = cinderclient.Client('1', http_log_debug=CONF.debug, **args)
     management_url = _url_for(context, service_type='volume')
     _cinder.client.auth_token = context.auth_token
     _cinder.client.management_url = management_url
