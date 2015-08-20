@@ -40,8 +40,7 @@ class ClientsTestCase(base.BaseTestCase):
         self.assertEqual(nova.return_value, res)
         nova.assert_called_with(
             '2.3', bypass_url='novav21_url', http_log_debug=False,
-            auth_url='keystone_url', auth_token='fake_token',
-            username=None, api_key=None, project_id=None)
+            auth_url='keystone_url', auth_token='fake_token')
         self.assertEqual(0, len(logs.output))
 
         # test logging with debug option
@@ -49,8 +48,7 @@ class ClientsTestCase(base.BaseTestCase):
         clients.nova(context)
         nova.assert_called_with(
             '2.3', bypass_url='novav21_url', http_log_debug=True,
-            auth_url='keystone_url', auth_token='fake_token',
-            username=None, api_key=None, project_id=None)
+            auth_url='keystone_url', auth_token='fake_token')
         self.configure(debug=False)
 
         # test switching to v2 client
@@ -60,8 +58,7 @@ class ClientsTestCase(base.BaseTestCase):
         self.assertEqual('v2_client', res)
         nova.assert_called_with(
             '2', bypass_url='novav21_url', http_log_debug=False,
-            auth_url='keystone_url', auth_token='fake_token',
-            username=None, api_key=None, project_id=None)
+            auth_url='keystone_url', auth_token='fake_token')
         self.assertNotEqual(0, len(logs.output))
 
         # test raising of an exception if v2 client is not supported as well
@@ -79,8 +76,7 @@ class ClientsTestCase(base.BaseTestCase):
             res = clients.nova(context)
         nova.assert_called_with(
             '2.3', bypass_url='nova_url', http_log_debug=False,
-            auth_url='keystone_url', auth_token='fake_token',
-            username=None, api_key=None, project_id=None)
+            auth_url='keystone_url', auth_token='fake_token')
         self.assertNotEqual(0, len(logs.output))
 
         # test behavior if 'compute' service type is not found as well
@@ -88,8 +84,7 @@ class ClientsTestCase(base.BaseTestCase):
         clients.nova(context)
         nova.assert_called_with(
             '2.3', bypass_url=None, http_log_debug=False,
-            auth_url='keystone_url', auth_token='fake_token',
-            username=None, api_key=None, project_id=None)
+            auth_url='keystone_url', auth_token='fake_token')
 
     @mock.patch('neutronclient.v2_0.client.Client')
     def test_neutron(self, neutron):

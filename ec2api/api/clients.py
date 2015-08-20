@@ -54,12 +54,6 @@ def nova(context):
     args = {
         'auth_url': CONF.keystone_url,
         'auth_token': context.auth_token,
-        # NOTE(ft): These parameters are not used for authentification,
-        # but are required by novaclient < v2.18 which may be installed in
-        # Icehouse deployment
-        'username': None,
-        'api_key': None,
-        'project_id': None,
     }
     global _novaclient_vertion, _nova_service_type
     bypass_url = _url_for(context, service_type=_nova_service_type)
