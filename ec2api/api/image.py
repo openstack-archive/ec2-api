@@ -30,10 +30,12 @@ from oslo_concurrency import processutils
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import timeutils
+import requests
 
 from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
+from ec2api.api import faults
 from ec2api.api import instance as instance_api
 from ec2api.db import api as db_api
 from ec2api import exception
@@ -867,14 +869,31 @@ def _s3_test_for_malicious_tarball(path, filename):
     tar_file.close()
 
 
+def _get_ec2_credentials(context):
+    # ec2_creds = clients.keystone(context).ec2.list(context.user_id)
+    url = CONF.keystone_url + '/users/%s/credentials/OS-EC2' % context.user_id
+    headers = {'Content-Type': 'application/json',
+               'X-Auth-Token': context.auth_token}
+
+    response = requests.request('GET', url, headers=headers)
+    status_code = response.status_code
+    if status_code != 200:
+        msg = response.reason
+        return faults.ec2_error_response(context.request_id,
+                                         "AuthFailure", msg,
+                                         status=status_code)
+    result = response.json()
+    return result['credentials']
+
+
 def _s3_conn(context):
+    ec2_creds = _get_ec2_credentials(context)
     # NOTE(vish): access and secret keys for s3 server are not
     #             checked in nova-objectstore
-    ec2_creds = clients.keystone(context).ec2.list(context.user_id)
-    access = ec2_creds[0].access
+    access = ec2_creds[0]['access']
     if CONF.s3_affix_tenant:
         access = '%s:%s' % (access, context.project_id)
-    secret = ec2_creds[0].secret
+    secret = ec2_creds[0]['secret']
     calling = boto.s3.connection.OrdinaryCallingFormat()
     return boto.s3.connection.S3Connection(aws_access_key_id=access,
                                            aws_secret_access_key=secret,
