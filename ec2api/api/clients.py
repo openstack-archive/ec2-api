@@ -24,7 +24,17 @@ from ec2api.i18n import _, _LW
 
 logger = logging.getLogger(__name__)
 
+ec2_opts = [
+    cfg.StrOpt('nova_service_type',
+               default='computev21',
+               help='Service type of Compute API, registered in Keystone '
+                    'catalog. Should be v2.1 with microversion support. '
+                    'If it is obsolete v2, a lot of useful EC2 compliant '
+                    'instance properties will be unavailable.')
+]
+
 CONF = cfg.CONF
+CONF.register_opts(ec2_opts)
 
 
 try:
@@ -46,38 +56,21 @@ except ImportError:
 
 # Nova API's 2.3 microversion provides additional EC2 compliant instance
 # properties
-_novaclient_vertion = '2.3'
-_nova_service_type = 'computev21'
+REQUIRED_NOVA_API_VERSION = '2.3'
+_nova_api_version = None
 
 
 def nova(context):
     args = {
         'auth_url': CONF.keystone_url,
         'auth_token': context.auth_token,
+        'bypass_url': _url_for(context, service_type=CONF.nova_service_type),
+        'http_log_debug': CONF.debug,
     }
-    global _novaclient_vertion, _nova_service_type
-    bypass_url = _url_for(context, service_type=_nova_service_type)
-    if not bypass_url and _nova_service_type == 'computev21':
-        # NOTE(ft): partial compatibility with pre Kilo OS releases:
-        # if computev21 isn't provided by Nova, use compute instead
-        logger.warning(_LW("Nova server doesn't support v2.1, use v2 instead. "
-                           "A lot of useful EC2 compliant instance properties "
-                           "will be unavailable."))
-        _nova_service_type = 'compute'
-        return nova(context)
-    try:
-        return novaclient.Client(_novaclient_vertion, bypass_url=bypass_url,
-                                 http_log_debug=CONF.debug, **args)
-    except nova_exception.UnsupportedVersion:
-        if _novaclient_vertion == '2':
-            raise
-        # NOTE(ft): partial compatibility with Nova client w/o microversion
-        # support
-        logger.warning(_LW("Nova client doesn't support v2.3, use v2 instead. "
-                           "A lot of useful EC2 compliant instance properties "
-                           "will be unavailable."))
-        _novaclient_vertion = '2'
-        return nova(context)
+    global _nova_api_version
+    if not _nova_api_version:
+        _nova_api_version = _get_nova_api_version(context)
+    return novaclient.Client(_nova_api_version, **args)
 
 
 def neutron(context):
@@ -162,6 +155,19 @@ def _url_for(context, **kwargs):
             return None
 
     return None
+
+
+def _get_nova_api_version(context):
+    try:
+        novaclient.Client('2.1')
+    except nova_exception.UnsupportedVersion:
+        logger.warning(
+            _LW('Nova client does not support v2.1 Nova API, use v2 instead. '
+                'A lot of useful EC2 compliant instance properties '
+                'will be unavailable.'))
+        return '2'
+
+    return REQUIRED_NOVA_API_VERSION
 
 
 class _rpcapi_CertAPI(object):
