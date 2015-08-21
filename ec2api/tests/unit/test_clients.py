@@ -63,9 +63,69 @@ class ClientsTestCase(base.BaseTestCase):
             '2.3', bypass_url='nova_legacy_url', http_log_debug=False,
             auth_url='keystone_url', auth_token='fake_token')
 
+    @mock.patch.object(clients, '_url_for')
     @mock.patch('novaclient.client.Client')
-    def test_get_api_version(self, nova):
-        context = mock.NonCallableMock()
+    def test_get_api_version(self, nova, url_for):
+        context = mock.NonCallableMock(auth_token='fake_token')
+        v2 = mock.NonCallableMock()
+        v2.configure_mock(id='v2',
+                          version='',
+                          links=[{'href': 'http://host:port/path/v2/'}])
+        v2_1 = mock.NonCallableMock()
+        v2_1.configure_mock(id='v2.1',
+                            version='2.11',
+                            links=[{'href': 'http://host:port/path/v2.1/'}])
+
+        # test normal flow
+        url_for.return_value = 'http://host:port/path/v2.1/projectid'
+        nova.return_value.versions.get_current.return_value = v2_1
+        with fixtures.LoggerFixture(
+                format='[%(levelname)s] %(message)s') as logs:
+            res = clients._get_nova_api_version(context)
+        self.assertEqual(clients.REQUIRED_NOVA_API_MICROVERSION, res)
+        url_for.assert_called_with(context, service_type='compute')
+        nova.assert_called_with('2.1', http_log_debug=False,
+                                bypass_url=url_for.return_value)
+        nova.return_value.versions.get_current.assert_called_with()
+        self.assertTrue(logs.output.startswith('[INFO]'))
+
+        # test normal flow with debug log and custom service_type
+        self.configure(debug=True)
+        self.configure(nova_service_type='compute')
+        clients._get_nova_api_version(context)
+        url_for.assert_called_with(context, service_type='compute')
+        nova.assert_called_with('2.1', http_log_debug=True,
+                                bypass_url=url_for.return_value)
+        self.configure(debug=False)
+        self.configure(nova_service_type='compute')
+
+        # test Nova doesn't supprt required microversion
+        v2_1.version = '2.2'
+        with fixtures.LoggerFixture(
+                format='[%(levelname)s] %(message)s') as logs:
+            res = clients._get_nova_api_version(context)
+        self.assertEqual('2.2', res)
+        self.assertTrue(logs.output.startswith('[WARNING]'))
+
+        # test service type is not v2.1
+        nova.return_value.versions.get_current.return_value = v2
+        url_for.return_value = 'http://host:port/path/v2/projectid'
+        self.configure(nova_service_type='compute_legacy')
+        with fixtures.LoggerFixture(
+                format='[%(levelname)s] %(message)s') as logs:
+            res = clients._get_nova_api_version(context)
+        self.assertEqual('2', res)
+        self.assertTrue(logs.output.startswith('[WARNING]'))
+        self.configure(nova_service_type='compute')
+
+        # test service url is not found in version list
+        nova.return_value.versions.get_current.return_value = None
+        url_for.return_value = 'fake_url'
+        with fixtures.LoggerFixture(
+                format='[%(levelname)s] %(message)s') as logs:
+            res = clients._get_nova_api_version(context)
+        self.assertEqual(clients.REQUIRED_NOVA_API_MICROVERSION, res)
+        self.assertTrue(logs.output.startswith('[WARNING]'))
 
         # test switching to v2 client
         nova.side_effect = nova_exception.UnsupportedVersion()

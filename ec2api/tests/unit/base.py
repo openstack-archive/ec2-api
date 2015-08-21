@@ -23,6 +23,7 @@ from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 
 import ec2api.api.apirequest
+from ec2api.api import clients
 from ec2api.api import ec2utils
 from ec2api import config
 from ec2api.db import migration
@@ -38,6 +39,11 @@ DB_SCHEMA = None
 
 
 config.parse_args([], default_config_files=[])
+# TODO(ft): temporary solution to prevent discovery of Nova API version
+# in clients.nova. This should be removed when all tests either use
+# MockOSMixin (which should be improved in its turn) to mock novaclient,
+# or mock clients.nova directly.
+clients._nova_api_version = '2.3'
 
 
 def skip_not_implemented(test_item):
