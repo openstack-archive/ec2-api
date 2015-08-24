@@ -401,7 +401,7 @@ def get_os_image_mappings(os_image_properties):
         return virtual_name == 'swap' or (virtual_name and
                                           _ephemeral.match(virtual_name))
 
-    # NOTE(ft): substitute mapping if only device name is specified
+    # NOTE(ft): substitute mapping if the same device name is specified
     def add_mapping(mapping):
         device_name = block_device_strip_dev(mapping.get('device_name'))
         if device_name in names:
@@ -419,7 +419,7 @@ def get_os_image_mappings(os_image_properties):
     # in boot logic. This function should do the same, despite Nova EC2
     # behavior.
 
-    # TODO(ft): Nova EC2 prepended device names for virtual device mappings.
+    # NOTE(ft): Nova EC2 prepended device names for virtual device mappings.
     # But AWS doesn't do it.
     for vdm in os_image_properties.get('mappings', []):
         if is_virtual(vdm.get('virtual')):
