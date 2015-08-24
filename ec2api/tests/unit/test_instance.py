@@ -1431,6 +1431,28 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                         matchers.ListMatches(res, orderless_lists=True),
                         verbose=True)
 
+        res = instance_api._parse_block_device_mapping(
+            fake_context, [{'device_name': '/dev/vdf',
+                            'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1}},
+                           {'device_name': '/dev/vdf',
+                            'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2}}])
+        expected = [{'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
+                     'device_name': '/dev/vdf',
+                     'source_type': 'snapshot',
+                     'destination_type': 'volume'}]
+        self.assertThat(expected,
+                        matchers.ListMatches(res, orderless_lists=True),
+                        verbose=True)
+
+        self.assertRaises(
+            exception.InvalidBlockDeviceMapping,
+            instance_api._parse_block_device_mapping,
+            fake_context,
+            [{'device_name': '/dev/vdf',
+              'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_1}},
+             {'device_name': 'vdf',
+              'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2}}])
+
     @mock.patch('ec2api.db.api.IMPL')
     def test_build_block_device_mapping(self, db_api):
         fake_context = base.create_context()
