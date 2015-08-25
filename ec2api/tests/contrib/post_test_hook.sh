@@ -66,6 +66,9 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   user_name="user-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
   eval $(openstack user create "$user_name" --project "$project_id" --password "password" --email "$user_name@example.com" -f shell -c id)
   user_id=$id
+  # add 'Member' role for swift access
+  role_id=$(openstack role show  Member -c id -f value)
+  openstack role add --project $project_id --user $user_id $role_id
   # create network
   if [[ -n $(openstack service list | grep neutron) ]]; then
     net_id=$(neutron net-create --tenant-id $project_id "private" | grep ' id ' | awk '{print $4}')
