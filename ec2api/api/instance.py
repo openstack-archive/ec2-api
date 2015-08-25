@@ -893,10 +893,6 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
 
 def _parse_block_device_mapping(context, block_device_mapping):
     # TODO(ft): check block_device_mapping structure
-    # TODO(ft): leave only the last bdm if several bdms are occured with
-    # the same device name. If names differ in /dev/ prefix occurence,
-    # raise InvalidBlockDeviceMapping with the message
-    # The device '<short_name>' is used in more than one block-device mapping
     # TODO(ft): support virtual devices
     # TODO(ft): support no_device
     bdms = []
@@ -928,6 +924,21 @@ def _parse_block_device_mapping(context, block_device_mapping):
                 bdm['volume_size'] = ebs['volume_size']
             if 'delete_on_termination' in ebs:
                 bdm['delete_on_termination'] = ebs['delete_on_termination']
+
+        # substitute a previous bdm which has the same device name
+        short_device_name = ec2utils.block_device_strip_dev(bdm['device_name'])
+        first_bdm, index = next(
+            ((m, i) for i, m in enumerate(bdms)
+             if (ec2utils.block_device_strip_dev(m['device_name']) ==
+                 short_device_name)),
+            (None, None))
+        if first_bdm:
+            if bdm['device_name'] == first_bdm['device_name']:
+                bdms.pop(index)
+            else:
+                msg = _("The device '%s' is used in more than one "
+                        "block-device mapping") % short_device_name
+                raise exception.InvalidBlockDeviceMapping(msg)
 
         bdms.append(bdm)
 
