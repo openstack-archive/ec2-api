@@ -54,9 +54,12 @@ except ImportError:
     logger.info(_('glanceclient not available'))
 
 
+# Nova API version with microversions support
+REQUIRED_NOVA_API_VERSION = '2.1'
+LEGACY_NOVA_API_VERSION = '2'
 # Nova API's 2.3 microversion provides additional EC2 compliant instance
 # properties
-REQUIRED_NOVA_API_VERSION = '2.3'
+REQUIRED_NOVA_API_MICROVERSION = '2.3'
 _nova_api_version = None
 
 
@@ -159,15 +162,16 @@ def _url_for(context, **kwargs):
 
 def _get_nova_api_version(context):
     try:
-        novaclient.Client('2.1')
+        novaclient.Client(REQUIRED_NOVA_API_VERSION)
     except nova_exception.UnsupportedVersion:
         logger.warning(
             _LW('Nova client does not support v2.1 Nova API, use v2 instead. '
                 'A lot of useful EC2 compliant instance properties '
                 'will be unavailable.'))
-        return '2'
+        return LEGACY_NOVA_API_VERSION
 
-    return REQUIRED_NOVA_API_VERSION
+    # NOTE(ft): novaclient supports microversions, use the last required one
+    return REQUIRED_NOVA_API_MICROVERSION
 
 
 class _rpcapi_CertAPI(object):
