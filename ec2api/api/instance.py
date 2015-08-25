@@ -952,6 +952,9 @@ def _build_block_device_mapping(context, block_device_mapping, os_image):
     root_device_name = (
         ec2utils.block_device_properties_root_device_name(properties))
     short_root_device_name = ec2utils.block_device_strip_dev(root_device_name)
+
+    # build a dict of image bmds to make the merge easier
+    # set some default values to a root bdm to simplify checks in mapping loop
     image_bdm_dict = {}
     for bdm in image_bdms:
         if bdm.get('device_name'):
@@ -965,9 +968,10 @@ def _build_block_device_mapping(context, block_device_mapping, os_image):
             continue
         image_bdm_dict[key] = bdm
     result = []
-    # NOTE(ft): only the last device definition in the list is considered
-    # by AWS. So get only the last definitions, despite Nova can do the same.
-    # Because this is not contracted in Nova.
+
+    # convert mappings to be ready to pass in nova.servers.create
+    # and merge to them a corresponding image bdm if existing
+    # (because Nova only supports an overloading, but not the merging)
     for bdm in mappings:
         short_device_name = ec2utils.block_device_strip_dev(bdm['device_name'])
         if short_device_name not in image_bdm_dict:
@@ -1001,11 +1005,14 @@ def _build_block_device_mapping(context, block_device_mapping, os_image):
                 image_bdm.update(bdm)
                 bdm = image_bdm
 
+        # move source id to nova.servers.create related parameter
+        # NOTE(ft): safely extract source id, because we do not validate
+        # v2 image bdm, thus the bdm may be invalid and do not contain
+        # mandatory keys
         source_type = bdm.get('source_type')
-        if source_type:
+        if source_type and source_type != 'blank':
             uuid = bdm.pop('_'.join([source_type, 'id']), None)
-            if uuid:
-                bdm['uuid'] = uuid
+            bdm['uuid'] = uuid
 
         result.append(bdm)
 
