@@ -225,13 +225,6 @@ function install_ec2api() {
     # both functions (setup_develop and setup_package) are defined at:
     # http://git.openstack.org/cgit/openstack-dev/devstack/tree/functions-common
     setup_package $EC2API_DIR -e
-
-    # NOTE(andrey-mp): temporary install euca2ools
-    # waiting for review https://review.openstack.org/#/c/169027/
-    # that review adds euca2ools installation into devstack
-    # scripts with tempest. euca2ools are needed for bundling image
-    # in tempest preparation scripts.
-    is_package_installed euca2ools || install_package euca2ools
 }
 
 
