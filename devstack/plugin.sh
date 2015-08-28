@@ -161,10 +161,7 @@ function configure_ec2api {
     mkdir_chown_stack "$EC2API_CONF_DIR"
 
     # Generate ec2api configuration file and configure common parameters.
-    oslo-config-generator --namespace ec2api \
-                          --namespace oslo.db \
-                          --namespace oslo.messaging \
-                          > $EC2API_CONF_FILE
+    touch $EC2API_CONF_FILE
     cp $EC2API_DIR/etc/ec2api/api-paste.ini $EC2API_CONF_DIR
 
     cleanup_ec2api
