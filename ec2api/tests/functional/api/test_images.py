@@ -147,14 +147,15 @@ class ImageTest(base.EC2TestCase):
         data = self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
-    def _create_image(self, name, desc):
+    def _create_image(self, name, desc, extra_run_instance_args={}):
         image_id = CONF.aws.ebs_image_id
         data = self.client.describe_images(ImageIds=[image_id])
         image = data['Images'][0]
         self.assertTrue('RootDeviceType' in image
                         and 'ebs' in image['RootDeviceType'])
 
-        instance_id = self.run_instance(ImageId=image_id)
+        instance_id = self.run_instance(ImageId=image_id,
+                                        **extra_run_instance_args)
         instance = self.get_instance(instance_id)
         for bdm in instance.get('BlockDeviceMappings', []):
             if 'Ebs' in bdm:
@@ -233,6 +234,31 @@ class ImageTest(base.EC2TestCase):
         new_desc = data_utils.rand_name('new desc')
         _modify_description(Attribute='description', Value=new_desc)
         _modify_description(Description={'Value': new_desc})
+
+        data = self.client.deregister_image(ImageId=image_id)
+        self.cancelResourceCleanUp(image_clean)
+
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
+    def test_check_bdm_in_image(self):
+        image_id = CONF.aws.ebs_image_id
+        data = self.client.describe_images(ImageIds=[image_id])
+        root_device_name = data['Images'][0]['RootDeviceName']
+        device_name_prefix = base.get_device_name_prefix(root_device_name)
+        device_name = device_name_prefix + 'h'
+
+        name = data_utils.rand_name('image')
+        desc = data_utils.rand_name('description')
+        image_id, image_clean = self._create_image(
+            name, desc,
+            extra_run_instance_args={
+                'BlockDeviceMappings': [{'DeviceName': device_name,
+                                         'Ebs': {'VolumeSize': 1}}]})
+
+        data = self.client.describe_images(ImageIds=[image_id])
+        image = data['Images'][0]
+
+        for bdm in image['BlockDeviceMappings']:
+            self.assertTrue('DeviceName', bdm)
 
         data = self.client.deregister_image(ImageId=image_id)
         self.cancelResourceCleanUp(image_clean)
