@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+
 import mock
 from oslo_config import cfg
 from oslo_config import fixture as config_fixture
@@ -65,14 +67,17 @@ class ProxyTestCase(test_base.BaseTestCase):
         self.assertEqual('fake_version', response.body)
 
     @mock.patch.object(metadata.MetadataRequestHandler, '_get_metadata')
-    def test_version_root(self, get_metadata):
+    @mock.patch.object(metadata.MetadataRequestHandler, '_get_requester')
+    def test_version_root(self, get_requester, get_metadata):
+        get_requester.return_value = mock.sentinel.requester
         get_metadata.return_value = 'fake'
         request = webob.Request.blank('/latest')
         response = request.get_response(self.handler)
         self.assertEqual('fake', response.body)
         response_ctype = response.headers['Content-Type']
         self.assertTrue(response_ctype.startswith("text/plain"))
-        get_metadata.assert_called_with(mock.ANY, ['latest'])
+        get_requester.assert_called_with(mock.ANY)
+        get_metadata.assert_called_with(['latest'], mock.sentinel.requester)
 
         get_metadata.side_effect = exception.EC2MetadataNotFound()
         request = webob.Request.blank('/latest')
@@ -86,52 +91,57 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.assertEqual(500, response.status_int)
             self.assertEqual(len(log.mock_calls), 2)
 
-    @mock.patch('ec2api.metadata.api.get_metadata_item')
-    @mock.patch('ec2api.metadata.api.get_os_instance_and_project_id')
-    @mock.patch.object(metadata.MetadataRequestHandler, '_get_remote_ip')
-    @mock.patch('ec2api.context.get_os_admin_context')
-    def test_get_metadata_by_ip(self, get_context, get_remote_ip, get_ids,
-                                get_metadata_item):
-        get_context.return_value = base.create_context(is_os_admin=True)
-        get_remote_ip.return_value = 'fake_instance_ip'
-        get_ids.return_value = ('fake_instance_id', 'fake_project_id')
-        get_metadata_item.return_value = 'fake_item'
+    def test_get_requester(self):
+        expected = {'os_instance_id': mock.sentinel.os_instance_id,
+                    'project_id': mock.sentinel.project_id,
+                    'private_ip': mock.sentinel.private_ip}
         req = mock.Mock(headers={})
 
-        retval = self.handler._get_metadata(req, ['fake_ver', 'fake_attr'])
-        self.assertEqual('fake_item', retval)
-        get_context.assert_called_with()
-        get_remote_ip.assert_called_with(req)
-        get_ids.assert_called_with(get_context.return_value,
-                                   'fake_instance_ip')
-        get_metadata_item.assert_called_with(get_context.return_value,
-                                             ['fake_ver', 'fake_attr'],
-                                             'fake_instance_id',
-                                             'fake_instance_ip')
-        self.assertEqual('fake_project_id',
-                         get_context.return_value.project_id)
+        with contextlib.nested(
+            mock.patch('ec2api.context.get_os_admin_context'),
+            mock.patch.object(metadata.MetadataRequestHandler,
+                              '_get_remote_ip'),
+            mock.patch('ec2api.metadata.api.get_os_instance_and_project_id'),
+        ) as (get_context, get_remote_ip, get_ids):
+            get_context.return_value = base.create_context(is_os_admin=True)
+            get_remote_ip.return_value = mock.sentinel.private_ip
+            get_ids.return_value = (mock.sentinel.os_instance_id,
+                                    mock.sentinel.project_id)
+
+            retval = self.handler._get_requester(req)
+            self.assertEqual(expected, retval)
+            get_context.assert_called_with()
+            get_remote_ip.assert_called_with(req)
+            get_ids.assert_called_with(get_context.return_value,
+                                       mock.sentinel.private_ip)
+
+        req.headers['X-Instance-ID'] = mock.sentinel.os_instance_id
+        with mock.patch.object(metadata.MetadataRequestHandler,
+                               '_unpack_request_attributes') as unpack_attr:
+            unpack_attr.return_value = (mock.sentinel.os_instance_id,
+                                        mock.sentinel.project_id,
+                                        mock.sentinel.private_ip)
+            retval = self.handler._get_requester(req)
+            self.assertEqual(expected, retval)
+            unpack_attr.assert_called_with(req)
 
     @mock.patch('ec2api.metadata.api.get_metadata_item')
-    @mock.patch.object(metadata.MetadataRequestHandler,
-                       '_unpack_request_attributes')
     @mock.patch('ec2api.context.get_os_admin_context')
-    def test_get_metadata_by_instance_id(self, get_context, unpack_request,
-                                         get_metadata_item):
+    def test_get_metadata(self, get_context, get_metadata_item):
         get_context.return_value = base.create_context(is_os_admin=True)
-        unpack_request.return_value = ('fake_instance_id', 'fake_project_id',
-                                       'fake_instance_ip')
+        requester = {'os_instance_id': mock.sentinel.os_instance_id,
+                     'project_id': mock.sentinel.project_id,
+                     'private_ip': mock.sentinel.private_ip}
         get_metadata_item.return_value = 'fake_item'
-        req = mock.Mock(headers={'X-Instance-ID': 'fake_instance_id'})
 
-        retval = self.handler._get_metadata(req, ['fake_ver', 'fake_attr'])
+        retval = self.handler._get_metadata(['fake_ver', 'fake_attr'],
+                                            requester)
         self.assertEqual('fake_item', retval)
         get_context.assert_called_with()
-        unpack_request.assert_called_with(req)
-        get_metadata_item.assert_called_with(get_context.return_value,
-                                             ['fake_ver', 'fake_attr'],
-                                             'fake_instance_id',
-                                             'fake_instance_ip')
-        self.assertEqual('fake_project_id',
+        get_metadata_item.assert_called_with(
+            get_context.return_value, ['fake_ver', 'fake_attr'],
+            mock.sentinel.os_instance_id, mock.sentinel.private_ip)
+        self.assertEqual(mock.sentinel.project_id,
                          get_context.return_value.project_id)
 
     @mock.patch.object(metadata.MetadataRequestHandler, '_proxy_request')
@@ -139,7 +149,9 @@ class ProxyTestCase(test_base.BaseTestCase):
         req = mock.Mock(path_info='/openstack')
         proxy.return_value = 'value'
 
-        retval = self.handler(req)
+        with mock.patch.object(metadata.MetadataRequestHandler,
+                               '_get_requester'):
+            retval = self.handler(req)
         self.assertEqual(retval, 'value')
 
     @mock.patch.object(metadata, 'LOG')
@@ -159,7 +171,9 @@ class ProxyTestCase(test_base.BaseTestCase):
     def test_proxy_call_no_instance(self, proxy):
         req = mock.Mock(path_info='/openstack')
         proxy.side_effect = exception.EC2MetadataNotFound()
-        retval = self.handler(req)
+        with mock.patch.object(metadata.MetadataRequestHandler,
+                               '_get_requester'):
+            retval = self.handler(req)
         self.assertIsInstance(retval, webob.exc.HTTPNotFound)
 
     @mock.patch.object(metadata.MetadataRequestHandler,
@@ -178,7 +192,7 @@ class ProxyTestCase(test_base.BaseTestCase):
             resp.__getitem__.return_value = "text/plain"
             mock_http.return_value.request.return_value = (resp, 'content')
 
-            retval = self.handler._proxy_request(req)
+            retval = self.handler._proxy_request(req, mock.sentinel.requester)
             mock_http.assert_called_once_with(
                 ca_certs=None, disable_ssl_certificate_validation=True)
             mock_http.assert_has_calls([
@@ -197,7 +211,7 @@ class ProxyTestCase(test_base.BaseTestCase):
                     body=body
                 )]
             )
-            build_headers.assert_called_once_with(req)
+            build_headers.assert_called_once_with(mock.sentinel.requester)
 
             return retval
 
@@ -241,41 +255,17 @@ class ProxyTestCase(test_base.BaseTestCase):
             self._proxy_request_test_helper(response_code=302)
 
     @mock.patch.object(metadata.MetadataRequestHandler, '_sign_instance_id')
-    @mock.patch('ec2api.context.get_os_admin_context')
-    @mock.patch.object(metadata.MetadataRequestHandler, '_get_remote_ip')
-    def test_build_proxy_request_headers(self, get_remote_ip, get_context,
-                                         sign_instance_id):
-        req = mock.Mock(headers={})
-
-        req.headers = {'X-Instance-ID': 'fake_instance_id',
-                       'fake_key': 'fake_value'}
-
-        self.assertThat(self.handler._build_proxy_request_headers(req),
-                        matchers.DictMatches(req.headers))
-
-        req.headers = {'fake_key': 'fake_value'}
-        get_remote_ip.return_value = 'fake_instance_ip'
-        get_context.return_value = 'fake_context'
-        sign_instance_id.return_value = 'signed'
-
-        with mock.patch('ec2api.metadata.api.'
-                        'get_os_instance_and_project_id') as get_ids:
-
-            get_ids.return_value = ('fake_instance_id', 'fake_project_id')
-            self.assertThat(self.handler._build_proxy_request_headers(req),
-                            matchers.DictMatches(
-                                {'X-Forwarded-For': 'fake_instance_ip',
-                                 'X-Instance-ID': 'fake_instance_id',
-                                 'X-Tenant-ID': 'fake_project_id',
-                                 'X-Instance-ID-Signature': 'signed'}))
-            get_remote_ip.assert_called_with(req)
-            get_context.assert_called_with()
-            sign_instance_id.assert_called_with('fake_instance_id')
-            get_ids.assert_called_with('fake_context', 'fake_instance_ip')
-
-            get_ids.side_effect = exception.EC2MetadataNotFound()
-            self.assertRaises(exception.EC2MetadataNotFound,
-                              self.handler._build_proxy_request_headers, req)
+    def test_build_proxy_request_headers(self, sign_instance_id):
+        sign_instance_id.return_value = mock.sentinel.signed
+        requester = {'os_instance_id': mock.sentinel.os_instance_id,
+                     'project_id': mock.sentinel.project_id,
+                     'private_ip': mock.sentinel.private_ip}
+        result = self.handler._build_proxy_request_headers(requester)
+        expected = {'X-Forwarded-For': mock.sentinel.private_ip,
+                    'X-Instance-ID': mock.sentinel.os_instance_id,
+                    'X-Tenant-ID': mock.sentinel.project_id,
+                    'X-Instance-ID-Signature': mock.sentinel.signed}
+        self.assertThat(result, matchers.DictMatches(expected))
 
     def test_sign_instance_id(self):
         self.assertEqual(
@@ -337,8 +327,8 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('novaclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     @mock.patch('ec2api.metadata.api.instance_api')
-    def test_get_metadata(self, instance_api, db_api, nova,
-                          keystone_client_class):
+    def test_get_metadata_items(self, instance_api, db_api, nova,
+                                keystone_client_class):
         service_catalog = mock.MagicMock()
         service_catalog.get_data.return_value = []
         keystone_client_class.return_value.return_value = mock.Mock(
