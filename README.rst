@@ -96,106 +96,106 @@ Limitations
 ===========
 
 General:
-- DryRun option is not supported.
-- Some exceptions are not exactly the same as reported by AWS.
+ * DryRun option is not supported.
+ * Some exceptions are not exactly the same as reported by AWS.
 
 Not supported functionality features:
-- Network ACL
-- VPC Peering connection
-- Classic Link
-- Reserved Instances
-- Spot Instances
-- Placement Groups
-- Monitoring Instances and Volumes
-- Instances Tasks - Bundle, Export, Import
+ * Network ACL
+ * VPC Peering connection
+ * Classic Link
+ * Reserved Instances
+ * Spot Instances
+ * Placement Groups
+ * Monitoring Instances and Volumes
+ * Instances Tasks - Bundle, Export, Import
 
 Availability zone related:
-- messages AvailabilityZone property
-- regionName AvailabilityZone property
+ * messages AvailabilityZone property
+ * regionName AvailabilityZone property
 
 Image related:
-- CopyImage
-- platform Image property
-- productCodes Image property
-- hypervisor Image property
-- imageOwnerAlias Image property
-- sriovNetSupport Image property
-- stateReason Image property
-- virtualizationType Image property
-- encrypted EbsBlockDevice property
-- iops EbsBlockDevice property
-- volumeType EbsBlockDevice property
-- selective filtering by Image Owner
+ * CopyImage
+ * platform Image property
+ * productCodes Image property
+ * hypervisor Image property
+ * imageOwnerAlias Image property
+ * sriovNetSupport Image property
+ * stateReason Image property
+ * virtualizationType Image property
+ * encrypted EbsBlockDevice property
+ * iops EbsBlockDevice property
+ * volumeType EbsBlockDevice property
+ * selective filtering by Image Owner
 
 Instance related:
-- DescribeInstanceStatus
-- ReportInstanceStatus
-- productCodes Instance property
-- ebsOptimized Instance property
-- sriovNetSupport Instance property
-- monitoring Instance property
-- placement Instance property
-- platform Instance property
-- publicDnsName Instance property
-- stateTransitionReason Instance property
-- architecture Instance property
-- hypervisor Instance property
-- iamInstanceProfile Instance property
-- instanceLifecycle Instance property
-- spotInstanceRequestId Instance property
-- stateReason Instance property
-- virtualizationType Instance property
-- instanceInitiatedShutdownBehavior Instance attribute
-- attachTime EbsInstanceBlockDevice property
+ * DescribeInstanceStatus
+ * ReportInstanceStatus
+ * productCodes Instance property
+ * ebsOptimized Instance property
+ * sriovNetSupport Instance property
+ * monitoring Instance property
+ * placement Instance property
+ * platform Instance property
+ * publicDnsName Instance property
+ * stateTransitionReason Instance property
+ * architecture Instance property
+ * hypervisor Instance property
+ * iamInstanceProfile Instance property
+ * instanceLifecycle Instance property
+ * spotInstanceRequestId Instance property
+ * stateReason Instance property
+ * virtualizationType Instance property
+ * instanceInitiatedShutdownBehavior Instance attribute
+ * attachTime EbsInstanceBlockDevice property
 
 Network interface related:
-- availabilityZone NetworkInterface property
+ * availabilityZone NetworkInterface property
 
 Snapshot related:
-- CopySnapshot
-- ModifySnapshotAttribute
-- ResetSnapshotAttribute
-- encryption Snapshot property
-- kmsKeyId Snapshot property
-- ownerAlias Snapshot property
-- selective filtering by Snapshot Owner, RestorableBy
+ * CopySnapshot
+ * ModifySnapshotAttribute
+ * ResetSnapshotAttribute
+ * encryption Snapshot property
+ * kmsKeyId Snapshot property
+ * ownerAlias Snapshot property
+ * selective filtering by Snapshot Owner, RestorableBy
 
 Subnet related:
-- ModifySubnetAttribute
-- availabilityZone Subnet property
-- defaultForAz Subnet property
-- mapPublicIpOnLaunch Subnet property
+ * ModifySubnetAttribute
+ * availabilityZone Subnet property
+ * defaultForAz Subnet property
+ * mapPublicIpOnLaunch Subnet property
 
 Volume related:
-- DescribeVolumeAttribute
-- DescribeVolumeStatus
-- ModifyVolumeAttribute
-- kmsKeyId Volume property
-- iops Volume property
-- volumeType (current implementation isn't AWS compatible) Volume property
+ * DescribeVolumeAttribute
+ * DescribeVolumeStatus
+ * ModifyVolumeAttribute
+ * kmsKeyId Volume property
+ * iops Volume property
+ * volumeType (current implementation isn't AWS compatible) Volume property
 
 VPC related:
-- describeVpcAttribute
-- modifyVpcAttribute
-- instanceTenancy VPC property
+ * describeVpcAttribute
+ * modifyVpcAttribute
+ * instanceTenancy VPC property
 
 DescribeAccountAttributes result properties:
-- pc-max-security-groups-per-interface AccountAttribute property
-- max-elastic-ips AccountAttribute property
-- vpc-max-elastic-ips AccountAttribute property
+ * pc-max-security-groups-per-interface AccountAttribute property
+ * max-elastic-ips AccountAttribute property
+ * vpc-max-elastic-ips AccountAttribute property
 
 VpnGateway related:
-- availabilityZone property
+ * availabilityZone property
 
 CustomerGateway related:
-- bgpAsn property
+ * bgpAsn property
 
 VpnConnection related:
-- vgwTelemetry property
-- tunnel_inside_address CustomerGatewayConfiguration tag
-- clear_df_bit CustomerGatewayConfiguration tag
-- fragmentation_before_encryption CustomerGatewayConfiguration tag
-- dead_peer_detection CustomerGatewayConfiguration tag
+ * vgwTelemetry property
+ * tunnel_inside_address CustomerGatewayConfiguration tag
+ * clear_df_bit CustomerGatewayConfiguration tag
+ * fragmentation_before_encryption CustomerGatewayConfiguration tag
+ * dead_peer_detection CustomerGatewayConfiguration tag
 
 Supported Features
 ==================
@@ -214,20 +214,20 @@ Legacy OpenStack release notice
 EC2 API supports Havana, Icehouse, Juno with additional limitations:
 
 Instance related:
-- rootDeviceName Instance property
-- kernelId Instance property
-- ramdiskId Instance property
-- userData Instance property
-- hostName Instance property
-- reservationId Reservation property (ec2api own ids are generated for
+ * rootDeviceName Instance property
+ * kernelId Instance property
+ * ramdiskId Instance property
+ * userData Instance property
+ * hostName Instance property
+ * reservationId Reservation property (ec2api own ids are generated for
 instances launched not by ec2api)
-- launchIndex Instance property (0 for instances launched not by ec2api)
+ * launchIndex Instance property (0 for instances launched not by ec2api)
 
 Volume related:
-- deleteOnTermination property
+ * deleteOnTermination property
 
 Network interface related:
-- deleteOnTermination (False value can be assigned but doesn't supported)
+ * deleteOnTermination (False value can be assigned but doesn't supported)
 
 All these properties can be specified in RunInstance command though, they are
 not reported in describe operations.
@@ -238,10 +238,9 @@ deleteOnTermination.
 
 
 Preferred way to run EC2 API in older releases is to run it in virtual environment:
-- create virtual environment by running command 'python tools/install_venv.py'
-- run install inside venv 'tools/with_venv.sh ./install.sh'
-- and then you need to run EC2 API services: 'ec2-api', 'ec2-api-metadata'
-  and 'ec2-api-s3'
+ * create virtual environment by running command 'python tools/install_venv.py'
+ * run install inside venv 'tools/with_venv.sh ./install.sh'
+ * and then you need to run EC2 API services: 'ec2-api', 'ec2-api-metadata', and 'ec2-api-s3'
 Also you need to reconfigure metadata ports in nova(and neutron) config files
 if you want metadata to work correctly. (See 'Installation' section).
 After these steps you will have working EC2 API services at ports:
