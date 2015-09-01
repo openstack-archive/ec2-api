@@ -161,14 +161,6 @@ class MetadataRequestHandler(wsgi.Application):
             'X-Instance-ID-Signature': signature,
         }
 
-    def _get_remote_ip(self, req):
-        remote_ip = req.remote_addr
-        if CONF.use_forwarded_for:
-            remote_ip = req.headers.get('X-Forwarded-For', remote_ip)
-        if not remote_ip:
-            raise exception.EC2MetadataInvalidAddress()
-        return remote_ip
-
     def _sign_instance_id(self, instance_id):
         return hmac.new(CONF.metadata.metadata_proxy_shared_secret,
                         instance_id,
@@ -183,28 +175,25 @@ class MetadataRequestHandler(wsgi.Application):
                     context, provider_id, remote_ip))
         elif req.headers.get('X-Instance-ID'):
             os_instance_id, project_id, remote_ip = (
-                self._unpack_request_attributes(req))
+                self._unpack_neutron_request(req))
         else:
+            remote_ip = self._unpack_nova_network_request(req)
             context = ec2_context.get_os_admin_context()
-            remote_ip = self._get_remote_ip(req)
             os_instance_id, project_id = (
                 api.get_os_instance_and_project_id(context, remote_ip))
         return {'os_instance_id': os_instance_id,
                 'project_id': project_id,
                 'private_ip': remote_ip}
 
-    def _get_metadata(self, path_tokens, requester):
-        context = ec2_context.get_os_admin_context()
-        # NOTE(ft): substitute project_id for context to instance's one.
-        # It's needed for correct describe and auto update DB operations.
-        # It doesn't affect operations via OpenStack's clients because
-        # these clients use auth_token field only
-        context.project_id = requester['project_id']
-        return api.get_metadata_item(context, path_tokens,
-                                     requester['os_instance_id'],
-                                     requester['private_ip'])
+    def _unpack_nova_network_request(self, req):
+        remote_ip = req.remote_addr
+        if CONF.use_forwarded_for:
+            remote_ip = req.headers.get('X-Forwarded-For', remote_ip)
+        if not remote_ip:
+            raise exception.EC2MetadataInvalidAddress()
+        return remote_ip
 
-    def _unpack_request_attributes(self, req):
+    def _unpack_neutron_request(self, req):
         os_instance_id = req.headers.get('X-Instance-ID')
         project_id = req.headers.get('X-Tenant-ID')
         signature = req.headers.get('X-Instance-ID-Signature')
@@ -268,6 +257,17 @@ class MetadataRequestHandler(wsgi.Application):
 
             msg = _('Invalid proxy request signature.')
             raise webob.exc.HTTPForbidden(explanation=msg)
+
+    def _get_metadata(self, path_tokens, requester):
+        context = ec2_context.get_os_admin_context()
+        # NOTE(ft): substitute project_id for context to instance's one.
+        # It's needed for correct describe and auto update DB operations.
+        # It doesn't affect operations via OpenStack's clients because
+        # these clients use auth_token field only
+        context.project_id = requester['project_id']
+        return api.get_metadata_item(context, path_tokens,
+                                     requester['os_instance_id'],
+                                     requester['private_ip'])
 
     def _add_response_data(self, response, data):
         if isinstance(data, six.text_type):
