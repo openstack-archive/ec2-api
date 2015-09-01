@@ -79,8 +79,10 @@ class MetadataRequestHandler(wsgi.Application):
             path = '/' + path
         path = posixpath.normpath(path)
         path_tokens = path.split('/')[1:]
+        if path_tokens[0] == 'ec2':
+            path_tokens = path_tokens[1:]
 
-        if path_tokens in ([''], ['ec2']):
+        if path_tokens == ['']:
             resp = api.get_version_list()
             return self._add_response_data(req.response, resp)
 
@@ -88,10 +90,10 @@ class MetadataRequestHandler(wsgi.Application):
             requester = self._get_requester(req)
             if path_tokens[0] == 'openstack':
                 return self._proxy_request(req, requester)
-            elif path_tokens[0] == 'ec2':
-                path_tokens = path_tokens[1:]
+
             resp = self._get_metadata(path_tokens, requester)
             return self._add_response_data(req.response, resp)
+
         except exception.EC2MetadataNotFound:
             return webob.exc.HTTPNotFound()
         except Exception:
