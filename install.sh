@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 #Parameters to configure
 SERVICE_USERNAME=ec2api
