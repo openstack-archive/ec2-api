@@ -98,32 +98,33 @@ class ProxyTestCase(test_base.BaseTestCase):
         req = mock.Mock(headers={})
 
         with contextlib.nested(
-            mock.patch('ec2api.context.get_os_admin_context'),
             mock.patch.object(metadata.MetadataRequestHandler,
-                              '_get_remote_ip'),
+                              '_unpack_nova_network_request'),
+            mock.patch('ec2api.context.get_os_admin_context'),
             mock.patch('ec2api.metadata.api.get_os_instance_and_project_id'),
-        ) as (get_context, get_remote_ip, get_ids):
+        ) as (unpack_request, get_context, get_ids):
             get_context.return_value = base.create_context(is_os_admin=True)
-            get_remote_ip.return_value = mock.sentinel.private_ip
+            unpack_request.return_value = mock.sentinel.private_ip
             get_ids.return_value = (mock.sentinel.os_instance_id,
                                     mock.sentinel.project_id)
 
             retval = self.handler._get_requester(req)
             self.assertEqual(expected, retval)
             get_context.assert_called_with()
-            get_remote_ip.assert_called_with(req)
+            unpack_request.assert_called_with(req)
             get_ids.assert_called_with(get_context.return_value,
                                        mock.sentinel.private_ip)
 
         req.headers['X-Instance-ID'] = mock.sentinel.os_instance_id
         with mock.patch.object(metadata.MetadataRequestHandler,
-                               '_unpack_request_attributes') as unpack_attr:
-            unpack_attr.return_value = (mock.sentinel.os_instance_id,
-                                        mock.sentinel.project_id,
-                                        mock.sentinel.private_ip)
+                               '_unpack_neutron_request') as unpack_request:
+            unpack_request.return_value = (mock.sentinel.os_instance_id,
+                                           mock.sentinel.project_id,
+                                           mock.sentinel.private_ip)
+
             retval = self.handler._get_requester(req)
             self.assertEqual(expected, retval)
-            unpack_attr.assert_called_with(req)
+            unpack_request.assert_called_with(req)
 
         req.headers['X-Metadata-Provider'] = mock.sentinel.provider_id
         with contextlib.nested(
@@ -295,48 +296,51 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.handler._sign_instance_id('foo')
         )
 
-    def test_get_remote_ip(self):
+    def test_unpack_nova_network_request(self):
         req = mock.Mock(remote_addr='fake_addr', headers={})
 
-        self.assertEqual('fake_addr', self.handler._get_remote_ip(req))
+        self.assertEqual('fake_addr',
+                         self.handler._unpack_nova_network_request(req))
 
         cfg.CONF.set_override('use_forwarded_for', True)
-        self.assertEqual('fake_addr', self.handler._get_remote_ip(req))
+        self.assertEqual('fake_addr',
+                         self.handler._unpack_nova_network_request(req))
 
         req.headers['X-Forwarded-For'] = 'fake_forwarded_for'
         self.assertEqual('fake_forwarded_for',
-                         self.handler._get_remote_ip(req))
+                         self.handler._unpack_nova_network_request(req))
 
         cfg.CONF.set_override('use_forwarded_for', False)
-        self.assertEqual('fake_addr', self.handler._get_remote_ip(req))
+        self.assertEqual('fake_addr',
+                         self.handler._unpack_nova_network_request(req))
 
-    def test_unpack_request_attributes(self):
+    def test_unpack_neutron_request(self):
         sign = (
             '97e7709481495f1a3a589e5ee03f8b5d51a3e0196768e300c441b58fe0382f4d')
         req = mock.Mock(headers={'X-Instance-ID': 'fake_instance_id',
                                  'X-Tenant-ID': 'fake_project_id',
                                  'X-Forwarded-For': 'fake_instance_ip',
                                  'X-Instance-ID-Signature': sign})
-        retval = self.handler._unpack_request_attributes(req)
+        retval = self.handler._unpack_neutron_request(req)
         self.assertEqual(
             ('fake_instance_id', 'fake_project_id', 'fake_instance_ip'),
             retval)
 
         req.headers['X-Instance-ID-Signature'] = 'fake'
         self.assertRaises(webob.exc.HTTPForbidden,
-                          self.handler._unpack_request_attributes, req)
+                          self.handler._unpack_neutron_request, req)
 
         req.headers.pop('X-Instance-ID-Signature')
         self.assertRaises(webob.exc.HTTPForbidden,
-                          self.handler._unpack_request_attributes, req)
+                          self.handler._unpack_neutron_request, req)
 
         req.headers.pop('X-Tenant-ID')
         self.assertRaises(webob.exc.HTTPBadRequest,
-                          self.handler._unpack_request_attributes, req)
+                          self.handler._unpack_neutron_request, req)
 
         req.headers.pop('X-Forwarded-For')
         self.assertRaises(exception.EC2MetadataInvalidAddress,
-                          self.handler._unpack_request_attributes, req)
+                          self.handler._unpack_neutron_request, req)
 
     def test_unpack_nsx_request(self):
         sign = (
@@ -381,7 +385,7 @@ class ProxyTestCase(test_base.BaseTestCase):
                                  'X-Tenant-ID': 'fake_project_id',
                                  'X-Forwarded-For': 'fake_instance_ip',
                                  'X-Instance-ID-Signature': sign})
-        self.handler._unpack_request_attributes(req)
+        self.handler._unpack_neutron_request(req)
         self.assertEqual(1, constant_time_compare.call_count)
 
     @mock.patch('ec2api.context.get_keystone_client_class')
