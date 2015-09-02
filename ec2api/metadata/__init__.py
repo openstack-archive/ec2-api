@@ -85,11 +85,12 @@ class MetadataRequestHandler(wsgi.Application):
             return self._add_response_data(req.response, resp)
 
         try:
+            requester = self._get_requester(req)
             if path_tokens[0] == 'openstack':
-                return self._proxy_request(req)
+                return self._proxy_request(req, requester)
             elif path_tokens[0] == 'ec2':
                 path_tokens = path_tokens[1:]
-            resp = self._get_metadata(req, path_tokens)
+            resp = self._get_metadata(path_tokens, requester)
             return self._add_response_data(req.response, resp)
         except exception.EC2MetadataNotFound:
             return webob.exc.HTTPNotFound()
@@ -99,8 +100,8 @@ class MetadataRequestHandler(wsgi.Application):
                     'Please try your request again.')
             return webob.exc.HTTPInternalServerError(explanation=unicode(msg))
 
-    def _proxy_request(self, req):
-        headers = self._build_proxy_request_headers(req)
+    def _proxy_request(self, req, requester):
+        headers = self._build_proxy_request_headers(requester)
         nova_ip_port = '%s:%s' % (CONF.metadata.nova_metadata_ip,
                                   CONF.metadata.nova_metadata_port)
         url = urlparse.urlunsplit((
@@ -149,19 +150,13 @@ class MetadataRequestHandler(wsgi.Application):
         else:
             raise Exception(_('Unexpected response code: %s') % resp.status)
 
-    def _build_proxy_request_headers(self, req):
-        if req.headers.get('X-Instance-ID'):
-            return req.headers
-
-        remote_ip = self._get_remote_ip(req)
-        context = ec2_context.get_os_admin_context()
-        instance_id, project_id = (
-            api.get_os_instance_and_project_id(context, remote_ip))
+    def _build_proxy_request_headers(self, requester):
+        signature = self._sign_instance_id(requester['os_instance_id'])
         return {
-            'X-Forwarded-For': remote_ip,
-            'X-Instance-ID': instance_id,
-            'X-Tenant-ID': project_id,
-            'X-Instance-ID-Signature': self._sign_instance_id(instance_id),
+            'X-Forwarded-For': requester['private_ip'],
+            'X-Instance-ID': requester['os_instance_id'],
+            'X-Tenant-ID': requester['project_id'],
+            'X-Instance-ID-Signature': signature,
         }
 
     def _get_remote_ip(self, req):
@@ -177,22 +172,29 @@ class MetadataRequestHandler(wsgi.Application):
                         instance_id,
                         hashlib.sha256).hexdigest()
 
-    def _get_metadata(self, req, path_tokens):
-        context = ec2_context.get_os_admin_context()
+    def _get_requester(self, req):
         if req.headers.get('X-Instance-ID'):
             os_instance_id, project_id, remote_ip = (
                 self._unpack_request_attributes(req))
         else:
+            context = ec2_context.get_os_admin_context()
             remote_ip = self._get_remote_ip(req)
             os_instance_id, project_id = (
                 api.get_os_instance_and_project_id(context, remote_ip))
+        return {'os_instance_id': os_instance_id,
+                'project_id': project_id,
+                'private_ip': remote_ip}
+
+    def _get_metadata(self, path_tokens, requester):
+        context = ec2_context.get_os_admin_context()
         # NOTE(ft): substitute project_id for context to instance's one.
         # It's needed for correct describe and auto update DB operations.
         # It doesn't affect operations via OpenStack's clients because
         # these clients use auth_token field only
-        context.project_id = project_id
-        return api.get_metadata_item(context, path_tokens, os_instance_id,
-                                     remote_ip)
+        context.project_id = requester['project_id']
+        return api.get_metadata_item(context, path_tokens,
+                                     requester['os_instance_id'],
+                                     requester['private_ip'])
 
     def _unpack_request_attributes(self, req):
         os_instance_id = req.headers.get('X-Instance-ID')
