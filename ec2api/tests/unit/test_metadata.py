@@ -125,6 +125,28 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.assertEqual(expected, retval)
             unpack_attr.assert_called_with(req)
 
+        req.headers['X-Metadata-Provider'] = mock.sentinel.provider_id
+        with contextlib.nested(
+            mock.patch.object(metadata.MetadataRequestHandler,
+                              '_unpack_nsx_request'),
+            mock.patch('ec2api.context.get_os_admin_context'),
+            mock.patch('ec2api.metadata.api.'
+                       'get_os_instance_and_project_id_by_provider_id'),
+        ) as (unpack_request, get_context, get_ids):
+            unpack_request.return_value = (mock.sentinel.provider_id,
+                                           mock.sentinel.private_ip)
+            get_context.return_value = base.create_context(is_os_admin=True)
+            get_ids.return_value = (mock.sentinel.os_instance_id,
+                                    mock.sentinel.project_id)
+
+            retval = self.handler._get_requester(req)
+            self.assertEqual(expected, retval)
+            unpack_request.assert_called_with(req)
+            get_context.assert_called_with()
+            get_ids.assert_called_with(get_context.return_value,
+                                       mock.sentinel.provider_id,
+                                       mock.sentinel.private_ip)
+
     @mock.patch('ec2api.metadata.api.get_metadata_item')
     @mock.patch('ec2api.context.get_os_admin_context')
     def test_get_metadata(self, get_context, get_metadata_item):
@@ -304,6 +326,10 @@ class ProxyTestCase(test_base.BaseTestCase):
         self.assertRaises(webob.exc.HTTPForbidden,
                           self.handler._unpack_request_attributes, req)
 
+        req.headers.pop('X-Instance-ID-Signature')
+        self.assertRaises(webob.exc.HTTPForbidden,
+                          self.handler._unpack_request_attributes, req)
+
         req.headers.pop('X-Tenant-ID')
         self.assertRaises(webob.exc.HTTPBadRequest,
                           self.handler._unpack_request_attributes, req)
@@ -311,6 +337,41 @@ class ProxyTestCase(test_base.BaseTestCase):
         req.headers.pop('X-Forwarded-For')
         self.assertRaises(exception.EC2MetadataInvalidAddress,
                           self.handler._unpack_request_attributes, req)
+
+    def test_unpack_nsx_request(self):
+        sign = (
+            '344aa301e652d6c214c4f4a475a43c9f69d9f2d26d87e939c6bac3f21a9d2476')
+        req = mock.Mock(headers={'X-Metadata-Provider': 'fake_provider_id',
+                                 'X-Forwarded-For': 'fake_instance_ip',
+                                 'X-Metadata-Provider-Signature': sign})
+        retval = self.handler._unpack_nsx_request(req)
+        self.assertEqual(('fake_provider_id', 'fake_instance_ip'), retval)
+
+        req.headers['X-Forwarded-For'] = 'fake_instance_ip,fake_router_ip'
+        retval = self.handler._unpack_nsx_request(req)
+        self.assertEqual(('fake_provider_id', 'fake_instance_ip'), retval)
+
+        req.headers['X-Metadata-Provider-Signature'] = 'fake'
+        self.assertRaises(webob.exc.HTTPForbidden,
+                          self.handler._unpack_nsx_request, req)
+
+        req.headers.pop('X-Metadata-Provider-Signature')
+        self.assertRaises(webob.exc.HTTPForbidden,
+                          self.handler._unpack_nsx_request, req)
+
+        with config_fixture.Config() as conf:
+            conf.config(group='metadata',
+                        metadata_proxy_shared_secret=None)
+            retval = self.handler._unpack_nsx_request(req)
+            self.assertEqual(('fake_provider_id', 'fake_instance_ip'), retval)
+
+        req.headers.pop('X-Metadata-Provider')
+        self.assertRaises(webob.exc.HTTPBadRequest,
+                          self.handler._unpack_nsx_request, req)
+
+        req.headers.pop('X-Forwarded-For')
+        self.assertRaises(webob.exc.HTTPBadRequest,
+                          self.handler._unpack_nsx_request, req)
 
     @mock.patch('ec2api.utils.constant_time_compare')
     def test_usage_of_constant_time_compare(self, constant_time_compare):

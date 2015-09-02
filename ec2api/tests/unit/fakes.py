@@ -576,7 +576,8 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
                             'subnet_id': ID_OS_SUBNET_2}],
              'device_id': ID_OS_INSTANCE_1,
              'device_owner': '',
-             'security_groups': [ID_OS_SECURITY_GROUP_1]}
+             'security_groups': [ID_OS_SECURITY_GROUP_1],
+             'tenant_id': ID_OS_PROJECT}
 
 
 # instance objects

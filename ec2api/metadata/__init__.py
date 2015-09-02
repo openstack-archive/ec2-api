@@ -173,7 +173,13 @@ class MetadataRequestHandler(wsgi.Application):
                         hashlib.sha256).hexdigest()
 
     def _get_requester(self, req):
-        if req.headers.get('X-Instance-ID'):
+        if req.headers.get('X-Metadata-Provider'):
+            provider_id, remote_ip = self._unpack_nsx_request(req)
+            context = ec2_context.get_os_admin_context()
+            os_instance_id, project_id = (
+                api.get_os_instance_and_project_id_by_provider_id(
+                    context, provider_id, remote_ip))
+        elif req.headers.get('X-Instance-ID'):
             os_instance_id, project_id, remote_ip = (
                 self._unpack_request_attributes(req))
         else:
@@ -219,27 +225,47 @@ class MetadataRequestHandler(wsgi.Application):
         if msg:
             raise webob.exc.HTTPBadRequest(explanation=msg)
 
+        self._validate_signature(signature, os_instance_id, remote_ip)
+        return os_instance_id, project_id, remote_ip
+
+    def _unpack_nsx_request(self, req):
+        remote_address = req.headers.get('X-Forwarded-For')
+        if remote_address is None:
+            msg = _('X-Forwarded-For is missing from request.')
+            raise webob.exc.HTTPBadRequest(explanation=msg)
+        provider_id = req.headers.get('X-Metadata-Provider')
+        if provider_id is None:
+            msg = _('X-Metadata-Provider is missing from request.')
+            raise webob.exc.HTTPBadRequest(explanation=msg)
+        remote_ip = remote_address.split(',')[0]
+
+        if CONF.metadata.metadata_proxy_shared_secret:
+            signature = req.headers.get('X-Metadata-Provider-Signature')
+            self._validate_signature(signature, provider_id, remote_ip)
+
+        return provider_id, remote_ip
+
+    def _validate_signature(self, signature, requester_id, requester_ip):
         expected_signature = hmac.new(
             CONF.metadata.metadata_proxy_shared_secret,
-            os_instance_id,
+            requester_id,
             hashlib.sha256).hexdigest()
 
-        if not utils.constant_time_compare(expected_signature, signature):
+        if not (signature and
+                utils.constant_time_compare(expected_signature, signature)):
             LOG.warning(_LW(
                             'X-Instance-ID-Signature: %(signature)s does '
                             'not match the expected value: '
                             '%(expected_signature)s for id: '
-                            '%(instance_id)s. Request From: '
-                            '%(remote_ip)s'),
+                            '%(requester_id)s. Request From: '
+                            '%(requester_ip)s'),
                         {'signature': signature,
                          'expected_signature': expected_signature,
-                         'instance_id': os_instance_id,
-                         'remote_ip': remote_ip})
+                         'requester_id': requester_id,
+                         'requester_ip': requester_ip})
 
             msg = _('Invalid proxy request signature.')
             raise webob.exc.HTTPForbidden(explanation=msg)
-
-        return os_instance_id, project_id, remote_ip
 
     def _add_response_data(self, response, data):
         if isinstance(data, six.text_type):

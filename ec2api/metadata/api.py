@@ -84,6 +84,27 @@ def get_os_instance_and_project_id(context, fixed_ip):
         raise exception.EC2MetadataNotFound()
 
 
+def get_os_instance_and_project_id_by_provider_id(context, provider_id,
+                                                  fixed_ip):
+    neutron = clients.neutron(context)
+    os_subnets = neutron.list_subnets(advanced_service_providers=[provider_id],
+                                      fields=['network_id'])
+    if not os_subnets:
+        raise exception.EC2MetadataNotFound()
+    os_networks = [subnet['network_id']
+                   for subnet in os_subnets['subnets']]
+    try:
+        os_port = neutron.list_ports(
+            fixed_ips='ip_address=' + fixed_ip,
+            network_id=os_networks,
+            fields=['device_id', 'tenant_id'])['ports'][0]
+    except IndexError:
+        raise exception.EC2MetadataNotFound()
+    os_instance_id = os_port['device_id']
+    project_id = os_port['tenant_id']
+    return os_instance_id, project_id
+
+
 def get_metadata_item(context, path_tokens, os_instance_id, remote_ip):
     version = path_tokens[0]
     if version == "latest":

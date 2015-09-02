@@ -80,6 +80,36 @@ class MetadataApiTestCase(base.ApiTestCase):
             fakes.OSInstance(fakes.OS_INSTANCE_2)]
         check_raise()
 
+    def test_get_instance_and_project_id_by_provider_id(self):
+        self.neutron.list_subnets.return_value = {
+            'subnets': [fakes.OS_SUBNET_1, fakes.OS_SUBNET_2]}
+        self.neutron.list_ports.return_value = {
+            'ports': [fakes.OS_PORT_2]}
+        self.assertEqual(
+            (fakes.ID_OS_INSTANCE_1, fakes.ID_OS_PROJECT),
+            api.get_os_instance_and_project_id_by_provider_id(
+                self.fake_context, mock.sentinel.provider_id,
+                fakes.IP_NETWORK_INTERFACE_2))
+        self.neutron.list_subnets.assert_called_with(
+            advanced_service_providers=[mock.sentinel.provider_id],
+            fields=['network_id'])
+        self.neutron.list_ports.assert_called_with(
+            fixed_ips=('ip_address=%s' % fakes.IP_NETWORK_INTERFACE_2),
+            network_id=[fakes.ID_OS_NETWORK_1, fakes.ID_OS_NETWORK_2],
+            fields=['device_id', 'tenant_id'])
+
+        self.neutron.list_ports.return_value = {'ports': []}
+        self.assertRaises(exception.EC2MetadataNotFound,
+                          api.get_os_instance_and_project_id_by_provider_id,
+                          self.fake_context, mock.sentinel.provider_id,
+                          fakes.IP_NETWORK_INTERFACE_2)
+
+        self.neutron.list_subnets.return_value = {'subnets': []}
+        self.assertRaises(exception.EC2MetadataNotFound,
+                          api.get_os_instance_and_project_id_by_provider_id,
+                          self.fake_context, mock.sentinel.provider_id,
+                          fakes.IP_NETWORK_INTERFACE_2)
+
     def test_get_version_root(self):
         retval = api.get_metadata_item(self.fake_context, ['2009-04-04'],
                                        fakes.ID_OS_INSTANCE_1,
