@@ -4,9 +4,3 @@
 enable_service ec2-api
 enable_service ec2-api-metadata
 enable_service ec2-api-s3
-
-# we have to use Nova client supported Nova microversions,
-# but related changes are not done in the client release.
-# So we temporary use a not commited patch
-# https://review.openstack.org/#/c/152569/
-LIBS_FROM_GIT=python-novaclient
