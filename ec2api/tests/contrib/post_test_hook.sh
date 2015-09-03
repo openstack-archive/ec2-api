@@ -113,7 +113,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   instance_name="i-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
   instance_id=$(nova boot \
     --flavor "$FLAVOR_NAME" \
-    --block-device-mapping "/dev/vda=$volume_id:::1" \
+    --block-device "device=/dev/vda,id=$volume_id,shutdown=remove,source=volume,dest=volume,bootindex=0" \
     "$instance_name" | awk '/ id / {print $4}')
   fail=0
   until [[ $(instance_status $instance_id) == "ACTIVE" ]]; do

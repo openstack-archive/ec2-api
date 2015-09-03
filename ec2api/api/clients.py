@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 ec2_opts = [
     cfg.StrOpt('nova_service_type',
-               default='computev21',
+               default='compute',
                help='Service type of Compute API, registered in Keystone '
                     'catalog. Should be v2.1 with microversion support. '
                     'If it is obsolete v2, a lot of useful EC2 compliant '

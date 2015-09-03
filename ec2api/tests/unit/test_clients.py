@@ -32,14 +32,14 @@ class ClientsTestCase(base.BaseTestCase):
     def test_nova(self, nova, get_api_version):
         context = mock.NonCallableMock(
             auth_token='fake_token',
-            service_catalog=[{'type': 'computev21',
-                              'endpoints': [{'publicURL': 'novav21_url'}]}])
+            service_catalog=[{'type': 'compute',
+                              'endpoints': [{'publicURL': 'nova_url'}]}])
 
         # test normal flow with get_api_version call
         res = clients.nova(context)
         self.assertEqual(nova.return_value, res)
         nova.assert_called_with(
-            '2.3', bypass_url='novav21_url', http_log_debug=False,
+            '2.3', bypass_url='nova_url', http_log_debug=False,
             auth_url='keystone_url', auth_token='fake_token')
         get_api_version.assert_called_once_with(context)
 
@@ -48,19 +48,19 @@ class ClientsTestCase(base.BaseTestCase):
         self.configure(debug=True)
         clients.nova(context)
         nova.assert_called_with(
-            '2.3', bypass_url='novav21_url', http_log_debug=True,
+            '2.3', bypass_url='nova_url', http_log_debug=True,
             auth_url='keystone_url', auth_token='fake_token')
         self.assertFalse(get_api_version.called)
         self.configure(debug=False)
 
         # test CONF.nova_service_type is used
         context.service_catalog.append({
-            'type': 'compute',
-            'endpoints': [{'publicURL': 'nova_url'}]})
-        self.configure(nova_service_type='compute')
+            'type': 'compute_legacy',
+            'endpoints': [{'publicURL': 'nova_legacy_url'}]})
+        self.configure(nova_service_type='compute_legacy')
         clients.nova(context)
         nova.assert_called_with(
-            '2.3', bypass_url='nova_url', http_log_debug=False,
+            '2.3', bypass_url='nova_legacy_url', http_log_debug=False,
             auth_url='keystone_url', auth_token='fake_token')
 
     @mock.patch('novaclient.client.Client')
