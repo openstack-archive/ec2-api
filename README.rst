@@ -220,7 +220,7 @@ Instance related:
  * userData Instance property
  * hostName Instance property
  * reservationId Reservation property (ec2api own ids are generated for
-instances launched not by ec2api)
+   instances launched not by ec2api)
  * launchIndex Instance property (0 for instances launched not by ec2api)
 
 Volume related:
