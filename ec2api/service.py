@@ -14,8 +14,7 @@
 
 """Generic Node base class for all workers that run on hosts."""
 
-import multiprocessing
-
+from oslo_concurrency import processutils
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import importutils
@@ -80,7 +79,7 @@ class WSGIService(object):
         self.port = getattr(CONF, '%s_listen_port' % name, 0)
         self.use_ssl = getattr(CONF, '%s_use_ssl' % name, False)
         self.workers = (getattr(CONF, '%s_workers' % name, None) or
-                        self.cpu_count())
+                        processutils.get_worker_count())
         if self.workers and self.workers < 1:
             worker_name = '%s_workers' % name
             msg = (_("%(worker_name)s value of %(workers)s is invalid, "
@@ -104,12 +103,6 @@ class WSGIService(object):
 
         """
         self.server.reset()
-
-    def cpu_count(self):
-        try:
-            return multiprocessing.cpu_count()
-        except NotImplementedError:
-            return 1
 
     def _get_manager(self):
         """Initialize a Manager object appropriate for this service.
