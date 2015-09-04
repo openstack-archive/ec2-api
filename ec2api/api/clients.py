@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from novaclient import client as novaclient
 from novaclient import exceptions as nova_exception
 from oslo_config import cfg
@@ -20,7 +19,7 @@ from oslo_log import log as logging
 import oslo_messaging as messaging
 
 from ec2api import context as ec2_context
-from ec2api.i18n import _, _LW
+from ec2api.i18n import _, _LI, _LW
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +51,16 @@ try:
 except ImportError:
     glanceclient = None
     logger.info(_('glanceclient not available'))
+try:
+    # api_versions module is introduced since v2.27 novaclient
+    from novaclient import api_versions as nova_api_versions
+except ImportError:
+    nova_api_versions = None
 
 
 # Nova API version with microversions support
 REQUIRED_NOVA_API_VERSION = '2.1'
+REQUIRED_NOVA_API_VERSION_ID = 'v%s' % REQUIRED_NOVA_API_VERSION
 LEGACY_NOVA_API_VERSION = '2'
 # Nova API's 2.3 microversion provides additional EC2 compliant instance
 # properties
@@ -161,8 +166,10 @@ def _url_for(context, **kwargs):
 
 
 def _get_nova_api_version(context):
+    url = _url_for(context, service_type=CONF.nova_service_type)
     try:
-        novaclient.Client(REQUIRED_NOVA_API_VERSION)
+        client = novaclient.Client(REQUIRED_NOVA_API_VERSION, bypass_url=url,
+                                   http_log_debug=CONF.debug)
     except nova_exception.UnsupportedVersion:
         logger.warning(
             _LW('Nova client does not support v2.1 Nova API, use v2 instead. '
@@ -170,7 +177,49 @@ def _get_nova_api_version(context):
                 'will be unavailable.'))
         return LEGACY_NOVA_API_VERSION
 
-    # NOTE(ft): novaclient supports microversions, use the last required one
+    # NOTE(ft): this is a somewhat paranoid check, because api_versions
+    # had been introduced to novaclient together with v2.1 support. Probaly
+    # it should be removed after at least a couple of novaclinet has been
+    # released with no change of APIVersion class location.
+    if not nova_api_versions:
+        logger.warning(_LW('Nova client suports v2.1, but does unexpectedly '
+                           'not have api_versions module. Nova API version '
+                           'check is skipped. Use v%s Nova API.'),
+                       REQUIRED_NOVA_API_MICROVERSION)
+        return REQUIRED_NOVA_API_MICROVERSION
+
+    required = nova_api_versions.APIVersion(REQUIRED_NOVA_API_MICROVERSION)
+    current = client.versions.get_current()
+    if not current:
+        logger.warning(
+            _LW('Could not check Nova API version because no version '
+                'was found in Nova version list for url %(url)s of service '
+                'type "%(service_type)s". '
+                'Use v%(required_api_version)s Nova API.'),
+            {'url': url, 'service_type': CONF.nova_service_type,
+             'required_api_version': REQUIRED_NOVA_API_MICROVERSION})
+        return REQUIRED_NOVA_API_MICROVERSION
+    if current.id != REQUIRED_NOVA_API_VERSION_ID:
+        logger.warning(
+            _LW('Specified "%s" Nova service type does not support v2.1 API. '
+                'A lot of useful EC2 compliant instance properties '
+                'will be unavailable.'),
+            CONF.nova_service_type)
+        return LEGACY_NOVA_API_VERSION
+    if (nova_api_versions.APIVersion(current.version) < required):
+        logger.warning(
+            _LW('Nova support v%(nova_api_version)s, '
+                'but v%(required_api_version)s is required. '
+                'A lot of useful EC2 compliant instance properties '
+                'will be unavailable.'),
+            {'nova_api_version': current.version,
+             'required_api_version': REQUIRED_NOVA_API_MICROVERSION})
+        return current.version
+    logger.info(_LI('Provided Nova API version is  v%(nova_api_version)s, '
+                    'used one is v%(required_api_version)s'),
+                {'nova_api_version': current.version,
+                 'required_api_version': (
+                        REQUIRED_NOVA_API_MICROVERSION)})
     return REQUIRED_NOVA_API_MICROVERSION
 
 
