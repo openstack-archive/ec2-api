@@ -91,6 +91,13 @@ CONTAINER_TO_KIND = {'aki': 'aki',
 IMAGE_TYPES = {'aki': 'kernel',
                'ari': 'ramdisk',
                'ami': 'machine'}
+GLANCE_STATUS_TO_EC2 = {'queued': 'pending',
+                        'saving': 'pending',
+                        'active': 'available',
+                        'killed': 'deregistered',
+                        'pending_delete': 'deregistered',
+                        'deleted': 'deregistered',
+                        'deactivated': 'invalid'}
 EPHEMERAL_PREFIX_LEN = len('ephemeral')
 
 
@@ -532,11 +539,11 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
                  }
     if 'description' in image:
         ec2_image['description'] = image['description']
-    state = os_image.status
-    # NOTE(vish): fallback status if image_state isn't set
-    if state == 'active':
-        state = 'available'
-    ec2_image['imageState'] = os_image.properties.get('image_state', state)
+    state = GLANCE_STATUS_TO_EC2.get(os_image.status, 'error')
+    if state in ('available', 'pending'):
+        state = _s3_image_state_map.get(os_image.properties.get('image_state'),
+                                        state)
+    ec2_image['imageState'] = state
 
     kernel_id = os_image.properties.get('kernel_id')
     if kernel_id:
@@ -691,6 +698,18 @@ ec2utils.register_auto_create_db_item_extension(
 
 
 # NOTE(ft): following functions are copied from various parts of Nova
+
+# translate our internal state to states valid by the EC2 API documentation
+_s3_image_state_map = {'downloading': 'pending',
+                       'failed_download': 'failed',
+                       'decrypting': 'pending',
+                       'failed_decrypt': 'failed',
+                       'untarring': 'pending',
+                       'failed_untar': 'failed',
+                       'uploading': 'pending',
+                       'failed_upload': 'failed',
+                       'available': 'available'}
+
 
 def _s3_create(context, metadata):
     """Gets a manifest from s3 and makes an image."""

@@ -482,6 +482,43 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual('instance-store', image['rootDeviceType'])
         self.assertNotIn('blockDeviceMapping', image)
 
+        # check Glance status translation
+        os_image = fakes.OSImage({'id': fakes.ID_OS_IMAGE_1})
+
+        def check_status_translation(status, expected):
+            os_image.status = status
+            image = image_api._format_image(
+                'fake_context', fakes.DB_IMAGE_1, os_image, None, None)
+            self.assertEqual(expected, image['imageState'],
+                             "Wrong '%s' Glance status translation" % status)
+        check_status_translation('queued', 'pending')
+        check_status_translation('saving', 'pending')
+        check_status_translation('active', 'available')
+        check_status_translation('killed', 'deregistered')
+        check_status_translation('pending_delete', 'deregistered')
+        check_status_translation('deleted', 'deregistered')
+        check_status_translation('deactivated', 'invalid')
+        check_status_translation('unknown-status', 'error')
+
+        # check internal state translation
+        os_image.status = 'queued'
+
+        def check_state_translation(state, expected):
+            os_image.properties['image_state'] = state
+            image = image_api._format_image(
+                'fake_context', fakes.DB_IMAGE_1, os_image, None, None)
+            self.assertEqual(expected, image['imageState'],
+                             "Wrong '%s' internal state translation" % state)
+
+        for state in ('downloading', 'decrypting', 'untarring', 'uploading'):
+            check_state_translation(state, 'pending')
+        for state in ('failed_download', 'failed_decrypt', 'failed_untar',
+                      'failed_upload'):
+            check_state_translation(state, 'failed')
+        os_image.status = 'active'
+        check_state_translation('available', 'available')
+        check_state_translation('unknown-state', 'available')
+
     @mock.patch('ec2api.db.api.IMPL')
     def test_format_mappings(self, db_api):
         # check virtual mapping formatting
