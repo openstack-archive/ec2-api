@@ -176,6 +176,7 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE DEFAULT admin_user $EC2API_ADMIN_USER
     iniset $EC2API_CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
 
+    iniset $EC2API_CONF_FILE DEFAULT ec2api_workers "$API_WORKERS"
     iniset $EC2API_CONF_FILE DEFAULT keystone_url "http://${KEYSTONE_AUTH_HOST}:35357/v2.0"
     iniset $EC2API_CONF_FILE DEFAULT region_list "$REGION_NAME"
 
@@ -194,6 +195,7 @@ function configure_ec2api {
     configure_ec2api_networking
 
     # metadata configuring
+    iniset $EC2API_CONF_FILE DEFAULT metadata_workers "$API_WORKERS"
     if [[ ,${ENABLED_SERVICES} =~ ,"q-" ]]; then
         # with neutron
         iniset $Q_META_CONF_FILE DEFAULT nova_metadata_port 8789
