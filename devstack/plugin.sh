@@ -52,16 +52,14 @@ function recreate_endpoint {
     if [[ "$KEYSTONE_CATALOG_BACKEND" = 'sql' ]]; then
 
         # Remove nova's ec2 service/endpoint
-        local endpoint_id=$(openstack endpoint list \
-            --column "ID" \
-            --column "Region" \
-            --column "Service Name" \
-            | grep " $REGION_NAME " \
-            | grep " $endpoint " | get_field 1)
-        if [[ -n "$endpoint_id" ]]; then
-            openstack endpoint delete $endpoint_id
+        local endpoint_ids=$(openstack --os-identity-api-version 3 endpoint list \
+            --service "$endpoint" --region "$REGION_NAME" -c ID -f value)
+        if [[ -n "$endpoint_ids" ]]; then
+            for endpoint_id in $endpoint_ids ; do
+                openstack endpoint delete $endpoint_id
+            done
         fi
-        local service_id=$(openstack service list \
+        local service_id=$(openstack --os-identity-api-version 3 service list \
             -c "ID" -c "Name" \
             | grep " $endpoint " | get_field 1)
         if [[ -n "$service_id" ]]; then
@@ -73,12 +71,12 @@ function recreate_endpoint {
             --name "$endpoint" \
             --description="$description" \
             -f value -c id)
-        openstack endpoint create \
-            $service_id \
-            --region "$REGION_NAME" \
-            --publicurl "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/" \
-            --adminurl "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/" \
-            --internalurl "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
+        openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
+            $service_id public "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
+        openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
+            $service_id admin "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
+        openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
+            $service_id internal "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
     fi
 }
 

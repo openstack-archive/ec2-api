@@ -27,11 +27,8 @@ OLD_OS_PROJECT_NAME=$OS_PROJECT_NAME
 OLD_OS_USERNAME=$OS_USERNAME
 OLD_OS_PASSWORD=$OS_PASSWORD
 
-# neutron CLI can parse only OS_TENANT_NAME variable
-export OS_TENANT_NAME=$OS_PROJECT_NAME
-# nova CLI fails with these variables
-unset OS_USER_DOMAIN_ID
-unset OS_PROJECT_DOMAIN_ID
+# bug somewhere
+unset OS_AUTH_TYPE
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
@@ -63,28 +60,28 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   project_name="project-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
   eval $(openstack project create -f shell -c id $project_name)
   project_id=$id
-  [[ -n "$project_id" ]] || (echo "Can't create project" && exit 1);
+  [[ -n "$project_id" ]] || { echo "Can't create project"; exit 1; }
   user_name="user-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
   eval $(openstack user create "$user_name" --project "$project_id" --password "password" --email "$user_name@example.com" -f shell -c id)
   user_id=$id
-  [[ -n "$user_id" ]] || (echo "Can't create user" && exit 1);
+  [[ -n "$user_id" ]] || { echo "Can't create user"; exit 1; }
   # add 'Member' role for swift access
   role_id=$(openstack role show  Member -c id -f value)
   openstack role add --project $project_id --user $user_id $role_id
   # create network
   if [[ -n $(openstack service list | grep neutron) ]]; then
     net_id=$(neutron net-create --tenant-id $project_id "private" | grep ' id ' | awk '{print $4}')
-    [[ -n "$net_id" ]] || (echo "net-create failed" && exit 1);
+    [[ -n "$net_id" ]] || { echo "net-create failed"; exit 1; }
     subnet_id=$(neutron subnet-create --tenant-id $project_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
-    [[ -n "$subnet_id" ]] || (echo "subnet-create failed" && exit 1);
+    [[ -n "$subnet_id" ]] || { echo "subnet-create failed"; exit 1; }
     router_id=$(neutron router-create --tenant-id $project_id "private_router" | grep ' id ' | awk '{print $4}')
-    [[ -n "$router_id" ]] || (echo "router-create failed" && exit 1);
+    [[ -n "$router_id" ]] || { echo "router-create failed"; exit 1; }
     neutron router-interface-add $router_id $subnet_id
-    [[ "$?" -eq 0 ]] || (echo "router-interface-add failed" && exit 1);
+    [[ "$?" -eq 0 ]] || { echo "router-interface-add failed"; exit 1; }
     public_net_id=$(neutron net-list | grep public | awk '{print $2}')
-    [[ -n "$public_net_id" ]] || (echo "can't find public network" && exit 1);
+    [[ -n "$public_net_id" ]] || { echo "can't find public network"; exit 1; }
     neutron router-gateway-set $router_id $public_net_id
-    [[ "$?" -eq 0 ]] || (echo "router-gateway-set failed" && exit 1);
+    [[ "$?" -eq 0 ]] || { echo "router-gateway-set failed"; exit 1; }
   fi
   # populate credentials
   openstack ec2 credentials create --user $user_id --project $project_id 1>&2
@@ -109,7 +106,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   openstack_image_id=$(openstack image list --long | grep "cirros" | grep " ami " | head -1 | awk '{print $2}')
   if [[ -n "$openstack_image_id" ]]; then
     volume_id=$(cinder create --image-id $openstack_image_id 1 | awk '/ id / {print $4}')
-    [[ -n "$volume_id" ]] || (echo "can't create volume for EBS image creation" && exit 1);
+    [[ -n "$volume_id" ]] || { echo "can't create volume for EBS image creation"; exit 1; }
     fail=0
     while [[ true ]] ; do
       if ((fail >= MAX_FAIL)); then
@@ -134,7 +131,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
       --flavor "$FLAVOR_NAME" \
       --block-device "device=/dev/vda,id=$volume_id,shutdown=remove,source=volume,dest=volume,bootindex=0" \
       "$instance_name" | awk '/ id / {print $4}')
-    [[ -n "$instance_id" ]] || (echo "can't boot EBS instance" && exit 1);
+    [[ -n "$instance_id" ]] || { echo "can't boot EBS instance"; exit 1; }
     fail=0
     while [[ true ]] ; do
       if ((fail >= MAX_FAIL)); then
