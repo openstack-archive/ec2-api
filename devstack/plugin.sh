@@ -56,14 +56,14 @@ function recreate_endpoint {
             --service "$endpoint" --region "$REGION_NAME" -c ID -f value)
         if [[ -n "$endpoint_ids" ]]; then
             for endpoint_id in $endpoint_ids ; do
-                openstack endpoint delete $endpoint_id
+                openstack --os-identity-api-version 3 endpoint delete $endpoint_id
             done
         fi
         local service_id=$(openstack --os-identity-api-version 3 service list \
             -c "ID" -c "Name" \
             | grep " $endpoint " | get_field 1)
         if [[ -n "$service_id" ]]; then
-            openstack service delete $service_id
+            openstack --os-identity-api-version 3 service delete $service_id
         fi
 
         local service_id=$(openstack service create \
