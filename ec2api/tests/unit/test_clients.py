@@ -196,9 +196,10 @@ class ClientsTestCase(base.BaseTestCase):
     def test_keystone(self, keystone_client_class):
         context = mock.NonCallableMock(
             auth_token='fake_token',
-            project_id='fake_project')
+            project_id='fake_project',
+            session=None)
         res = clients.keystone(context)
         self.assertEqual(keystone_client_class.return_value.return_value, res)
         keystone_client_class.return_value.assert_called_with(
-            auth_url='keystone_url', token='fake_token',
+            auth_url='keystone_url', token='fake_token', session=None,
             tenant_id='fake_project', project_id='fake_project')

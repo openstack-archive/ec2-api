@@ -147,7 +147,8 @@ def keystone(context):
         token=context.auth_token,
         project_id=context.project_id,
         tenant_id=context.project_id,
-        auth_url=CONF.keystone_url)
+        auth_url=CONF.keystone_url,
+        session=context.session)
 
 
 def nova_cert(context):

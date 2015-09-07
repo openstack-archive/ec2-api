@@ -18,6 +18,9 @@ Starting point for routing EC2 requests.
 import hashlib
 import sys
 
+from keystoneclient import access as keystone_access
+from keystoneclient.auth.identity import access as keystone_identity_access
+from keystoneclient import session as keystone_session
 from oslo_config import cfg
 from oslo_context import context as common_context
 from oslo_log import log as logging
@@ -226,42 +229,28 @@ class EC2KeystoneAuth(wsgi.Middleware):
             msg = response.reason
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=status_code)
-        result = response.json()
 
         try:
-            if 'token' in result:
-                # NOTE(andrey-mp): response from keystone v3
-                token_id = response.headers['x-subject-token']
-                user_id = result['token']['user']['id']
-                project_id = result['token']['project']['id']
-                user_name = result['token']['user'].get('name')
-                project_name = result['token']['project'].get('name')
-                catalog = result['token']['catalog']
-            else:
-                token_id = result['access']['token']['id']
-                user_id = result['access']['user']['id']
-                project_id = result['access']['token']['tenant']['id']
-                user_name = result['access']['user'].get('name')
-                project_name = result['access']['token']['tenant'].get('name')
-                catalog = result['access']['serviceCatalog']
-        except (AttributeError, KeyError):
+            auth_ref = keystone_access.AccessInfo.factory(resp=response,
+                                                          body=response.json())
+        except (NotImplementedError, KeyError):
             LOG.exception(_("Keystone failure"))
             msg = _("Failure communicating with keystone")
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=400)
-
+        auth = keystone_identity_access.AccessInfoPlugin(auth_ref)
+        session = keystone_session.Session(auth=auth)
         remote_address = req.remote_addr
         if CONF.use_forwarded_for:
             remote_address = req.headers.get('X-Forwarded-For',
                                              remote_address)
 
-        ctxt = context.RequestContext(user_id, project_id,
+        ctxt = context.RequestContext(auth_ref.user_id, auth_ref.project_id,
                                       request_id=request_id,
-                                      user_name=user_name,
-                                      project_name=project_name,
-                                      auth_token=token_id,
+                                      user_name=auth_ref.username,
+                                      project_name=auth_ref.project_name,
                                       remote_address=remote_address,
-                                      service_catalog=catalog,
+                                      session=session,
                                       api_version=req.params.get('Version'))
 
         req.environ['ec2api.context'] = ctxt
