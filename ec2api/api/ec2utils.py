@@ -360,6 +360,8 @@ def get_os_image(context, ec2_image_id):
     if not ids:
         raise exception.InvalidAMIIDNotFound(id=ec2_image_id)
     _id, os_id = ids[0]
+    if not os_id:
+        return None
     glance = clients.glance(context)
     try:
         return glance.images.get(os_id)

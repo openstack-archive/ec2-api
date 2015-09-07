@@ -376,6 +376,9 @@ class UniversalDescriber(object):
 
         return formatted_items
 
+    def handle_unpaired_item(self, item, formatted_items):
+        self.delete_obsolete_item(item)
+
     def describe(self, context, ids=None, names=None, filter=None,
                  max_results=None, next_token=None):
         if max_results and max_results < 5:
@@ -418,7 +421,7 @@ class UniversalDescriber(object):
         # NOTE(Alex): delete obsolete items
         for item in self.items:
             if item['id'] not in paired_items_ids:
-                self.delete_obsolete_item(item)
+                self.handle_unpaired_item(item, formatted_items)
         # NOTE(Alex): some requested items are not found
         if self.ids or self.names:
             params = {'id': next(iter(self.ids or self.names))}
