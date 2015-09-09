@@ -86,7 +86,7 @@ def create_vpn_connection(context, customer_gateway_id, vpn_gateway_id,
             {'ipsecpolicy': os_ipsecpolicy})['ipsecpolicy']
         cleaner.addCleanup(neutron.delete_ipsecpolicy, os_ipsecpolicy['id'])
 
-        psk = ''.join(random.choice(SHARED_KEY_CHARS) for _x in xrange(32))
+        psk = ''.join(random.choice(SHARED_KEY_CHARS) for _x in range(32))
         vpn_connection = db_api.add_item(
              context, 'vpn',
              {'customer_gateway_id': customer_gateway['id'],

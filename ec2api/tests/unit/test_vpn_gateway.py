@@ -105,9 +105,9 @@ class VpnGatewayTestCase(base.ApiTestCase):
                                   common.OnCrashCleaner)
             mock_manager.assert_has_calls([
                 mock.call.create_vpnservice(
-                    *(mock.ANY for _x in xrange(5))),
+                    *(mock.ANY for _x in range(5))),
                 mock.call.reset_vpn_connections(
-                    subnets=mock.ANY, *(mock.ANY for _x in xrange(4)))])
+                    subnets=mock.ANY, *(mock.ANY for _x in range(4)))])
 
         do_check()
         self.neutron.add_gateway_router.assert_called_once_with(
@@ -243,9 +243,9 @@ class VpnGatewayTestCase(base.ApiTestCase):
                 fakes.ID_OS_IPSEC_SITE_CONNECTION_2)
             mock_manager.assert_has_calls([
                 mock.call.stop_gateway_vpn_connections(
-                    *(mock.ANY for _x in xrange(4))),
+                    *(mock.ANY for _x in range(4))),
                 mock.call.delete_vpnservice(
-                    *(mock.ANY for _x in xrange(4)))])
+                    *(mock.ANY for _x in range(4)))])
 
         do_check()
         self.neutron.remove_gateway_router.assert_called_once_with(
