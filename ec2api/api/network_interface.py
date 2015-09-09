@@ -87,6 +87,8 @@ def create_network_interface(context, subnet_id,
             fixed_ips.append({'ip_address': str(ip_address)})
     if not fixed_ips and not secondary_private_ip_address_count:
         secondary_private_ip_address_count = 1
+    if secondary_private_ip_address_count is None:
+        secondary_private_ip_address_count = 0
     if secondary_private_ip_address_count > 0:
         for _i in range(secondary_private_ip_address_count):
             fixed_ips.append({'subnet_id': os_subnet['id']})
