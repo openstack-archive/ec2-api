@@ -177,7 +177,7 @@ _xml_scheme = re.compile('\sxmlns=".*"')
 
 
 def parse_xml(xml_string):
-    xml_string = _xml_scheme.sub('', xml_string)
+    xml_string = _xml_scheme.sub('', xml_string.decode("utf-8"))
     xml = etree.fromstring(xml_string)
 
     def convert_node(node):
