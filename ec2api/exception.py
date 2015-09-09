@@ -100,6 +100,11 @@ class EC2KeystoneDiscoverFailure(EC2APIException):
     msg_fmt = _("Could not discover keystone versions.")
 
 
+class EC2DBInvalidOsIdUpdate(EC2APIException):
+    msg_fmt = _('Invalid update of os_id of %(item_id)s item '
+                'from %(old_os_id)s to %(new_os_id)s')
+
+
 # Internal ec2api metadata exceptions
 
 class EC2MetadataException(EC2APIException):

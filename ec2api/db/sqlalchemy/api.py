@@ -29,6 +29,7 @@ from sqlalchemy.sql import bindparam
 
 import ec2api.context
 from ec2api.db.sqlalchemy import models
+from ec2api import exception
 
 CONF = cfg.CONF
 
@@ -142,8 +143,12 @@ def add_item_id(context, kind, os_id, project_id=None):
 def update_item(context, item):
     item_ref = (model_query(context, models.Item).
                 filter_by(project_id=context.project_id,
-                          id=item["id"]).
+                          id=item['id']).
                 one())
+    if item_ref.os_id and item_ref.os_id != item['os_id']:
+        raise exception.EC2DBInvalidOsIdUpdate(item_id=item['id'],
+                                               old_os_id=item_ref.os_id,
+                                               new_os_id=item['os_id'])
     item_ref.update(_pack_item_data(item))
     item_ref.save()
     return _unpack_item_data(item_ref)
