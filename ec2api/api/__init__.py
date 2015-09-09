@@ -376,7 +376,7 @@ def ec2_error_ex(ex, req, unexpected=False):
     if unexpected:
         # Log filtered environment for unexpected errors.
         env = req.environ.copy()
-        for k in env.keys():
+        for k in list(env.keys()):
             if not isinstance(env[k], six.string_types):
                 env.pop(k)
         log_fun(_('Environment: %s') % jsonutils.dumps(env))
