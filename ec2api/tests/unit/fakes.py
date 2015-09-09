@@ -273,7 +273,7 @@ CIDR_VPN_1_PROPAGATED_1 = '192.168.110.0/24'
 CIDR_VPN_2_PROPAGATED_1 = '192.168.210.0/24'
 CIDR_VPN_2_PROPAGATED_2 = '192.168.220.0/24'
 
-CUSTOMER_GATEWAY_CONFIGURATION_1 = etree.tostring(etree.fromstring(
+CUSTOMER_GATEWAY_CONFIGURATION_1_DATA = (
     '<?xml version=\'1.0\' encoding=\'UTF-8\'?>'
     '<vpn_connection id="' + ID_EC2_VPN_CONNECTION_1 + '">'
     '  <customer_gateway_id>' + (ID_EC2_CUSTOMER_GATEWAY_1 +
@@ -312,10 +312,12 @@ CUSTOMER_GATEWAY_CONFIGURATION_1 = etree.tostring(etree.fromstring(
     '      <tcp_mss_adjustment>1387</tcp_mss_adjustment>'
     '    </ipsec>'
     '  </ipsec_tunnel>'
-    '</vpn_connection>',
-    parser=etree.XMLParser(remove_blank_text=True)
-), xml_declaration=True, encoding='UTF-8', pretty_print=True)
-CUSTOMER_GATEWAY_CONFIGURATION_2 = etree.tostring(etree.fromstring(
+    '</vpn_connection>').encode("utf-8")
+CUSTOMER_GATEWAY_CONFIGURATION_1 = etree.tostring(
+    etree.fromstring(CUSTOMER_GATEWAY_CONFIGURATION_1_DATA,
+                     parser=etree.XMLParser(remove_blank_text=True)),
+    xml_declaration=True, encoding='UTF-8', pretty_print=True)
+CUSTOMER_GATEWAY_CONFIGURATION_2_DATA = (
     '<?xml version=\'1.0\' encoding=\'UTF-8\'?>'
     '<vpn_connection id="' + ID_EC2_VPN_CONNECTION_2 + '">'
     '  <customer_gateway_id>' + (ID_EC2_CUSTOMER_GATEWAY_2 +
@@ -354,9 +356,11 @@ CUSTOMER_GATEWAY_CONFIGURATION_2 = etree.tostring(etree.fromstring(
     '      <tcp_mss_adjustment>1387</tcp_mss_adjustment>'
     '    </ipsec>'
     '  </ipsec_tunnel>'
-    '</vpn_connection>',
-    parser=etree.XMLParser(remove_blank_text=True)
-), xml_declaration=True, encoding='UTF-8', pretty_print=True)
+    '</vpn_connection>').encode("utf-8")
+CUSTOMER_GATEWAY_CONFIGURATION_2 = etree.tostring(
+    etree.fromstring(CUSTOMER_GATEWAY_CONFIGURATION_2_DATA,
+                     parser=etree.XMLParser(remove_blank_text=True)),
+    xml_declaration=True, encoding='UTF-8', pretty_print=True)
 
 
 # Object constants section
