@@ -17,6 +17,7 @@ import copy
 
 import netaddr
 from novaclient import exceptions as nova_exception
+import six
 
 from ec2api.api import clients
 from ec2api.api import common
@@ -594,7 +595,7 @@ def _get_active_route_destinations(context, route_table):
                     if (item['vpc_id'] == route_table['vpc_id'] and
                         (ec2utils.get_ec2_id_kind(item['id']) != 'vgw' or
                          item['id'] in vpn_connections))}
-    for vpn in vpn_connections.itervalues():
+    for vpn in six.itervalues(vpn_connections):
         if vpn['vpn_gateway_id'] in destinations:
             destinations[vpn['vpn_gateway_id']]['vpn_connection'] = vpn
     return destinations

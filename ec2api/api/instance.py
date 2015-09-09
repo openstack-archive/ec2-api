@@ -1049,7 +1049,7 @@ def _get_groups_name_to_id(context):
 
 
 def _get_ip_info_for_instance(os_instance):
-    addresses = list(itertools.chain(*os_instance.addresses.itervalues()))
+    addresses = list(itertools.chain(*six.itervalues(os_instance.addresses)))
     fixed_ip = next((addr['addr'] for addr in addresses
                      if (addr['version'] == 4 and
                          addr['OS-EXT-IPS:type'] == 'fixed')), None)
