@@ -405,6 +405,6 @@ class Executor(wsgi.Application):
             resp = webob.Response()
             resp.status = 200
             resp.headers['Content-Type'] = 'text/xml'
-            resp.body = str(result)
+            resp.body = six.binary_type(result)
 
             return resp
