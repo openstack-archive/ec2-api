@@ -19,6 +19,7 @@ import hashlib
 import sys
 
 from oslo_config import cfg
+from oslo_context import context as common_context
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
 from oslo_utils import timeutils
@@ -173,7 +174,7 @@ class EC2KeystoneAuth(wsgi.Middleware):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
-        request_id = context.generate_request_id()
+        request_id = common_context.generate_request_id()
 
         # NOTE(alevine) We need to calculate the hash here because
         # subsequent access to request modifies the req.body so the hash

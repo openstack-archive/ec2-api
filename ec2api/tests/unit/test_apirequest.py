@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import uuid
-
 from lxml import etree
 import mock
+from oslo_context import context
 from oslo_utils import timeutils
 
 from ec2api.api import apirequest
@@ -31,7 +30,8 @@ class EC2RequesterTestCase(base.BaseTestCase):
         super(EC2RequesterTestCase, self).setUp()
         self.controller = self.mock(
             'ec2api.api.cloud.VpcCloudController').return_value
-        self.fake_context = mock.NonCallableMock(request_id=str(uuid.uuid4()))
+        self.fake_context = mock.NonCallableMock(
+            request_id=context.generate_request_id())
 
     def test_invoke_returns_data(self):
         self.controller.fake_action.return_value = fakes.DICT_FAKE_RESULT_DATA

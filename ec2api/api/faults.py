@@ -15,12 +15,12 @@
 from xml.sax import saxutils
 
 from oslo_config import cfg
+from oslo_context import context as common_context
 from oslo_log import log as logging
 import webob.dec
 import webob.exc
 
 import ec2api.api
-from ec2api import context
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -89,6 +89,6 @@ class Fault(webob.exc.HTTPException):
         if CONF.use_forwarded_for:
             remote_address = req.headers.get('X-Forwarded-For', remote_address)
 
-        resp = ec2_error_response(context.generate_request_id(), code,
+        resp = ec2_error_response(common_context.generate_request_id(), code,
                                   message=message, status=status)
         return resp

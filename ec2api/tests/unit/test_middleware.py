@@ -17,6 +17,7 @@
 from lxml import etree
 import mock
 from oslo_config import cfg
+from oslo_context import context
 from oslotest import base as test_base
 import requests
 import webob.dec
@@ -52,8 +53,9 @@ class ExecutorTestCase(test_base.BaseTestCase):
         fake_wsgi_request = Fake()
 
         fake_wsgi_request.environ = {
-                'ec2api.context': mock.Mock(request_id='fake-request'),
-                'ec2.request': fake_ec2_request,
+            'ec2api.context': mock.Mock(
+                request_id=context.generate_request_id()),
+            'ec2.request': fake_ec2_request,
         }
         return self.executor(fake_wsgi_request)
 

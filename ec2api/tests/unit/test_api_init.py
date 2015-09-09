@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import uuid
-
 from boto import exception as boto_exception
 from cinderclient import exceptions as cinder_exception
 from glanceclient.common import exceptions as glance_exception
@@ -21,6 +19,7 @@ from keystoneclient import exceptions as keystone_exception
 import mock
 from neutronclient.common import exceptions as neutron_exception
 from novaclient import exceptions as nova_exception
+from oslo_context import context
 
 from ec2api import api
 from ec2api.api import apirequest
@@ -38,7 +37,8 @@ class ApiInitTestCase(base.BaseTestCase):
         super(ApiInitTestCase, self).setUp()
         self.controller = self.mock(
             'ec2api.api.cloud.VpcCloudController').return_value
-        self.fake_context = mock.NonCallableMock(request_id=str(uuid.uuid4()))
+        self.fake_context = mock.NonCallableMock(
+            request_id=context.generate_request_id())
 
         ec2_request = apirequest.APIRequest('FakeAction', 'fake_v1',
                                             {'Param': 'fake_param'})

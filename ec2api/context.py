@@ -14,8 +14,6 @@
 
 """RequestContext: context for requests that persist through all of ec2."""
 
-import uuid
-
 from keystoneclient import client as keystone_client
 from keystoneclient.v2_0 import client as keystone_client_v2
 from keystoneclient.v3 import client as keystone_client_v3
@@ -45,10 +43,6 @@ CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
 
 LOG = logging.getLogger(__name__)
-
-
-def generate_request_id():
-    return 'req-' + str(uuid.uuid4())
 
 
 class RequestContext(context.RequestContext):
