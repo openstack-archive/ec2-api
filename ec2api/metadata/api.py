@@ -17,6 +17,7 @@ import itertools
 
 from novaclient import exceptions as nova_exception
 from oslo_log import log as logging
+import six
 
 from ec2api.api import clients
 from ec2api.api import ec2utils
@@ -79,7 +80,7 @@ def get_os_instance_and_project_id(context, fixed_ip):
                     if any((addr['addr'] == fixed_ip and
                             addr['OS-EXT-IPS:type'] == 'fixed')
                            for addr in itertools.chain(
-                                *os_instance.addresses.itervalues())))
+                                *six.itervalues(os_instance.addresses))))
     except (nova_exception.NotFound, StopIteration):
         raise exception.EC2MetadataNotFound()
 

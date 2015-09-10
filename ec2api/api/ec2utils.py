@@ -126,7 +126,7 @@ def dict_from_dotted_str(items):
 
 def _render_dict(el, data):
     try:
-        for key, val in data.iteritems():
+        for key, val in six.iteritems(data):
             sub_el = etree.SubElement(el, key)
             _render_data(sub_el, val)
     except Exception:
@@ -434,7 +434,7 @@ def get_os_image_mappings(os_image_properties):
                 new_bdm = create_virtual_bdm(bdm.get('device_name'),
                                              virtual_name)
             else:
-                new_bdm = {key: val for key, val in bdm.iteritems()
+                new_bdm = {key: val for key, val in six.iteritems(bdm)
                            if key in LEGACY_BDM_FIELDS}
                 if bdm.get('snapshot_id'):
                     new_bdm.update({'source_type': 'snapshot',
