@@ -14,7 +14,6 @@
 
 import fixtures
 import mock
-from novaclient import exceptions as nova_exception
 
 from ec2api.api import clients
 from ec2api.tests.unit import base
@@ -91,14 +90,6 @@ class ClientsTestCase(base.BaseTestCase):
                 format='[%(levelname)s] %(message)s') as logs:
             res = clients._get_nova_api_version(context)
         self.assertEqual(clients.REQUIRED_NOVA_API_MICROVERSION, res)
-        self.assertTrue(logs.output.startswith('[WARNING]'))
-
-        # test switching to v2 client
-        nova.side_effect = nova_exception.UnsupportedVersion()
-        with fixtures.LoggerFixture(
-                format='[%(levelname)s] %(message)s') as logs:
-            res = clients._get_nova_api_version(context)
-        self.assertEqual('2', res)
         self.assertTrue(logs.output.startswith('[WARNING]'))
 
     @mock.patch('neutronclient.v2_0.client.Client')
