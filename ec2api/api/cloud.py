@@ -20,10 +20,11 @@ datastore.
 """
 
 import collections
-import itertools
 
 from oslo_config import cfg
 from oslo_log import log as logging
+import six
+import six.moves
 
 from ec2api.api import address
 from ec2api.api import availability_zone
@@ -57,17 +58,17 @@ def module_and_param_types(module, *args, **kwargs):
     def wrapped(func):
 
         def func_wrapped(*args, **kwargs):
-            impl_func = getattr(module, func.func_name)
+            impl_func = getattr(module, func.__name__)
             context = args[1]
-            params = collections.OrderedDict(itertools.izip(
-                func.func_code.co_varnames[2:], param_types))
+            params = collections.OrderedDict(six.moves.zip(
+                func.__code__.co_varnames[2:], param_types))
             param_num = 0
-            mandatory_params_num = (func.func_code.co_argcount - 2 -
-                                    len(func.func_defaults or []))
+            mandatory_params_num = (func.__code__.co_argcount - 2 -
+                                    len(func.__defaults__ or []))
             for param_name, param_type in params.items():
                 param_value = kwargs.get(param_name)
                 if param_value is not None:
-                    validator = module.Validator(param_name, func.func_name,
+                    validator = module.Validator(param_name, func.__name__,
                                                  params)
                     validation_func = getattr(validator, param_type)
                     validation_func(param_value)
