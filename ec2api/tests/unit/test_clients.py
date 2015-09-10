@@ -25,53 +25,28 @@ class ClientsTestCase(base.BaseTestCase):
     def setUp(self):
         reload(clients)
         super(ClientsTestCase, self).setUp()
-        self.configure(keystone_url='keystone_url')
 
     @mock.patch.object(clients, '_get_nova_api_version', return_value='2.3')
     @mock.patch('novaclient.client.Client')
     def test_nova(self, nova, get_api_version):
-        context = mock.NonCallableMock(
-            auth_token='fake_token',
-            service_catalog=[{'type': 'compute',
-                              'endpoints': [{'publicURL': 'nova_url'}]}],
-            session=None)
+        context = mock.NonCallableMock(session=mock.sentinel.session)
 
         # test normal flow with get_api_version call
         res = clients.nova(context)
         self.assertEqual(nova.return_value, res)
-        nova.assert_called_with(
-            '2.3', bypass_url='nova_url', http_log_debug=False, session=None,
-            auth_url='keystone_url', auth_token='fake_token',
-            service_type='compute')
+        nova.assert_called_with('2.3', service_type='compute',
+                                session=mock.sentinel.session)
         get_api_version.assert_called_once_with(context)
 
-        # test logging with debug option and no get_api_version call
-        get_api_version.reset_mock()
-        self.configure(debug=True)
-        clients.nova(context)
-        nova.assert_called_with(
-            '2.3', bypass_url='nova_url', http_log_debug=True, session=None,
-            auth_url='keystone_url', auth_token='fake_token',
-            service_type='compute')
-        self.assertFalse(get_api_version.called)
-        self.configure(debug=False)
-
         # test CONF.nova_service_type is used
-        context.service_catalog.append({
-            'type': 'compute_legacy',
-            'endpoints': [{'publicURL': 'nova_legacy_url'}]})
         self.configure(nova_service_type='compute_legacy')
         clients.nova(context)
-        nova.assert_called_with(
-            '2.3', bypass_url='nova_legacy_url', http_log_debug=False,
-            auth_url='keystone_url', auth_token='fake_token', session=None,
-            service_type='compute_legacy')
+        nova.assert_called_with('2.3', service_type='compute_legacy',
+                                session=mock.sentinel.session)
 
-    @mock.patch.object(clients, '_url_for')
     @mock.patch('novaclient.client.Client')
-    def test_get_api_version(self, nova, url_for):
-        context = mock.NonCallableMock(auth_token='fake_token',
-                                       session=None)
+    def test_get_api_version(self, nova):
+        context = mock.NonCallableMock(session=mock.sentinel.session)
         v2 = mock.NonCallableMock()
         v2.configure_mock(id='v2',
                           version='',
@@ -82,29 +57,15 @@ class ClientsTestCase(base.BaseTestCase):
                             links=[{'href': 'http://host:port/path/v2.1/'}])
 
         # test normal flow
-        url_for.return_value = 'http://host:port/path/v2.1/projectid'
         nova.return_value.versions.get_current.return_value = v2_1
         with fixtures.LoggerFixture(
                 format='[%(levelname)s] %(message)s') as logs:
             res = clients._get_nova_api_version(context)
         self.assertEqual(clients.REQUIRED_NOVA_API_MICROVERSION, res)
-        url_for.assert_called_with(context, service_type='compute')
-        nova.assert_called_with('2.1', http_log_debug=False, session=None,
-                                bypass_url=url_for.return_value,
-                                service_type='compute')
+        nova.assert_called_with('2.1', service_type='compute',
+                                session=mock.sentinel.session)
         nova.return_value.versions.get_current.assert_called_with()
         self.assertTrue(logs.output.startswith('[INFO]'))
-
-        # test normal flow with debug log and custom service_type
-        self.configure(debug=True)
-        self.configure(nova_service_type='compute')
-        clients._get_nova_api_version(context)
-        url_for.assert_called_with(context, service_type='compute')
-        nova.assert_called_with('2.1', http_log_debug=True, session=None,
-                                bypass_url=url_for.return_value,
-                                service_type='compute')
-        self.configure(debug=False)
-        self.configure(nova_service_type='compute')
 
         # test Nova doesn't supprt required microversion
         v2_1.version = '2.2'
@@ -116,7 +77,6 @@ class ClientsTestCase(base.BaseTestCase):
 
         # test service type is not v2.1
         nova.return_value.versions.get_current.return_value = v2
-        url_for.return_value = 'http://host:port/path/v2/projectid'
         self.configure(nova_service_type='compute_legacy')
         with fixtures.LoggerFixture(
                 format='[%(levelname)s] %(message)s') as logs:
@@ -127,7 +87,6 @@ class ClientsTestCase(base.BaseTestCase):
 
         # test service url is not found in version list
         nova.return_value.versions.get_current.return_value = None
-        url_for.return_value = 'fake_url'
         with fixtures.LoggerFixture(
                 format='[%(levelname)s] %(message)s') as logs:
             res = clients._get_nova_api_version(context)
@@ -144,62 +103,34 @@ class ClientsTestCase(base.BaseTestCase):
 
     @mock.patch('neutronclient.v2_0.client.Client')
     def test_neutron(self, neutron):
-        context = mock.NonCallableMock(
-            auth_token='fake_token',
-            service_catalog=[{'type': 'network',
-                              'endpoints': [{'publicURL': 'neutron_url'}]}],
-            session=None)
+        context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.neutron(context)
         self.assertEqual(neutron.return_value, res)
-        neutron.assert_called_with(
-            auth_url='keystone_url', service_type='network', session=None,
-            token='fake_token', endpoint_url='neutron_url')
+        neutron.assert_called_with(service_type='network',
+                                   session=mock.sentinel.session)
 
     @mock.patch('glanceclient.client.Client')
     def test_glance(self, glance):
-        context = mock.NonCallableMock(
-            auth_token='fake_token',
-            service_catalog=[{'type': 'image',
-                              'endpoints': [{'publicURL': 'glance_url'}]}],
-            session=None)
+        context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.glance(context)
         self.assertEqual(glance.return_value, res)
-        glance.assert_called_with(
-            '1', auth_url='keystone_url', service_type='image',
-            token='fake_token', endpoint='glance_url')
+        glance.assert_called_with('1', service_type='image',
+                                  session=mock.sentinel.session)
 
     @mock.patch('cinderclient.client.Client')
     def test_cinder(self, cinder):
         # test normal flow
-        context = mock.NonCallableMock(
-            auth_token='fake_token',
-            service_catalog=[{'type': 'volume',
-                              'endpoints': [{'publicURL': 'cinder_url'}]}],
-            session=None)
+        context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.cinder(context)
         self.assertEqual(cinder.return_value, res)
-        cinder.assert_called_with(
-            '1', auth_url='keystone_url', service_type='volume',
-            username=None, api_key=None, http_log_debug=False, session=None)
-        self.assertEqual('fake_token', res.client.auth_token)
-        self.assertEqual('cinder_url', res.client.management_url)
-
-        # test logging with debug option
-        self.configure(debug=True)
-        clients.cinder(context)
-        cinder.assert_called_with(
-            '1', auth_url='keystone_url', service_type='volume',
-            username=None, api_key=None, http_log_debug=True, session=None)
+        cinder.assert_called_with('1', service_type='volume',
+                                  session=mock.sentinel.session)
 
     @mock.patch('ec2api.context.get_keystone_client_class',
                 return_value=mock.Mock(return_value=mock.Mock()))
     def test_keystone(self, keystone_client_class):
-        context = mock.NonCallableMock(
-            auth_token='fake_token',
-            project_id='fake_project',
-            session=None)
+        context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.keystone(context)
         self.assertEqual(keystone_client_class.return_value.return_value, res)
         keystone_client_class.return_value.assert_called_with(
-            auth_url='keystone_url', token='fake_token', session=None,
-            tenant_id='fake_project', project_id='fake_project')
+            session=mock.sentinel.session)
