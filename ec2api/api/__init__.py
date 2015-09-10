@@ -361,7 +361,7 @@ def ec2_error_ex(ex, req, unexpected=False):
     request_id = context.request_id
     log_msg_args = {
         'ex_name': type(ex).__name__,
-        'ex_str': unicode(ex)
+        'ex_str': ex
     }
     log_fun(log_msg % log_msg_args, context=context, exc_info=exc_info)
 
