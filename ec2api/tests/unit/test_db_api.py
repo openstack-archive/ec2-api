@@ -17,6 +17,7 @@ from sqlalchemy.orm import exc as orm_exception
 
 from ec2api.api import validator
 from ec2api.db import api as db_api
+from ec2api import exception
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -141,6 +142,22 @@ class DbApiTestCase(base.DbTestCase):
                           self.context,
                           {'id': fakes.random_ec2_id('fake'),
                            'key': 'val'})
+
+    def test_update_item_os_id(self):
+        item = db_api.add_item(self.context, 'fake', {})
+        item['os_id'] = 'fake_os_id'
+        db_api.update_item(self.context, item)
+        item = db_api.get_item_by_id(self.context, item['id'])
+        self.assertThat({'os_id': 'fake_os_id'},
+                        matchers.IsSubDictOf(item))
+        item['os_id'] = 'other_fake_os_id'
+        self.assertRaises(exception.EC2DBInvalidOsIdUpdate,
+                          db_api.update_item,
+                          self.context, item)
+        item['os_id'] = None
+        self.assertRaises(exception.EC2DBInvalidOsIdUpdate,
+                          db_api.update_item,
+                          self.context, item)
 
     def test_delete_item(self):
         item = db_api.add_item(self.context, 'fake', {})
