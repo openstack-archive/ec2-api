@@ -368,11 +368,11 @@ def ec2_error_ex(ex, req, unexpected=False):
     if unexpected and status >= 500:
         message = _('Unknown error occurred.')
     elif getattr(ex, 'message', None):
-        message = unicode(ex.message)
+        message = six.text_type(ex.message)
     elif ex.args and any(arg for arg in ex.args):
-        message = " ".join(map(unicode, ex.args))
+        message = " ".join(map(six.text_type, ex.args))
     else:
-        message = unicode(ex)
+        message = six.text_type(ex)
     if unexpected:
         # Log filtered environment for unexpected errors.
         env = req.environ.copy()
