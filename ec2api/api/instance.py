@@ -23,6 +23,7 @@ from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import timeutils
+import six
 
 from ec2api.api import clients
 from ec2api.api import common
@@ -1674,9 +1675,9 @@ _NAME_TO_CODE = {
     inst_state_SUSPEND: inst_state_STOPPED_CODE,
     inst_state_RESCUE: inst_state_RUNNING_CODE,
 }
-_CODE_TO_NAMES = {code: [item[0] for item in _NAME_TO_CODE.iteritems()
+_CODE_TO_NAMES = {code: [item[0] for item in six.iteritems(_NAME_TO_CODE)
                          if item[1] == code]
-                  for code in set(_NAME_TO_CODE.itervalues())}
+                  for code in set(six.itervalues(_NAME_TO_CODE))}
 
 
 def inst_state_name_to_code(name):
