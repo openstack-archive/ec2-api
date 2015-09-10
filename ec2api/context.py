@@ -134,7 +134,7 @@ def is_user_context(context):
     """Indicates if the request context is a normal user."""
     if not context:
         return False
-    if context.is_admin:
+    if context.is_os_admin:
         return False
     if not context.user_id or not context.project_id:
         return False
@@ -185,5 +185,5 @@ def require_context(ctxt):
 
     if context is not a user or an admin context.
     """
-    if not ctxt.is_admin and not is_user_context(ctxt):
+    if not ctxt.is_os_admin and not is_user_context(ctxt):
         raise exception.AuthFailure()
