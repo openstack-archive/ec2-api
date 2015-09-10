@@ -491,7 +491,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
                     context, self.neutron, cleaner, fakes.DB_VPN_GATEWAY_1)
                 raise Exception('fake-exception')
         except Exception as ex:
-            if ex.message != 'fake-exception':
+            if str(ex) != 'fake-exception':
                 raise
         self.db_api.update_item.assert_called_with(
             mock.ANY, fakes.DB_VPN_CONNECTION_1)
@@ -678,7 +678,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
                     fakes.DB_CUSTOMER_GATEWAY_1, cidrs)
                 raise Exception('fake-exception')
         except Exception as ex:
-            if ex.message != 'fake-exception':
+            if str(ex) != 'fake-exception':
                 raise
         self.neutron.delete_ipsec_site_connection.assert_called_once_with(
             id_os_connection)
@@ -696,7 +696,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
                     cidrs)
                 raise Exception('fake-exception')
         except Exception as ex:
-            if ex.message != 'fake-exception':
+            if str(ex) != 'fake-exception':
                 raise
         self.assertFalse(self.neutron.delete_ipsec_site_connection.called)
         self.assertFalse(self.db_api.update_item.called)
@@ -747,7 +747,7 @@ class VpnConnectionTestCase(base.ApiTestCase):
                     copy.deepcopy(fakes.DB_VPN_CONNECTION_1))
                 raise Exception('fake-exception')
         except Exception as ex:
-            if ex.message != 'fake-exception':
+            if str(ex) != 'fake-exception':
                 raise
         self.db_api.update_item.assert_called_with(
             mock.ANY, fakes.DB_VPN_CONNECTION_1)
