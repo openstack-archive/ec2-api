@@ -21,7 +21,12 @@
    :synopsis: Infrastructure-as-a-Service Cloud platform.
 """
 
+import six
+
 import gettext
 
 
-gettext.install('ec2api', unicode=1)
+if six.PY2:
+    gettext.install('ec2api', unicode=1)
+else:
+    gettext.install('ec2api')
