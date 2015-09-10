@@ -17,6 +17,7 @@ from xml.sax import saxutils
 from oslo_config import cfg
 from oslo_context import context as common_context
 from oslo_log import log as logging
+import six
 import webob.dec
 import webob.exc
 
@@ -34,15 +35,12 @@ def xhtml_escape(value):
 
 
 def utf8(value):
-    """Try to turn a string into utf-8 if possible.
-
-    Code is directly from the utf8 function in
-    http://github.com/facebook/tornado/blob/master/tornado/escape.py
-
-    """
-    if isinstance(value, unicode):
+    """Get the UTF8-encoded version of a value."""
+    if not isinstance(value, (six.binary_type, six.text_type)):
+        value = str(value)
+    if isinstance(value, six.text_type):
         return value.encode('utf-8')
-    assert isinstance(value, str)
+
     return value
 
 
@@ -53,13 +51,14 @@ def ec2_error_response(request_id, code, message, status=500):
     resp = webob.Response()
     resp.status = status
     resp.headers['Content-Type'] = 'text/xml'
-    resp.body = str('<?xml version="1.0"?>\n'
-                    '<Response><Errors><Error><Code>%s</Code>'
-                    '<Message>%s</Message></Error></Errors>'
-                    '<RequestID>%s</RequestID></Response>' %
-                    (xhtml_escape(utf8(code)),
-                     xhtml_escape(utf8(message)),
-                     xhtml_escape(utf8(request_id))))
+    resp.body = six.binary_type(utf8(
+        '<?xml version="1.0"?>\n'
+        '<Response><Errors><Error><Code>%s</Code>'
+        '<Message>%s</Message></Error></Errors>'
+        '<RequestID>%s</RequestID></Response>' %
+        (xhtml_escape(code),
+         xhtml_escape(message),
+         xhtml_escape(request_id.decode("utf-8")))))
     return resp
 
 
