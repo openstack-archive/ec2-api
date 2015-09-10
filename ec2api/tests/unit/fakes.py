@@ -119,7 +119,7 @@ ROOT_DEVICE_NAME_INSTANCE_1 = '/dev/vda'
 ROOT_DEVICE_NAME_INSTANCE_2 = '/dev/sdb1'
 IPV6_INSTANCE_2 = 'fe80:b33f::a8bb:ccff:fedd:eeff'
 CLIENT_TOKEN_INSTANCE_2 = 'client-token-2'
-USER_DATA_INSTANCE_2 = base64.b64encode('fake-user data')
+USER_DATA_INSTANCE_2 = base64.b64encode(b'fake-user data')
 
 
 # DHCP options constants
