@@ -377,7 +377,7 @@ class ImageDescriber(common.TaggableItemsDescriber):
                 if os_image.properties.get('ec2_id') in self.pending_images:
                     # NOTE(ft): the image is being creating, Glance had created
                     # image, but creating thread doesn't yet update db item
-                    image = self.pending_images[os_image.metadata['ec2_id']]
+                    image = self.pending_images[os_image.properties['ec2_id']]
                     image['os_id'] = os_image.id
                     image['is_public'] = os_image.is_public
                     db_api.update_item(self.context, image)
@@ -444,7 +444,8 @@ class ImageDescriber(common.TaggableItemsDescriber):
                         image['description'] = item['description']
                     image['imageState'] = item.get('state', 'pending')
                 formatted_items.append(image)
-                self.ids.remove(item['id'])
+                if item['id'] in self.ids:
+                    self.ids.remove(item['id'])
 
 
 def describe_images(context, executable_by=None, image_id=None,
