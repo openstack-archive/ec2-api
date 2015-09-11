@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from cinderclient import client as cinderclient
+from glanceclient import client as glanceclient
+from neutronclient.v2_0 import client as neutronclient
+from novaclient import api_versions as nova_api_versions
 from novaclient import client as novaclient
-from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging as messaging
 
 from ec2api import context as ec2_context
-from ec2api.i18n import _, _LI, _LW
+from ec2api.i18n import _LI, _LW
 
 logger = logging.getLogger(__name__)
 
@@ -34,28 +37,6 @@ ec2_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
-
-
-try:
-    from neutronclient.v2_0 import client as neutronclient
-except ImportError:
-    neutronclient = None
-    logger.info(_('neutronclient not available'))
-try:
-    from cinderclient import client as cinderclient
-except ImportError:
-    cinderclient = None
-    logger.info(_('cinderclient not available'))
-try:
-    from glanceclient import client as glanceclient
-except ImportError:
-    glanceclient = None
-    logger.info(_('glanceclient not available'))
-try:
-    # api_versions module is introduced since v2.27 novaclient
-    from novaclient import api_versions as nova_api_versions
-except ImportError:
-    nova_api_versions = None
 
 
 # Nova API version with microversions support
@@ -116,27 +97,9 @@ def nova_cert(context):
 
 
 def _get_nova_api_version(context):
-    try:
-        client = novaclient.Client(REQUIRED_NOVA_API_VERSION,
-                                   session=context.session,
-                                   service_type=CONF.nova_service_type)
-    except nova_exception.UnsupportedVersion:
-        logger.warning(
-            _LW('Nova client does not support v2.1 Nova API, use v2 instead. '
-                'A lot of useful EC2 compliant instance properties '
-                'will be unavailable.'))
-        return LEGACY_NOVA_API_VERSION
-
-    # NOTE(ft): this is a somewhat paranoid check, because api_versions
-    # had been introduced to novaclient together with v2.1 support. Probaly
-    # it should be removed after at least a couple of novaclinet has been
-    # released with no change of APIVersion class location.
-    if not nova_api_versions:
-        logger.warning(_LW('Nova client suports v2.1, but does unexpectedly '
-                           'not have api_versions module. Nova API version '
-                           'check is skipped. Use v%s Nova API.'),
-                       REQUIRED_NOVA_API_MICROVERSION)
-        return REQUIRED_NOVA_API_MICROVERSION
+    client = novaclient.Client(REQUIRED_NOVA_API_VERSION,
+                               session=context.session,
+                               service_type=CONF.nova_service_type)
 
     required = nova_api_versions.APIVersion(REQUIRED_NOVA_API_MICROVERSION)
     current = client.versions.get_current()
