@@ -12,36 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from xml.sax import saxutils
-
 from oslo_config import cfg
 from oslo_context import context as common_context
 from oslo_log import log as logging
-import six
 import webob.dec
 import webob.exc
 
 import ec2api.api
+from ec2api import utils
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
-
-
-def xhtml_escape(value):
-    """Escapes a string so it is valid within XML or XHTML.
-
-    """
-    return saxutils.escape(value, {'"': '&quot;', "'": '&apos;'})
-
-
-def utf8(value):
-    """Get the UTF8-encoded version of a value."""
-    if not isinstance(value, (six.binary_type, six.text_type)):
-        value = str(value)
-    if isinstance(value, six.text_type):
-        return value.encode('utf-8')
-
-    return value
 
 
 def ec2_error_response(request_id, code, message, status=500):
@@ -51,14 +32,14 @@ def ec2_error_response(request_id, code, message, status=500):
     resp = webob.Response()
     resp.status = status
     resp.headers['Content-Type'] = 'text/xml'
-    resp.body = six.binary_type(utf8(
+    resp.body = (
         '<?xml version="1.0"?>\n'
         '<Response><Errors><Error><Code>%s</Code>'
         '<Message>%s</Message></Error></Errors>'
         '<RequestID>%s</RequestID></Response>' %
-        (xhtml_escape(code),
-         xhtml_escape(message),
-         xhtml_escape(request_id.decode("utf-8")))))
+        (utils.xhtml_escape(code),
+         utils.xhtml_escape(message),
+         utils.xhtml_escape(request_id.decode("utf-8")))).encode("utf-8")
     return resp
 
 

@@ -35,11 +35,12 @@ S3 client with this module::
 import bisect
 import datetime
 import os.path
-import urllib
 
 from oslo_config import cfg
+from oslo_log import log as logging
 import routes
 import six
+from six.moves.urllib import parse
 import webob
 
 from ec2api.openstack.common import fileutils
@@ -62,6 +63,7 @@ s3_opts = [
 
 CONF = cfg.CONF
 CONF.register_opts(s3_opts)
+LOG = logging.getLogger(__name__)
 
 
 def get_wsgi_server():
@@ -138,13 +140,23 @@ class BaseRequestHandler(object):
 
     @webob.dec.wsgify
     def __call__(self, request):
-        method = request.method.lower()
-        f = getattr(self, method, self.invalid)
-        self.request = request
-        self.response = webob.Response()
-        params = request.environ['wsgiorg.routing_args'][1]
-        del params['controller']
-        f(**params)
+        try:
+            method = request.method.lower()
+            f = getattr(self, method, self.invalid)
+            self.request = request
+            self.response = webob.Response()
+            params = request.environ['wsgiorg.routing_args'][1]
+            del params['controller']
+            f(**params)
+        except Exception:
+            # TODO(andrey-mp): improve this block
+            LOG.exception('Unhandled error')
+            self.render_xml({"Error": {
+                "Code": "BadRequest",
+                "Message": "Unhandled error"
+            }})
+            self.set_status(501)
+
         return self.response
 
     def get_argument(self, arg, default):
@@ -164,7 +176,10 @@ class BaseRequestHandler(object):
         self.set_status(404)
 
     def finish(self, body=''):
-        self.response.body = utils.utf8(body)
+        if isinstance(body, six.binary_type):
+            self.response.body = body
+        else:
+            self.response.body = body.encode("utf-8")
 
     def invalid(self, **kwargs):
         pass
@@ -172,12 +187,12 @@ class BaseRequestHandler(object):
     def render_xml(self, value):
         assert isinstance(value, dict) and len(value) == 1
         self.set_header("Content-Type", "application/xml; charset=UTF-8")
-        name = value.keys()[0]
+        name = next(six.iterkeys(value))
         parts = []
-        parts.append('<' + utils.utf8(name) +
+        parts.append('<' + name +
                      ' xmlns="http://s3.amazonaws.com/doc/2006-03-01/">')
-        self._render_parts(value.values()[0], parts)
-        parts.append('</' + utils.utf8(name) + '>')
+        self._render_parts(next(six.itervalues(value)), parts)
+        parts.append('</' + name + '>')
         self.finish('<?xml version="1.0" encoding="UTF-8"?>\n' +
                     ''.join(parts))
 
@@ -187,7 +202,7 @@ class BaseRequestHandler(object):
 
         if isinstance(value, six.string_types):
             parts.append(utils.xhtml_escape(value))
-        elif isinstance(value, int) or isinstance(value, long):
+        elif isinstance(value, six.integer_types):
             parts.append(str(value))
         elif isinstance(value, datetime.datetime):
             parts.append(value.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
@@ -196,9 +211,9 @@ class BaseRequestHandler(object):
                 if not isinstance(subvalue, list):
                     subvalue = [subvalue]
                 for subsubvalue in subvalue:
-                    parts.append('<' + utils.utf8(name) + '>')
+                    parts.append('<' + name + '>')
                     self._render_parts(subsubvalue, parts)
-                    parts.append('</' + utils.utf8(name) + '>')
+                    parts.append('</' + name + '>')
         else:
             raise Exception("Unknown S3 value type %r", value)
 
@@ -324,7 +339,7 @@ class BucketHandler(BaseRequestHandler):
 
 class ObjectHandler(BaseRequestHandler):
     def get(self, bucket, object_name):
-        object_name = urllib.unquote(object_name)
+        object_name = parse.unquote(object_name)
         path = self._object_path(bucket, object_name)
         if (not path.startswith(self.application.directory) or
                 not os.path.isfile(path)):
@@ -334,14 +349,14 @@ class ObjectHandler(BaseRequestHandler):
         self.set_header("Content-Type", "application/unknown")
         self.set_header("Last-Modified", datetime.datetime.utcfromtimestamp(
             info.st_mtime))
-        object_file = open(path, "r")
+        object_file = open(path, "rb")
         try:
             self.finish(object_file.read())
         finally:
             object_file.close()
 
     def put(self, bucket, object_name):
-        object_name = urllib.unquote(object_name)
+        object_name = parse.unquote(object_name)
         bucket_dir = os.path.abspath(os.path.join(
             self.application.directory, bucket))
         if (not bucket_dir.startswith(self.application.directory) or
@@ -354,7 +369,7 @@ class ObjectHandler(BaseRequestHandler):
             return
         directory = os.path.dirname(path)
         fileutils.ensure_tree(directory)
-        object_file = open(path, "w")
+        object_file = open(path, "wb")
         object_file.write(self.request.body)
         object_file.close()
         self.set_header('ETag',
@@ -362,7 +377,7 @@ class ObjectHandler(BaseRequestHandler):
         self.finish()
 
     def delete(self, bucket, object_name):
-        object_name = urllib.unquote(object_name)
+        object_name = parse.unquote(object_name)
         path = self._object_path(bucket, object_name)
         if (not path.startswith(self.application.directory) or
                 not os.path.isfile(path)):

@@ -79,16 +79,3 @@ def xhtml_escape(value):
 
     """
     return saxutils.escape(value, {'"': '&quot;', "'": '&apos;'})
-
-
-def utf8(value):
-    """Try to turn a string into utf-8 if possible.
-
-    Code is directly from the utf8 function in
-    http://github.com/facebook/tornado/blob/master/tornado/escape.py
-
-    """
-    if isinstance(value, unicode):
-        return value.encode('utf-8')
-    assert isinstance(value, str)
-    return value
