@@ -14,7 +14,11 @@
 
 """RequestContext: context for requests that persist through all of ec2."""
 
+import threading
+
+from keystoneclient.auth.identity.generic import password as keystone_auth
 from keystoneclient import client as keystone_client
+from keystoneclient import session as keystone_session
 from keystoneclient.v2_0 import client as keystone_client_v2
 from keystoneclient.v3 import client as keystone_client_v3
 from oslo_config import cfg
@@ -79,6 +83,7 @@ class RequestContext(context.RequestContext):
         # oslo_context's RequestContext.to_dict() generates this field, we can
         # safely ignore this as we don't use it.
         kwargs.pop('user_identity', None)
+        self.session = kwargs.pop('session', None)
         if kwargs:
             LOG.warning(_LW('Arguments dropped when creating context: %s') %
                         str(kwargs))
@@ -157,27 +162,34 @@ def get_keystone_client_class():
     return _keystone_client_class
 
 
+_local_storage = threading.local()
+
+
 def get_os_admin_context():
     """Create a context to interact with OpenStack as an administrator."""
-    current_context = context.get_current()
-    if (current_context and current_context.is_os_admin):
+    # TODO(ft): make Keystone session reusable between greenthreads.
+    # A service handles a lot of greenthreads (about 1k per processor),
+    # but only few admin contexts are simultaneously used. We could have
+    # TokenPool for them, or even have a singletone if Session supports
+    # such usage.
+    current_context = getattr(_local_storage, 'os_admin_context', None)
+    if current_context:
         return current_context
-    # TODO(ft): make an authentification token reusable
-    keystone_client_class = get_keystone_client_class()
-    keystone = keystone_client_class(
+    auth = keystone_auth.Password(
         username=CONF.admin_user,
         password=CONF.admin_password,
         project_name=CONF.admin_tenant_name,
         tenant_name=CONF.admin_tenant_name,
         auth_url=CONF.keystone_url,
     )
-    service_catalog = keystone.service_catalog.get_data()
-    return RequestContext(
-            keystone.auth_user_id,
-            keystone.auth_tenant_id,
-            auth_token=keystone.auth_token,
-            service_catalog=service_catalog,
-            is_os_admin=True)
+    session = keystone_session.Session(auth=auth)
+    current_context = RequestContext(
+            None, None,
+            session=session,
+            is_os_admin=True,
+            overwrite=False)
+    _local_storage.os_admin_context = current_context
+    return current_context
 
 
 def require_context(ctxt):

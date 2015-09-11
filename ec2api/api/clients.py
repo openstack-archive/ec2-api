@@ -74,11 +74,17 @@ def nova(context):
         'auth_token': context.auth_token,
         'bypass_url': _url_for(context, service_type=CONF.nova_service_type),
         'http_log_debug': CONF.debug,
+        'session': context.session,
+        'service_type': CONF.nova_service_type,
     }
     global _nova_api_version
     if not _nova_api_version:
         _nova_api_version = _get_nova_api_version(context)
-    return novaclient.Client(_nova_api_version, **args)
+    # NOTE(ft): workaround for LP #1494116 bug
+    clnt = novaclient.Client(_nova_api_version, **args)
+    if not hasattr(clnt.client, 'last_request_id'):
+        setattr(clnt.client, 'last_request_id', None)
+    return clnt
 
 
 def neutron(context):
@@ -90,6 +96,7 @@ def neutron(context):
         'service_type': 'network',
         'token': context.auth_token,
         'endpoint_url': _url_for(context, service_type='network'),
+        'session': context.session,
     }
 
     return neutronclient.Client(**args)
@@ -100,10 +107,15 @@ def glance(context):
         return None
 
     args = {
-        'auth_url': CONF.keystone_url,
         'service_type': 'image',
-        'token': context.auth_token,
     }
+    # NOTE(ft): glanceclient gives precedence to token authentification
+    # if both session and auth_Url are passed in
+    if context.session:
+        args['session'] = context.session
+    else:
+        args['auth_url'] = CONF.keystone_url
+        args['token'] = context.auth_token
 
     return glanceclient.Client(
         "1", endpoint=_url_for(context, service_type='image'), **args)
@@ -118,6 +130,7 @@ def cinder(context):
         'auth_url': CONF.keystone_url,
         'username': None,
         'api_key': None,
+        'session': context.session,
     }
 
     _cinder = cinderclient.Client('1', http_log_debug=CONF.debug, **args)
@@ -145,9 +158,7 @@ def nova_cert(context):
 def _url_for(context, **kwargs):
     service_catalog = context.service_catalog
     if not service_catalog:
-        catalog = keystone(context).service_catalog.catalog
-        service_catalog = catalog['serviceCatalog']
-        context.service_catalog = service_catalog
+        return None
 
     service_type = kwargs['service_type']
     for service in service_catalog:
@@ -169,7 +180,9 @@ def _get_nova_api_version(context):
     url = _url_for(context, service_type=CONF.nova_service_type)
     try:
         client = novaclient.Client(REQUIRED_NOVA_API_VERSION, bypass_url=url,
-                                   http_log_debug=CONF.debug)
+                                   http_log_debug=CONF.debug,
+                                   session=context.session,
+                                   service_type=CONF.nova_service_type)
     except nova_exception.UnsupportedVersion:
         logger.warning(
             _LW('Nova client does not support v2.1 Nova API, use v2 instead. '
