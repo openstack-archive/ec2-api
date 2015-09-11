@@ -15,12 +15,12 @@
 import hashlib
 import hmac
 import posixpath
-import urlparse
 
 import httplib2
 from oslo_config import cfg
 from oslo_log import log as logging
 import six
+import six.moves.urllib.parse as urlparse
 import webob
 
 from ec2api import context as ec2_context
@@ -100,7 +100,8 @@ class MetadataRequestHandler(wsgi.Application):
             LOG.exception(_LE("Unexpected error."))
             msg = _('An unknown error has occurred. '
                     'Please try your request again.')
-            return webob.exc.HTTPInternalServerError(explanation=unicode(msg))
+            return webob.exc.HTTPInternalServerError(
+                explanation=six.text_type(msg))
 
     def _proxy_request(self, req, requester):
         headers = self._build_proxy_request_headers(requester)
@@ -148,7 +149,8 @@ class MetadataRequestHandler(wsgi.Application):
                 'Remote metadata server experienced an internal server error.'
             )
             LOG.warn(msg)
-            return webob.exc.HTTPInternalServerError(explanation=unicode(msg))
+            return webob.exc.HTTPInternalServerError(
+                explanation=six.text_type(msg))
         else:
             raise Exception(_('Unexpected response code: %s') % resp.status)
 
