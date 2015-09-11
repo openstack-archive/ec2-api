@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
 import copy
 import json
 import os
@@ -812,13 +811,13 @@ class S3TestCase(base.BaseTestCase):
         glance = self.mock_glance()
         _handle, tempf = tempfile.mkstemp()
         fake_context = base.create_context()
-        with contextlib.nested(
-            mock.patch('ec2api.api.image._s3_conn'),
-            mock.patch('ec2api.api.image._s3_download_file'),
-            mock.patch('ec2api.api.image._s3_decrypt_image'),
-            mock.patch('ec2api.api.image._s3_untarzip_image')
-        ) as (s3_conn, s3_download_file, s3_decrypt_image, s3_untarzip_image):
 
+        @mock.patch('ec2api.api.image._s3_untarzip_image')
+        @mock.patch('ec2api.api.image._s3_decrypt_image')
+        @mock.patch('ec2api.api.image._s3_download_file')
+        @mock.patch('ec2api.api.image._s3_conn')
+        def do_test(s3_conn, s3_download_file, s3_decrypt_image,
+                    s3_untarzip_image):
             (s3_conn.return_value.
              get_bucket.return_value.
              get_key.return_value.
@@ -855,6 +854,8 @@ class S3TestCase(base.BaseTestCase):
                 s3_decrypt_image.assert_called_with(
                     fake_context, mock.ANY, 'foo', 'foo', mock.ANY)
                 s3_untarzip_image.assert_called_with(mock.ANY, mock.ANY)
+
+            do_test()
 
     @mock.patch('ec2api.api.image.eventlet.spawn_n')
     def test_s3_create_bdm(self, spawn_n):

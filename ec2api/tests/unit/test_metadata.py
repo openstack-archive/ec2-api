@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
-
 import mock
 from oslo_config import cfg
 from oslo_config import fixture as config_fixture
@@ -97,12 +95,11 @@ class ProxyTestCase(test_base.BaseTestCase):
                     'private_ip': mock.sentinel.private_ip}
         req = mock.Mock(headers={})
 
-        with contextlib.nested(
-            mock.patch.object(metadata.MetadataRequestHandler,
-                              '_unpack_nova_network_request'),
-            mock.patch('ec2api.context.get_os_admin_context'),
-            mock.patch('ec2api.metadata.api.get_os_instance_and_project_id'),
-        ) as (unpack_request, get_context, get_ids):
+        @mock.patch('ec2api.metadata.api.get_os_instance_and_project_id')
+        @mock.patch('ec2api.context.get_os_admin_context')
+        @mock.patch.object(metadata.MetadataRequestHandler,
+                           '_unpack_nova_network_request')
+        def do_test1(unpack_request, get_context, get_ids):
             get_context.return_value = base.create_context(is_os_admin=True)
             unpack_request.return_value = mock.sentinel.private_ip
             get_ids.return_value = (mock.sentinel.os_instance_id,
@@ -115,9 +112,13 @@ class ProxyTestCase(test_base.BaseTestCase):
             get_ids.assert_called_with(get_context.return_value,
                                        mock.sentinel.private_ip)
 
+        do_test1()
+
         req.headers['X-Instance-ID'] = mock.sentinel.os_instance_id
-        with mock.patch.object(metadata.MetadataRequestHandler,
-                               '_unpack_neutron_request') as unpack_request:
+
+        @mock.patch.object(metadata.MetadataRequestHandler,
+                           '_unpack_neutron_request')
+        def do_test2(unpack_request):
             unpack_request.return_value = (mock.sentinel.os_instance_id,
                                            mock.sentinel.project_id,
                                            mock.sentinel.private_ip)
@@ -126,14 +127,16 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.assertEqual(expected, retval)
             unpack_request.assert_called_with(req)
 
+        do_test2()
+
         req.headers['X-Metadata-Provider'] = mock.sentinel.provider_id
-        with contextlib.nested(
-            mock.patch.object(metadata.MetadataRequestHandler,
-                              '_unpack_nsx_request'),
-            mock.patch('ec2api.context.get_os_admin_context'),
-            mock.patch('ec2api.metadata.api.'
-                       'get_os_instance_and_project_id_by_provider_id'),
-        ) as (unpack_request, get_context, get_ids):
+
+        @mock.patch('ec2api.metadata.api.'
+                    'get_os_instance_and_project_id_by_provider_id')
+        @mock.patch('ec2api.context.get_os_admin_context')
+        @mock.patch.object(metadata.MetadataRequestHandler,
+                           '_unpack_nsx_request')
+        def do_test3(unpack_request, get_context, get_ids):
             unpack_request.return_value = (mock.sentinel.provider_id,
                                            mock.sentinel.private_ip)
             get_context.return_value = base.create_context(is_os_admin=True)
@@ -147,6 +150,8 @@ class ProxyTestCase(test_base.BaseTestCase):
             get_ids.assert_called_with(get_context.return_value,
                                        mock.sentinel.provider_id,
                                        mock.sentinel.private_ip)
+
+        do_test3()
 
     @mock.patch('ec2api.metadata.api.get_metadata_item')
     @mock.patch('ec2api.context.get_os_admin_context')
