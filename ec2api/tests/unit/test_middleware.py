@@ -162,3 +162,13 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         mock_request.assert_called_with('POST',
                                         CONF.keystone_url + '/ec2tokens',
                                         data=mock.ANY, headers=mock.ANY)
+
+        fake_request = mock.NonCallableMock(status_code=200, headers={})
+        fake_request.json.return_value = {'token': {}}
+        mock_request.return_value = fake_request
+        resp = self.kauth(req)
+        self._validate_ec2_error(resp, 400, 'AuthFailure')
+
+        fake_request.json.return_value = {'access': {}}
+        resp = self.kauth(req)
+        self._validate_ec2_error(resp, 400, 'AuthFailure')
