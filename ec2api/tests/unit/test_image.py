@@ -21,7 +21,6 @@ import tempfile
 from cinderclient import exceptions as cinder_exception
 import eventlet
 import mock
-from oslotest import base as test_base
 
 from ec2api.api import image as image_api
 from ec2api import exception
@@ -483,7 +482,7 @@ class ImageTestCase(base.ApiTestCase):
                            None))
 
 
-class ImagePrivateTestCase(test_base.BaseTestCase):
+class ImagePrivateTestCase(base.BaseTestCase):
 
     def test_format_image(self):
         image_ids = {fakes.ID_OS_IMAGE_1: fakes.ID_EC2_IMAGE_1,
@@ -576,8 +575,8 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         check_state_translation('available', 'available')
         check_state_translation('unknown-state', 'available')
 
-    @mock.patch('ec2api.db.api.IMPL')
-    def test_format_mappings(self, db_api):
+    def test_format_mappings(self):
+        db_api = self.mock_db()
         # check virtual mapping formatting
         properties = {
             'mappings': [
@@ -601,9 +600,7 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual(expected, result)
 
         # check bdm v2 formatting
-        db_api.get_items_ids.side_effect = (
-            tools.get_db_api_get_items_ids(fakes.DB_IMAGE_2,
-                                           fakes.DB_VOLUME_3))
+        db_api.set_mock_items(fakes.DB_IMAGE_2, fakes.DB_VOLUME_3)
         properties = {
             'bdm_v2': True,
             'block_device_mapping': [
@@ -686,34 +683,27 @@ class ImagePrivateTestCase(test_base.BaseTestCase):
         result = image_api._format_mappings('fake_context', properties)
         self.assertEqual(expected, result)
 
-    @mock.patch('ec2api.db.api.IMPL')
-    def test_get_db_items(self, db_api):
+    def test_get_db_items(self):
         describer = image_api.ImageDescriber()
         describer.context = base.create_context()
 
         # NOTE(ft): the first requested image appears is user owend and public,
         # the second is absent
-        db_api.get_items.side_effect = (
-            tools.get_db_api_get_items())
-        db_api.get_items_by_ids.side_effect = (
-            tools.get_db_api_get_items_by_ids(fakes.DB_IMAGE_1))
-        db_api.get_public_items.side_effect = [
-            [fakes.DB_IMAGE_1], [], []]
+        db_api = self.mock_db()
+        db_api.set_mock_items(fakes.DB_IMAGE_1)
 
         describer.ids = set([fakes.ID_EC2_IMAGE_1, fakes.ID_EC2_IMAGE_2])
         self.assertRaises(exception.InvalidAMIIDNotFound,
                           describer.get_db_items)
 
 
-class S3TestCase(base.ApiTestCase):
-    # TODO(ft): 'execute' feature isn't used here, but some mocks and
-    # fake context are. ApiTestCase should be split to some classes to use
-    # its feature optimally
+class S3TestCase(base.BaseTestCase):
 
     def test_s3_parse_manifest(self):
-        self.set_mock_db_items(fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
-        self.db_api.get_item_by_id.return_value = None
-        self.glance.images.get.side_effect = (
+        db_api = self.mock_db()
+        glance = self.mock_glance()
+        db_api.set_mock_items(fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
+        glance.images.get.side_effect = (
             tools.get_by_1st_arg_getter({
                 fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
                 fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
@@ -739,16 +729,17 @@ class S3TestCase(base.ApiTestCase):
                         matchers.ListMatches(['foo']))
         self.assertEqual('foo', key)
         self.assertEqual('foo', iv)
-        self.db_api.get_items_ids.assert_any_call(
+        db_api.get_items_ids.assert_any_call(
             mock.ANY, 'aki', item_ids=(fakes.ID_EC2_IMAGE_AKI_1,),
             item_os_ids=None)
-        self.db_api.get_items_ids.assert_any_call(
+        db_api.get_items_ids.assert_any_call(
             mock.ANY, 'ari', item_ids=(fakes.ID_EC2_IMAGE_ARI_1,),
             item_os_ids=None)
 
     @mock.patch.object(fakes.OSImage, 'update', autospec=True)
     def test_s3_create_image_locations(self, osimage_update):
         self.configure(image_decryption_dir=None)
+        glance = self.mock_glance()
         _handle, tempf = tempfile.mkstemp()
         fake_context = base.create_context()
         with contextlib.nested(
@@ -764,7 +755,7 @@ class S3TestCase(base.ApiTestCase):
              get_contents_as_string.return_value) = FILE_MANIFEST_XML
             s3_download_file.return_value = tempf
             s3_untarzip_image.return_value = tempf
-            (self.glance.images.create.return_value) = (
+            (glance.images.create.return_value) = (
                 fakes.OSImage({'id': fakes.random_os_id(),
                                'status': 'queued'}))
 
@@ -797,6 +788,7 @@ class S3TestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.image.eventlet.spawn_n')
     def test_s3_create_bdm(self, spawn_n):
+        glance = self.mock_glance()
         metadata = {'properties': {
                         'image_location': 'fake_bucket/fake_manifest',
                         'root_device_name': '/dev/sda1',
@@ -818,7 +810,7 @@ class S3TestCase(base.ApiTestCase):
 
             image_api._s3_create(fake_context, metadata)
 
-            self.glance.images.create.assert_called_once_with(
+            glance.images.create.assert_called_once_with(
                 disk_format='ami', container_format='ami', is_public=False,
                 properties={'architecture': 'x86_64',
                             'image_state': 'pending',
