@@ -265,6 +265,11 @@ class EC2UtilsTestCase(testtools.TestCase):
             ec2utils.get_os_image,
             fake_context, fakes.random_ec2_id('ami'))
 
+        # check case of creating image
+        db_api.get_items_ids.return_value = [(fakes.ID_EC2_IMAGE_1, None)]
+        self.assertIsNone(ec2utils.get_os_image(fake_context,
+                                                fakes.ID_EC2_IMAGE_1))
+
     @mock.patch('neutronclient.v2_0.client.Client')
     def test_get_os_public_network(self, neutron):
         neutron = neutron.return_value

@@ -37,7 +37,7 @@ from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _, _LE, _LI
+from ec2api.i18n import _, _LE, _LI, _LW
 
 
 LOG = logging.getLogger(__name__)
@@ -127,40 +127,70 @@ def create_image(context, instance_id, name=None, description=None,
             raise exception.IncorrectState(reason=msg)
 
         restart_instance = True
-        os_instance.stop()
-
-        # wait instance for really stopped
-        start_time = time.time()
-        while os_instance.status != 'SHUTOFF':
-            time.sleep(1)
-            os_instance.get()
-            # NOTE(yamahata): timeout and error. 1 hour for now for safety.
-            #                 Is it too short/long?
-            #                 Or is there any better way?
-            timeout = 1 * 60 * 60
-            if time.time() > start_time + timeout:
-                err = _("Couldn't stop instance within %d sec") % timeout
-                raise exception.EC2Exception(message=err)
 
     # meaningful image name
     name_map = dict(instance=instance['os_id'], now=timeutils.isotime())
     name = name or _('image of %(instance)s at %(now)s') % name_map
 
-    glance = clients.glance(context)
-    with common.OnCrashCleaner() as cleaner:
-        os_image_id = os_instance.create_image(name)
-        cleaner.addCleanup(glance.images.delete, os_image_id)
-        # TODO(andrey-mp): snapshot and volume also must be deleted in case
-        # of error
-        os_image = glance.images.get(os_image_id)
-        image = db_api.add_item(context, _get_os_image_kind(os_image),
-                                {'os_id': os_image_id,
-                                 'is_public': False,
-                                 'description': description})
+    def delayed_create(context, image, name, os_instance):
+        try:
+            os_instance.stop()
 
+            # wait instance for really stopped
+            start_time = time.time()
+            while os_instance.status != 'SHUTOFF':
+                time.sleep(1)
+                os_instance.get()
+                # NOTE(yamahata): timeout and error. 1 hour for now for safety.
+                #                 Is it too short/long?
+                #                 Or is there any better way?
+                timeout = 1 * 60 * 60
+                if time.time() > start_time + timeout:
+                    err = (_("Couldn't stop instance within %d sec") % timeout)
+                    raise exception.EC2Exception(message=err)
+
+            os_image_id = os_instance.create_image(
+                name, metadata={'ec2_id': image['id']})
+            image['os_id'] = os_image_id
+            db_api.update_item(context, image)
+        except Exception:
+            LOG.exception(_LE('Failed to complete image %s creation'),
+                          image.id)
+            try:
+                image['state'] = 'failed'
+                db_api.update_item(context, image)
+            except Exception:
+                LOG.warning(_LW("Couldn't set 'failed' state for db image %s"),
+                            image.id, exc_info=True)
+
+        try:
+            os_instance.start()
+        except Exception:
+            LOG.warning(_LW('Failed to start instance %(i_id)s after '
+                            'completed creation of image %(image_id)s'),
+                        {'i_id': instance['id'],
+                         'image_id': image['id']},
+                        exc_info=True)
+
+    image = {'is_public': False,
+             'description': description}
     if restart_instance:
-        os_instance.start()
-
+        # NOTE(ft): image type is hardcoded, because we don't know it now,
+        # but cannot change it later. But Nova doesn't specify container format
+        # for snapshots of volume backed instances, so that it is 'ami' in fact
+        image = db_api.add_item(context, 'ami', image)
+        eventlet.spawn_n(delayed_create, context, image, name, os_instance)
+    else:
+        glance = clients.glance(context)
+        with common.OnCrashCleaner() as cleaner:
+            os_image_id = os_instance.create_image(name)
+            cleaner.addCleanup(glance.images.delete, os_image_id)
+            # TODO(andrey-mp): snapshot and volume also must be deleted in case
+            # of error
+            os_image = glance.images.get(os_image_id)
+            image['os_id'] = os_image_id
+            image = db_api.add_item(context, _get_os_image_kind(os_image),
+                                    image)
     return {'imageId': image['id']}
 
 
@@ -244,13 +274,20 @@ def register_image(context, name=None, image_location=None,
 
 def deregister_image(context, image_id):
     os_image = ec2utils.get_os_image(context, image_id)
-    _check_owner(context, os_image)
+    if not os_image:
+        image = db_api.get_item_by_id(context, image_id)
+        if image.get('state') != 'failed':
+            # TODO(ft): figure out corresponding AWS error
+            raise exception.IncorrectState(
+                reason='Image is still being created')
+    else:
+        _check_owner(context, os_image)
 
-    glance = clients.glance(context)
-    try:
-        glance.images.delete(os_image.id)
-    except glance_exception.HTTPNotFound:
-        pass
+        glance = clients.glance(context)
+        try:
+            glance.images.delete(os_image.id)
+        except glance_exception.HTTPNotFound:
+            pass
     db_api.delete_item(context, image_id)
     return True
 
@@ -315,6 +352,8 @@ class ImageDescriber(common.TaggableItemsDescriber):
             if len(images_ids) < len(self.ids):
                 missed_ids = self.ids - images_ids
                 raise exception.InvalidAMIIDNotFound(id=next(iter(missed_ids)))
+        self.pending_images = {i['id']: i for i in local_images
+                               if not i['os_id']}
         self.snapshot_ids = dict(
             (s['os_id'], s['id'])
             for s in db_api.get_items(self.context, 'snap'))
@@ -323,15 +362,29 @@ class ImageDescriber(common.TaggableItemsDescriber):
         return images
 
     def get_os_items(self):
-        return clients.glance(self.context).images.list()
+        os_images = list(clients.glance(self.context).images.list())
+        self.ec2_created_os_images = {
+            os_image.properties['ec2_id']: os_image
+            for os_image in os_images
+            if (os_image.properties.get('ec2_id') and
+                self.context.project_id == os_image.owner)}
+        return os_images
 
     def auto_update_db(self, image, os_image):
         if not image:
             kind = _get_os_image_kind(os_image)
             if self.context.project_id == os_image.owner:
-                image = ec2utils.get_db_item_by_os_id(
-                    self.context, kind, os_image.id, self.items_dict,
-                    os_image=os_image)
+                if os_image.properties.get('ec2_id') in self.pending_images:
+                    # NOTE(ft): the image is being creating, Glance had created
+                    # image, but creating thread doesn't yet update db item
+                    image = self.pending_images[os_image.metadata['ec2_id']]
+                    image['os_id'] = os_image.id
+                    image['is_public'] = os_image.is_public
+                    db_api.update_item(self.context, image)
+                else:
+                    image = ec2utils.get_db_item_by_os_id(
+                        self.context, kind, os_image.id, self.items_dict,
+                        os_image=os_image)
             else:
                 image_id = ec2utils.os_id_to_ec2_id(
                     self.context, kind, os_image.id,
@@ -361,6 +414,37 @@ class ImageDescriber(common.TaggableItemsDescriber):
 
     def get_tags(self):
         return db_api.get_tags(self.context, ('ami', 'ari', 'aki'), self.ids)
+
+    def handle_unpaired_item(self, item, formatted_items):
+        if item['os_id']:
+            super(ImageDescriber, self).handle_unpaired_item(item,
+                                                             formatted_items)
+        else:
+            # NOTE(ft): process creating images, ignoring ids mapping
+            if 'is_public' in item:
+                # NOTE(ft): the image is being creating, Glance had created
+                # image, but creating thread doesn't yet update db item
+                os_image = self.ec2_created_os_images.get(item['id'])
+                if os_image:
+                    item['os_id'] = os_image.id
+                    item['is_public'] = os_image.is_public
+                    db_api.update_item(self.context, item)
+                    image = self.format(item, os_image)
+                else:
+                    # NOTE(ft): Glance image is yet not created, but DB item
+                    # exists. So that we adds EC2 image to output results
+                    # with all data we have.
+                    # TODO(ft): check if euca2ools can process such result
+                    image = {'imageId': item['id'],
+                             'imageOwnerId': self.context.project_id,
+                             'imageType': IMAGE_TYPES[
+                                    ec2utils.get_ec2_id_kind(item['id'])],
+                             'isPublic': item['is_public']}
+                    if 'description' in item:
+                        image['description'] = item['description']
+                    image['imageState'] = item.get('state', 'pending')
+                formatted_items.append(image)
+                self.ids.remove(item['id'])
 
 
 def describe_images(context, executable_by=None, image_id=None,
@@ -420,6 +504,10 @@ def describe_image_attribute(context, image_id, attribute):
         raise exception.InvalidRequest()
 
     os_image = ec2utils.get_os_image(context, image_id)
+    if not os_image:
+        # TODO(ft): figure out corresponding AWS error
+        raise exception.IncorrectState(
+            reason='Image is still being created or failed')
     _check_owner(context, os_image)
     image = ec2utils.get_db_item(context, image_id)
 
@@ -433,6 +521,10 @@ def modify_image_attribute(context, image_id, attribute=None,
                            description=None, launch_permission=None,
                            product_code=None, user_id=None, value=None):
     os_image = ec2utils.get_os_image(context, image_id)
+    if not os_image:
+        # TODO(ft): figure out corresponding AWS error
+        raise exception.IncorrectState(
+            reason='Image is still being created or failed')
 
     attributes = set()
 
@@ -539,7 +631,10 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
                  }
     if 'description' in image:
         ec2_image['description'] = image['description']
-    state = GLANCE_STATUS_TO_EC2.get(os_image.status, 'error')
+    if 'state' in image:
+        state = image['state']
+    else:
+        state = GLANCE_STATUS_TO_EC2.get(os_image.status, 'error')
     if state in ('available', 'pending'):
         state = _s3_image_state_map.get(os_image.properties.get('image_state'),
                                         state)

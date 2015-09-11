@@ -106,9 +106,11 @@ class ImageTestCase(base.ApiTestCase):
                                                        'SHUTOFF')
                                                if next(stop_called) else None)
         image_id = fakes.random_ec2_id('ami')
-        os_instance.create_image.return_value = image_id
-        self.glance.images.get.return_value = fakes.OSImage({'id': image_id},
-                                                            from_get=True)
+        os_image_id = fakes.random_os_id()
+        os_instance.create_image.return_value = os_image_id
+        self.glance.images.get.return_value = fakes.OSImage(
+            {'id': os_image_id},
+            from_get=True)
         self.nova.servers.get.return_value = os_instance
         is_ebs_instance.return_value = True
         self.db_api.add_item.side_effect = tools.get_db_api_add_item(image_id)
@@ -124,15 +126,30 @@ class ImageTestCase(base.ApiTestCase):
             mock.ANY, fakes.ID_EC2_INSTANCE_2)
         self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_2)
         is_ebs_instance.assert_called_once_with(mock.ANY, os_instance.id)
+        expected_image = {'is_public': False,
+                          'description': 'fake desc'}
+        if no_reboot:
+            expected_image['os_id'] = os_image_id
         self.db_api.add_item.assert_called_once_with(
-            mock.ANY, 'ami', {'os_id': image_id,
-                              'is_public': False,
-                              'description': 'fake desc'})
+            mock.ANY, 'ami', expected_image)
+        if not no_reboot:
+            eventlet.sleep()
         if not no_reboot:
             os_instance.stop.assert_called_once_with()
             os_instance.get.assert_called_once_with()
             os_instance.start.assert_called_once_with()
+        if no_reboot:
             os_instance.create_image.assert_called_once_with('fake_name')
+        else:
+            os_instance.create_image.assert_called_once_with(
+                'fake_name', metadata={'ec2_id': image_id})
+            self.db_api.update_item.assert_called_once_with(
+                mock.ANY, {'id': image_id,
+                           'is_public': False,
+                           'description': 'fake desc',
+                           'os_id': os_image_id,
+                           'vpc_id': None})
+
         self.db_api.reset_mock()
         self.nova.servers.reset_mock()
 
@@ -276,6 +293,7 @@ class ImageTestCase(base.ApiTestCase):
     def test_deregister_image(self):
         self._setup_model()
 
+        # normal flow
         resp = self.execute('DeregisterImage',
                             {'ImageId': fakes.ID_EC2_IMAGE_1})
         self.assertThat(resp, matchers.DictMatches({'return': True}))
@@ -284,11 +302,31 @@ class ImageTestCase(base.ApiTestCase):
         self.glance.images.delete.assert_called_once_with(
             fakes.ID_OS_IMAGE_1)
 
+        # deregister image which failed on asynchronously creation
+        self.glance.reset_mock()
+        image_id = fakes.random_ec2_id('ami')
+        self.add_mock_db_items({'id': image_id,
+                                'os_id': None,
+                                'state': 'failed'})
+        resp = self.execute('DeregisterImage',
+                            {'ImageId': image_id})
+        self.assertThat(resp, matchers.DictMatches({'return': True}))
+        self.db_api.delete_item.assert_called_with(mock.ANY, image_id)
+        self.assertFalse(self.glance.images.delete.called)
+
     def test_deregister_image_invalid_parameters(self):
         self._setup_model()
 
         self.assert_execution_error('InvalidAMIID.NotFound', 'DeregisterImage',
                                     {'ImageId': fakes.random_ec2_id('ami')})
+
+        # deregister asynchronously creating image
+        image_id = fakes.random_ec2_id('ami')
+        self.add_mock_db_items({'id': image_id,
+                                'os_id': None})
+        self.assert_execution_error('IncorrectState',
+                                    'DeregisterImage',
+                                    {'ImageId': image_id})
 
     def test_describe_images(self):
         self._setup_model()
@@ -393,6 +431,15 @@ class ImageTestCase(base.ApiTestCase):
                  {'blockDeviceMapping': (
                         fakes.EC2_IMAGE_2['blockDeviceMapping'])})
 
+    def test_describe_image_attributes_invalid_parameters(self):
+        image_id = fakes.random_ec2_id('ami')
+        self.set_mock_db_items({'id': image_id,
+                                'os_id': None})
+        self.assert_execution_error('IncorrectState',
+                                    'DescribeImageAttribute',
+                                    {'ImageId': image_id,
+                                     'Attribute': 'kernel'})
+
     @mock.patch.object(fakes.OSImage, 'update', autospec=True)
     def test_modify_image_attributes(self, osimage_update):
         self._setup_model()
@@ -408,6 +455,15 @@ class ImageTestCase(base.ApiTestCase):
         self.assertEqual(fakes.ID_OS_IMAGE_1,
                          osimage_update.call_args[0][0].id)
 
+    def test_modify_image_attributes_invalid_parameters(self):
+        image_id = fakes.random_ec2_id('ami')
+        self.set_mock_db_items({'id': image_id,
+                                'os_id': None})
+        self.assert_execution_error('IncorrectState',
+                                    'ModifyImageAttribute',
+                                    {'ImageId': image_id,
+                                     'Attribute': 'kernel'})
+
     def _setup_model(self):
         self.set_mock_db_items(fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
                                fakes.DB_SNAPSHOT_1, fakes.DB_SNAPSHOT_2,
@@ -415,9 +471,10 @@ class ImageTestCase(base.ApiTestCase):
                                fakes.DB_VOLUME_1, fakes. DB_VOLUME_2)
         self.db_api.get_public_items.return_value = []
 
+        # NOTE(ft): glance.image.list returns an iterator, not just a list
         self.glance.images.list.side_effect = (
-            lambda: [fakes.OSImage(fakes.OS_IMAGE_1),
-                     fakes.OSImage(fakes.OS_IMAGE_2)])
+            lambda: (fakes.OSImage(i)
+                     for i in (fakes.OS_IMAGE_1, fakes.OS_IMAGE_2)))
         self.glance.images.get.side_effect = (
             lambda os_id: (fakes.OSImage(fakes.OS_IMAGE_1, from_get=True)
                            if os_id == fakes.ID_OS_IMAGE_1 else
