@@ -18,7 +18,6 @@ import copy
 import mock
 from novaclient import exceptions as nova_exception
 
-from ec2api import context
 from ec2api import exception
 from ec2api.metadata import api
 from ec2api.tests.unit import base
@@ -264,16 +263,9 @@ class MetadataApiIntegralTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.instance.security_group_api')
     @mock.patch('ec2api.api.instance.network_interface_api')
-    @mock.patch('keystoneclient.v2_0.client.Client')
-    def test_get_metadata_integral(self, keystone, network_interface_api,
+    def test_get_metadata_integral(self, network_interface_api,
                                    security_group_api):
-        service_catalog = mock.MagicMock()
-        service_catalog.get_data.return_value = []
-        keystone.return_value = mock.Mock(auth_user_id='fake_user_id',
-                                          auth_tenant_id=fakes.ID_OS_PROJECT,
-                                          auth_token='fake_token',
-                                          service_catalog=service_catalog)
-        fake_context = context.get_os_admin_context()
+        fake_context = base.create_context(is_os_admin=True)
 
         self.set_mock_db_items(
             fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,

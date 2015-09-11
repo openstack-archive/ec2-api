@@ -34,7 +34,6 @@ from ec2api.tests.unit import tools
 import ec2api.wsgi
 
 
-ADMIN_TOKEN = 'admin_token'
 DB_SCHEMA = None
 
 
@@ -53,10 +52,12 @@ def skip_not_implemented(test_item):
 
 
 def create_context(is_os_admin=False):
-    auth_token = ADMIN_TOKEN if is_os_admin else None
-    return ec2api.context.RequestContext(
-        fakes.ID_OS_USER, fakes.ID_OS_PROJECT, auth_token=auth_token,
-        service_catalog=mock.NonCallableMagicMock())
+    session = (mock.sentinel.admin_session
+               if is_os_admin else
+               mock.sentinel.session)
+    return ec2api.context.RequestContext(fakes.ID_OS_USER, fakes.ID_OS_PROJECT,
+                                         is_os_admin=is_os_admin,
+                                         session=session)
 
 
 class MockOSMixin(object):
@@ -100,9 +101,9 @@ class MockOSMixin(object):
         novaclient_getter.side_effect = (
             lambda *args, **kwargs: (
                 nova_admin
-                if (kwargs.get('auth_token') == ADMIN_TOKEN) else
+                if (kwargs.get('session') == mock.sentinel.admin_session) else
                 nova
-                if (kwargs.get('auth_token') != ADMIN_TOKEN) else
+                if (kwargs.get('session') == mock.sentinel.session) else
                 None))
         return nova, nova_admin
 

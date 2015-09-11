@@ -69,19 +69,13 @@ _nova_api_version = None
 
 
 def nova(context):
-    args = {
-        'auth_url': CONF.keystone_url,
-        'auth_token': context.auth_token,
-        'bypass_url': _url_for(context, service_type=CONF.nova_service_type),
-        'http_log_debug': CONF.debug,
-        'session': context.session,
-        'service_type': CONF.nova_service_type,
-    }
     global _nova_api_version
     if not _nova_api_version:
         _nova_api_version = _get_nova_api_version(context)
+    clnt = novaclient.Client(_nova_api_version,
+                             session=context.session,
+                             service_type=CONF.nova_service_type)
     # NOTE(ft): workaround for LP #1494116 bug
-    clnt = novaclient.Client(_nova_api_version, **args)
     if not hasattr(clnt.client, 'last_request_id'):
         setattr(clnt.client, 'last_request_id', None)
     return clnt
@@ -91,64 +85,29 @@ def neutron(context):
     if neutronclient is None:
         return None
 
-    args = {
-        'auth_url': CONF.keystone_url,
-        'service_type': 'network',
-        'token': context.auth_token,
-        'endpoint_url': _url_for(context, service_type='network'),
-        'session': context.session,
-    }
-
-    return neutronclient.Client(**args)
+    return neutronclient.Client(session=context.session,
+                                service_type='network')
 
 
 def glance(context):
     if glanceclient is None:
         return None
 
-    args = {
-        'service_type': 'image',
-    }
-    # NOTE(ft): glanceclient gives precedence to token authentification
-    # if both session and auth_Url are passed in
-    if context.session:
-        args['session'] = context.session
-    else:
-        args['auth_url'] = CONF.keystone_url
-        args['token'] = context.auth_token
-
-    return glanceclient.Client(
-        "1", endpoint=_url_for(context, service_type='image'), **args)
+    return glanceclient.Client('1', service_type='image',
+                               session=context.session)
 
 
 def cinder(context):
     if cinderclient is None:
         return nova(context, 'volume')
 
-    args = {
-        'service_type': 'volume',
-        'auth_url': CONF.keystone_url,
-        'username': None,
-        'api_key': None,
-        'session': context.session,
-    }
-
-    _cinder = cinderclient.Client('1', http_log_debug=CONF.debug, **args)
-    management_url = _url_for(context, service_type='volume')
-    _cinder.client.auth_token = context.auth_token
-    _cinder.client.management_url = management_url
-
-    return _cinder
+    return cinderclient.Client('1', session=context.session,
+                               service_type='volume')
 
 
 def keystone(context):
     keystone_client_class = ec2_context.get_keystone_client_class()
-    return keystone_client_class(
-        token=context.auth_token,
-        project_id=context.project_id,
-        tenant_id=context.project_id,
-        auth_url=CONF.keystone_url,
-        session=context.session)
+    return keystone_client_class(session=context.session)
 
 
 def nova_cert(context):
@@ -156,32 +115,9 @@ def nova_cert(context):
     return _cert_api
 
 
-def _url_for(context, **kwargs):
-    service_catalog = context.service_catalog
-    if not service_catalog:
-        return None
-
-    service_type = kwargs['service_type']
-    for service in service_catalog:
-        if service['type'] != service_type:
-            continue
-        for endpoint in service['endpoints']:
-            if 'publicURL' in endpoint:
-                return endpoint['publicURL']
-            elif endpoint.get('interface') == 'public':
-                # NOTE(andrey-mp): keystone v3
-                return endpoint['url']
-        else:
-            return None
-
-    return None
-
-
 def _get_nova_api_version(context):
-    url = _url_for(context, service_type=CONF.nova_service_type)
     try:
-        client = novaclient.Client(REQUIRED_NOVA_API_VERSION, bypass_url=url,
-                                   http_log_debug=CONF.debug,
+        client = novaclient.Client(REQUIRED_NOVA_API_VERSION,
                                    session=context.session,
                                    service_type=CONF.nova_service_type)
     except nova_exception.UnsupportedVersion:
@@ -210,7 +146,8 @@ def _get_nova_api_version(context):
                 'was found in Nova version list for url %(url)s of service '
                 'type "%(service_type)s". '
                 'Use v%(required_api_version)s Nova API.'),
-            {'url': url, 'service_type': CONF.nova_service_type,
+            {'url': client.client.get_endpoint(),
+             'service_type': CONF.nova_service_type,
              'required_api_version': REQUIRED_NOVA_API_MICROVERSION})
         return REQUIRED_NOVA_API_MICROVERSION
     if current.id != REQUIRED_NOVA_API_VERSION_ID:
