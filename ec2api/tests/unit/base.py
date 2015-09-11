@@ -121,7 +121,36 @@ class MockOSMixin(object):
         return cinder
 
 
-class BaseTestCase(MockOSMixin, test_base.BaseTestCase):
+class MockDBMixin(object):
+
+    def mock_db(self):
+        db_api_patcher = mock.patch('ec2api.db.api.IMPL', autospec=db_backend)
+        db_api = db_api_patcher.start()
+        self.addCleanup(db_api_patcher.stop)
+
+        def set_mock_items(*items):
+            db_api.__db_items = copy.copy(items)
+            db_api.get_items.side_effect = (
+                tools.get_db_api_get_items(*db_api.__db_items))
+            db_api.get_item_by_id.side_effect = (
+                tools.get_db_api_get_item_by_id(*db_api.__db_items))
+            db_api.get_items_by_ids.side_effect = (
+                tools.get_db_api_get_items_by_ids(*db_api.__db_items))
+            db_api.get_items_ids.side_effect = (
+                tools.get_db_api_get_items_ids(*db_api.__db_items))
+
+        def add_mock_items(*items):
+            merged_items = items + tuple(item for item in db_api.__db_items
+                                         if all(i['id'] != item['id']
+                                                for i in items))
+            db_api.set_mock_items(*merged_items)
+
+        setattr(db_api, 'set_mock_items', set_mock_items)
+        setattr(db_api, 'add_mock_items', add_mock_items)
+        return db_api
+
+
+class BaseTestCase(MockOSMixin, MockDBMixin, test_base.BaseTestCase):
 
     def setUp(self):
         super(BaseTestCase, self).setUp()
@@ -139,11 +168,7 @@ class ApiTestCase(BaseTestCase):
     def setUp(self):
         super(ApiTestCase, self).setUp()
         self.mock_all_os()
-
-        db_api_patcher = mock.patch('ec2api.db.api.IMPL', autospec=db_backend)
-        self.db_api = db_api_patcher.start()
-        self.addCleanup(db_api_patcher.stop)
-
+        self.db_api = self.mock_db()
         self.isotime = self.mock('oslo_utils.timeutils.isotime')
 
     def execute(self, action, args):
@@ -170,21 +195,10 @@ class ApiTestCase(BaseTestCase):
         self.assertEqual(False, True)
 
     def set_mock_db_items(self, *items):
-        self._db_items = copy.copy(items)
-        self.db_api.get_items.side_effect = (
-            tools.get_db_api_get_items(*self._db_items))
-        self.db_api.get_item_by_id.side_effect = (
-            tools.get_db_api_get_item_by_id(*self._db_items))
-        self.db_api.get_items_by_ids.side_effect = (
-            tools.get_db_api_get_items_by_ids(*self._db_items))
-        self.db_api.get_items_ids.side_effect = (
-            tools.get_db_api_get_items_ids(*self._db_items))
+        self.db_api.set_mock_items(*items)
 
     def add_mock_db_items(self, *items):
-        merged_items = items + tuple(item for item in self._db_items
-                                     if all(i['id'] != item['id']
-                                            for i in items))
-        self.set_mock_db_items(*merged_items)
+        self.db_api.add_mock_items(*items)
 
     def check_filtering(self, operation, resultset_key, filters):
         for name, value in filters:
