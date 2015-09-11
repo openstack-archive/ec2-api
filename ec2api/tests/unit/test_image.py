@@ -696,6 +696,76 @@ class ImagePrivateTestCase(base.BaseTestCase):
         self.assertRaises(exception.InvalidAMIIDNotFound,
                           describer.get_db_items)
 
+    def test_describe_images_being_created(self):
+        db_api = self.mock_db()
+        glance = self.mock_glance()
+        context = base.create_context()
+        image_id = fakes.random_ec2_id('ami')
+        image = {'id': image_id,
+                 'os_id': None,
+                 'is_public': False,
+                 'description': 'fake desc'}
+        db_api.set_mock_items(image)
+        db_api.get_public_items.return_value = []
+
+        # describe cases when no glance image exists
+        glance.images.list.return_value = []
+        expected = {'imagesSet': [{'imageId': image_id,
+                                   'description': 'fake desc',
+                                   'imageOwnerId': fakes.ID_OS_PROJECT,
+                                   'imageState': 'pending',
+                                   'imageType': 'machine',
+                                   'isPublic': False}]}
+
+        # describe all images
+        result = image_api.describe_images(context)
+        self.assertEqual(expected, result)
+
+        # describe the image
+        result = image_api.describe_images(context, image_id=[image_id])
+        self.assertEqual(expected, result)
+
+        # describe failed image
+        image['state'] = 'failed'
+        expected['imagesSet'][0]['imageState'] = 'failed'
+        result = image_api.describe_images(base.create_context())
+        self.assertEqual(expected, result)
+
+        # describe cases when glance image exists, db item is yet not updated
+        del image['state']
+        os_image_id = fakes.random_os_id()
+        os_image = {'id': os_image_id,
+                    'owner': fakes.ID_OS_PROJECT,
+                    'status': 'active',
+                    'is_public': False,
+                    'properties': {'ec2_id': image_id}}
+        glance.images.list.return_value = [fakes.OSImage(os_image)]
+        expected['imagesSet'] = [{
+            'architecture': None,
+            'creationDate': None,
+            'description': 'fake desc',
+            'imageId': image_id,
+            'imageLocation': 'None (None)',
+            'imageOwnerId': fakes.ID_OS_PROJECT,
+            'imageState': 'available',
+            'imageType': 'machine',
+            'isPublic': False,
+            'name': None,
+            'rootDeviceType': 'instance-store'}]
+
+        # describe all images
+        result = image_api.describe_images(context)
+        self.assertEqual(expected, result)
+        db_api.update_item.assert_called_once_with(
+            context, tools.update_dict(image, {'os_id': os_image_id}))
+
+        # describe the image
+        db_api.reset_mock()
+        result = image_api.describe_images(context, image_id=[image_id])
+        self.assertEqual(expected, result)
+        db_api.update_item.assert_called_once_with(
+            context, tools.update_dict(image, {'os_id': os_image_id}))
+
 
 class S3TestCase(base.BaseTestCase):
 
