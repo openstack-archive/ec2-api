@@ -1018,7 +1018,7 @@ class RouteTableTestCase(base.ApiTestCase):
                     fakes.DB_ROUTE_TABLE_1, [fakes.DB_SUBNET_1])
                 raise Exception('fake_exception')
         except Exception as ex:
-            if ex.message != 'fake_exception':
+            if str(ex) != 'fake_exception':
                 raise
 
         self.neutron.update_subnet.assert_any_call(

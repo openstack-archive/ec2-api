@@ -453,7 +453,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
                     copy.deepcopy(self.DB_SUBNET_1_NO_VPN), fakes.DB_VPC_1)
                 raise Exception('fake-exception')
         except Exception as ex:
-            if ex.message != 'fake-exception':
+            if str(ex) != 'fake-exception':
                 raise
         self.db_api.update_item.assert_called_with(
             mock.ANY, self.DB_SUBNET_1_NO_VPN)
@@ -478,7 +478,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
                     copy.deepcopy(fakes.DB_SUBNET_1))
                 raise Exception('fake-exception')
         except Exception as ex:
-            if ex.message != 'fake-exception':
+            if str(ex) != 'fake-exception':
                 raise
         self.db_api.update_item.assert_called_with(
             mock.ANY, fakes.DB_SUBNET_1)
