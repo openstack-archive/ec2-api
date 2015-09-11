@@ -16,6 +16,7 @@
 import base64
 
 from oslo_log import log
+import six
 from tempest_lib.common import ssh
 from tempest_lib.common.utils import data_utils
 import testtools
@@ -35,14 +36,14 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)
         sec_group_name = self.create_standard_security_group()
-        user_data = data_utils.rand_uuid()
+        user_data = six.text_type(data_utils.rand_uuid()) + six.unichr(1071)
         instance_id = self.run_instance(KeyName=key_name, UserData=user_data,
                                         SecurityGroups=[sec_group_name])
 
         data = self.client.describe_instance_attribute(
             InstanceId=instance_id, Attribute='userData')
         self.assertEqual(data['UserData']['Value'],
-                         base64.b64encode(user_data))
+            base64.b64encode(user_data.encode("utf-8")).decode("utf-8"))
 
         ip_address = self.get_instance_ip(instance_id)
 
@@ -50,6 +51,8 @@ class InstancesTest(scenario_base.BaseScenarioTest):
 
         url = 'http://169.254.169.254'
         data = ssh_client.exec_command('curl %s/latest/user-data' % url)
+        if isinstance(data, six.binary_type):
+            data = data.decode("utf-8")
         self.assertEqual(user_data, data)
 
         data = ssh_client.exec_command('curl %s/latest/meta-data/ami-id' % url)

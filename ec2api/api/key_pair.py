@@ -101,7 +101,7 @@ def import_key_pair(context, key_name, public_key_material):
         raise exception.MissingParameter(
             _('The request must contain the parameter PublicKeyMaterial'))
     nova = clients.nova(context)
-    public_key = base64.b64decode(public_key_material)
+    public_key = base64.b64decode(public_key_material).decode("utf-8")
     try:
         key_pair = nova.keypairs.create(key_name, public_key)
     except nova_exception.OverLimit:

@@ -21,6 +21,7 @@ import traceback
 
 import botocore.exceptions
 from oslo_log import log
+import six
 from tempest_lib import base
 from tempest_lib import exceptions
 import testtools
@@ -145,7 +146,7 @@ def safe_setup(f):
                 cls.tearDownClass()
             except Exception as te:
                 LOG.exception("tearDownClass failed: %s" % te)
-            raise exc_info[1], None, exc_info[2]
+            six.reraise(*exc_info)
 
     return decorator
 

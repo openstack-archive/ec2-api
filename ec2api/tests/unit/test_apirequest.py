@@ -79,8 +79,9 @@ class EC2RequesterTestCase(base.BaseTestCase):
         xml = etree.fromstring(observed)
         self.assertEqual(xmlns, xml.nsmap.get(None))
         observed_data = tools.parse_xml(observed)
-        expected = {root_tag: tools.update_dict(dict_data,
-                                                {'requestId': request_id})}
+        expected = {root_tag: tools.update_dict(
+                                  dict_data,
+                                  {'requestId': request_id.decode("ascii")})}
         self.assertThat(observed_data, matchers.DictMatches(expected))
 
     def test_render_response_ascii(self):
@@ -89,7 +90,7 @@ class EC2RequesterTestCase(base.BaseTestCase):
             'string': 'foo',
             'int': 1,
         }
-        data = req._render_response(resp, 'uuid')
+        data = req._render_response(resp, 'uuid').decode("utf-8")
         self.assertIn('<FakeActionResponse xmlns="http://ec2.amazonaws.com/'
                       'doc/FakeVersion/', data)
         self.assertIn('<int>1</int>', data)
@@ -100,7 +101,7 @@ class EC2RequesterTestCase(base.BaseTestCase):
         resp = {
             'utf8': six.unichr(40960) + u'abcd' + six.unichr(1972)
         }
-        data = req._render_response(resp, 'uuid')
+        data = req._render_response(resp, 'uuid').decode("utf-8")
         self.assertIn('<utf8>&#40960;abcd&#1972;</utf8>', data)
 
     # Tests for individual data element format functions

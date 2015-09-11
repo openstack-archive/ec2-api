@@ -129,7 +129,7 @@ class KeyPairTest(base.EC2TestCase):
                      "XcPojYN56tI0OlrGqojbediJYD0rUsJu4weZpbn8vilb3JuDY+jws"
                      "snSA8wzBx3A/8y9Pp1B test@ubuntu")
         data = self.client.import_key_pair(KeyName=keyName,
-                                                 PublicKeyMaterial=publicKey)
+                                           PublicKeyMaterial=publicKey)
         res_clean = self.addResourceCleanUp(self.client.delete_key_pair,
                                             KeyName=keyName)
 

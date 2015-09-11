@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
+
 import mock
 from oslo_config import cfg
 from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
+import six
 import testtools
 import webob
 
@@ -48,21 +51,21 @@ class ProxyTestCase(test_base.BaseTestCase):
         request = webob.Request.blank('/')
         response = request.get_response(self.handler)
         self.assertEqual(200, response.status_int)
-        self.assertEqual('foo', response.body)
+        self.assertEqual('foo', response.body.decode("utf-8"))
 
     @mock.patch('ec2api.metadata.api.get_version_list')
     def test_root(self, get_version_list):
         get_version_list.return_value = 'fake_version'
         request = webob.Request.blank('/')
         response = request.get_response(self.handler)
-        self.assertEqual('fake_version', response.body)
+        self.assertEqual('fake_version', response.body.decode("utf-8"))
         response_ctype = response.headers['Content-Type']
         self.assertTrue(response_ctype.startswith("text/plain"))
         get_version_list.assert_called_with()
 
         request = webob.Request.blank('/foo/../')
         response = request.get_response(self.handler)
-        self.assertEqual('fake_version', response.body)
+        self.assertEqual('fake_version', response.body.decode("utf-8"))
 
     @mock.patch.object(metadata.MetadataRequestHandler, '_get_metadata')
     @mock.patch.object(metadata.MetadataRequestHandler, '_get_requester')
@@ -71,7 +74,7 @@ class ProxyTestCase(test_base.BaseTestCase):
         get_metadata.return_value = 'fake'
         request = webob.Request.blank('/latest')
         response = request.get_response(self.handler)
-        self.assertEqual('fake', response.body)
+        self.assertEqual('fake', response.body.decode("utf-8"))
         response_ctype = response.headers['Content-Type']
         self.assertTrue(response_ctype.startswith("text/plain"))
         get_requester.assert_called_with(mock.ANY)
@@ -397,6 +400,7 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.db.api.IMPL')
     @mock.patch('ec2api.metadata.api.instance_api')
     def test_get_metadata_items(self, instance_api, db_api, nova):
+        FAKE_USER_DATA = u'fake_user_data-' + six.unichr(1071)
         nova.return_value.fixed_ips.get.return_value = (
                 mock.Mock(hostname='fake_name'))
         nova.return_value.servers.list.return_value = [
@@ -408,9 +412,10 @@ class ProxyTestCase(test_base.BaseTestCase):
                 (fakes.ID_EC2_INSTANCE_1, fakes.ID_OS_INSTANCE_1)]
         instance_api.describe_instances.return_value = {
                'reservationSet': [fakes.EC2_RESERVATION_1]}
+        userDataValue = base64.b64encode(FAKE_USER_DATA.encode('utf-8'))
         instance_api.describe_instance_attribute.return_value = {
                 'instanceId': fakes.ID_EC2_INSTANCE_1,
-                'userData': {'value': 'fake_user_data'}}
+                'userData': {'value': userDataValue}}
 
         def _test_metadata_path(relpath):
             # recursively confirm a http 200 from all meta-data elements
@@ -419,7 +424,7 @@ class ProxyTestCase(test_base.BaseTestCase):
                     relpath, remote_addr=fakes.IP_NETWORK_INTERFACE_2)
             response = request.get_response(self.handler)
             self.assertEqual(200, response.status_int)
-            for item in response.body.split('\n'):
+            for item in response.body.decode("utf-8").split('\n'):
                 if 'public-keys' in relpath:
                     # meta-data/public-keys/0=keyname refers to
                     # meta-data/public-keys/0

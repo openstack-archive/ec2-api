@@ -119,7 +119,7 @@ ROOT_DEVICE_NAME_INSTANCE_1 = '/dev/vda'
 ROOT_DEVICE_NAME_INSTANCE_2 = '/dev/sdb1'
 IPV6_INSTANCE_2 = 'fe80:b33f::a8bb:ccff:fedd:eeff'
 CLIENT_TOKEN_INSTANCE_2 = 'client-token-2'
-USER_DATA_INSTANCE_2 = base64.b64encode(b'fake-user data')
+USER_DATA_INSTANCE_2 = base64.b64encode(b'fake-user data').decode('ascii')
 
 
 # DHCP options constants
@@ -316,7 +316,7 @@ CUSTOMER_GATEWAY_CONFIGURATION_1_DATA = (
 CUSTOMER_GATEWAY_CONFIGURATION_1 = etree.tostring(
     etree.fromstring(CUSTOMER_GATEWAY_CONFIGURATION_1_DATA,
                      parser=etree.XMLParser(remove_blank_text=True)),
-    xml_declaration=True, encoding='UTF-8', pretty_print=True)
+    xml_declaration=True, encoding='UTF-8', pretty_print=True).decode("utf-8")
 CUSTOMER_GATEWAY_CONFIGURATION_2_DATA = (
     '<?xml version=\'1.0\' encoding=\'UTF-8\'?>'
     '<vpn_connection id="' + ID_EC2_VPN_CONNECTION_2 + '">'
@@ -360,7 +360,7 @@ CUSTOMER_GATEWAY_CONFIGURATION_2_DATA = (
 CUSTOMER_GATEWAY_CONFIGURATION_2 = etree.tostring(
     etree.fromstring(CUSTOMER_GATEWAY_CONFIGURATION_2_DATA,
                      parser=etree.XMLParser(remove_blank_text=True)),
-    xml_declaration=True, encoding='UTF-8', pretty_print=True)
+    xml_declaration=True, encoding='UTF-8', pretty_print=True).decode("utf-8")
 
 
 # Object constants section

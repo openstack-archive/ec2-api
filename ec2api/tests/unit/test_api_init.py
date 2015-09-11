@@ -58,9 +58,10 @@ class ApiInitTestCase(base.BaseTestCase):
         expected_xml = fakes.XML_RESULT_TEMPLATE % {
             'action': 'FakeAction',
             'api_version': 'fake_v1',
-            'request_id': self.fake_context.request_id,
+            'request_id': self.fake_context.request_id.decode("ascii"),
             'data': '<fakeTag>fake_data</fakeTag>'}
-        self.assertThat(res.body, matchers.XMLMatches(expected_xml))
+        self.assertThat(res.body.decode("utf-8"),
+                        matchers.XMLMatches(expected_xml))
         self.controller.fake_action.assert_called_once_with(self.fake_context,
                                                             param='fake_param')
 
@@ -77,8 +78,9 @@ class ApiInitTestCase(base.BaseTestCase):
             expected_xml = fakes.XML_ERROR_TEMPLATE % {
                 'code': code,
                 'message': message,
-                'request_id': self.fake_context.request_id}
-            self.assertThat(res.body, matchers.XMLMatches(expected_xml))
+                'request_id': self.fake_context.request_id.decode("ascii")}
+            self.assertThat(res.body.decode("utf-8"),
+                            matchers.XMLMatches(expected_xml))
             self.controller.fake_action.assert_called_once_with(
                 self.fake_context, param='fake_param')
 

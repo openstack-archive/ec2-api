@@ -39,7 +39,7 @@ def ec2_error_response(request_id, code, message, status=500):
         '<RequestID>%s</RequestID></Response>' %
         (utils.xhtml_escape(code),
          utils.xhtml_escape(message),
-         utils.xhtml_escape(request_id.decode("utf-8")))).encode("utf-8")
+         utils.xhtml_escape(request_id.decode("ascii")))).encode("utf-8")
     return resp
 
 

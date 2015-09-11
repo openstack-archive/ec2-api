@@ -93,7 +93,7 @@ class S3APITestCase(test_base.BaseTestCase):
         # Test key operations on buckets.
         bucket_name = 'testbucket'
         key_name = 'somekey'
-        key_contents = 'somekey'
+        key_contents = b'somekey'
 
         b = self.conn.create_bucket(bucket_name)
         k = b.new_key(key_name)

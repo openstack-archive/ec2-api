@@ -331,9 +331,10 @@ class VpnConnectionTestCase(base.ApiTestCase):
                           for v in resp['vpnConnectionSet']
                           if v['vpnConnectionId'] == vpn['vpnConnectionId'])
             self.assertThat(
-                config,
-                matchers.XMLMatches(vpn['customerGatewayConfiguration'],
-                                    orderless_sequence=True))
+                config.encode(),
+                matchers.XMLMatches(
+                    vpn['customerGatewayConfiguration'].encode(),
+                    orderless_sequence=True))
             self.assertTrue(config.startswith(
                 '<?xml version=\'1.0\' encoding=\'UTF-8\'?>'))
         self.neutron.list_ikepolicies.assert_called_once_with(

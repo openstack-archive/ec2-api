@@ -17,6 +17,7 @@ import copy
 
 import mock
 from novaclient import exceptions as nova_exception
+import six
 
 from ec2api import exception
 from ec2api.metadata import api
@@ -24,6 +25,9 @@ from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
+
+
+FAKE_USER_DATA = u'fake_user_data-' + six.unichr(1071)
 
 
 class MetadataApiTestCase(base.ApiTestCase):
@@ -38,9 +42,10 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_INSTANCE_1)
         self.instance_api.describe_instances.return_value = {
                'reservationSet': [fakes.EC2_RESERVATION_1]}
+        userDataValue = base64.b64encode(FAKE_USER_DATA.encode('utf-8'))
         self.instance_api.describe_instance_attribute.return_value = {
                 'instanceId': fakes.ID_EC2_INSTANCE_1,
-                'userData': {'value': base64.b64encode('fake_user_data')}}
+                'userData': {'value': userDataValue}}
 
         self.fake_context = base.create_context()
 
@@ -153,7 +158,7 @@ class MetadataApiTestCase(base.ApiTestCase):
         retval = api.get_metadata_item(
                self.fake_context, ['2009-04-04', 'user-data'],
                fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
-        self.assertEqual('fake_user_data', retval)
+        self.assertEqual(FAKE_USER_DATA, retval)
 
     def test_no_user_data(self):
         self.instance_api.describe_instance_attribute.return_value = {

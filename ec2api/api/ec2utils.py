@@ -104,7 +104,7 @@ def dict_from_dotted_str(items):
     for key, value in items:
         parts = key.split(".")
         key = str(camelcase_to_underscore(parts[0]))
-        if isinstance(value, str) or isinstance(value, unicode):
+        if isinstance(value, six.string_types):
             # NOTE(vish): Automatically convert strings back
             #             into their respective values
             value = _try_convert(value)
@@ -147,6 +147,8 @@ def _render_data(el, data):
         el.text = str(data).lower()
     elif isinstance(data, datetime.datetime):
         el.text = _database_to_isoformat(data)
+    elif isinstance(data, six.binary_type):
+        el.text = data.decode("utf-8")
     elif data is not None:
         el.text = six.text_type(data)
 

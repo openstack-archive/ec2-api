@@ -21,6 +21,7 @@ import random
 import mock
 from novaclient import exceptions as nova_exception
 from oslotest import base as test_base
+import six
 
 import ec2api.api.clients
 from ec2api.api import instance as instance_api
@@ -644,7 +645,8 @@ class InstanceTestCase(base.ApiTestCase):
         utcnow.return_value = datetime.datetime(2015, 1, 19, 23, 34, 45, 123)
         resp = self.execute(operation,
                             {'InstanceId': fakes.ID_EC2_INSTANCE_2})
-        expected_data = base64.b64encode(getter.return_value)
+        expected_data = (base64.b64encode(six.b(getter.return_value))
+                               .decode("utf-8"))
         self.assertEqual({'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'timestamp': '2015-01-19T23:34:45.000Z',
                           key: expected_data},
@@ -1022,7 +1024,7 @@ class InstanceTestCase(base.ApiTestCase):
                 ids_ec2_subnet_by_port,
                 ips,
                 ids_ec2_instance_by_port,
-                range(subnets_count) * instances_count,
+                list(range(subnets_count)) * instances_count,
                 dots_by_port)]
         db_detached_enis = [
             fakes.gen_db_network_interface(
@@ -1048,7 +1050,7 @@ class InstanceTestCase(base.ApiTestCase):
                 dots_by_port,
                 ids_ec2_subnet_by_port,
                 ids_ec2_instance_by_port,
-                range(subnets_count) * instances_count)]
+                list(range(subnets_count)) * instances_count)]
         ec2_detached_enis = [
             fakes.gen_ec2_network_interface(
                 db_eni['id'],
@@ -1924,7 +1926,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
              'instance_id': inst['id'],
              'delete_on_termination': num in (0, 1, 4, 6)}
             for num, inst in enumerate(itertools.chain(
-                  *(zip(instances[:3], instances[:3]) +
+                  *(list(zip(instances[:3], instances[:3])) +
                     [[{'id': fakes.random_ec2_id('i')}] * 2])))]
         network_interfaces.extend({'id': fakes.random_ec2_id('eni')}
                                   for dummy in range(2))
