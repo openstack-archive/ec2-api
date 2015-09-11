@@ -210,7 +210,8 @@ class EC2KeystoneAuth(wsgi.Middleware):
             'verb': req.method,
             'path': req.path,
             'params': params,
-            'headers': req.headers,
+            # python3 takes only keys fo json from headers object
+            'headers': {k: req.headers[k] for k in req.headers},
             'body_hash': body_hash
         }
 
