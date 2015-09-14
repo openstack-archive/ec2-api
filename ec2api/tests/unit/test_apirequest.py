@@ -90,7 +90,7 @@ class EC2RequesterTestCase(base.BaseTestCase):
             'string': 'foo',
             'int': 1,
         }
-        data = req._render_response(resp, 'uuid').decode("utf-8")
+        data = req._render_response(resp, 'uuid').decode()
         self.assertIn('<FakeActionResponse xmlns="http://ec2.amazonaws.com/'
                       'doc/FakeVersion/', data)
         self.assertIn('<int>1</int>', data)
@@ -101,7 +101,7 @@ class EC2RequesterTestCase(base.BaseTestCase):
         resp = {
             'utf8': six.unichr(40960) + u'abcd' + six.unichr(1972)
         }
-        data = req._render_response(resp, 'uuid').decode("utf-8")
+        data = req._render_response(resp, 'uuid').decode()
         self.assertIn('<utf8>&#40960;abcd&#1972;</utf8>', data)
 
     # Tests for individual data element format functions

@@ -212,7 +212,9 @@ def _build_metadata(context, ec2_instance, ec2_reservation,
                     context, ec2_instance['instanceId'], 'userData')
     if 'userData' in userdata:
         userdata = userdata['userData']['value']
-        full_metadata['user-data'] = base64.b64decode(userdata)
+        userdata = base64.b64decode(userdata)
+        userdata = userdata.decode("utf-8")
+        full_metadata['user-data'] = userdata
 
     return full_metadata
 
@@ -264,10 +266,8 @@ def _format_metadata_item(data):
         return output[:-1]
     elif isinstance(data, list):
         return '\n'.join(data)
-    elif isinstance(data, six.binary_type):
-        return data.decode("utf-8")
     else:
-        return str(data)
+        return six.text_type(data)
 
 
 def _find_path_in_tree(data, path_tokens):

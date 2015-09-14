@@ -474,7 +474,7 @@ def get_password_data(context, instance_id):
     now = timeutils.utcnow()
     return {"instanceId": instance_id,
             "timestamp": now,
-            "passwordData": base64.b64encode(six.b(password))}
+            "passwordData": base64.b64encode(password.encode())}
 
 
 def get_console_output(context, instance_id):
@@ -487,7 +487,7 @@ def get_console_output(context, instance_id):
     now = timeutils.utcnow()
     return {"instanceId": instance_id,
             "timestamp": now,
-            "output": base64.b64encode(six.b(console_output))}
+            "output": base64.b64encode(console_output.encode())}
 
 
 def describe_instance_attribute(context, instance_id, attribute):

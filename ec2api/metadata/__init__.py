@@ -165,8 +165,8 @@ class MetadataRequestHandler(wsgi.Application):
 
     def _sign_instance_id(self, instance_id):
         return hmac.new(
-            six.b(CONF.metadata.metadata_proxy_shared_secret),
-            six.b(instance_id),
+            CONF.metadata.metadata_proxy_shared_secret.encode("utf-8"),
+            instance_id.encode(),
             hashlib.sha256).hexdigest()
 
     def _get_requester(self, req):
@@ -241,8 +241,8 @@ class MetadataRequestHandler(wsgi.Application):
 
     def _validate_signature(self, signature, requester_id, requester_ip):
         expected_signature = hmac.new(
-            six.b(CONF.metadata.metadata_proxy_shared_secret),
-            six.b(requester_id),
+            CONF.metadata.metadata_proxy_shared_secret.encode("utf-8"),
+            requester_id.encode(),
             hashlib.sha256).hexdigest()
 
         if not (signature and
