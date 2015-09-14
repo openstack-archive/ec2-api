@@ -14,8 +14,6 @@
 
 """RequestContext: context for requests that persist through all of ec2."""
 
-import threading
-
 from keystoneclient.auth.identity.generic import password as keystone_auth
 from keystoneclient import client as keystone_client
 from keystoneclient import session as keystone_session
@@ -162,34 +160,29 @@ def get_keystone_client_class():
     return _keystone_client_class
 
 
-_local_storage = threading.local()
+_admin_session = None
 
 
 def get_os_admin_context():
     """Create a context to interact with OpenStack as an administrator."""
-    # TODO(ft): make Keystone session reusable between greenthreads.
-    # A service handles a lot of greenthreads (about 1k per processor),
-    # but only few admin contexts are simultaneously used. We could have
-    # TokenPool for them, or even have a singletone if Session supports
-    # such usage.
-    current_context = getattr(_local_storage, 'os_admin_context', None)
-    if current_context:
-        return current_context
-    auth = keystone_auth.Password(
-        username=CONF.admin_user,
-        password=CONF.admin_password,
-        project_name=CONF.admin_tenant_name,
-        tenant_name=CONF.admin_tenant_name,
-        auth_url=CONF.keystone_url,
-    )
-    session = keystone_session.Session(auth=auth)
-    current_context = RequestContext(
+    # NOTE(ft): this is a singletone because keystone's session looks thread
+    # safe for both regular and token renewal requests
+    global _admin_session
+    if not _admin_session:
+        auth = keystone_auth.Password(
+            username=CONF.admin_user,
+            password=CONF.admin_password,
+            project_name=CONF.admin_tenant_name,
+            tenant_name=CONF.admin_tenant_name,
+            auth_url=CONF.keystone_url,
+        )
+        _admin_session = keystone_session.Session(auth=auth)
+
+    return RequestContext(
             None, None,
-            session=session,
+            session=_admin_session,
             is_os_admin=True,
             overwrite=False)
-    _local_storage.os_admin_context = current_context
-    return current_context
 
 
 def require_context(ctxt):

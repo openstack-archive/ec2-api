@@ -65,7 +65,7 @@ class ContextTestCase(test_base.BaseTestCase):
         self.assertNotEqual(context.get_current(), ctx)
 
         password_plugin.reset_mock()
-        self.assertEqual(ctx, ec2_context.get_os_admin_context())
+        ec2_context.get_os_admin_context()
         self.assertFalse(password_plugin.called)
 
     @mock.patch('keystoneclient.client.Client')
