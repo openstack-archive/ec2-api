@@ -45,7 +45,9 @@ REQUIRED_NOVA_API_VERSION_ID = 'v%s' % REQUIRED_NOVA_API_VERSION
 LEGACY_NOVA_API_VERSION = '2'
 # Nova API's 2.3 microversion provides additional EC2 compliant instance
 # properties
-REQUIRED_NOVA_API_MICROVERSION = '2.3'
+# Nova API's 2.10 microversion provides admin access to users keypairs,
+# which allows metadata service to expose openssh part of an instance key
+REQUIRED_NOVA_API_MICROVERSION = '2.10'
 _nova_api_version = None
 
 
