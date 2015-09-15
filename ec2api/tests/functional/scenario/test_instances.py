@@ -58,6 +58,10 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         data = ssh_client.exec_command('curl %s/latest/meta-data/ami-id' % url)
         self.assertEqual(CONF.aws.image_id, data)
 
+        data = ssh_client.exec_command(
+            'curl %s/latest/meta-data/public-keys/0/' % url)
+        self.assertEqual('openssh-key', data)
+
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_compare_console_output(self):
         key_name = data_utils.rand_name('testkey')

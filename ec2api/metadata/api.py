@@ -203,8 +203,19 @@ def _build_metadata(context, ec2_instance, ec2_reservation,
     # meta-data/public-keys/0/openssh-key : '%s' % publickey
     if ec2_instance['keyName']:
         metadata['public-keys'] = {
-            # TODO(andrey-mp): public key should be added in the future
             '0': {'_name': "0=" + ec2_instance['keyName']}}
+        nova = clients.nova(context)
+        os_instance = nova.servers.get(os_instance_id)
+        try:
+            keypair = nova.keypairs._get(
+                '/%s/%s?user_id=%s' % (nova.keypairs.keypair_prefix,
+                                       ec2_instance['keyName'],
+                                       os_instance.user_id),
+                'keypair')
+        except nova_exception.NotFound:
+            pass
+        else:
+            metadata['public-keys']['0']['openssh-key'] = keypair.public_key
 
     full_metadata = {'meta-data': metadata}
 

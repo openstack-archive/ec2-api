@@ -209,13 +209,30 @@ class MetadataApiTestCase(base.ApiTestCase):
                fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
         self.assertEqual('0=%s' % fakes.NAME_KEY_PAIR, retval)
 
-    @base.skip_not_implemented
     def test_pubkey(self):
+        self.nova.servers.get.return_value = (
+               fakes.OSInstance(fakes.OS_INSTANCE_1))
+        self.nova.keypairs.keypair_prefix = 'os_keypairs'
+        self.nova.keypairs._get.return_value = (
+               fakes.NovaKeyPair(fakes.OS_KEY_PAIR))
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'public-keys', '0', 'openssh-key'],
                fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
         self.assertEqual(fakes.PUBLIC_KEY_KEY_PAIR, retval)
+        self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_1)
+        self.nova.keypairs._get.assert_called_once_with(
+               '/os_keypairs/%s?user_id=%s' % (fakes.NAME_KEY_PAIR,
+                                               fakes.ID_OS_USER),
+               'keypair')
+
+        self.nova.keypairs._get.side_effect = nova_exception.NotFound(404)
+        self.assertRaises(
+                exception.EC2MetadataNotFound,
+                api.get_metadata_item,
+                self.fake_context,
+                ['2009-04-04', 'meta-data', 'public-keys', '0', 'openssh-key'],
+                fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
 
     def test_image_type_ramdisk(self):
         retval = api.get_metadata_item(
@@ -285,9 +302,8 @@ class MetadataApiIntegralTestCase(base.ApiTestCase):
             fakes.ID_OS_INSTANCE_1: fakes.OSInstance_full(fakes.OS_INSTANCE_1),
             fakes.ID_OS_INSTANCE_2: fakes.OSInstance_full(fakes.OS_INSTANCE_2)
         })
-        keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)
-        keypair.configure_mock(name=fakes.NAME_KEY_PAIR)
-        self.nova.keypairs.get.return_value = keypair
+        self.nova_admin.keypairs._get.return_value = (
+               fakes.NovaKeyPair(fakes.OS_KEY_PAIR))
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2),

@@ -721,6 +721,7 @@ class OSInstance(object):
         self.key_name = instance_dict.get('key_name')
         self.created = instance_dict.get('created')
         self.tenant_id = instance_dict.get('tenant_id', ID_OS_PROJECT)
+        self.user_id = ID_OS_USER
         self.addresses = copy.deepcopy(instance_dict.get('addresses', {}))
         self.security_groups = copy.deepcopy(
             instance_dict.get('security_groups', []))
