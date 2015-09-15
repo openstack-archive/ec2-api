@@ -18,6 +18,7 @@ from lxml import etree
 import mock
 from oslo_config import cfg
 from oslo_context import context
+from oslo_serialization import jsonutils
 from oslotest import base as test_base
 import requests
 import webob.dec
@@ -172,3 +173,27 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         fake_request.json.return_value = {'access': {}}
         resp = self.kauth(req)
         self._validate_ec2_error(resp, 400, 'AuthFailure')
+
+    @mock.patch.object(requests, 'request', return_value=FakeResponse(200))
+    def test_params_for_keystone_call(self, mock_request):
+        req = wsgi.Request.blank('/test')
+        req.GET['Signature'] = 'test-signature'
+        req.GET['AWSAccessKeyId'] = 'test-key-id'
+        self.kauth(req)
+        mock_request.assert_called_with(
+            'POST', CONF.keystone_url + '/ec2tokens',
+            data=mock.ANY, headers=mock.ANY)
+
+        data = jsonutils.loads(mock_request.call_args[1]['data'])
+        expected_data = {
+            'ec2Credentials': {
+                'access': 'test-key-id',
+                'headers': {'Host': 'localhost:80'},
+                'host': 'localhost:80',
+                'verb': 'GET',
+                'params': {'AWSAccessKeyId': 'test-key-id'},
+                'signature': 'test-signature',
+                'path': '/test',
+                'body_hash': 'e3b0c44298fc1c149afbf4c8996fb924'
+                             '27ae41e4649b934ca495991b7852b855'}}
+        self.assertDictEqual(expected_data, data)
