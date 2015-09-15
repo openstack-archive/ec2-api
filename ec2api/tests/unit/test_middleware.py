@@ -174,6 +174,7 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         resp = self.kauth(req)
         self._validate_ec2_error(resp, 400, 'AuthFailure')
 
+    @tools.screen_unexpected_exception_logs
     @mock.patch.object(requests, 'request', return_value=FakeResponse(200))
     def test_params_for_keystone_call(self, mock_request):
         req = wsgi.Request.blank('/test')
