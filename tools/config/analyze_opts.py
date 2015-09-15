@@ -26,8 +26,8 @@ import argparse
 import os
 import sys
 
+from oslo_config import iniparser
 sys.path.append(os.getcwd())
-from oslo.config import iniparser
 
 
 class PropertyCollecter(iniparser.BaseParser):
