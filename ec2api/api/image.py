@@ -149,6 +149,8 @@ def create_image(context, instance_id, name=None, description=None,
                     err = (_("Couldn't stop instance within %d sec") % timeout)
                     raise exception.EC2Exception(message=err)
 
+            # NOTE(ft): create an image with ec2_id metadata to let other code
+            # link os and db objects in race conditions
             os_image_id = os_instance.create_image(
                 name, metadata={'ec2_id': image['id']})
             image['os_id'] = os_image_id
