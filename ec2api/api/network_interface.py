@@ -118,8 +118,7 @@ def create_network_interface(context, subnet_id,
             os_port = neutron.create_port(os_port_body)['port']
         except (neutron_exception.IpAddressGenerationFailureClient,
                 neutron_exception.OverQuotaClient):
-            raise exception.NetworkInterfaceLimitExceeded(
-                        subnet_id=subnet_id)
+            raise exception.InsufficientFreeAddressesInSubnet()
         except (neutron_exception.IpAddressInUseClient,
                 neutron_exception.BadRequest) as ex:
             # NOTE(ft): AWS returns InvalidIPAddress.InUse for a primary IP
@@ -279,8 +278,7 @@ def assign_private_ip_addresses(context, network_interface_id,
         neutron.update_port(os_port['id'],
                             {'port': {'fixed_ips': fixed_ips}})
     except neutron_exception.IpAddressGenerationFailureClient:
-        raise exception.NetworkInterfaceLimitExceeded(
-                    subnet_id=subnet['id'])
+        raise exception.InsufficientFreeAddressesInSubnet()
     except neutron_exception.IpAddressInUseClient:
         msg = _('Some of %(addresses)s is assigned, but move is not '
                 'allowed.') % {'addresses': private_ip_address}

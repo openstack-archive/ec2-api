@@ -239,7 +239,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
             self.neutron.create_port.side_effect = cls()
             do_check({'SubnetId': fakes.ID_EC2_SUBNET_1,
                       'PrivateIpAddress': fakes.IP_NETWORK_INTERFACE_1},
-                     'NetworkInterfaceLimitExceeded')
+                     'InsufficientFreeAddressesInSubnet')
 
         for cls in [neutron_exception.IpAddressInUseClient,
                     neutron_exception.BadRequest]:
@@ -656,7 +656,7 @@ class NetworkInterfaceTestCase(base.ApiTestCase):
 
         self.neutron.update_port.side_effect = (
             neutron_exception.IpAddressGenerationFailureClient())
-        do_check('NetworkInterfaceLimitExceeded')
+        do_check('InsufficientFreeAddressesInSubnet')
 
         self.neutron.update_port.side_effect = (
             neutron_exception.IpAddressInUseClient())

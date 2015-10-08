@@ -142,7 +142,8 @@ class NetworkInterfaceTest(base.EC2TestCase):
                     SubnetId=self.subnet_id)
             except botocore.exceptions.ClientError as e:
                 error_code = e.response['Error']['Code']
-                self.assertEqual('NetworkInterfaceLimitExceeded', error_code)
+                self.assertEqual('InsufficientFreeAddressesInSubnet',
+                                 error_code, e.message)
                 break
             ni_id = data['NetworkInterface']['NetworkInterfaceId']
             res_clean = self.addResourceCleanUp(

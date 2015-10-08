@@ -462,9 +462,9 @@ class SubnetLimitExceeded(EC2OverlimitException):
                 'can create')
 
 
-class NetworkInterfaceLimitExceeded(EC2OverlimitException):
-    msg_fmt = _('You have reached the limit of network interfaces for subnet'
-                '%(subnet_id)s.')
+class InsufficientFreeAddressesInSubnet(EC2OverlimitException):
+    msg_fmt = _('The specified subnet does not have enough free addresses to '
+                'satisfy the request.')
 
 
 class AddressLimitExceeded(EC2OverlimitException):
