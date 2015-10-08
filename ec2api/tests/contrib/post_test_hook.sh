@@ -29,8 +29,6 @@ OLD_OS_PASSWORD=$OS_PASSWORD
 
 # bug somewhere
 unset OS_AUTH_TYPE
-# remove v2.0 from OS_AUTH_URL
-export OS_AUTH_URL=$(echo $OS_AUTH_URL | sed -r "s#(.*\/).*#\1#")
 
 if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
