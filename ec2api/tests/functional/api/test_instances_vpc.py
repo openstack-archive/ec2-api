@@ -137,12 +137,6 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.assertNotEmpty(instances)
         self.assertEqual(instance_id, instances[0]['InstanceId'])
 
-    @testtools.skipUnless(
-        CONF.aws.run_incompatible_tests,
-        "Amazon can create instance with several network interfaces in"
-        "one subnet. Openstack can't do it without additional configuration."
-        "Worked only from Juno with parameter in config - "
-        "nova.conf/neutron/allow_duplicate_networks = True")
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_instance_with_two_interfaces(self):
         kwargs = {
