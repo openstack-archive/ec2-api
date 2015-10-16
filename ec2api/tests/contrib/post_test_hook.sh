@@ -217,9 +217,9 @@ export OS_PROJECT_NAME=$OLD_OS_PROJECT_NAME
 export OS_TENANT_NAME=$OLD_OS_PROJECT_NAME
 export OS_USERNAME=$OLD_OS_USERNAME
 export OS_PASSWORD=$OLD_OS_PASSWORD
-nova list --all-tenants
-cinder list --all-tenants
+openstack server list --all-projects
+openstack image list
+openstack volume list --all-projects
 cinder snapshot-list --all-tenants
-glance image-list --all-tenants
 
 exit $RETVAL
