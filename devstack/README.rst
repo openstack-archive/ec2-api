@@ -8,6 +8,6 @@
 
      > cat local.conf
      [[local|localrc]]
-     enable_plugin ec2-api https://github.com/stackforge/ec2-api
+     enable_plugin ec2-api https://git.openstack.org/openstack/ec2-api
 
 3. run ``stack.sh``

@@ -36,7 +36,7 @@ the local.conf or localrc the following line:
 
 ::
 
- enable_plugin ec2-api https://github.com/stackforge/ec2-api 
+ enable_plugin ec2-api https://git.openstack.org/openstack/ec2-api
 
 To configure OpenStack for EC2 API metadata service:
 
