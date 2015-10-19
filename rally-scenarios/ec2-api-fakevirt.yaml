@@ -13,7 +13,7 @@
         ec2api_servers:
           flavor: "m1.nano"
           image: "*cirros*"
-          servers_per_tenant: 200
+          servers_per_tenant: 100
           run_in_vpc: False
           assign_floating_ip: False
           build_timeout: 150
@@ -30,7 +30,7 @@
         ec2api_servers:
           flavor: "m1.nano"
           image: "*cirros*"
-          servers_per_tenant: 200
+          servers_per_tenant: 100
           servers_per_run: 4
           run_in_vpc: True
           assign_floating_ip: True

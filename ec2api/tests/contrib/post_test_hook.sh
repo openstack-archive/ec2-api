@@ -45,13 +45,19 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
   if [[ $RUN_LONG_TESTS == "1" ]]; then
     REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
+    REGULAR_IMAGE_NAME="precise-server-cloudimg-i386-disk1.img"
     REGULAR_IMAGE_FNAME="precise"
-    openstack image create --disk-format raw --container-format bare --public --location $REGULAR_IMAGE_URL $REGULAR_IMAGE_FNAME
+    sudo rm /tmp/$REGULAR_IMAGE_NAME
+    wget -nv -P /tmp $REGULAR_IMAGE_URL
     if [[ "$?" -ne "0" ]]; then
-      echo "Creation precise image failed"
+      echo "Downloading of precise image failed."
       exit 1
     fi
-    sleep 60
+    openstack image create --disk-format raw --container-format bare --public --file /tmp/$REGULAR_IMAGE_NAME $REGULAR_IMAGE_FNAME
+    if [[ "$?" -ne "0" ]]; then
+      echo "Creation of precise image failed."
+      exit 1
+    fi
     # find this image
     image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "precise" | grep "ami-" | head -n 1 | awk '{print $2}')
   fi
