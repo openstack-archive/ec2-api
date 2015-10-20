@@ -4,6 +4,7 @@
 SERVICE_USERNAME=ec2api
 SERVICE_PASSWORD=ec2api
 SERVICE_TENANT=service
+EC2API_PORT=8788
 CONNECTION="mysql://ec2api:ec2api@127.0.0.1/ec2api?charset=utf8"
 LOG_DIR=/var/log/ec2api
 CONF_DIR=/etc/ec2api
@@ -263,9 +264,11 @@ AUTH_PORT=`openstack catalog show identity -f value|grep adminURL|awk '{print $2
 AUTH_PORT=${AUTH_PORT##*:}
 AUTH_PORT=${AUTH_PORT%%/*}
 AUTH_PROTO=${OS_AUTH_URL%%:*}
-PUBLIC_URL=${OS_AUTH_URL%:*}:8788/
+PUBLIC_URL=${OS_AUTH_URL%:*}:"$EC2API_PORT"/
 
 #update default config with some values
+iniset $CONF_FILE DEFAULT ec2api_listen_port "$EC2API_PORT"
+iniset $CONF_FILE DEFAULT ec2_port "$EC2API_PORT"
 iniset $CONF_FILE DEFAULT api_paste_config $APIPASTE_FILE
 iniset $CONF_FILE DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [%(request_id)s %(user_name)s %(project_name)s] %(instance)s%(message)s"
 iniset $CONF_FILE DEFAULT log_dir "$LOG_DIR"

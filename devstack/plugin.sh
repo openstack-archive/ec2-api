@@ -180,6 +180,9 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE DEFAULT keystone_url "http://${KEYSTONE_AUTH_HOST}:35357/v2.0"
     iniset $EC2API_CONF_FILE DEFAULT region_list "$REGION_NAME"
 
+    iniset $EC2API_CONF_FILE DEFAULT ec2api_listen_port "$EC2API_SERVICE_PORT"
+    iniset $EC2API_CONF_FILE DEFAULT ec2_port "$EC2API_SERVICE_PORT"
+
     if is_service_enabled swift3; then
         iniset $EC2API_CONF_FILE DEFAULT s3_port "$S3_SERVICE_PORT"
     else
