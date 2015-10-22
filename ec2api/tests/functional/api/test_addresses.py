@@ -128,7 +128,7 @@ class AddressTest(base.EC2TestCase):
         data = self.client.describe_addresses(*[], **{})
         self.assertEqual(start_count + 1, len(data['Addresses']))
         for address in data['Addresses']:
-            if address['AllocationId'] == id:
+            if address.get('AllocationId') == id:
                 self.assertEqual('vpc', address['Domain'])
                 self.assertEqual(ip, address['PublicIp'])
                 break
@@ -275,13 +275,16 @@ class AddressTest(base.EC2TestCase):
         clean_aa = self.addResourceCleanUp(self.client.disassociate_address,
                                            AssociationId=assoc_id)
 
-        data = self.client.describe_addresses(*[], **{})
+        kwargs = {
+            'AllocationIds': [alloc_id],
+        }
+        data = self.client.describe_addresses(*[], **kwargs)
         self.assertEqual(instance_id, data['Addresses'][0]['InstanceId'])
 
         data = self.client.disassociate_address(AssociationId=assoc_id)
         self.cancelResourceCleanUp(clean_aa)
 
-        data = self.client.describe_addresses(*[], **{})
+        data = self.client.describe_addresses(*[], **kwargs)
         self.assertIsNone(data['Addresses'][0].get('InstanceId'))
 
         # NOTE(andrey-mp): cleanup
@@ -322,7 +325,10 @@ class AddressTest(base.EC2TestCase):
         clean_aa = self.addResourceCleanUp(self.client.disassociate_address,
                                            PublicIp=ip)
 
-        data = self.client.describe_addresses(*[], **{})
+        kwargs = {
+            'PublicIps': [ip],
+        }
+        data = self.client.describe_addresses(*[], **kwargs)
         self.assertEqual(instance_id, data['Addresses'][0]['InstanceId'])
 
         data = self.client.disassociate_address(PublicIp=ip)
@@ -330,7 +336,7 @@ class AddressTest(base.EC2TestCase):
         # NOTE(andrey-mp): Amazon needs some time to diassociate
         time.sleep(2)
 
-        data = self.client.describe_addresses(*[], **{})
+        data = self.client.describe_addresses(*[], **kwargs)
         self.assertFalse(data['Addresses'][0].get('InstanceId'))
 
         time.sleep(3)
