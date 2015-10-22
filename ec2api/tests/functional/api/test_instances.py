@@ -170,7 +170,11 @@ class InstanceTest(base.EC2TestCase):
         self.assertIsNotNone(data['Timestamp'])
         self.assertIn('PasswordData', data)
 
-        waiter = base.EC2Waiter(self.client.get_console_output)
+        def _wait_for_output(*args, **kwargs):
+            data = self.client.get_console_output(*args, **kwargs)
+            self.assertIn('Output', data)
+
+        waiter = base.EC2Waiter(_wait_for_output)
         waiter.wait_no_exception(InstanceId=instance_id)
 
         data = self.client.get_console_output(InstanceId=instance_id)
