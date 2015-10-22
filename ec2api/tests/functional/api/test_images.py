@@ -339,7 +339,7 @@ class ImageRegisterTest(base.EC2TestCase):
                     target = re.sub(re.escape(os.sep), '/', target)
                 hfile = open(source, 'r')
                 cls.s3_client.put_object(Bucket=bucket_name, Key=target,
-                                         Body=hfile)
+                                         Body=hfile, ACL='public-read')
 
     valid_image_state = set(('available', 'pending', 'failed'))
 
