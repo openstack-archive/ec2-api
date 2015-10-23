@@ -373,6 +373,5 @@ class VolumeTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
-        self.assertRaises('InvalidVolume.NotFound',
-                          self.client.describe_volumes,
-                          VolumeIds=[volume_id])
+        # volume should be deleted by the Cloud
+        self.get_volume_waiter().wait_delete(volume_id)
