@@ -132,6 +132,21 @@ class EC2Waiter(object):
             time.sleep(interval)
             interval += self.default_check_interval
 
+    def wait_for_result(self, *args, **kwargs):
+        interval = self.default_check_interval
+        start_time = time.time()
+        while True:
+            result = self.wait_func(*args, **kwargs)
+            if result:
+                return result
+
+            dtime = time.time() - start_time
+            if dtime > self.default_timeout:
+                raise testtools.TestCase.failureException(
+                    "Timeout exceeded while waiting")
+            time.sleep(interval)
+            interval += self.default_check_interval
+
 
 def safe_setup(f):
     """A decorator used to wrap the setUpClass for safe setup."""

@@ -13,6 +13,9 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import time
+
+import botocore.exceptions
 from oslo_log import log
 from tempest_lib.common.utils import data_utils
 
@@ -221,36 +224,57 @@ class SnapshotPagingTest(scenario_base.BaseScenarioTest):
                                      VolumeId=volume_id)
         cls.get_volume_waiter().wait_available(volume_id)
 
+        def _create_snapshot():
+            try:
+                return cls.client.create_snapshot(VolumeId=volume_id)
+            except botocore.exceptions.ClientError as e:
+                code = (e.response.get('ResponseMetadata', {})
+                                  .get('HTTPStatusCode'))
+                if not code or code != 500:
+                    raise
+
+        waiter = base.EC2Waiter(_create_snapshot)
         cls.ids = list()
-        for dummy in xrange(0, cls.SNAPSHOTS_COUNT):
-            data = cls.client.create_snapshot(VolumeId=volume_id)
+        while len(cls.ids) < cls.SNAPSHOTS_COUNT:
+            time.sleep(2)
+            data = waiter.wait_for_result()
             snapshot_id = data['SnapshotId']
             cls.addResourceCleanUpStatic(cls.client.delete_snapshot,
                                          SnapshotId=snapshot_id)
-            cls.ids.append(snapshot_id)
-        for snapshot_id in cls.ids:
             cls.get_snapshot_waiter().wait_available(snapshot_id,
                                                      final_set=('completed'))
+            cls.ids.append(snapshot_id)
 
     def test_simple_snapshots_paging_with_many_results(self):
-        data = self.client.describe_snapshots(MaxResults=500)
-        self.assertNotIn('NextToken', data)
+        data = self.client.describe_snapshots(MaxResults=500,
+                                              OwnerIds=['self'])
         self.assertNotEmpty(data['Snapshots'])
-        self.assertLessEqual(self.SNAPSHOTS_COUNT, len(data['Snapshots']))
+        count = 0
+        for s in data['Snapshots']:
+            if s['SnapshotId'] in self.ids:
+                count += 1
+        self.assertEqual(self.SNAPSHOTS_COUNT, count)
 
     def test_simple_snapshots_paging_with_min_results(self):
-        data = self.client.describe_snapshots(MaxResults=5)
+        data = self.client.describe_snapshots(MaxResults=5, OwnerIds=['self'])
         self.assertIn('NextToken', data)
         self.assertNotEmpty(data['Snapshots'])
 
-    def test_snapshots_paging_second_page(self):
-        data = self.client.describe_snapshots(MaxResults=5)
-        self.assertIn('NextToken', data)
-        self.assertNotEmpty(data['Snapshots'])
-        data = self.client.describe_snapshots(
-            MaxResults=5, NextToken=data['NextToken'])
-        self.assertNotIn('NextToken', data)
-        self.assertNotEmpty(data['Snapshots'])
+    def test_snapshots_paging(self):
+        count = 0
+        max_results = 5
+        kwargs = {'MaxResults': max_results, 'OwnerIds': ['self']}
+        while True:
+            data = self.client.describe_snapshots(*[], **kwargs)
+            self.assertGreaterEqual(max_results, len(data['Snapshots']))
+            for s in data['Snapshots']:
+                if s['SnapshotId'] in self.ids:
+                    count += 1
+            if 'NextToken' not in data:
+                break
+            kwargs['NextToken'] = data['NextToken']
+
+        self.assertEqual(self.SNAPSHOTS_COUNT, count)
 
     def test_invalid_paging(self):
         self.assertRaises('InvalidParameterValue',
