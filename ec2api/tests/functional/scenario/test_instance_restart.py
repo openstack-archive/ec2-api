@@ -38,8 +38,8 @@ class InstanceRestartTest(scenario_base.BaseScenarioTest):
         instance_id = self.run_instance(KeyName=key_name,
                                         ImageId=CONF.aws.image_id_ubuntu,
                                         SecurityGroups=[sec_group_name])
-        ip_address = self.get_instance_ip(instance_id)
 
+        ip_address = self.get_instance_ip(instance_id)
         ssh_client = ssh.Client(ip_address, CONF.aws.image_user_ubuntu,
                                 pkey=pkey)
         ssh_client.exec_command('last -x')
@@ -52,6 +52,10 @@ class InstanceRestartTest(scenario_base.BaseScenarioTest):
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('running'))
 
+        # Amazon can change auto-assigned public ip
+        ip_address = self.get_instance_ip(instance_id)
+        ssh_client = ssh.Client(ip_address, CONF.aws.image_user_ubuntu,
+                                pkey=pkey)
         data = ssh_client.exec_command('last -x')
         self.assertIn("shutdown", data)
 
