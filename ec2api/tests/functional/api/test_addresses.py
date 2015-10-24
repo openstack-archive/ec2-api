@@ -113,8 +113,7 @@ class AddressTest(base.EC2TestCase):
 
     @base.skip_without_vpc()
     def test_describe_vpc_addresses(self):
-        data = self.client.describe_addresses(*[], **{})
-        start_count = len(data['Addresses'])
+        self.client.describe_addresses(*[], **{})
 
         kwargs = {
             'Domain': 'vpc',
@@ -126,7 +125,6 @@ class AddressTest(base.EC2TestCase):
                                             AllocationId=id)
 
         data = self.client.describe_addresses(*[], **{})
-        self.assertEqual(start_count + 1, len(data['Addresses']))
         for address in data['Addresses']:
             if address.get('AllocationId') == id:
                 self.assertEqual('vpc', address['Domain'])
@@ -188,8 +186,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean2)
 
     def test_describe_standard_addresses(self):
-        data = self.client.describe_addresses(*[], **{})
-        start_count = len(data['Addresses'])
+        self.client.describe_addresses(*[], **{})
 
         data = self.client.allocate_address(*[], **{})
         ip = data['PublicIp']
@@ -197,7 +194,6 @@ class AddressTest(base.EC2TestCase):
                                             PublicIp=ip)
 
         data = self.client.describe_addresses(*[], **{})
-        self.assertEqual(start_count + 1, len(data['Addresses']))
         for address in data['Addresses']:
             if address['PublicIp'] == ip:
                 self.assertEqual('standard', address['Domain'])
