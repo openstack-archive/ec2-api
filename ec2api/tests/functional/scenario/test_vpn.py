@@ -49,7 +49,6 @@ class VpnTest(scenario_base.BaseScenarioTest):
             raise cls.skipException('VPC is disabled')
 
     def test_vpn_routing(self):
-        raise self.skipException('VPC is disabled')
         vpc_id, _subnet_id = self.create_vpc_and_subnet(self.VPC_CIDR)
 
         self._create_and_configure_vpn(vpc_id, self.CUSTOMER_GATEWAY_IP,
