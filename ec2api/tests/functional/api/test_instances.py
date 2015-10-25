@@ -186,9 +186,10 @@ class InstanceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_stop_instance(self):
         instance_type = CONF.aws.instance_type
-        image_id = CONF.aws.image_id
+        image_id = CONF.aws.ebs_image_id
         data = self.client.run_instances(
             ImageId=image_id, InstanceType=instance_type,
             Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1)
@@ -235,42 +236,6 @@ class InstanceTest(base.EC2TestCase):
         self.assertIsNotNone(instance.get('PrivateIpAddress'))
         self.assertNotEqual(instance.get('PublicIpAddress'),
                             instance.get('PrivateIpAddress'))
-
-        self.client.terminate_instances(InstanceIds=[instance_id])
-        self.cancelResourceCleanUp(res_clean)
-        self.get_instance_waiter().wait_delete(instance_id)
-
-    def test_launch_instance_with_creating_blank_volume(self):
-        """Launch instance with creating blank volume."""
-        data = self.client.describe_images(ImageIds=[CONF.aws.image_id])
-        # NOTE(ft): ec2 api doesn't report root device name if it isn't
-        # explicity contained in an image. So we assume it is /dev/vda,
-        # which is true for only qemu hypervisor though.
-        device_name_prefix = base.get_device_name_prefix(
-            data['Images'][0].get('RootDeviceName', '/dev/vda'))
-        device_name = device_name_prefix + 'b'
-        instance_type = CONF.aws.instance_type
-        data = self.client.run_instances(
-            ImageId=CONF.aws.image_id, InstanceType=instance_type,
-            Placement={'AvailabilityZone': self.zone}, MinCount=1, MaxCount=1,
-            BlockDeviceMappings=[{'DeviceName': device_name,
-                                  'Ebs': {'VolumeSize': 1}}])
-        instance_id = data['Instances'][0]['InstanceId']
-        res_clean = self.addResourceCleanUp(self.client.terminate_instances,
-                                            InstanceIds=[instance_id])
-        self.get_instance_waiter().wait_available(instance_id,
-                                                  final_set=('running'))
-
-        bdt = self.get_instance_bdm(instance_id, device_name)
-        self.assertIsNotNone(bdt)
-        volume_id = bdt['Ebs'].get('VolumeId')
-        self.assertIsNotNone(volume_id)
-        self.assertTrue(bdt['Ebs']['DeleteOnTermination'])
-
-        data = self.client.describe_volumes(VolumeIds=[volume_id])
-        self.assertEqual(1, len(data['Volumes']))
-        volume = data['Volumes'][0]
-        self.assertEqual(1, volume['Size'])
 
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)

@@ -311,13 +311,13 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
-    @testtools.skipUnless(CONF.aws.image_id, "EBS image id is not defined")
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     @testtools.skipUnless(CONF.aws.instance_type_alt,
                           "Alternative instance type is not defined")
     @testtools.skipUnless(CONF.aws.instance_type_alt != CONF.aws.instance_type,
                           "Alternative instance type is not defined")
     def test_instance_type_attribute(self):
-        instance_id = self.run_instance()
+        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id)
 
         self.client.stop_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
