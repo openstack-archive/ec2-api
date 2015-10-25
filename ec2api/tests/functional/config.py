@@ -64,16 +64,19 @@ AWSGroup = [
                help="Instance type"),
     cfg.StrOpt('image_id',
                default=None,
-               help="Image ID for instance running(can be cirros)"),
+               help="Image ID for instance running(can be cirros). "
+                    "It must be any instance with instance-store "
+                    "root device type."),
     cfg.StrOpt('ebs_image_id',
                default=None,
-               help="EBS Image ID for testing snapshots, volumes, instances"),
+               help="EBS Image ID for testing snapshots, volumes, instances."),
     cfg.StrOpt('image_user',
                default='cirros',
                help="User for sshing into instance based on configured image"),
     cfg.StrOpt('image_id_ubuntu',
                default=None,
-               help="Fully functional image ID for instance running"),
+               help="Fully functional image ID for instance running. "
+                    "For some tests it must be ubuntu-trusty-i386."),
     cfg.StrOpt('image_user_ubuntu',
                default='ubuntu',
                help="User for sshing into instance based on configured image"),
