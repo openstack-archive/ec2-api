@@ -113,8 +113,6 @@ class AddressTest(base.EC2TestCase):
 
     @base.skip_without_vpc()
     def test_describe_vpc_addresses(self):
-        self.client.describe_addresses(*[], **{})
-
         kwargs = {
             'Domain': 'vpc',
         }
@@ -186,8 +184,6 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean2)
 
     def test_describe_standard_addresses(self):
-        self.client.describe_addresses(*[], **{})
-
         data = self.client.allocate_address(*[], **{})
         ip = data['PublicIp']
         res_clean = self.addResourceCleanUp(self.client.release_address,
