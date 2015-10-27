@@ -78,7 +78,7 @@ class FaultWrapper(wsgi.Middleware):
         try:
             return req.get_response(self.application)
         except Exception:
-            LOG.exception(_("FaultWrapper cathes error"))
+            LOG.exception(_("FaultWrapper catches error"))
             return faults.Fault(webob.exc.HTTPInternalServerError())
 
 
