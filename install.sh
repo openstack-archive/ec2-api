@@ -10,6 +10,10 @@ LOG_DIR=/var/log/ec2api
 CONF_DIR=/etc/ec2api
 NOVA_CONF=/etc/nova/nova.conf
 SIGNING_DIR=/var/cache/ec2api
+CONF_FILE=$CONF_DIR/ec2api.conf
+APIPASTE_FILE=$CONF_DIR/api-paste.ini
+
+AUTH_CACHE_DIR=${AUTH_CACHE_DIR:-/var/cache/ec2api}
 
 #Check for environment
 if [[ -z "$OS_AUTH_URL" || -z "$OS_USERNAME" || -z "$OS_PASSWORD" ]]; then
@@ -245,8 +249,6 @@ add_role $SERVICE_USERID $SERVICE_TENANT $ADMIN_ROLE $SERVICE_USERNAME
 echo Creating log dir
 sudo install -d $LOG_DIR --owner=$USER
 
-CONF_FILE=$CONF_DIR/ec2api.conf
-APIPASTE_FILE=$CONF_DIR/api-paste.ini
 #copy conf files (do not override it)
 echo Creating configs
 sudo mkdir -p /etc/ec2api > /dev/null
@@ -257,14 +259,6 @@ if [ ! -s $APIPASTE_FILE ]; then
     sudo cp etc/ec2api/api-paste.ini $APIPASTE_FILE
 fi
 
-AUTH_HOST=${OS_AUTH_URL#*//}
-AUTH_HOST=${AUTH_HOST%:*}
-AUTH_CACHE_DIR=${AUTH_CACHE_DIR:-/var/cache/ec2api}
-AUTH_PORT=`openstack catalog show identity -f value|grep adminURL|awk '{print $2}'`
-AUTH_PORT=${AUTH_PORT##*:}
-AUTH_PORT=${AUTH_PORT%%/*}
-AUTH_PROTO=${OS_AUTH_URL%%:*}
-PUBLIC_URL=${OS_AUTH_URL%:*}:"$EC2API_PORT"/
 
 #update default config with some values
 iniset $CONF_FILE DEFAULT ec2api_listen_port "$EC2API_PORT"
