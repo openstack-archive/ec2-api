@@ -43,23 +43,24 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   nova flavor-create --is-public True m1.ec2api 16 512 0 1
   nova flavor-create --is-public True m1.ec2api-alt 17 256 0 1
 
+  # prepare ubuntu image
   if [[ $RUN_LONG_TESTS == "1" ]]; then
     REGULAR_IMAGE_URL="https://cloud-images.ubuntu.com/precise/current/precise-server-cloudimg-i386-disk1.img"
-    REGULAR_IMAGE_NAME="precise-server-cloudimg-i386-disk1.img"
-    REGULAR_IMAGE_FNAME="precise"
-    sudo rm /tmp/$REGULAR_IMAGE_NAME
+    REGULAR_IMAGE_FNAME="precise-server-cloudimg-i386-disk1.img"
+    REGULAR_IMAGE_NAME="precise"
+    sudo rm /tmp/$REGULAR_IMAGE_FNAME
     wget -nv -P /tmp $REGULAR_IMAGE_URL
     if [[ "$?" -ne "0" ]]; then
       echo "Downloading of precise image failed."
       exit 1
     fi
-    openstack image create --disk-format raw --container-format bare --public --file /tmp/$REGULAR_IMAGE_NAME $REGULAR_IMAGE_FNAME
+    openstack image create --disk-format raw --container-format bare --public --file /tmp/$REGULAR_IMAGE_FNAME $REGULAR_IMAGE_NAME
     if [[ "$?" -ne "0" ]]; then
       echo "Creation of precise image failed."
       exit 1
     fi
     # find this image
-    image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "precise" | grep "ami-" | head -n 1 | awk '{print $2}')
+    image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "$REGULAR_IMAGE_NAME" | grep "ami-" | head -n 1 | awk '{print $2}')
   fi
 
   # create separate user/project
@@ -99,6 +100,30 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   export OS_TENANT_NAME=$project_name
   export OS_USERNAME=$user_name
   export OS_PASSWORD="password"
+
+  # prepare cirros image for register_image test. uploading it to S3.
+  CIRROS_IMAGE_URL="http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img"
+  CIRROS_IMAGE_FNAME="cirros-0.3.4-x86_64-disk.img"
+  sudo rm /tmp/$CIRROS_IMAGE_FNAME
+  wget -nv -P /tmp $CIRROS_IMAGE_URL
+  if [[ "$?" -eq "0" ]]; then
+    mkdir -p /tmp/cirros
+    # do it under sudo because admin-pk is not accessible under user
+    sudo euca-bundle-image -i /tmp/$CIRROS_IMAGE_FNAME -d /tmp/cirrosimage -r x86_64 -c $EC2_CERT -k $EC2_PRIVATE_KEY --ec2cert $EUCALYPTUS_CERT --user $EC2_USER_ID
+    if [[ "$?" -eq "0" ]]; then
+      sudo chmod a+r /tmp/cirrosimage/*
+      euca-upload-bundle -b cirrosimage -m /tmp/cirrosimage/$CIRROS_IMAGE_FNAME.manifest.xml --acl public-read -I $EC2_ACCESS_KEY -S $EC2_SECRET_KEY --debug
+      if [[ "$?" -eq "0" ]]; then
+        CIRROS_IMAGE_MANIFEST="cirrosimage/$CIRROS_IMAGE_FNAME.manifest.xml"
+      else
+        echo "Uploading of image $CIRROS_IMAGE_URL to S3 failed."
+      fi
+    else
+      echo "Bundling of image $CIRROS_IMAGE_URL failed."
+    fi
+  else
+    echo "Downloading of image $CIRROS_IMAGE_URL failed."
+  fi
 
   # find simple image
   image_id=$(euca-describe-images --show-empty-fields | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
@@ -177,16 +202,6 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
     run_long_tests="False"
   fi
 
-  # TODO(andey-mp): make own code
-  # copy some variables from tempest.conf
-  tempest_conf="../tempest/etc/tempest.conf"
-  if [[ -f $tempest_conf ]]; then
-    s3_materials_path=`grep ^s3_materials_path $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
-    aki_manifest=`grep ^aki_manifest $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
-    ami_manifest=`grep ^ami_manifest $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
-    ari_manifest=`grep ^ari_manifest $tempest_conf | awk '{split($0,a,"="); print a[2]}'`
-  fi
-
   sudo bash -c "cat > $TEST_CONFIG_DIR/$TEST_CONFIG <<EOF
 [aws]
 ec2_url = $EC2_URL
@@ -200,10 +215,7 @@ build_timeout = $timeout
 run_long_tests = $run_long_tests
 instance_type = m1.ec2api
 instance_type_alt = m1.ec2api-alt
-s3_materials_path=$s3_materials_path
-aki_manifest=$aki_manifest
-ami_manifest=$ami_manifest
-ari_manifest=$ari_manifest
+ami_image_location=$CIRROS_IMAGE_MANIFEST
 EOF"
 fi
 

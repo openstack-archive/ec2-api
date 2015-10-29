@@ -13,8 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from __future__ import print_function
-
 import logging as std_logging
 import os
 
@@ -86,18 +84,9 @@ AWSGroup = [
     cfg.BoolOpt('run_long_tests',
                 default=False,
                 help='Will run all long tests also.'),
-    cfg.StrOpt('s3_materials_path',
+    cfg.StrOpt('ami_image_location',
                default=None,
-               help="S3 Materials Path"),
-    cfg.StrOpt('ari_manifest',
-               default=None,
-               help="ARI Ramdisk Image manifest"),
-    cfg.StrOpt('ami_manifest',
-               default=None,
-               help="AMI Machine Image manifest"),
-    cfg.StrOpt('aki_manifest',
-               default=None,
-               help="AKI Kernel Image manifest"),
+               help="S3 URL with manifest of AMI Machine Image."),
 ]
 
 

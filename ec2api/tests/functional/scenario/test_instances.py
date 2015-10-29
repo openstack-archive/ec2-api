@@ -14,6 +14,7 @@
 #    under the License.
 
 import base64
+import os
 
 from oslo_log import log
 import six
@@ -131,4 +132,27 @@ class InstancesTest(scenario_base.BaseScenarioTest):
             self.assertIn(data_to_check, data['Output'])
 
         waiter = base.EC2Waiter(_compare_console_output)
+        waiter.wait_no_exception()
+
+    @testtools.skipUnless(CONF.aws.ami_image_location, "Image is absent in S3")
+    def test_run_and_ping_registered_image(self):
+        image_name = data_utils.rand_name("ami-name")
+        data = self.client.register_image(
+            Name=image_name, ImageLocation=CONF.aws.ami_image_location)
+        image_id = data['ImageId']
+        self.addResourceCleanUp(self.client.deregister_image, ImageId=image_id)
+        self.get_image_waiter().wait_available(image_id)
+
+        # launch this image
+        sec_group_name = self.create_standard_security_group()
+        instance_id = self.run_instance(ImageId=image_id,
+                                        SecurityGroups=[sec_group_name])
+
+        ip_address = self.get_instance_ip(instance_id)
+
+        def _ping():
+            response = os.system("ping -c 1 " + ip_address + " > /dev/null")
+            self.assertEqual(0, response)
+
+        waiter = base.EC2Waiter(_ping)
         waiter.wait_no_exception()
