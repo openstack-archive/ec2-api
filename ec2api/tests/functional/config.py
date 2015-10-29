@@ -87,6 +87,9 @@ AWSGroup = [
     cfg.StrOpt('ami_image_location',
                default=None,
                help="S3 URL with manifest of AMI Machine Image."),
+    cfg.BoolOpt('run_ssh',
+                default=True,
+                help='Can block all tests that wants to ssh into instance.'),
 ]
 
 

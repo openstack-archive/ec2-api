@@ -65,6 +65,7 @@ class VpnTest(scenario_base.BaseScenarioTest):
         self.assertEqual('active', route['State'])
         self.assertEqual('EnableVgwRoutePropagation', route['Origin'])
 
+    @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.run_long_tests, 'Slow test has skipped.')
     @testtools.skipUnless(CONF.aws.image_id_ubuntu,
                           "ubuntu image id is not defined")

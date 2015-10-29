@@ -71,6 +71,7 @@ PUBLIC_KEY_MATERIAL = (
 
 class InstancesTest(scenario_base.BaseScenarioTest):
 
+    @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_metadata(self):
         key_name = data_utils.rand_name('testkey')
@@ -107,6 +108,7 @@ class InstancesTest(scenario_base.BaseScenarioTest):
             'curl %s/latest/meta-data/public-keys/0/openssh-key' % url)
         self.assertEqual(PUBLIC_KEY_MATERIAL, data)
 
+    @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_compare_console_output(self):
         key_name = data_utils.rand_name('testkey')
@@ -134,6 +136,7 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         waiter = base.EC2Waiter(_compare_console_output)
         waiter.wait_no_exception()
 
+    @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.ami_image_location, "Image is absent in S3")
     def test_run_and_ping_registered_image(self):
         image_name = data_utils.rand_name("ami-name")

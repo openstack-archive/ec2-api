@@ -59,16 +59,19 @@ class InstancesInVPCTest(scenario_base.BaseScenarioTest):
         waiter.wait_no_exception('ping %s -c 1' % last_ip)
 
     @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_instances_in_min_subnet(self):
         self._test_instances(28)
 
     @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_instances_in_max_subnet(self):
         self._test_instances(16)
 
     @base.skip_without_vpc()
+    @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_default_gateway(self):
         novpc_group = self.create_standard_security_group()

@@ -202,6 +202,12 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
     run_long_tests="False"
   fi
 
+  # right now nova-network is very unstable to run tests that want to ssh into instance
+  run_ssh="False"
+  if [[ -n $(openstack service list | grep neutron) ]]; then
+    run_ssh="True"
+  fi
+
   sudo bash -c "cat > $TEST_CONFIG_DIR/$TEST_CONFIG <<EOF
 [aws]
 ec2_url = $EC2_URL
@@ -216,6 +222,7 @@ run_long_tests = $run_long_tests
 instance_type = m1.ec2api
 instance_type_alt = m1.ec2api-alt
 ami_image_location=$CIRROS_IMAGE_MANIFEST
+run_ssh=$run_ssh
 EOF"
 fi
 
