@@ -38,6 +38,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
     echo "Looks like credentials are absent."
     exit 1
   fi
+  neutron_item=$(openstack service list | grep neutron)
 
   # prepare flavors
   nova flavor-create --is-public True m1.ec2api 16 512 0 1
@@ -76,7 +77,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
   role_id=$(openstack role show  Member -c id -f value)
   openstack role add --project $project_id --user $user_id $role_id
   # create network
-  if [[ -n $(openstack service list | grep neutron) ]]; then
+  if [[ -n "$neutron_item" ]]; then
     net_id=$(neutron net-create --tenant-id $project_id "private" | grep ' id ' | awk '{print $4}')
     [[ -n "$net_id" ]] || { echo "net-create failed"; exit 1; }
     subnet_id=$(neutron subnet-create --tenant-id $project_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
@@ -204,7 +205,7 @@ if [[ ! -f $TEST_CONFIG_DIR/$TEST_CONFIG ]]; then
 
   # right now nova-network is very unstable to run tests that want to ssh into instance
   run_ssh="False"
-  if [[ -n $(openstack service list | grep neutron) ]]; then
+  if [[ -n "$neutron_item" ]]; then
     run_ssh="True"
   fi
 
