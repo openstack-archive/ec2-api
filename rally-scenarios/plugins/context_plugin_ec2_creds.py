@@ -35,7 +35,7 @@ class PrepareEC2ClientContext(context.Context):
             self.config)
         self.net_wrapper.start_cidr = '10.0.0.0/16'
 
-    @rutils.log_task_wrapper(LOG.info, _("Enter context: `EC2 creds`"))
+    @logging.log_task_wrapper(LOG.info, _("Enter context: `EC2 creds`"))
     def setup(self):
         """This method is called before the task start."""
         try:
@@ -75,7 +75,7 @@ class PrepareEC2ClientContext(context.Context):
             else:
                 LOG.warning(msg)
 
-    @rutils.log_task_wrapper(LOG.info, _("Exit context: `EC2 creds`"))
+    @logging.log_task_wrapper(LOG.info, _("Exit context: `EC2 creds`"))
     def cleanup(self):
         try:
             if self.net_wrapper.SERVICE_IMPL == consts.Service.NEUTRON:

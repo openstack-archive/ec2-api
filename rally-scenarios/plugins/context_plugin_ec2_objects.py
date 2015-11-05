@@ -250,7 +250,7 @@ class FakeNetworkGenerator(EC2Objects):
         "nis_per_subnet": 5,
     }
 
-    @rutils.log_task_wrapper(LOG.info, _("Enter context: `EC2 Networks`"))
+    @logging.log_task_wrapper(LOG.info, _("Enter context: `EC2 Networks`"))
     def setup(self):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
@@ -267,7 +267,7 @@ class FakeNetworkGenerator(EC2Objects):
             for dummy in xrange(0, subnets_count):
                 self.prepare_network(tenant_id, client, nis_count)
 
-    @rutils.log_task_wrapper(LOG.info, _("Exit context: `EC2 Networks`"))
+    @logging.log_task_wrapper(LOG.info, _("Exit context: `EC2 Networks`"))
     def cleanup(self):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
@@ -323,7 +323,7 @@ class FakeServerGenerator(EC2Objects):
         "servers_per_run": 10
     }
 
-    @rutils.log_task_wrapper(LOG.info, _("Enter context: `EC2 Servers`"))
+    @logging.log_task_wrapper(LOG.info, _("Enter context: `EC2 Servers`"))
     def setup(self):
         image = self.config["image"]
         image_id = None
@@ -349,7 +349,7 @@ class FakeServerGenerator(EC2Objects):
             self.wait_for_instances(tenant_id, client)
             self.assign_floating_ips(tenant_id, client)
 
-    @rutils.log_task_wrapper(LOG.info, _("Exit context: `EC2 Servers`"))
+    @logging.log_task_wrapper(LOG.info, _("Exit context: `EC2 Servers`"))
     def cleanup(self):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):

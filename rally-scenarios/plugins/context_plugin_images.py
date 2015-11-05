@@ -47,7 +47,7 @@ class FakeImageGenerator(context.Context):
         "additionalProperties": False
     }
 
-    @rutils.log_task_wrapper(LOG.info, _("Enter context: `Images`"))
+    @logging.log_task_wrapper(LOG.info, _("Enter context: `Images`"))
     def setup(self):
         disk_format = self.config["disk_format"]
         container_format = self.config["container_format"]
@@ -69,7 +69,7 @@ class FakeImageGenerator(context.Context):
 
             self.context["tenants"][tenant_id]["images"] = current_images
 
-    @rutils.log_task_wrapper(LOG.info, _("Exit context: `Images`"))
+    @logging.log_task_wrapper(LOG.info, _("Exit context: `Images`"))
     def cleanup(self):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
