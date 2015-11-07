@@ -30,6 +30,11 @@ EC2API_STATE_PATH=${EC2API_STATE_PATH:=$DATA_DIR/ec2api}
 EC2API_SERVICE_PORT=${EC2API_SERVICE_PORT:-8788}
 EC2API_S3_SERVICE_PORT=${EC2API_S3_SERVICE_PORT:-3334}
 
+SERVICE_PROTOCOL=${SERVICE_PROTOCOL:-http}
+if is_service_enabled tls-proxy || [ "$USE_SSL" == "True" ]; then
+    SERVICE_PROTOCOL="https"
+fi
+
 EC2API_RABBIT_VHOST=${EC2API_RABBIT_VHOST:-''}
 
 EC2API_ADMIN_USER=${EC2API_ADMIN_USER:-ec2api}
@@ -48,10 +53,11 @@ function recreate_endpoint {
     local endpoint=$1
     local description=$2
     local port=$3
+    local protocol=$4
 
     if [[ "$KEYSTONE_CATALOG_BACKEND" = 'sql' ]]; then
 
-        # Remove nova's ec2 service/endpoint
+        # Remove nova's service/endpoint
         local endpoint_ids=$(openstack --os-identity-api-version 3 endpoint list \
             --service "$endpoint" --region "$REGION_NAME" -c ID -f value)
         if [[ -n "$endpoint_ids" ]]; then
@@ -72,11 +78,11 @@ function recreate_endpoint {
             --description="$description" \
             -f value -c id)
         openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
-            $service_id public "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
+            $service_id public "$protocol://$SERVICE_HOST:$port/"
         openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
-            $service_id admin "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
+            $service_id admin "$protocol://$SERVICE_HOST:$port/"
         openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
-            $service_id internal "$SERVICE_PROTOCOL://$SERVICE_HOST:$port/"
+            $service_id internal "$protocol://$SERVICE_HOST:$port/"
     fi
 }
 
@@ -106,9 +112,9 @@ function create_ec2api_accounts() {
         --project $SERVICE_TENANT \
         --user $EC2API_USER
 
-    recreate_endpoint "ec2" "EC2 Compatibility Layer" $EC2API_SERVICE_PORT
+    recreate_endpoint "ec2" "EC2 Compatibility Layer" $EC2API_SERVICE_PORT $SERVICE_PROTOCOL
     if ! is_service_enabled swift3; then
-        recreate_endpoint "s3" "S3" $EC2API_S3_SERVICE_PORT
+        recreate_endpoint "s3" "S3" $EC2API_S3_SERVICE_PORT "http"
     fi
 }
 
@@ -177,7 +183,7 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
 
     iniset $EC2API_CONF_FILE DEFAULT ec2api_workers "$API_WORKERS"
-    iniset $EC2API_CONF_FILE DEFAULT keystone_url "http://${KEYSTONE_AUTH_HOST}:35357/v2.0"
+    iniset $EC2API_CONF_FILE DEFAULT keystone_url "$KEYSTONE_SERVICE_PROTOCOL://$KEYSTONE_SERVICE_HOST:$KEYSTONE_SERVICE_PORT/v2.0"
     iniset $EC2API_CONF_FILE DEFAULT region_list "$REGION_NAME"
 
     iniset $EC2API_CONF_FILE DEFAULT ec2api_listen_port "$EC2API_SERVICE_PORT"
@@ -191,6 +197,15 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE DEFAULT s3_host "$SERVICE_HOST"
 
     configure_ec2api_rpc_backend
+
+    if is_service_enabled tls-proxy || [ "$USE_SSL" == "True" ]; then
+        ensure_certificates EC2API
+
+        iniset $NOVA_CONF DEFAULT ssl_cert_file "$NOVA_SSL_CERT"
+        iniset $NOVA_CONF DEFAULT ssl_key_file "$NOVA_SSL_KEY"
+        iniset $NOVA_CONF DEFAULT ec2api_use_ssl "True"
+        iniset $NOVA_CONF DEFAULT metadata_use_ssl "True"
+    fi
 
     # configure the database.
     iniset $EC2API_CONF_FILE database connection `database_connection_url ec2api`
