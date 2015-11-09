@@ -35,6 +35,10 @@ AWSGroup = [
     cfg.StrOpt('s3_url',
                default="http://localhost:3334/",
                help="S3 URL"),
+    cfg.StrOpt('ca_bundle',
+               default=None,
+               help="The CA certificate bundle to use when verifying "
+                    "SSL certificates."),
     cfg.StrOpt('aws_secret',
                default=None,
                help="AWS Secret Key",

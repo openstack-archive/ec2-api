@@ -258,7 +258,7 @@ class FakeNetworkGenerator(EC2Objects):
                      % (user["tenant_id"]))
 
             args = user['ec2args']
-            client = botocoreclient._get_ec2_client(
+            client = botocoreclient.get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
 
             self.context["tenants"][tenant_id]["networks"] = list()
@@ -272,7 +272,7 @@ class FakeNetworkGenerator(EC2Objects):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
             args = user['ec2args']
-            client = botocoreclient._get_ec2_client(
+            client = botocoreclient.get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
             self.cleanup_networks(tenant_id, client)
 
@@ -334,7 +334,7 @@ class FakeServerGenerator(EC2Objects):
                      % (user["tenant_id"]))
 
             args = user['ec2args']
-            client = botocoreclient._get_ec2_client(
+            client = botocoreclient.get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
 
             if image_id is None:
@@ -354,7 +354,7 @@ class FakeServerGenerator(EC2Objects):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
             args = user['ec2args']
-            client = botocoreclient._get_ec2_client(
+            client = botocoreclient.get_ec2_client(
                 args['url'], args['region'], args['access'], args['secret'])
 
             self.terminate_instances_and_wait(tenant_id, client)

@@ -224,6 +224,7 @@ instance_type = m1.ec2api
 instance_type_alt = m1.ec2api-alt
 ami_image_location=$CIRROS_IMAGE_MANIFEST
 run_ssh=$run_ssh
+ca_bundle=$OS_CACERT
 EOF"
 fi
 

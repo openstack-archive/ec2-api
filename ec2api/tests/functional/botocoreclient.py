@@ -16,20 +16,26 @@
 import botocore.session
 
 
-def _get_client(client_name, url, region, access, secret):
+def _get_client(client_name, url, region, access, secret, ca_bundle):
     connection_data = {
         'config_file': (None, 'AWS_CONFIG_FILE', None, None),
         'region': ('region', 'BOTO_DEFAULT_REGION', region, None),
     }
     session = botocore.session.get_session(connection_data)
-    return session.create_client(
-        client_name, region_name=region, endpoint_url=url,
-        aws_access_key_id=access, aws_secret_access_key=secret)
+    kwargs = {
+        'region_name': region,
+        'endpoint_url': url,
+        'aws_access_key_id': access,
+        'aws_secret_access_key': secret
+    }
+    if ca_bundle:
+        kwargs['verify'] = ca_bundle
+    return session.create_client(client_name, **kwargs)
 
 
-def _get_ec2_client(url, region, access, secret):
-    return _get_client('ec2', url, region, access, secret)
+def get_ec2_client(url, region, access, secret, ca_bundle=None):
+    return _get_client('ec2', url, region, access, secret, ca_bundle)
 
 
-def _get_s3_client(url, region, access, secret):
-    return _get_client('s3', url, region, access, secret)
+def get_s3_client(url, region, access, secret, ca_bundle=None):
+    return _get_client('s3', url, region, access, secret, ca_bundle)

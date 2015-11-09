@@ -231,12 +231,14 @@ class EC2TestCase(base.BaseTestCase):
     @safe_setup
     def setUpClass(cls):
         super(EC2TestCase, cls).setUpClass()
-        cls.client = botocoreclient._get_ec2_client(
+        cls.client = botocoreclient.get_ec2_client(
             CONF.aws.ec2_url, CONF.aws.aws_region,
-            CONF.aws.aws_access, CONF.aws.aws_secret)
-        cls.s3_client = botocoreclient._get_s3_client(
+            CONF.aws.aws_access, CONF.aws.aws_secret,
+            CONF.aws.ca_bundle)
+        cls.s3_client = botocoreclient.get_s3_client(
             CONF.aws.s3_url, CONF.aws.aws_region,
-            CONF.aws.aws_access, CONF.aws.aws_secret)
+            CONF.aws.aws_access, CONF.aws.aws_secret,
+            CONF.aws.ca_bundle)
         TesterStateHolder().ec2_client = cls.client
 
     @classmethod

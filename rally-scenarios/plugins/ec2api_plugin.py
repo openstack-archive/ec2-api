@@ -47,7 +47,7 @@ class EC2APIPlugin(scenario.OpenStackScenario):
     def _get_client(self, is_nova):
         args = self.context['user']['ec2args']
         url = args['nova_url'] if is_nova else args['url']
-        client = botocoreclient._get_ec2_client(
+        client = botocoreclient.get_ec2_client(
             url, args['region'], args['access'], args['secret'])
         return client
 
