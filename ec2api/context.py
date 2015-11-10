@@ -27,6 +27,7 @@ import six
 
 from ec2api import exception
 from ec2api.i18n import _, _LW
+from ec2api import utils
 
 
 ec2_opts = [
@@ -176,7 +177,9 @@ def get_os_admin_context():
             tenant_name=CONF.admin_tenant_name,
             auth_url=CONF.keystone_url,
         )
-        _admin_session = keystone_session.Session(auth=auth)
+        params = {'auth': auth}
+        utils.update_request_params_with_ssl(params)
+        _admin_session = keystone_session.Session(**params)
 
     return RequestContext(
             None, None,

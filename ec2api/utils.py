@@ -79,3 +79,9 @@ def xhtml_escape(value):
 
     """
     return saxutils.escape(value, {'"': '&quot;', "'": '&apos;'})
+
+
+def update_request_params_with_ssl(params):
+    verify = CONF.ssl_ca_file or not CONF.ssl_insecure
+    if verify is not True:
+        params['verify'] = verify

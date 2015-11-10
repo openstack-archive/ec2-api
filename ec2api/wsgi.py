@@ -47,6 +47,9 @@ wsgi_opts = [
              'generate log lines. The following values can be formatted '
              'into it: client_ip, date_time, request_line, status_code, '
              'body_length, wall_seconds.'),
+    cfg.BoolOpt('ssl_insecure',
+                default=False,
+                help="Verify HTTPS connections."),
     cfg.StrOpt('ssl_ca_file',
                help="CA certificate file to use to verify "
                     "connecting clients"),

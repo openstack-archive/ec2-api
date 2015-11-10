@@ -38,6 +38,7 @@ from ec2api.api import faults
 from ec2api import context
 from ec2api import exception
 from ec2api.i18n import _
+from ec2api import utils
 from ec2api import wsgi
 
 
@@ -222,9 +223,9 @@ class EC2KeystoneAuth(wsgi.Middleware):
             creds = {'auth': {'OS-KSEC2:ec2Credentials': cred_dict}}
         creds_json = jsonutils.dumps(creds)
         headers = {'Content-Type': 'application/json'}
-
-        response = requests.request('POST', token_url,
-                                    data=creds_json, headers=headers)
+        params = {'data': creds_json, 'headers': headers}
+        utils.update_request_params_with_ssl(params)
+        response = requests.request('POST', token_url, **params)
         status_code = response.status_code
         if status_code != 200:
             msg = response.reason
@@ -240,7 +241,9 @@ class EC2KeystoneAuth(wsgi.Middleware):
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=400)
         auth = keystone_identity_access.AccessInfoPlugin(auth_ref)
-        session = keystone_session.Session(auth=auth)
+        params = {'auth': auth}
+        utils.update_request_params_with_ssl(params)
+        session = keystone_session.Session(**params)
         remote_address = req.remote_addr
         if CONF.use_forwarded_for:
             remote_address = req.headers.get('X-Forwarded-For',
