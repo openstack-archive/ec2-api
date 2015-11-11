@@ -47,12 +47,6 @@ wsgi_opts = [
              'generate log lines. The following values can be formatted '
              'into it: client_ip, date_time, request_line, status_code, '
              'body_length, wall_seconds.'),
-    cfg.BoolOpt('ssl_insecure',
-                default=False,
-                help="Verify HTTPS connections."),
-    cfg.StrOpt('ssl_ca_file',
-               help="CA certificate file to use to verify "
-                    "connecting clients"),
     cfg.StrOpt('ssl_cert_file',
                help="SSL certificate of API server"),
     cfg.StrOpt('ssl_key_file',
@@ -163,17 +157,12 @@ class Server(object):
 
         if self._use_ssl:
             try:
-                ca_file = CONF.ssl_ca_file
                 cert_file = CONF.ssl_cert_file
                 key_file = CONF.ssl_key_file
 
                 if cert_file and not os.path.exists(cert_file):
                     raise RuntimeError(
                           _("Unable to find cert_file : %s") % cert_file)
-
-                if ca_file and not os.path.exists(ca_file):
-                    raise RuntimeError(
-                          _("Unable to find ca_file : %s") % ca_file)
 
                 if key_file and not os.path.exists(key_file):
                     raise RuntimeError(
@@ -190,10 +179,6 @@ class Server(object):
                     'keyfile': key_file,
                     'cert_reqs': ssl.CERT_NONE,
                 }
-
-                if CONF.ssl_ca_file:
-                    ssl_kwargs['ca_certs'] = ca_file
-                    ssl_kwargs['cert_reqs'] = ssl.CERT_REQUIRED
 
                 dup_socket = eventlet.wrap_ssl(dup_socket,
                                                **ssl_kwargs)

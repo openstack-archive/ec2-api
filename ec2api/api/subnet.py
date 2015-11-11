@@ -17,12 +17,12 @@ from neutronclient.common import exceptions as neutron_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import network_interface as network_interface_api
 from ec2api.api import route_table as route_table_api
 from ec2api.api import vpn_gateway as vpn_gateway_api
+from ec2api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _

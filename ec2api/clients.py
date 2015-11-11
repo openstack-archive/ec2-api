@@ -14,6 +14,9 @@
 
 from cinderclient import client as cinderclient
 from glanceclient import client as glanceclient
+from keystoneclient.auth.identity.generic import password as keystone_auth
+from keystoneclient import client as keystoneclient
+from keystoneclient import session as keystone_session
 from neutronclient.v2_0 import client as neutronclient
 from novaclient import api_versions as nova_api_versions
 from novaclient import client as novaclient
@@ -21,18 +24,32 @@ from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging as messaging
 
-from ec2api import context as ec2_context
-from ec2api.i18n import _LI, _LW
+from ec2api.i18n import _, _LI, _LW
 
 logger = logging.getLogger(__name__)
 
 ec2_opts = [
+    cfg.BoolOpt('ssl_insecure',
+                default=False,
+                help="Verify HTTPS connections."),
+    cfg.StrOpt('ssl_ca_file',
+               help="CA certificate file to use to verify "
+                    "connecting clients"),
     cfg.StrOpt('nova_service_type',
                default='compute',
                help='Service type of Compute API, registered in Keystone '
                     'catalog. Should be v2.1 with microversion support. '
                     'If it is obsolete v2, a lot of useful EC2 compliant '
-                    'instance properties will be unavailable.')
+                    'instance properties will be unavailable.'),
+    # TODO(andrey-mp): keystone v3 allows to pass domain_name
+    # or domain_id to auth. This code should support this feature.
+    cfg.StrOpt('admin_user',
+               help=_("Admin user to access specific cloud resourses")),
+    cfg.StrOpt('admin_password',
+               help=_("Admin password"),
+               secret=True),
+    cfg.StrOpt('admin_tenant_name',
+               help=_("Admin tenant name")),
 ]
 
 CONF = cfg.CONF
@@ -89,8 +106,8 @@ def cinder(context):
 
 
 def keystone(context):
-    keystone_client_class = ec2_context.get_keystone_client_class()
-    return keystone_client_class(session=context.session)
+    return keystoneclient.Client(auth_url=CONF.keystone_url,
+                                 session=context.session)
 
 
 def nova_cert(context):
@@ -180,5 +197,31 @@ class _rpc_RequestContextSerializer(messaging.NoOpSerializer):
     def serialize_context(self, context):
         return context.to_dict()
 
-    def deserialize_context(self, context):
-        return ec2_context.RequestContext.from_dict(context)
+
+_admin_session = None
+
+
+def get_os_admin_session():
+    """Create a context to interact with OpenStack as an administrator."""
+    # NOTE(ft): this is a singletone because keystone's session looks thread
+    # safe for both regular and token renewal requests
+    global _admin_session
+    if not _admin_session:
+        auth = keystone_auth.Password(
+            username=CONF.admin_user,
+            password=CONF.admin_password,
+            project_name=CONF.admin_tenant_name,
+            tenant_name=CONF.admin_tenant_name,
+            auth_url=CONF.keystone_url,
+        )
+        params = {'auth': auth}
+        update_request_params_with_ssl(params)
+        _admin_session = keystone_session.Session(**params)
+
+    return _admin_session
+
+
+def update_request_params_with_ssl(params):
+    verify = CONF.ssl_ca_file or not CONF.ssl_insecure
+    if verify is not True:
+        params['verify'] = verify

@@ -16,8 +16,8 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import netutils
 
-from ec2api.api import clients
 from ec2api.api import common
+from ec2api import clients
 from ec2api import exception
 
 

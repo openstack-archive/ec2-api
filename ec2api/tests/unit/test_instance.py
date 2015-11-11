@@ -23,8 +23,8 @@ from novaclient import exceptions as nova_exception
 from oslotest import base as test_base
 import six
 
-import ec2api.api.clients
 from ec2api.api import instance as instance_api
+import ec2api.clients
 from ec2api import exception
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
@@ -1990,7 +1990,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             search_opts={'all_tenants': True,
                          'project_id': context.project_id})
 
-    @mock.patch('ec2api.api.clients.nova', wraps=ec2api.api.clients.nova)
+    @mock.patch('ec2api.clients.nova', wraps=ec2api.clients.nova)
     @mock.patch('ec2api.context.get_os_admin_context')
     @mock.patch('cinderclient.client.Client')
     @mock.patch('novaclient.client.Client')

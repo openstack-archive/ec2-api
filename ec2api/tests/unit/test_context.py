@@ -14,8 +14,6 @@
 
 import imp
 
-from keystoneclient.v2_0 import client as keystone_client_v2
-from keystoneclient.v3 import client as keystone_client_v3
 import mock
 from oslo_config import cfg
 from oslo_config import fixture as config_fixture
@@ -23,7 +21,6 @@ from oslo_context import context
 from oslotest import base as test_base
 
 from ec2api import context as ec2_context
-from ec2api import exception
 
 cfg.CONF.import_opt('keystone_url', 'ec2api.api')
 
@@ -67,24 +64,3 @@ class ContextTestCase(test_base.BaseTestCase):
         password_plugin.reset_mock()
         ec2_context.get_os_admin_context()
         self.assertFalse(password_plugin.called)
-
-    @mock.patch('keystoneclient.client.Client')
-    def test_get_keystone_client_class(self, client):
-        client.return_value = mock.MagicMock(spec=keystone_client_v2.Client)
-        ec2_context._keystone_client_class = None
-        client_class = ec2_context.get_keystone_client_class()
-        client.assert_called_once_with(auth_url='http://localhost:5000/v2.0')
-        self.assertEqual(keystone_client_v2.Client, client_class)
-        client.reset_mock()
-
-        client.return_value = mock.MagicMock(spec=keystone_client_v3.Client)
-        ec2_context._keystone_client_class = None
-        client_class = ec2_context.get_keystone_client_class()
-        client.assert_called_once_with(auth_url='http://localhost:5000/v2.0')
-        self.assertEqual(keystone_client_v3.Client, client_class)
-        client.reset_mock()
-
-        client.return_value = mock.MagicMock()
-        ec2_context._keystone_client_class = None
-        self.assertRaises(exception.EC2KeystoneDiscoverFailure,
-                          ec2_context.get_keystone_client_class)

@@ -19,10 +19,10 @@ import netaddr
 from novaclient import exceptions as nova_exception
 import six
 
-from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import vpn_connection as vpn_connection_api
+from ec2api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _

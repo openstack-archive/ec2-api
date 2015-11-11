@@ -16,9 +16,9 @@ from cinderclient import exceptions as cinder_exception
 from novaclient import exceptions as nova_exception
 from oslo_log import log as logging
 
-from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
+from ec2api import clients
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception

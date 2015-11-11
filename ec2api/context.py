@@ -14,37 +14,18 @@
 
 """RequestContext: context for requests that persist through all of ec2."""
 
-from keystoneclient.auth.identity.generic import password as keystone_auth
-from keystoneclient import client as keystone_client
-from keystoneclient import session as keystone_session
-from keystoneclient.v2_0 import client as keystone_client_v2
-from keystoneclient.v3 import client as keystone_client_v3
 from oslo_config import cfg
 from oslo_context import context
 from oslo_log import log as logging
 from oslo_utils import timeutils
 import six
 
+from ec2api import clients
 from ec2api import exception
-from ec2api.i18n import _, _LW
-from ec2api import utils
+from ec2api.i18n import _LW
 
-
-ec2_opts = [
-    cfg.StrOpt('admin_user',
-               help=_("Admin user")),
-    cfg.StrOpt('admin_password',
-               help=_("Admin password"),
-               secret=True),
-    cfg.StrOpt('admin_tenant_name',
-               help=_("Admin tenant name")),
-    # TODO(andrey-mp): keystone v3 allows to pass domain_name
-    # or domain_id to auth. This code should support this feature.
-]
 
 CONF = cfg.CONF
-CONF.register_opts(ec2_opts)
-
 LOG = logging.getLogger(__name__)
 
 
@@ -145,49 +126,6 @@ def is_user_context(context):
     return True
 
 
-_keystone_client_class = None
-
-
-def get_keystone_client_class():
-    global _keystone_client_class
-    if _keystone_client_class is None:
-        keystone = keystone_client.Client(auth_url=CONF.keystone_url)
-        if isinstance(keystone, keystone_client_v2.Client):
-            _keystone_client_class = keystone_client_v2.Client
-        elif isinstance(keystone, keystone_client_v3.Client):
-            _keystone_client_class = keystone_client_v3.Client
-        else:
-            raise exception.EC2KeystoneDiscoverFailure()
-    return _keystone_client_class
-
-
-_admin_session = None
-
-
-def get_os_admin_context():
-    """Create a context to interact with OpenStack as an administrator."""
-    # NOTE(ft): this is a singletone because keystone's session looks thread
-    # safe for both regular and token renewal requests
-    global _admin_session
-    if not _admin_session:
-        auth = keystone_auth.Password(
-            username=CONF.admin_user,
-            password=CONF.admin_password,
-            project_name=CONF.admin_tenant_name,
-            tenant_name=CONF.admin_tenant_name,
-            auth_url=CONF.keystone_url,
-        )
-        params = {'auth': auth}
-        utils.update_request_params_with_ssl(params)
-        _admin_session = keystone_session.Session(**params)
-
-    return RequestContext(
-            None, None,
-            session=_admin_session,
-            is_os_admin=True,
-            overwrite=False)
-
-
 def require_context(ctxt):
     """Raise exception.AuthFailure()
 
@@ -195,3 +133,13 @@ def require_context(ctxt):
     """
     if not ctxt.is_os_admin and not is_user_context(ctxt):
         raise exception.AuthFailure()
+
+
+def get_os_admin_context():
+    """Create a context to interact with OpenStack as an administrator."""
+    admin_session = clients.get_os_admin_session()
+    return RequestContext(
+        None, None,
+        session=admin_session,
+        is_os_admin=True,
+        overwrite=False)

@@ -12,7 +12,7 @@
 
 import itertools
 
-import ec2api.context
+import ec2api.clients
 import ec2api.db.api
 import ec2api.exception
 import ec2api.paths
@@ -25,7 +25,7 @@ def list_opts():
     return [
         ('DEFAULT',
          itertools.chain(
-             ec2api.context.ec2_opts,
+             ec2api.clients.ec2_opts,
              ec2api.db.api.tpool_opts,
              ec2api.exception.exc_log_opts,
              ec2api.paths.path_opts,

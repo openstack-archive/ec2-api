@@ -18,8 +18,8 @@ from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from ec2api.api import clients
 from ec2api.api import common
+from ec2api import clients
 from ec2api import exception
 from ec2api.i18n import _
 

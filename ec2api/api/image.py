@@ -31,10 +31,10 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import timeutils
 
-from ec2api.api import clients
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
+from ec2api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _, _LE, _LI, _LW

@@ -15,7 +15,6 @@ import itertools
 import ec2api.api
 import ec2api.api.auth
 import ec2api.api.availability_zone
-import ec2api.api.clients
 import ec2api.api.common
 import ec2api.api.dhcp_options
 import ec2api.api.ec2utils
@@ -30,7 +29,6 @@ def list_opts():
              ec2api.api.ec2_opts,
              ec2api.api.auth.auth_opts,
              ec2api.api.availability_zone.availability_zone_opts,
-             ec2api.api.clients.ec2_opts,
              ec2api.api.common.ec2_opts,
              ec2api.api.dhcp_options.ec2_opts,
              ec2api.api.ec2utils.ec2_opts,

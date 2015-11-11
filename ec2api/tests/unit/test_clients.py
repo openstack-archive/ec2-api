@@ -119,11 +119,10 @@ class ClientsTestCase(base.BaseTestCase):
         cinder.assert_called_with('1', service_type='volume',
                                   session=mock.sentinel.session)
 
-    @mock.patch('ec2api.context.get_keystone_client_class',
-                return_value=mock.Mock(return_value=mock.Mock()))
-    def test_keystone(self, keystone_client_class):
+    @mock.patch('keystoneclient.client.Client')
+    def test_keystone(self, keystone):
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.keystone(context)
-        self.assertEqual(keystone_client_class.return_value.return_value, res)
-        keystone_client_class.return_value.assert_called_with(
-            session=mock.sentinel.session)
+        self.assertEqual(keystone.return_value, res)
+        keystone.assert_called_with(auth_url='http://localhost:5000/v2.0',
+                                    session=mock.sentinel.session)

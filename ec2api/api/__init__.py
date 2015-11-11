@@ -35,10 +35,10 @@ import webob.exc
 from ec2api.api import apirequest
 from ec2api.api import ec2utils
 from ec2api.api import faults
+from ec2api import clients
 from ec2api import context
 from ec2api import exception
 from ec2api.i18n import _
-from ec2api import utils
 from ec2api import wsgi
 
 
@@ -59,14 +59,6 @@ ec2_opts = [
 CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
 CONF.import_opt('use_forwarded_for', 'ec2api.api.auth')
-
-
-EMPTY_SHA256_HASH = (
-    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
-# This is the buffer size used when calculating sha256 checksums.
-# Experimenting with various buffer sizes showed that this value generally
-# gave the best result (in terms of performance).
-PAYLOAD_BUFFER = 1024 * 1024
 
 
 # Fault Wrapper around all EC2 requests #
@@ -117,12 +109,6 @@ class RequestLogging(wsgi.Middleware):
             request.content_type,
             response.content_type,
             context=ctxt)
-
-
-class InvalidCredentialsException(Exception):
-    def __init__(self, msg):
-        super(Exception, self).__init__()
-        self.msg = msg
 
 
 class EC2KeystoneAuth(wsgi.Middleware):
@@ -211,7 +197,7 @@ class EC2KeystoneAuth(wsgi.Middleware):
             'verb': req.method,
             'path': req.path,
             'params': params,
-            # python3 takes only keys fo json from headers object
+            # python3 takes only keys for json from headers object
             'headers': {k: req.headers[k] for k in req.headers},
             'body_hash': body_hash
         }
@@ -224,7 +210,7 @@ class EC2KeystoneAuth(wsgi.Middleware):
         creds_json = jsonutils.dumps(creds)
         headers = {'Content-Type': 'application/json'}
         params = {'data': creds_json, 'headers': headers}
-        utils.update_request_params_with_ssl(params)
+        clients.update_request_params_with_ssl(params)
         response = requests.request('POST', token_url, **params)
         status_code = response.status_code
         if status_code != 200:
@@ -242,7 +228,7 @@ class EC2KeystoneAuth(wsgi.Middleware):
                                              status=400)
         auth = keystone_identity_access.AccessInfoPlugin(auth_ref)
         params = {'auth': auth}
-        utils.update_request_params_with_ssl(params)
+        clients.update_request_params_with_ssl(params)
         session = keystone_session.Session(**params)
         remote_address = req.remote_addr
         if CONF.use_forwarded_for:
