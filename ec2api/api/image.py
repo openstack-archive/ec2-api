@@ -875,7 +875,8 @@ def _get_ec2_credentials(context):
     headers = {'Content-Type': 'application/json',
                'X-Auth-Token': context.auth_token}
 
-    response = requests.request('GET', url, headers=headers)
+    verify = CONF.ssl_ca_file or not CONF.ssl_insecure
+    response = requests.request('GET', url, headers=headers, verify=verify)
     status_code = response.status_code
     if status_code != 200:
         msg = response.reason

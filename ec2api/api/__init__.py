@@ -218,7 +218,8 @@ class EC2KeystoneAuth(wsgi.Middleware):
         creds_json = jsonutils.dumps(creds)
         headers = {'Content-Type': 'application/json'}
 
-        response = requests.request('POST', token_url,
+        verify = CONF.ssl_ca_file or not CONF.ssl_insecure
+        response = requests.request('POST', token_url, verify=verify,
                                     data=creds_json, headers=headers)
         status_code = response.status_code
         if status_code != 200:

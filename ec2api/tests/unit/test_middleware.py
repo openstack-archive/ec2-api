@@ -147,7 +147,8 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         self._validate_ec2_error(resp, 400, 'AuthFailure')
         mock_request.assert_called_with('POST',
                                         CONF.keystone_url + '/ec2tokens',
-                                        data=mock.ANY, headers=mock.ANY)
+                                        data=mock.ANY, headers=mock.ANY,
+                                        verify=True)
 
     @tools.screen_all_logs
     @mock.patch.object(requests, 'request', return_value=FakeResponse(200))
@@ -159,4 +160,5 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         self._validate_ec2_error(resp, 400, 'AuthFailure')
         mock_request.assert_called_with('POST',
                                         CONF.keystone_url + '/ec2tokens',
-                                        data=mock.ANY, headers=mock.ANY)
+                                        data=mock.ANY, headers=mock.ANY,
+                                        verify=True)

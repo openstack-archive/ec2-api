@@ -56,7 +56,9 @@ class ContextTestCase(test_base.BaseTestCase):
             password=conf.admin_password,
             tenant_name=conf.admin_tenant_name,
             project_name=conf.admin_tenant_name,
-            auth_url=conf.keystone_url)
+            auth_url=conf.keystone_url,
+            cacert=conf.ssl_ca_file,
+            insecure=conf.ssl_insecure)
         service_catalog.get_data.assert_called_once_with()
 
         keystone.reset_mock()
@@ -68,14 +70,16 @@ class ContextTestCase(test_base.BaseTestCase):
         client.return_value = mock.MagicMock(spec=keystone_client_v2.Client)
         ec2_context._keystone_client_class = None
         client_class = ec2_context.get_keystone_client_class()
-        client.assert_called_once_with(auth_url='http://localhost:5000/v2.0')
+        client.assert_called_once_with(auth_url='http://localhost:5000/v2.0',
+                                       cacert=None, insecure=False)
         self.assertEqual(keystone_client_v2.Client, client_class)
         client.reset_mock()
 
         client.return_value = mock.MagicMock(spec=keystone_client_v3.Client)
         ec2_context._keystone_client_class = None
         client_class = ec2_context.get_keystone_client_class()
-        client.assert_called_once_with(auth_url='http://localhost:5000/v2.0')
+        client.assert_called_once_with(auth_url='http://localhost:5000/v2.0',
+                                       cacert=None, insecure=False)
         self.assertEqual(keystone_client_v3.Client, client_class)
         client.reset_mock()
 

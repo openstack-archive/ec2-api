@@ -60,6 +60,8 @@ def nova(context):
         'username': None,
         'api_key': None,
         'project_id': None,
+        'insecure': CONF.ssl_insecure,
+        'cacert': CONF.ssl_ca_file
     }
     global _novaclient_vertion, _nova_service_type
     bypass_url = _url_for(context, service_type=_nova_service_type)
@@ -95,6 +97,8 @@ def neutron(context):
         'service_type': 'network',
         'token': context.auth_token,
         'endpoint_url': _url_for(context, service_type='network'),
+        'insecure': CONF.ssl_insecure,
+        'cacert': CONF.ssl_ca_file
     }
 
     return neutronclient.Client(**args)
@@ -108,6 +112,8 @@ def glance(context):
         'auth_url': CONF.keystone_url,
         'service_type': 'image',
         'token': context.auth_token,
+        'insecure': CONF.ssl_insecure,
+        'cacert': CONF.ssl_ca_file
     }
 
     return glanceclient.Client(
@@ -123,6 +129,8 @@ def cinder(context):
         'auth_url': CONF.keystone_url,
         'username': None,
         'api_key': None,
+        'insecure': CONF.ssl_insecure,
+        'cacert': CONF.ssl_ca_file
     }
 
     _cinder = cinderclient.Client('1', **args)
@@ -139,7 +147,9 @@ def keystone(context):
         token=context.auth_token,
         project_id=context.project_id,
         tenant_id=context.project_id,
-        auth_url=CONF.keystone_url)
+        auth_url=CONF.keystone_url,
+        insecure=CONF.ssl_insecure,
+        cacert=CONF.ssl_ca_file)
 
 
 def nova_cert(context):

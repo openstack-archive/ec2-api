@@ -157,7 +157,9 @@ _keystone_client_class = None
 def get_keystone_client_class():
     global _keystone_client_class
     if _keystone_client_class is None:
-        keystone = keystone_client.Client(auth_url=CONF.keystone_url)
+        keystone = keystone_client.Client(auth_url=CONF.keystone_url,
+                                          insecure=CONF.ssl_insecure,
+                                          cacert=CONF.ssl_ca_file)
         if isinstance(keystone, keystone_client_v2.Client):
             _keystone_client_class = keystone_client_v2.Client
         elif isinstance(keystone, keystone_client_v3.Client):
@@ -180,6 +182,8 @@ def get_os_admin_context():
         project_name=CONF.admin_tenant_name,
         tenant_name=CONF.admin_tenant_name,
         auth_url=CONF.keystone_url,
+        insecure=CONF.ssl_insecure,
+        cacert=CONF.ssl_ca_file
     )
     service_catalog = keystone.service_catalog.get_data()
     return RequestContext(
