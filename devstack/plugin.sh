@@ -165,6 +165,7 @@ function configure_ec2api {
     mkdir_chown_stack "$EC2API_CONF_DIR"
 
     # Generate ec2api configuration file and configure common parameters.
+    sudo rm -f $EC2API_CONF_FILE
     touch $EC2API_CONF_FILE
     cp $EC2API_DIR/etc/ec2api/api-paste.ini $EC2API_CONF_DIR
 
@@ -265,6 +266,15 @@ function cleanup_ec2api() {
     sudo rm -rf $EC2API_KEYSTONE_SIGNING_DIR
 }
 
+function configure_functional_tests() {
+    (source $EC2API_DIR/devstack/create_config "functional_tests.conf")
+    if [[ "$?" -ne "0" ]]; then
+        warn $LINENO "EC2 API tests config could not be created."
+    elif is_service_enabled tempest; then
+        cat "$EC2API_DIR/functional_tests.conf" >> $TEMPEST_CONFIG
+    fi
+}
+
 # main dispatcher
 if [[ "$1" == "stack" && "$2" == "install" ]]; then
     echo_summary "Installing ec2-api"
@@ -277,6 +287,7 @@ elif [[ "$1" == "stack" && "$2" == "extra" ]]; then
     echo_summary "Initializing ec2-api"
     init_ec2api
     start_ec2api
+    configure_functional_tests
 fi
 
 if [[ "$1" == "unstack" ]]; then
