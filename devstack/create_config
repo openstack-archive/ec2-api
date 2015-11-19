@@ -25,7 +25,10 @@ FLAVOR_NAME_ALT="m1.ec2api-alt"
 
 if [[ -n "$TOP_DIR" ]]; then
   source $TOP_DIR/accrc/admin/admin
+  # bug somewhere
   unset OS_AUTH_TYPE
+  # remove v2.0 from OS_AUTH_URL
+  export OS_AUTH_URL=$(echo $OS_AUTH_URL | sed -r "s#(.*\/).*#\1#")
 fi
 
 openstack endpoint list
