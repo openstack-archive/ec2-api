@@ -49,7 +49,9 @@ if [[ ! -f $EC2API_DIR/$TEST_CONFIG ]]; then
 fi
 
 sudo pip install virtualenv
-virtualenv .venv --system-site-package
+sudo rm -rf .venv
+sudo virtualenv .venv --system-site-package
+sudo chown -R $USER .venv
 source .venv/bin/activate
 pip install -r test-requirements.txt
 sudo OS_STDOUT_CAPTURE=-1 OS_STDERR_CAPTURE=-1 OS_TEST_TIMEOUT=500 OS_TEST_LOCK_PATH=${TMPDIR:-'/tmp'} \
