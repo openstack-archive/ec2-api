@@ -42,13 +42,12 @@ def create_snapshot(context, volume_id, description=None):
                volume_id)
         raise exception.IncorrectState(reason=msg)
     with common.OnCrashCleaner() as cleaner:
-        os_snapshot = cinder.volume_snapshots.create(
-                os_volume.id, force=True,
-                display_description=description)
+        os_snapshot = cinder.volume_snapshots.create(os_volume.id, True)
         cleaner.addCleanup(os_snapshot.delete)
         snapshot = db_api.add_item(context, 'snap', {'os_id': os_snapshot.id})
         cleaner.addCleanup(db_api.delete_item, context, snapshot['id'])
-        os_snapshot.update(display_name=snapshot['id'])
+        os_snapshot.update(display_name=snapshot['id'],
+                           display_description=description)
 
     return _format_snapshot(context, snapshot, os_snapshot,
                             volume_id=volume_id)
@@ -142,6 +141,8 @@ def _format_snapshot(context, snapshot, os_snapshot, volumes={},
     progress = os_snapshot.progress
     if not progress:
         progress = '0%'
+    description = (getattr(os_snapshot, 'description', None) or
+        getattr(os_snapshot, 'display_description', None))
     return {'snapshotId': snapshot['id'],
             'volumeId': volume_id,
             'status': mapped_status,
@@ -149,4 +150,4 @@ def _format_snapshot(context, snapshot, os_snapshot, volumes={},
             'progress': progress,
             'ownerId': ownerId,
             'volumeSize': os_snapshot.size,
-            'description': os_snapshot.display_description}
+            'description': description}

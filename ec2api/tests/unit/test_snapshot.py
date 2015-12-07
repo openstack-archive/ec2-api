@@ -116,7 +116,7 @@ class SnapshotTestCase(base.ApiTestCase):
             tools.purge_dict(fakes.DB_SNAPSHOT_1, ('id',)))
 
         self.cinder.volume_snapshots.create.assert_called_once_with(
-            fakes.ID_OS_VOLUME_2, force=True, display_description=None)
+            fakes.ID_OS_VOLUME_2, force=True)
 
     def test_format_snapshot_maps_status(self):
         fake_snapshot = fakes.OSSnapshot(fakes.OS_SNAPSHOT_1)
