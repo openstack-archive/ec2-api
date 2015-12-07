@@ -106,7 +106,8 @@ class InstancesTest(scenario_base.BaseScenarioTest):
 
         data = ssh_client.exec_command(
             'curl %s/latest/meta-data/public-keys/0/openssh-key' % url)
-        self.assertEqual(PUBLIC_KEY_MATERIAL, data)
+        # compare only keys. without 'sha-rsa' and owner
+        self.assertEqual(PUBLIC_KEY_MATERIAL.split()[1], data.split()[1])
 
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
