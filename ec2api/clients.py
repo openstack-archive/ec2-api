@@ -41,6 +41,10 @@ ec2_opts = [
                     'catalog. Should be v2.1 with microversion support. '
                     'If it is obsolete v2, a lot of useful EC2 compliant '
                     'instance properties will be unavailable.'),
+    cfg.StrOpt('cinder_service_type',
+               default='volume',
+               help='Service type of Volume API, registered in Keystone '
+                    'catalog.'),
     # TODO(andrey-mp): keystone v3 allows to pass domain_name
     # or domain_id to auth. This code should support this feature.
     cfg.StrOpt('admin_user',
@@ -82,27 +86,23 @@ def nova(context):
 
 
 def neutron(context):
-    if neutronclient is None:
-        return None
-
     return neutronclient.Client(session=context.session,
                                 service_type='network')
 
 
 def glance(context):
-    if glanceclient is None:
-        return None
-
     return glanceclient.Client('1', service_type='image',
                                session=context.session)
 
 
 def cinder(context):
-    if cinderclient is None:
-        return nova(context, 'volume')
-
-    return cinderclient.Client('1', session=context.session,
-                               service_type='volume')
+    url = context.session.get_endpoint(service_type=CONF.cinder_service_type)
+    # TODO(jamielennox): This should be using proper version discovery from
+    # the cinder service rather than just inspecting the URL for certain string
+    # values.
+    version = cinderclient.get_volume_api_from_url(url)
+    return cinderclient.Client(version, session=context.session,
+                               service_type=CONF.cinder_service_type)
 
 
 def keystone(context):

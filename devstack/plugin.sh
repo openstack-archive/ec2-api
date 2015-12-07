@@ -12,6 +12,8 @@
 # stop_ec2api
 
 
+env | sort
+
 # Save trace setting
 XTRACE=$(set +o | grep xtrace)
 set -o xtrace
