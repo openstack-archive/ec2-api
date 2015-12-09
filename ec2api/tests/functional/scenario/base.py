@@ -45,9 +45,13 @@ class BaseScenarioTest(base.EC2TestCase):
         if is_vpc:
             self.addResourceCleanUp(self.client.disassociate_address,
                                     AssociationId=data['AssociationId'])
+            self.get_address_assoc_waiter().wait_available(
+                {'AllocationId': alloc_id})
         else:
             self.addResourceCleanUp(self.client.disassociate_address,
                                     PublicIp=public_ip)
+            self.get_address_assoc_waiter().wait_available(
+                {'PublicIp': public_ip})
 
         return public_ip
 

@@ -26,7 +26,7 @@ from ec2api.api import ec2utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _, _LW
+from ec2api.i18n import _, _LI, _LW
 
 
 ec2_opts = [
@@ -307,6 +307,9 @@ class UniversalDescriber(object):
         if item is None and self.KIND not in VPC_KINDS:
             item = ec2utils.auto_create_db_item(self.context, self.KIND,
                                                 self.get_id(os_item))
+            LOG.info(
+                _LI('Item %(item)s was updated to %(os_item)s.') %
+                {'item': str(item), 'os_item': str(os_item)})
         return item
 
     def get_id(self, os_item):
@@ -316,6 +319,7 @@ class UniversalDescriber(object):
         return os_item['name']
 
     def delete_obsolete_item(self, item):
+        LOG.info(_LI('Deleting obsolete item %(item)s') % {'item': str(item)})
         db_api.delete_item(self.context, item['id'])
 
     def is_filtering_value_found(self, filter_value, value):
@@ -380,7 +384,7 @@ class UniversalDescriber(object):
 
         return formatted_items
 
-    def handle_unpaired_item(self, item, formatted_items):
+    def handle_unpaired_item(self, item):
         self.delete_obsolete_item(item)
 
     def describe(self, context, ids=None, names=None, filter=None,
@@ -404,6 +408,8 @@ class UniversalDescriber(object):
             os_item_name = self.get_name(os_item)
             os_item_id = self.get_id(os_item)
             item = self.items_dict.get(os_item_id, None)
+            if item:
+                paired_items_ids.add(item['id'])
             # NOTE(Alex): Filter out items not requested in names or ids
             if (self.selective_describe and
                     not (os_item_name in self.names or
@@ -411,6 +417,8 @@ class UniversalDescriber(object):
                 continue
             # NOTE(Alex): Autoupdate DB for autoupdatable items
             item = self.auto_update_db(item, os_item)
+            # NOTE(andrey-mp): save item id again
+            # (if item has created by auto update)
             if item:
                 paired_items_ids.add(item['id'])
             formatted_item = self.format(item, os_item)
@@ -424,8 +432,14 @@ class UniversalDescriber(object):
                 formatted_items.append(formatted_item)
         # NOTE(Alex): delete obsolete items
         for item in self.items:
-            if item['id'] not in paired_items_ids:
-                self.handle_unpaired_item(item, formatted_items)
+            if item['id'] in paired_items_ids:
+                continue
+            formatted_item = self.handle_unpaired_item(item)
+            if formatted_item:
+                if not self.filtered_out(formatted_item, filter):
+                    formatted_items.append(formatted_item)
+                if item['id'] in self.ids:
+                    self.ids.remove(item['id'])
         # NOTE(Alex): some requested items are not found
         if self.ids or self.names:
             params = {'id': next(iter(self.ids or self.names))}

@@ -32,10 +32,14 @@ class SecurityGroupBaseTest(base.EC2TestCase):
     def _test_rules(self, add_func, del_func, field, vpc_id=None):
         kwargs = dict()
         if vpc_id:
-            kwargs['Filters'] = [{'Name': 'vpc-id',
-                                  'Values': [vpc_id]}]
+            kwargs['Filters'] = [{'Name': 'vpc-id', 'Values': [vpc_id]}]
         data = self.client.describe_security_groups(*[], **kwargs)
-        default_group = data['SecurityGroups'][0]
+        security_groups = data['SecurityGroups']
+        if not vpc_id:
+            # TODO(andrey-mp): remove it when fitering by None will be
+            security_groups = [sg for sg in security_groups
+                               if sg.get('VpcId') is None]
+        default_group = security_groups[0]
 
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')

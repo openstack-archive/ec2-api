@@ -80,6 +80,8 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
         assoc_id1 = data['AssociationId']
         clean_aa1 = self.addResourceCleanUp(self.client.disassociate_address,
                                             AssociationId=assoc_id1)
+        self.get_address_assoc_waiter().wait_available(
+            {'AllocationId': alloc_id1})
 
         instance = self.get_instance(instance_id)
         nis = instance.get('NetworkInterfaces', [])
@@ -106,6 +108,8 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
         assoc_id2 = data['AssociationId']
         clean_aa2 = self.addResourceCleanUp(self.client.disassociate_address,
                                             AssociationId=assoc_id2)
+        self.get_address_assoc_waiter().wait_available(
+            {'AllocationId': alloc_id2})
 
         kwargs = {
             'NetworkInterfaceId': ni_id2,
@@ -147,3 +151,5 @@ class VpcAddressTest(scenario_base.BaseScenarioTest):
 
         self.client.disassociate_address(AssociationId=assoc_id1)
         self.cancelResourceCleanUp(clean_aa1)
+        self.get_address_assoc_waiter().wait_delete(
+            {'AllocationId': alloc_id1})

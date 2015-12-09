@@ -53,7 +53,8 @@ def create_subnet(context, vpc_id, cidr_block,
             context, main_route_table, cidr_block)
     neutron = clients.neutron(context)
     with common.OnCrashCleaner() as cleaner:
-        os_network_body = {'network': {}}
+        # NOTE(andrey-mp): set fake name to filter networks in instance api
+        os_network_body = {'network': {'name': 'subnet-0'}}
         try:
             os_network = neutron.create_network(os_network_body)['network']
             cleaner.addCleanup(neutron.delete_network, os_network['id'])

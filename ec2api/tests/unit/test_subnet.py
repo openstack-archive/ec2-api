@@ -46,7 +46,7 @@ class SubnetTestCase(base.ApiTestCase):
                     mock.ANY, 'subnet',
                     tools.purge_dict(subnet_1, ('id',)))
             self.neutron.create_network.assert_called_once_with(
-                    {'network': {}})
+                    {'network': {'name': 'subnet-0'}})
             self.neutron.update_network.assert_called_once_with(
                     fakes.ID_OS_NETWORK_1,
                     {'network': {'name': fakes.ID_EC2_SUBNET_1}})

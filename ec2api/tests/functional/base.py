@@ -336,6 +336,9 @@ class EC2TestCase(base.BaseTestCase):
         'delete_vpn_gateway': (
             'get_vpn_gateway_waiter',
             lambda kwargs: kwargs['VpnGatewayId']),
+        'disassociate_address': (
+            'get_address_assoc_waiter',
+            lambda kwargs: kwargs),
     }
 
     @classmethod
@@ -459,6 +462,31 @@ class EC2TestCase(base.BaseTestCase):
     @classmethod
     def get_subnet_waiter(cls):
         return EC2Waiter(cls._subnet_get_state)
+
+    @classmethod
+    def _address_assoc_get_state(cls, kwargs):
+        try:
+            ip = kwargs.get('PublicIp')
+            alloc_id = kwargs.get('AllocationId')
+            assoc_id = kwargs.get('AssociationId')
+            if ip:
+                data = cls.client.describe_addresses(PublicIps=[ip])
+            elif alloc_id:
+                data = cls.client.describe_addresses(AllocationIds=[alloc_id])
+            elif assoc_id:
+                data = cls.client.describe_addresses(
+                    Filters=[{'Name': 'association-id', 'Values': [assoc_id]}])
+
+            if ('Addresses' in data and len(data['Addresses']) == 1 and
+                    data['Addresses'][0].get('InstanceId')):
+                return 'available'
+            raise exceptions.NotFound()
+        except botocore.exceptions.ClientError:
+            raise exceptions.NotFound()
+
+    @classmethod
+    def get_address_assoc_waiter(cls):
+        return EC2Waiter(cls._address_assoc_get_state)
 
     @classmethod
     def _instance_get_state(cls, instance_id):

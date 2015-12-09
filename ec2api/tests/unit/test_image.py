@@ -724,6 +724,11 @@ class ImagePrivateTestCase(base.BaseTestCase):
         result = image_api.describe_images(context, image_id=[image_id])
         self.assertEqual(expected, result)
 
+        # describe with filter
+        result = image_api.describe_images(
+            context, filter=[{'name': 'name', 'value': 'noname'}])
+        self.assertEqual({'imagesSet': []}, result)
+
         # describe failed image
         image['state'] = 'failed'
         expected['imagesSet'][0]['imageState'] = 'failed'

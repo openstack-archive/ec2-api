@@ -86,7 +86,7 @@ def create_security_group(context, group_name, group_description,
 
 
 def _create_security_group(context, group_name, group_description,
-                           vpc_id=None):
+                           vpc_id=None, default=False):
     nova = clients.nova(context)
     with common.OnCrashCleaner() as cleaner:
         try:
@@ -99,9 +99,14 @@ def _create_security_group(context, group_name, group_description,
         if vpc_id:
             # NOTE(Alex) Check if such vpc exists
             ec2utils.get_db_item(context, vpc_id)
-        security_group = db_api.add_item(context, 'sg',
-                                         {'vpc_id': vpc_id,
-                                          'os_id': os_security_group.id})
+        item = {'vpc_id': vpc_id, 'os_id': os_security_group.id}
+        if not default:
+            security_group = db_api.add_item(context, 'sg', item)
+        else:
+            item['id'] = ec2utils.change_ec2_id_kind(vpc_id, 'sg')
+            # NOTE(andrey-mp): try to add item with specific id
+            # and catch exception if it exists
+            security_group = db_api.restore_item(context, 'sg', item)
         return {'return': 'true',
                 'groupId': security_group['id']}
 
@@ -109,8 +114,16 @@ def _create_security_group(context, group_name, group_description,
 def _create_default_security_group(context, vpc):
     # NOTE(Alex): OpenStack doesn't allow creation of another group
     # named 'default' hence vpc-id is used.
-    return _create_security_group(context, vpc['id'],
-                                  'Default VPC security group', vpc['id'])
+    try:
+        _create_security_group(context, vpc['id'],
+                               'Default VPC security group', vpc['id'],
+                               default=True)
+    except (exception.EC2DBDuplicateEntry, exception.InvalidVpcIDNotFound):
+        # NOTE(andrey-mp): when this thread tries to recreate default group
+        # but another thread tries to delete vpc we should pass vpc not found
+        LOG.exception('Failed to create default security group.')
+        return False
+    return True
 
 
 def delete_security_group(context, group_name=None, group_id=None,
@@ -176,8 +189,9 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
                 db_group = db_groups_dict.get(os_group)
                 if db_group and db_group == vpc['id']:
                     continue
-            had_to_repair = True
-            _create_default_security_group(self.context, vpc)
+            result = _create_default_security_group(self.context, vpc)
+            if result:
+                had_to_repair = True
         return had_to_repair
 
 

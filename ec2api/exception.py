@@ -105,6 +105,10 @@ class EC2DBInvalidOsIdUpdate(EC2APIException):
                 'from %(old_os_id)s to %(new_os_id)s')
 
 
+class EC2DBDuplicateEntry(EC2APIException):
+    msg_fmt = _('Entry %(id)s already exists in DB.')
+
+
 # Internal ec2api metadata exceptions
 
 class EC2MetadataException(EC2APIException):

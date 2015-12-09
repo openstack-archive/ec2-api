@@ -417,37 +417,36 @@ class ImageDescriber(common.TaggableItemsDescriber):
     def get_tags(self):
         return db_api.get_tags(self.context, ('ami', 'ari', 'aki'), self.ids)
 
-    def handle_unpaired_item(self, item, formatted_items):
+    def handle_unpaired_item(self, item):
         if item['os_id']:
-            super(ImageDescriber, self).handle_unpaired_item(item,
-                                                             formatted_items)
+            return super(ImageDescriber, self).handle_unpaired_item(item)
+
+        if 'is_public' not in item:
+            return None
+
+        # NOTE(ft): process creating images, ignoring ids mapping
+        # NOTE(ft): the image is being creating, Glance had created
+        # image, but creating thread doesn't yet update db item
+        os_image = self.ec2_created_os_images.get(item['id'])
+        if os_image:
+            item['os_id'] = os_image.id
+            item['is_public'] = os_image.is_public
+            db_api.update_item(self.context, item)
+            image = self.format(item, os_image)
         else:
-            # NOTE(ft): process creating images, ignoring ids mapping
-            if 'is_public' in item:
-                # NOTE(ft): the image is being creating, Glance had created
-                # image, but creating thread doesn't yet update db item
-                os_image = self.ec2_created_os_images.get(item['id'])
-                if os_image:
-                    item['os_id'] = os_image.id
-                    item['is_public'] = os_image.is_public
-                    db_api.update_item(self.context, item)
-                    image = self.format(item, os_image)
-                else:
-                    # NOTE(ft): Glance image is yet not created, but DB item
-                    # exists. So that we adds EC2 image to output results
-                    # with all data we have.
-                    # TODO(ft): check if euca2ools can process such result
-                    image = {'imageId': item['id'],
-                             'imageOwnerId': self.context.project_id,
-                             'imageType': IMAGE_TYPES[
-                                    ec2utils.get_ec2_id_kind(item['id'])],
-                             'isPublic': item['is_public']}
-                    if 'description' in item:
-                        image['description'] = item['description']
-                    image['imageState'] = item.get('state', 'pending')
-                formatted_items.append(image)
-                if item['id'] in self.ids:
-                    self.ids.remove(item['id'])
+            # NOTE(ft): Glance image is not yet created, but DB item
+            # exists. So that we adds EC2 image to output results
+            # with all data we have.
+            # TODO(ft): check if euca2ools can process such result
+            image = {'imageId': item['id'],
+                     'imageOwnerId': self.context.project_id,
+                     'imageType': IMAGE_TYPES[
+                            ec2utils.get_ec2_id_kind(item['id'])],
+                     'isPublic': item['is_public']}
+            if 'description' in item:
+                image['description'] = item['description']
+            image['imageState'] = item.get('state', 'pending')
+        return image
 
 
 def describe_images(context, executable_by=None, image_id=None,
