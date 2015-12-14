@@ -31,8 +31,8 @@ class PrepareEC2ClientContext(context.Context):
     def __init__(self, ctx):
         super(PrepareEC2ClientContext, self).__init__(ctx)
         self.net_wrapper = network_wrapper.wrap(
-            osclients.Clients(self.context["admin"]["endpoint"]),
-            self.config)
+            osclients.Clients(self.context["admin"]["credential"]),
+            self, config=self.config)
         self.net_wrapper.start_cidr = '10.0.0.0/16'
 
     @logging.log_task_wrapper(LOG.info, _("Enter context: `EC2 creds`"))
@@ -40,7 +40,7 @@ class PrepareEC2ClientContext(context.Context):
         """This method is called before the task start."""
         try:
             for user in self.context['users']:
-                osclient = osclients.Clients(user['endpoint'])
+                osclient = osclients.Clients(user['credential'])
                 keystone = osclient.keystone()
                 creds = keystone.ec2.list(user['id'])
                 if not creds:

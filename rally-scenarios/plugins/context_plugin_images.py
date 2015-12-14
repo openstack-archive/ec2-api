@@ -55,7 +55,7 @@ class FakeImageGenerator(context.Context):
 
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
-            glance = osclients.Clients(user["endpoint"]).glance().images
+            glance = osclients.Clients(user["credential"]).glance().images
             current_images = []
             for i in range(images_per_tenant):
                 kw = {
@@ -73,7 +73,7 @@ class FakeImageGenerator(context.Context):
     def cleanup(self):
         for user, tenant_id in rutils.iterate_per_tenants(
                 self.context["users"]):
-            glance = osclients.Clients(user["endpoint"]).glance().images
+            glance = osclients.Clients(user["credential"]).glance().images
             for image in self.context["tenants"][tenant_id].get("images", []):
                 with logging.ExceptionLogger(
                         LOG,
