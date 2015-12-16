@@ -266,6 +266,8 @@ class AddressTest(base.EC2TestCase):
         assoc_id = data['AssociationId']
         clean_aa = self.addResourceCleanUp(self.client.disassociate_address,
                                            AssociationId=assoc_id)
+        self.get_address_assoc_waiter().wait_available(
+            {'AllocationId': alloc_id})
 
         kwargs = {
             'AllocationIds': [alloc_id],
@@ -275,9 +277,7 @@ class AddressTest(base.EC2TestCase):
 
         data = self.client.disassociate_address(AssociationId=assoc_id)
         self.cancelResourceCleanUp(clean_aa)
-
-        data = self.client.describe_addresses(*[], **kwargs)
-        self.assertIsNone(data['Addresses'][0].get('InstanceId'))
+        self.get_address_assoc_waiter().wait_delete({'AllocationId': alloc_id})
 
         # NOTE(andrey-mp): cleanup
         time.sleep(3)
@@ -316,6 +316,7 @@ class AddressTest(base.EC2TestCase):
                                              PublicIp=ip)
         clean_aa = self.addResourceCleanUp(self.client.disassociate_address,
                                            PublicIp=ip)
+        self.get_address_assoc_waiter().wait_available({'PublicIp': ip})
 
         kwargs = {
             'PublicIps': [ip],
@@ -325,11 +326,7 @@ class AddressTest(base.EC2TestCase):
 
         data = self.client.disassociate_address(PublicIp=ip)
         self.cancelResourceCleanUp(clean_aa)
-        # NOTE(andrey-mp): Amazon needs some time to diassociate
-        time.sleep(2)
-
-        data = self.client.describe_addresses(*[], **kwargs)
-        self.assertFalse(data['Addresses'][0].get('InstanceId'))
+        self.get_address_assoc_waiter().wait_delete({'PublicIp': ip})
 
         time.sleep(3)
 
@@ -418,3 +415,5 @@ class AddressTest(base.EC2TestCase):
         assoc_id = data['AssociationId']
         self.addResourceCleanUp(self.client.disassociate_address,
                                 AssociationId=assoc_id)
+        self.get_address_assoc_waiter().wait_available(
+            {'AllocationId': alloc_id})

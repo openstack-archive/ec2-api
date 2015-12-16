@@ -176,14 +176,17 @@ def delete_item(context, item_id):
 
 @require_context
 def restore_item(context, kind, data):
-    item_ref = models.Item()
-    item_ref.update({
-        "project_id": context.project_id,
-    })
-    item_ref.id = data['id']
-    item_ref.update(_pack_item_data(data))
-    item_ref.save()
-    return _unpack_item_data(item_ref)
+    try:
+        item_ref = models.Item()
+        item_ref.update({
+            "project_id": context.project_id,
+        })
+        item_ref.id = data['id']
+        item_ref.update(_pack_item_data(data))
+        item_ref.save()
+        return _unpack_item_data(item_ref)
+    except db_exception.DBDuplicateEntry:
+        raise exception.EC2DBDuplicateEntry(id=data['id'])
 
 
 @require_context

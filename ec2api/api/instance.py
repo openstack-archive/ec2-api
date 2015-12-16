@@ -1417,14 +1417,16 @@ class InstanceEngineNeutron(object):
             os_subnets = neutron.list_subnets(
                 id=os_subnet_ids, fields=['network_id'],
                 tenant_id=context.project_id)['subnets']
-            vpc_os_network_ids = set(sn['network_id'] for sn in os_subnets)
+            vpc_os_network_ids = set(
+                sn['network_id'] for sn in os_subnets)
         else:
             vpc_os_network_ids = []
         os_networks = neutron.list_networks(
-            **{'router:external': False, 'fields': ['id'],
+            **{'router:external': False, 'fields': ['id', 'name'],
                'tenant_id': context.project_id})['networks']
         ec2_classic_os_networks = [n for n in os_networks
-                                   if n['id'] not in vpc_os_network_ids]
+                                   if n['id'] not in vpc_os_network_ids and
+                                   not n.get('name').startswith('subnet-')]
         if len(ec2_classic_os_networks) == 0:
             raise exception.Unsupported(
                     reason=_('There are no available networks '

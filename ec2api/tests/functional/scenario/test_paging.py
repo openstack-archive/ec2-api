@@ -328,7 +328,9 @@ class InstancePagingTest(scenario_base.BaseScenarioTest):
                 rcount += 1
         self.assertEqual(self.RESERVATIONS_COUNT, rcount)
         count = self.RESERVATIONS_COUNT * self.INSTANCES_IN_RESERVATIONS_COUNT
-        self.assertEqual(count, self._count_own_instances(data))
+        instances = set()
+        self._collect_own_instances(data, instances)
+        self.assertEqual(count, len(instances))
 
     def test_simple_instances_paging_with_min_results(self):
         max_results = 5
@@ -340,16 +342,17 @@ class InstancePagingTest(scenario_base.BaseScenarioTest):
         real_count = 0
         max_results = 5
         kwargs = {'MaxResults': max_results}
+        instances = set()
         while True:
             data = self.client.describe_instances(*[], **kwargs)
             self.assertGreaterEqual(max_results, self._count_instances(data))
-            real_count += self._count_own_instances(data)
+            self._collect_own_instances(data, instances)
             if 'NextToken' not in data:
                 break
             kwargs['NextToken'] = data['NextToken']
 
         count = self.RESERVATIONS_COUNT * self.INSTANCES_IN_RESERVATIONS_COUNT
-        self.assertEqual(count, real_count)
+        self.assertEqual(count, len(instances))
 
     def test_invalid_paging(self):
         self.assertRaises('InvalidParameterValue',
@@ -359,13 +362,11 @@ class InstancePagingTest(scenario_base.BaseScenarioTest):
             self.client.describe_instances,
             MaxResults=5, InstanceIds=[self.ids[0]])
 
-    def _count_own_instances(self, data):
-        count = 0
+    def _collect_own_instances(self, data, instances):
         for reservation in data['Reservations']:
             for instance in reservation['Instances']:
                 if instance['InstanceId'] in self.ids:
-                    count += 1
-        return count
+                    instances.add(instance['InstanceId'])
 
     def _count_instances(self, data):
         count = 0

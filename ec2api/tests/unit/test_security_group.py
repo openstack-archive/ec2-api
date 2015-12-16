@@ -265,6 +265,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
                         matchers.ListMatches(
                             [fakes.EC2_SECURITY_GROUP_2],
                             orderless_lists=True))
+        self.assertEqual(0, self.db_api.delete_item.call_count)
 
         self.db_api.get_items_by_ids = tools.CopyingMock(
             return_value=[fakes.DB_SECURITY_GROUP_2])
@@ -276,6 +277,7 @@ class SecurityGroupTestCase(base.ApiTestCase):
                             orderless_lists=True))
         self.db_api.get_items_by_ids.assert_called_once_with(
             mock.ANY, set([fakes.ID_EC2_SECURITY_GROUP_2]))
+        self.assertEqual(0, self.db_api.delete_item.call_count)
 
         self.check_filtering(
             'DescribeSecurityGroups', 'securityGroupInfo',
@@ -324,9 +326,11 @@ class SecurityGroupTestCase(base.ApiTestCase):
             {'security_groups': [fakes.OS_SECURITY_GROUP_2]})
 
         resp = self.execute('DescribeSecurityGroups', {})
-        self.db_api.add_item.assert_called_once_with(
+        self.db_api.restore_item.assert_called_once_with(
             mock.ANY, 'sg',
-            tools.purge_dict(fakes.DB_SECURITY_GROUP_1, ('id',)))
+            {'id': fakes.ID_EC2_VPC_1.replace('vpc', 'sg'),
+             'os_id': fakes.ID_OS_SECURITY_GROUP_1,
+             'vpc_id': fakes.ID_EC2_VPC_1})
         self.nova.security_groups.create.assert_called_once_with(
             fakes.ID_EC2_VPC_1, 'Default VPC security group')
 

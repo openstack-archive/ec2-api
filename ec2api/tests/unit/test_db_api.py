@@ -121,6 +121,15 @@ class DbApiTestCase(base.DbTestCase):
         item_id2 = db_api.add_item_id(self.context, 'fake', os_id)
         self.assertEqual(item_id1, item_id2)
 
+    def test_restore_item(self):
+        os_id = fakes.random_os_id()
+        item = {'os_id': os_id, 'key': 'val1'}
+        new_item = db_api.add_item(self.context, 'fake', item)
+        item['id'] = new_item['id']
+        self.assertRaises(
+            exception.EC2DBDuplicateEntry,
+            db_api.restore_item, self.context, 'fake', item)
+
     def test_update_item(self):
         item = db_api.add_item(self.context, 'fake', {'key': 'val1',
                                                       'key1': 'val'})

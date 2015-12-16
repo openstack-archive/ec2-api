@@ -100,7 +100,7 @@ class VPCTest(base.EC2TestCase):
         self.get_vpc_waiter().wait_delete(vpc_id)
 
     def test_describe_vpcs_filters(self):
-        cidr = '10.1.0.0/16'
+        cidr = '10.163.0.0/16'
         data = self.client.create_vpc(CidrBlock=cidr)
         vpc_id = data['Vpc']['VpcId']
         dv_clean = self.addResourceCleanUp(self.client.delete_vpc,
