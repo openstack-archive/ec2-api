@@ -248,9 +248,9 @@ function install_ec2api() {
 
 # start_ec2api() - Start running processes, including screen
 function start_ec2api() {
-    screen_it ec2-api "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api --config-file $EC2API_CONF_DIR/ec2api.conf"
-    screen_it ec2-api-metadata "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api-metadata --config-file $EC2API_CONF_DIR/ec2api.conf"
-    screen_it ec2-api-s3 "cd $EC2API_DIR && $EC2API_BIN_DIR/ec2-api-s3 --config-file $EC2API_CONF_DIR/ec2api.conf"
+    run_process ec2-api "$EC2API_BIN_DIR/ec2-api --config-file $EC2API_CONF_DIR/ec2api.conf"
+    run_process ec2-api-metadata "$EC2API_BIN_DIR/ec2-api-metadata --config-file $EC2API_CONF_DIR/ec2api.conf"
+    run_process ec2-api-s3 "$EC2API_BIN_DIR/ec2-api-s3 --config-file $EC2API_CONF_DIR/ec2api.conf"
 }
 
 
