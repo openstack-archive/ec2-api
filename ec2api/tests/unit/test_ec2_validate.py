@@ -22,6 +22,7 @@ import testtools
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api import exception
+from ec2api.openstack.common import timeutils as ec2api_timeutils
 from ec2api.tests.unit import tools
 
 
@@ -222,21 +223,19 @@ class EC2TimestampValidationTestCase(testtools.TestCase):
 
         # EC2 request with Timestamp in advanced time
         timestamp = timeutils.utcnow() + datetime.timedelta(seconds=250)
-        params = {'Timestamp': timeutils.strtime(timestamp,
-                                                 "%Y-%m-%dT%H:%M:%SZ")}
+        params = {'Timestamp': timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")}
         expired = ec2utils.is_ec2_timestamp_expired(params, expires=300)
         self.assertFalse(expired)
 
     @tools.screen_all_logs
     def test_validate_ec2_timestamp_advanced_time_expired(self):
         timestamp = timeutils.utcnow() + datetime.timedelta(seconds=350)
-        params = {'Timestamp': timeutils.strtime(timestamp,
-                                                 "%Y-%m-%dT%H:%M:%SZ")}
+        params = {'Timestamp': timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")}
         expired = ec2utils.is_ec2_timestamp_expired(params, expires=300)
         self.assertTrue(expired)
 
     def test_validate_ec2_req_timestamp_not_expired(self):
-        params = {'Timestamp': timeutils.isotime()}
+        params = {'Timestamp': ec2api_timeutils.isotime()}
         expired = ec2utils.is_ec2_timestamp_expired(params, expires=15)
         self.assertFalse(expired)
 
@@ -248,13 +247,13 @@ class EC2TimestampValidationTestCase(testtools.TestCase):
 
     @tools.screen_all_logs
     def test_validate_ec2_req_expired(self):
-        params = {'Expires': timeutils.isotime()}
+        params = {'Expires': ec2api_timeutils.isotime()}
         expired = ec2utils.is_ec2_timestamp_expired(params)
         self.assertTrue(expired)
 
     def test_validate_ec2_req_not_expired(self):
         expire = timeutils.utcnow() + datetime.timedelta(seconds=350)
-        params = {'Expires': timeutils.strtime(expire, "%Y-%m-%dT%H:%M:%SZ")}
+        params = {'Expires': expire.strftime("%Y-%m-%dT%H:%M:%SZ")}
         expired = ec2utils.is_ec2_timestamp_expired(params)
         self.assertFalse(expired)
 
@@ -271,7 +270,7 @@ class EC2TimestampValidationTestCase(testtools.TestCase):
 
         # EC2 request with both Timestamp and Expires
         params = {'Timestamp': '2011-04-22T11:29:49Z',
-                  'Expires': timeutils.isotime()}
+                  'Expires': ec2api_timeutils.isotime()}
         self.assertRaises(exception.InvalidRequest,
                           ec2utils.is_ec2_timestamp_expired,
                           params)
