@@ -256,10 +256,9 @@ function start_ec2api() {
 
 # stop_ec2api() - Stop running processes
 function stop_ec2api() {
-    # Kill the ec2api screen windows
-    screen -S $SCREEN_NAME -p ec2-api -X kill
-    screen -S $SCREEN_NAME -p ec2-api-metadata -X kill
-    screen -S $SCREEN_NAME -p ec2-api-s3 -X kill
+    stop_process ec2-api
+    stop_process ec2-api-metadata
+    stop_process ec2-api-s3
 }
 
 function cleanup_ec2api() {
