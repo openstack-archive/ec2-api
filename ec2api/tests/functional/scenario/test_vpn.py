@@ -51,19 +51,24 @@ class VpnTest(scenario_base.BaseScenarioTest):
     def test_vpn_routing(self):
         vpc_id, _subnet_id = self.create_vpc_and_subnet(self.VPC_CIDR)
 
-        self._create_and_configure_vpn(vpc_id, self.CUSTOMER_GATEWAY_IP,
-                                       self.CUSTOMER_VPN_CIDR)
+        vpn_data = self._create_and_configure_vpn(
+            vpc_id, self.CUSTOMER_GATEWAY_IP, self.CUSTOMER_VPN_CIDR)
+        vgw_id = vpn_data['VpnGatewayId']
 
         data = self.client.describe_route_tables(
             Filters=[{'Name': 'vpc-id', 'Values': [vpc_id]}])
         rtb_id = data['RouteTables'][0]['RouteTableId']
         data = self.client.describe_route_tables(RouteTableIds=[rtb_id])
-        route = next((r for r in data['RouteTables'][0]['Routes']
+        data = data['RouteTables'][0]
+        route = next((r for r in data['Routes']
                       if r['DestinationCidrBlock'] == self.CUSTOMER_VPN_CIDR),
                      None)
-        self.assertIsNotNone(route)
-        self.assertEqual('active', route['State'])
-        self.assertEqual('EnableVgwRoutePropagation', route['Origin'])
+        if route:
+            self.assertEqual('active', route['State'])
+            self.assertEqual('EnableVgwRoutePropagation', route['Origin'])
+        self.assertIn('PropagatingVgws', data)
+        self.assertNotEmpty(data['PropagatingVgws'])
+        self.assertEqual(vgw_id, data['PropagatingVgws'][0]['GatewayId'])
 
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.run_long_tests, 'Slow test has skipped.')
@@ -72,12 +77,17 @@ class VpnTest(scenario_base.BaseScenarioTest):
     @testtools.skipUnless(CONF.aws.image_id,
                           "image id is not defined")
     def test_vpn_connectivity(self):
+        is_amazon = 'amazon' in CONF.aws.ec2_url
+
         response = urllib2.urlopen(self.OPENSWAN_LINK, timeout=30)
         content = response.read()
-        filename = os.path.basename(self.OPENSWAN_LINK)
-        f = open(filename, 'w')
-        f.write(content)
-        f.close()
+        if not is_amazon:
+            # NOTE(andrey-mp): gating in openstack doesn't have internet access
+            # so we need to download this package and install it with dpkg
+            filename = os.path.basename(self.OPENSWAN_LINK)
+            f = open(filename, 'w')
+            f.write(content)
+            f.close()
 
         key_name = data_utils.rand_name('testkey')
         pkey = self.create_key_pair(key_name)
@@ -107,9 +117,13 @@ class VpnTest(scenario_base.BaseScenarioTest):
         # configure ubuntu, install openswan and run it
         ssh_client = ssh.Client(public_ip_ubuntu, CONF.aws.image_user_ubuntu,
                                 pkey=pkey)
-        self._upload_file(ssh_client, filename, filename)
-        ssh_client.exec_command('sudo DEBIAN_FRONTEND=noninteractive dpkg -i '
-                                + filename)
+        if not is_amazon:
+            self._upload_file(ssh_client, filename, filename)
+            ssh_client.exec_command('sudo DEBIAN_FRONTEND=noninteractive'
+                                    ' dpkg -i ' + filename)
+        else:
+            ssh_client.exec_command('DEBIAN_FRONTEND=noninteractive sudo '
+                                    'apt-get install -fqy openswan')
         ssh_client.exec_command('sudo -s su -c "'
                                 'echo 1 > /proc/sys/net/ipv4/ip_forward"')
         ssh_client.exec_command(
@@ -171,15 +185,6 @@ class VpnTest(scenario_base.BaseScenarioTest):
             self.client.delete_vpn_gateway, VpnGatewayId=vgw_id)
         self.get_vpn_gateway_waiter().wait_available(vgw_id)
 
-        data = self.client.create_vpn_connection(
-            CustomerGatewayId=cgw_id, VpnGatewayId=vgw_id,
-            Options={'StaticRoutesOnly': True}, Type='ipsec.1')
-        vpn_data = data['VpnConnection']
-        vpn_id = data['VpnConnection']['VpnConnectionId']
-        self.addResourceCleanUp(self.client.delete_vpn_connection,
-                                VpnConnectionId=vpn_id)
-        self.get_vpn_connection_waiter().wait_available(vpn_id)
-
         data = self.client.attach_vpn_gateway(VpnGatewayId=vgw_id,
                                               VpcId=vpc_id)
         self.addResourceCleanUp(self.client.detach_vpn_gateway,
@@ -194,6 +199,15 @@ class VpnTest(scenario_base.BaseScenarioTest):
                                                         GatewayId=vgw_id)
         self.addResourceCleanUp(self.client.disable_vgw_route_propagation,
             RouteTableId=rtb_id, GatewayId=vgw_id)
+
+        data = self.client.create_vpn_connection(
+            CustomerGatewayId=cgw_id, VpnGatewayId=vgw_id,
+            Options={'StaticRoutesOnly': True}, Type='ipsec.1')
+        vpn_data = data['VpnConnection']
+        vpn_id = data['VpnConnection']['VpnConnectionId']
+        self.addResourceCleanUp(self.client.delete_vpn_connection,
+                                VpnConnectionId=vpn_id)
+        self.get_vpn_connection_waiter().wait_available(vpn_id)
 
         data = self.client.create_vpn_connection_route(
             VpnConnectionId=vpn_id,

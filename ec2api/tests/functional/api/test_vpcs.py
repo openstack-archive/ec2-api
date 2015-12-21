@@ -117,12 +117,6 @@ class VPCTest(base.EC2TestCase):
             Filters=[{'Name': 'cidr', 'Values': ['123.0.0.0/16']}])
         self.assertEqual(0, len(data['Vpcs']))
 
-        if CONF.aws.run_incompatible_tests:
-            # NOTE(andrey-mp): describe no attributes
-            self.assertRaises('InvalidParameterCombination',
-                              self.client.describe_vpc_attribute,
-                              VpcId=vpc_id)
-
         # NOTE(andrey-mp): by fake filter
         self.assertRaises('InvalidParameterValue',
                           self.client.describe_vpcs,
@@ -161,25 +155,6 @@ class VPCTest(base.EC2TestCase):
         data = self.client.describe_vpc_attribute(VpcId=vpc_id,
                                                   Attribute=req_attr)
         self.assertNotEqual(attr, data[attribute].get('Value'))
-
-    @testtools.skipUnless(CONF.aws.run_incompatible_tests,
-        "InvalidParameterCombination' != 'InvalidRequest")
-    def test_describe_invalid_attributes(self):
-        cidr = '10.1.0.0/16'
-        data = self.client.create_vpc(CidrBlock=cidr)
-        vpc_id = data['Vpc']['VpcId']
-        dv_clean = self.addResourceCleanUp(self.client.delete_vpc,
-                                           VpcId=vpc_id)
-        self.get_vpc_waiter().wait_available(vpc_id)
-
-        # NOTE(andrey-mp): describe no attributes
-        self.assertRaises('InvalidParameterCombination',
-                          self.client.describe_vpc_attribute,
-                          VpcId=vpc_id)
-
-        data = self.client.delete_vpc(VpcId=vpc_id)
-        self.cancelResourceCleanUp(dv_clean)
-        self.get_vpc_waiter().wait_delete(vpc_id)
 
     def test_create_with_invalid_cidr(self):
         def _rollback(fn_data):
