@@ -48,13 +48,9 @@ class PrepareEC2ClientContext(context.Context):
                 else:
                     creds = creds[0]
                 url = keystone.service_catalog.url_for(service_type='ec2')
-                url_parts = url.rpartition(':')
-                nova_url = (url_parts[0] + ':8773/'
-                            + url_parts[2].partition('/')[2])
-                self.context['users'][0]['ec2args'] = {
+                user['ec2args'] = {
                     'region': 'RegionOne',
                     'url': url,
-                    'nova_url': nova_url,
                     'access': creds.access,
                     'secret': creds.secret
                 }

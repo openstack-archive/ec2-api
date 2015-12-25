@@ -19,6 +19,8 @@ from rally import consts
 from rally import osclients
 from rally.task import context
 
+from ec2api.tests.functional import botocoreclient
+
 
 LOG = logging.getLogger(__name__)
 
@@ -68,6 +70,12 @@ class FakeImageGenerator(context.Context):
                 current_images.append(image.id)
 
             self.context["tenants"][tenant_id]["images"] = current_images
+
+            # NOTE(andrey-mp): call ec2 api to initialize it
+            args = user['ec2args']
+            client = botocoreclient.get_ec2_client(
+                args['url'], args['region'], args['access'], args['secret'])
+            data = client.describe_images()
 
     @logging.log_task_wrapper(LOG.info, _("Exit context: `Images`"))
     def cleanup(self):

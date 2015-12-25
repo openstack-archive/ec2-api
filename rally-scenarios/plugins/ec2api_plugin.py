@@ -10,9 +10,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import functools
-
 from rally.common import log as logging
+from rally import osclients
 from rally.plugins.openstack import scenario
 from rally.task import atomic
 
@@ -20,135 +19,191 @@ from ec2api.tests.functional import botocoreclient
 
 LOG = logging.getLogger(__name__)
 
-
-_count_args = dict()
-
-
-class ActionTimerWithoutFirst(atomic.ActionTimer):
-
-    def __init__(self, scenario_instance, name):
-        super(ActionTimerWithoutFirst, self).__init__(scenario_instance, name)
-        self.scenario_instance = scenario_instance
-        self.name = name
-
-    def __exit__(self, type, value, tb):
-        if self.name in _count_args:
-            super(ActionTimerWithoutFirst, self).__exit__(type, value, tb)
-        else:
-            _count_args[self.name] = True
+_resources = dict()
 
 
 class EC2APIPlugin(scenario.OpenStackScenario):
 
     def __init__(self, *args, **kwargs):
         super(EC2APIPlugin, self).__init__(*args, **kwargs)
-        count_args = dict()
 
-    def _get_client(self, is_nova):
+        if 'instance_id' in _resources:
+            self.instance_id = _resources['instance_id']
+        else:
+            client = self.get_ec2_client()
+            data = client.describe_instances()
+            instances = (data['Reservations'][0]['Instances']
+                if data.get('Reservations') else None)
+            if instances:
+                index = len(instances) / 3
+                self.instance_id = instances[index]['InstanceId']
+                LOG.info("found instance = %s for ec2" % (self.instance_id))
+                _resources['instance_id'] = self.instance_id
+            else:
+                _resources['instance_id'] = None
+
+        if 'nova_server_id' in _resources:
+            self.nova_server_id = _resources['nova_server_id']
+        else:
+            client = osclients.Clients(
+                self.context['user']['credential']).nova()
+            project_id = self.context["tenant"]["id"]
+            servers = client.servers.list(
+                search_opts={'project_id': project_id})
+            if servers:
+                index = len(servers) / 3
+                self.nova_server_id = servers[index].id
+                LOG.info("found server = %s for nova" % (self.nova_server_id))
+                _resources['nova_server_id'] = self.nova_server_id
+            else:
+                _resources['nova_server_id'] = None
+
+    def get_ec2_client(self):
         args = self.context['user']['ec2args']
-        url = args['nova_url'] if is_nova else args['url']
         client = botocoreclient.get_ec2_client(
-            url, args['region'], args['access'], args['secret'])
+            args['url'], args['region'], args['access'], args['secret'])
         return client
 
-    def _run_both(self, base_name, func):
-        client = self._get_client(True)
-        with ActionTimerWithoutFirst(self, base_name + '_nova'):
-            func(self, client)
-        client = self._get_client(False)
-        with ActionTimerWithoutFirst(self, base_name + '_ec2api'):
-            func(self, client)
+    @scenario.configure()
+    def describe_images(self):
+        self.describe_images_ec2api()
+        self.describe_images_nova()
 
-    def _run_ec2(self, base_name, func):
-        client = self._get_client(False)
-        with ActionTimerWithoutFirst(self, base_name + '_ec2api'):
-            func(self, client)
+    def describe_images_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_images_ec2api'):
+            data = client.describe_images()
 
-    def _runner(run_func):
-        def wrap(func):
-            @functools.wraps(func)
-            def runner(self, *args, **kwargs):
-                run_func(self, func.__name__, func)
-            return runner
-        return wrap
+    def describe_images_nova(self):
+        client = osclients.Clients(
+            self.context['user']['credential']).nova().images
+        with atomic.ActionTimer(self, 'describe_images_nova'):
+            client.list()
 
     @scenario.configure()
-    @_runner(_run_both)
-    def describe_instances(self, client):
-        data = client.describe_instances()
-
-    @scenario.configure()
-    @_runner(_run_both)
-    def describe_addresses(self, client):
-        data = client.describe_addresses()
-
-    @scenario.configure()
-    @_runner(_run_both)
-    def describe_security_groups(self, client):
-        data = client.describe_security_groups()
-
-    @scenario.configure()
-    @_runner(_run_both)
-    def describe_regions(self, client):
-        data = client.describe_regions()
-
-    @scenario.configure()
-    @_runner(_run_both)
-    def describe_images(self, client):
-        data = client.describe_images()
-
-    @scenario.configure()
-    @_runner(_run_ec2)
-    def describe_vpcs(self, client):
-        data = client.describe_vpcs()
-
-    @scenario.configure()
-    @_runner(_run_ec2)
-    def describe_subnets(self, client):
-        data = client.describe_subnets()
-
-    @scenario.configure()
-    @_runner(_run_ec2)
-    def describe_network_interfaces(self, client):
-        data = client.describe_network_interfaces()
-
-    @scenario.configure()
-    @_runner(_run_ec2)
-    def describe_route_tables(self, client):
-        data = client.describe_route_tables()
-
-    _instance_id_by_client = dict()
-
-    @scenario.configure()
-    @_runner(_run_both)
-    def describe_one_instance(self, client):
-        client_id = str(client._endpoint)
-        instance_id = self._instance_id_by_client.get(client_id)
-        if not instance_id:
-            data = client.describe_instances()
-            instances = data['Reservations'][0]['Instances']
-            index = len(instances) / 3
-            instance_id = instances[index]['InstanceId']
-            self._instance_id_by_client[client_id] = instance_id
-            LOG.info("found instance = %s for client %s"
-                     % (instance_id, client_id))
-
-        data = client.describe_instances(InstanceIds=[instance_id])
+    def describe_regions(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_regions_ec2api'):
+            data = client.describe_regions()
 
     @scenario.configure()
     def describe_all_in_one(self):
-        self.describe_addresses()
-        self.describe_instances()
-        self.describe_security_groups()
-        self.describe_one_instance()
-        self.describe_vpcs()
-        self.describe_subnets()
-        self.describe_network_interfaces()
-        self.describe_route_tables()
+        self.describe_addresses_ec2api()
+        self.describe_floatingips_neutron()
+        self.describe_instances_ec2api()
+        self.describe_one_instance_ec2api()
+        self.describe_instances_nova()
+        self.describe_one_instance_nova()
+        self.describe_vpcs_ec2api()
+        self.describe_subnets_ec2api()
+        self.describe_network_interfaces_ec2api()
+        self.describe_route_tables_ec2api()
+        self.describe_security_groups_ec2api()
+        self.describe_networks_neutron()
+        self.describe_subnets_neutron()
+        self.describe_ports_neutron()
+        self.describe_security_groups_neutron()
 
     @scenario.configure()
     def describe_networks(self):
-        self.describe_vpcs()
-        self.describe_subnets()
-        self.describe_network_interfaces()
-        self.describe_route_tables()
+        self.describe_vpcs_ec2api()
+        self.describe_subnets_ec2api()
+        self.describe_network_interfaces_ec2api()
+        self.describe_route_tables_ec2api()
+        self.describe_security_groups_ec2api()
+        self.describe_networks_neutron()
+        self.describe_subnets_neutron()
+        self.describe_ports_neutron()
+        self.describe_security_groups_neutron()
+
+    def describe_addresses_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_addresses_ec2api'):
+            data = client.describe_addresses()
+
+    def describe_instances_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_instances_ec2api'):
+            data = client.describe_instances()
+
+    def describe_one_instance_ec2api(self):
+        if not self.instance_id:
+            return
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_one_instance_ec2api'):
+            data = client.describe_instances(InstanceIds=[self.instance_id])
+
+    def describe_instances_nova(self):
+        nova = osclients.Clients(
+            self.context['user']['credential']).nova()
+        project_id = self.context["tenant"]["id"]
+        with atomic.ActionTimer(self, 'describe_instances_nova'):
+            nova.servers.list(search_opts={'project_id': project_id})
+
+    def describe_one_instance_nova(self):
+        if not self.nova_server_id:
+            return
+        nova = osclients.Clients(
+            self.context['user']['credential']).nova()
+        with atomic.ActionTimer(self, 'describe_one_instance_nova'):
+            nova.servers.get(self.nova_server_id)
+
+    def describe_vpcs_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_vpcs_ec2api'):
+            data = client.describe_vpcs()
+
+    def describe_subnets_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_subnets_ec2api'):
+            data = client.describe_subnets()
+
+    def describe_network_interfaces_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_network_interfaces_ec2api'):
+            data = client.describe_network_interfaces()
+
+    def describe_route_tables_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_route_tables_ec2api'):
+            data = client.describe_route_tables()
+
+    def describe_security_groups_ec2api(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_security_groups_ec2api'):
+            data = client.describe_security_groups()
+
+    def describe_floatingips_neutron(self):
+        neutron = osclients.Clients(
+            self.context['user']['credential']).neutron()
+        project_id = self.context["tenant"]["id"]
+        with atomic.ActionTimer(self, 'describe_addesses_neutron'):
+            neutron.list_floatingips(tenant_id=project_id)
+
+    def describe_networks_neutron(self):
+        neutron = osclients.Clients(
+            self.context['user']['credential']).neutron()
+        project_id = self.context["tenant"]["id"]
+        with atomic.ActionTimer(self, 'describe_networks_neutron'):
+            neutron.list_networks(tenant_id=project_id)
+
+    def describe_subnets_neutron(self):
+        neutron = osclients.Clients(
+            self.context['user']['credential']).neutron()
+        project_id = self.context["tenant"]["id"]
+        with atomic.ActionTimer(self, 'describe_subnets_neutron'):
+            neutron.list_subnets(tenant_id=project_id)
+
+    def describe_ports_neutron(self):
+        neutron = osclients.Clients(
+            self.context['user']['credential']).neutron()
+        project_id = self.context["tenant"]["id"]
+        with atomic.ActionTimer(self, 'describe_ports_neutron'):
+            neutron.list_ports(tenant_id=project_id)
+
+    def describe_security_groups_neutron(self):
+        neutron = osclients.Clients(
+            self.context['user']['credential']).neutron()
+        project_id = self.context["tenant"]["id"]
+        with atomic.ActionTimer(self, 'describe_security_groups_neutron'):
+            neutron.list_security_groups(tenant_id=project_id)
