@@ -89,7 +89,7 @@ command).
 Run aws cli commands using new EC2 API endpoint URL (can be obtained from
 keystone with the new port 8788) like this:
 
-aws --endpoint-url http://10.0.2.15:8788/services/Cloud ec2 describe-instances
+aws --endpoint-url http://10.0.2.15:8788 ec2 describe-instances
 
 
 Limitations

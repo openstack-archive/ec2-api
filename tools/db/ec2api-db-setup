@@ -92,7 +92,7 @@ case "$1" in
         deb)
                 echo "Installing on a Debian system."
                 PACKAGE_INSTALL="$ELEVATE apt-get install"
-                PACKAGE_STATUS="dpkg-query -s"
+                PACKAGE_STATUS="dpkg-query -S"
                 SERVICE_MYSQLD="mysql"
                 SERVICE_START="$ELEVATE service $SERVICE_MYSQLD start"
                 SERVICE_STATUS="$ELEVATE service $SERVICE_MYSQLD status"
@@ -205,7 +205,7 @@ then
                 done
         fi
 
-        echo "UPDATE mysql.user SET password = password('${MYSQL_ROOT_PW}') WHERE user = 'root'; DELETE FROM mysql.user WHERE user = ''; flush privileges;" | mysql -u root
+        echo "UPDATE mysql.user SET password = password('${MYSQL_ROOT_PW}') WHERE user = 'root'; DELETE FROM mysql.user WHERE user = ''; flush privileges;" | mysql --protocol=TCP -u root
         if ! [ $? -eq 0 ] ; then
                 echo "Failed to set password for 'root' MySQL user."
                 exit 1
@@ -224,7 +224,7 @@ if [ "${MYSQL_ROOT_PW+defined}" ]
 then
         MYSQL_ROOT_PW_ARG="--password=${MYSQL_ROOT_PW}"
 fi
-echo "SELECT 1;" | mysql -u root ${MYSQL_ROOT_PW_ARG} > /dev/null
+echo "SELECT 1;" | mysql --protocol=TCP -u root ${MYSQL_ROOT_PW_ARG} > /dev/null
 if ! [ $? -eq 0 ]
 then
         echo "Failed to connect to the MySQL server. Please check your root user credentials."
@@ -236,7 +236,7 @@ echo "Verified connectivity to MySQL."
 # Now create the db.
 
 echo "Creating 'ec2api' database."
-cat << EOF | mysql -u root ${MYSQL_ROOT_PW_ARG}
+cat << EOF | mysql --protocol=TCP -u root ${MYSQL_ROOT_PW_ARG}
 DROP DATABASE IF EXISTS ec2api;
 CREATE DATABASE IF NOT EXISTS ec2api DEFAULT CHARACTER SET utf8;
 GRANT ALL ON ec2api.* TO 'ec2api'@'localhost' IDENTIFIED BY '${MYSQL_EC2API_PW}';
@@ -284,7 +284,7 @@ rm $log_conf
 
 # Do a final sanity check on the database.
 
-echo "SELECT * FROM migrate_version;" | mysql -u ec2api --password=${MYSQL_EC2API_PW} ec2api > /dev/null
+echo "SELECT * FROM migrate_version;" | mysql --protocol=TCP -u ec2api --password=${MYSQL_EC2API_PW} ec2api > /dev/null
 if ! [ $? -eq 0 ]
 then
         echo "Final sanity check failed."
