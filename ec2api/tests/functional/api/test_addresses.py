@@ -415,5 +415,3 @@ class AddressTest(base.EC2TestCase):
         assoc_id = data['AssociationId']
         self.addResourceCleanUp(self.client.disassociate_address,
                                 AssociationId=assoc_id)
-        self.get_address_assoc_waiter().wait_available(
-            {'AllocationId': alloc_id})
