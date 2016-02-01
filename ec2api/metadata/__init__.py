@@ -133,7 +133,7 @@ class MetadataRequestHandler(wsgi.Application):
             req.response.body = content
             return req.response
         elif resp.status == 403:
-            LOG.warn(_LW(
+            LOG.warning(_LW(
                 'The remote metadata server responded with Forbidden. This '
                 'response usually occurs when shared secrets do not match.'
             ))
@@ -148,7 +148,7 @@ class MetadataRequestHandler(wsgi.Application):
             msg = _(
                 'Remote metadata server experienced an internal server error.'
             )
-            LOG.warn(msg)
+            LOG.warning(msg)
             return webob.exc.HTTPInternalServerError(
                 explanation=six.text_type(msg))
         else:
