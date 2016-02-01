@@ -106,7 +106,8 @@ def cinder(context):
 
 
 def keystone(context):
-    return keystoneclient.Client(auth_url=CONF.keystone_url,
+    auth_url = context.session.get_endpoint(service_type='identity')
+    return keystoneclient.Client(auth_url=auth_url,
                                  session=context.session)
 
 

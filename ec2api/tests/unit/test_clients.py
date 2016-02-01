@@ -124,5 +124,5 @@ class ClientsTestCase(base.BaseTestCase):
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.keystone(context)
         self.assertEqual(keystone.return_value, res)
-        keystone.assert_called_with(auth_url='http://localhost:5000/v2.0',
+        keystone.assert_called_with(auth_url='v1',
                                     session=mock.sentinel.session)

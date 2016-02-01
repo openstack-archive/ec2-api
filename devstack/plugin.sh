@@ -186,7 +186,8 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
 
     iniset $EC2API_CONF_FILE DEFAULT ec2api_workers "$API_WORKERS"
-    iniset $EC2API_CONF_FILE DEFAULT keystone_url "$KEYSTONE_SERVICE_PROTOCOL://$KEYSTONE_SERVICE_HOST:$KEYSTONE_SERVICE_PORT/v2.0"
+    iniset $EC2API_CONF_FILE DEFAULT keystone_url "$KEYSTONE_SERVICE_URI"
+    iniset $EC2API_CONF_FILE DEFAULT keystone_ec2_tokens_url "$KEYSTONE_SERVICE_URI_V3/ec2tokens"
     iniset $EC2API_CONF_FILE DEFAULT region_list "$REGION_NAME"
 
     iniset $EC2API_CONF_FILE DEFAULT ec2api_listen_port "$EC2API_SERVICE_PORT"

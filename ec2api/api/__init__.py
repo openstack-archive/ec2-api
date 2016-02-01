@@ -46,11 +46,11 @@ LOG = logging.getLogger(__name__)
 
 ec2_opts = [
     cfg.StrOpt('keystone_url',
-               default='http://localhost:5000/v2.0',
-               help='URL to get token from ec2 request.'),
+               default='http://localhost:5000/',
+               help='URL for getting admin session.'),
     cfg.StrOpt('keystone_ec2_tokens_url',
-               default='$keystone_url/ec2tokens',
-               help='URL to get token from ec2 request.'),
+               default='http://localhost:5000/v3/ec2tokens',
+               help='URL to authenticate token from ec2 request.'),
     cfg.IntOpt('ec2_timestamp_expiry',
                default=300,
                help='Time in seconds before ec2 timestamp expires'),

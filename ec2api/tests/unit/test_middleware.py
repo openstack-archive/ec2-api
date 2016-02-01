@@ -149,7 +149,7 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         resp = self.kauth(req)
         self._validate_ec2_error(resp, 400, 'AuthFailure')
         mock_request.assert_called_with('POST',
-                                        CONF.keystone_url + '/ec2tokens',
+                                        CONF.keystone_ec2_tokens_url,
                                         data=mock.ANY, headers=mock.ANY)
 
     @tools.screen_all_logs
@@ -161,7 +161,7 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         resp = self.kauth(req)
         self._validate_ec2_error(resp, 400, 'AuthFailure')
         mock_request.assert_called_with('POST',
-                                        CONF.keystone_url + '/ec2tokens',
+                                        CONF.keystone_ec2_tokens_url,
                                         data=mock.ANY, headers=mock.ANY)
 
         fake_request = mock.NonCallableMock(status_code=200, headers={})
@@ -182,7 +182,7 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
         req.GET['AWSAccessKeyId'] = 'test-key-id'
         self.kauth(req)
         mock_request.assert_called_with(
-            'POST', CONF.keystone_url + '/ec2tokens',
+            'POST', CONF.keystone_ec2_tokens_url,
             data=mock.ANY, headers=mock.ANY)
 
         data = jsonutils.loads(mock_request.call_args[1]['data'])
