@@ -30,6 +30,8 @@ def _get_client(client_name, url, region, access, secret, ca_bundle):
     }
     if ca_bundle:
         kwargs['verify'] = ca_bundle
+    else:
+        kwargs['verify'] = False
     return session.create_client(client_name, **kwargs)
 
 
