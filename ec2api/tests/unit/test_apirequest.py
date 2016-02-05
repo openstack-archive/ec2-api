@@ -81,7 +81,7 @@ class EC2RequesterTestCase(base.BaseTestCase):
         observed_data = tools.parse_xml(observed)
         expected = {root_tag: tools.update_dict(
                                   dict_data,
-                                  {'requestId': request_id.decode("ascii")})}
+                                  {'requestId': request_id})}
         self.assertThat(observed_data, matchers.DictMatches(expected))
 
     def test_render_response_ascii(self):
