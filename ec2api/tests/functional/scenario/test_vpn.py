@@ -35,7 +35,6 @@ LOG = log.getLogger(__name__)
 
 class VpnTest(scenario_base.BaseScenarioTest):
 
-    VPC_CIDR = '10.4.0.0/20'
     CUSTOMER_GATEWAY_IP = '198.51.100.77'
     CUSTOMER_VPN_CIDR = '172.16.25.0/24'
     OPENSWAN_LINK = ('http://mirrors.kernel.org/ubuntu/pool/universe/o/'
@@ -49,7 +48,7 @@ class VpnTest(scenario_base.BaseScenarioTest):
             raise cls.skipException('VPC is disabled')
 
     def test_vpn_routing(self):
-        vpc_id, _subnet_id = self.create_vpc_and_subnet(self.VPC_CIDR)
+        vpc_id, _subnet_id = self.create_vpc_and_subnet('10.42.0.0/20')
 
         vpn_data = self._create_and_configure_vpn(
             vpc_id, self.CUSTOMER_GATEWAY_IP, self.CUSTOMER_VPN_CIDR)
@@ -102,7 +101,7 @@ class VpnTest(scenario_base.BaseScenarioTest):
         private_ip_ubuntu = instance['PrivateIpAddress']
 
         # create VPC, ..., VPN
-        vpc_id, subnet_id = self.create_vpc_and_subnet(self.VPC_CIDR)
+        vpc_id, subnet_id = self.create_vpc_and_subnet('10.43.0.0/20')
         self.prepare_vpc_default_security_group(vpc_id)
         vpn_data = self._create_and_configure_vpn(
             vpc_id, public_ip_ubuntu, private_ip_ubuntu + '/32')
@@ -237,7 +236,7 @@ class VpnTest(scenario_base.BaseScenarioTest):
         ipsec_conf = []
         for item in self._ipsec_conf:
             ipsec_conf.append(item % {
-                'vpc_cidr': self.VPC_CIDR,
+                'vpc_cidr': '10.43.0.0/20',
                 'vgw_ip': vgw_ip,
                 'private_ip_ubuntu': private_ip_ubuntu})
 

@@ -23,7 +23,7 @@ CONF = config.CONF
 
 class VpnGatewayTest(base.EC2TestCase):
 
-    VPC_CIDR = '10.4.0.0/20'
+    VPC_CIDR = '10.41.0.0/20'
     vpc_id = None
 
     @classmethod
