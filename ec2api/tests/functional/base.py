@@ -364,7 +364,10 @@ class EC2TestCase(base.BaseTestCase):
                           (cls.friendly_function_call_str(function, *pos_args,
                                                           **kw_args),
                            str((tb[0], tb[1], tb[2]))))
-                cls.cleanUpItem(function, pos_args, kw_args)
+                res = cls.cleanUpItem(function, pos_args, kw_args)
+                if not res:
+                    fail_count += 1
+                    LOG.error('Failure in cleanup for: %s' % str(kw_args))
             except BaseException:
                 fail_count += 1
                 LOG.exception('Failure in cleanup for: %s' % str(kw_args))
@@ -375,6 +378,7 @@ class EC2TestCase(base.BaseTestCase):
     @classmethod
     def cleanUpItem(cls, function, pos_args, kw_args):
         attempts_left = 10
+        interval = 1
         deleted = False
         while not deleted and attempts_left > 0:
             try:
@@ -390,11 +394,13 @@ class EC2TestCase(base.BaseTestCase):
                         waiter().wait_delete(obj_id)
                     except botocore.exceptions.ClientError as e:
                         LOG.exception('Exception occured in cleanup waiting')
+                        return False
             except botocore.exceptions.ClientError as e:
                 error_code = e.response['Error']['Code']
                 for err in cls._VALID_CLEANUP_ERRORS:
                     if err in error_code:
                         deleted = True
+                        break
                 else:
                     hook_res = False
                     key = (function.__name__, error_code)
@@ -405,10 +411,13 @@ class EC2TestCase(base.BaseTestCase):
                         hook_res = hook(obj_id)
                     if not hook_res:
                         LOG.error('Cleanup failed: %s', e, exc_info=True)
-                        return
+                        return False
                     LOG.error('Retrying cleanup due to: %s', e)
-                    time.sleep(1)
+                    time.sleep(interval)
                     attempts_left -= 1
+                    interval += 1
+
+        return deleted
 
     @classmethod
     def friendly_function_name_simple(cls, call_able):
@@ -476,6 +485,8 @@ class EC2TestCase(base.BaseTestCase):
             elif assoc_id:
                 data = cls.client.describe_addresses(
                     Filters=[{'Name': 'association-id', 'Values': [assoc_id]}])
+
+            LOG.debug('Addresses: %s' % str(data.get('Addresses')))
 
             if ('Addresses' in data and len(data['Addresses']) == 1 and
                     data['Addresses'][0].get('InstanceId')):

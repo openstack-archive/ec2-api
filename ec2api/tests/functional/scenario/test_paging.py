@@ -236,7 +236,7 @@ class SnapshotPagingTest(scenario_base.BaseScenarioTest):
         waiter = base.EC2Waiter(_create_snapshot)
         cls.ids = list()
         while len(cls.ids) < cls.SNAPSHOTS_COUNT:
-            time.sleep(2)
+            time.sleep(10)
             data = waiter.wait_for_result()
             snapshot_id = data['SnapshotId']
             cls.addResourceCleanUpStatic(cls.client.delete_snapshot,
