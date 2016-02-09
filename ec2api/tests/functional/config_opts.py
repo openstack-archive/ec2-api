@@ -28,7 +28,7 @@ AWSGroup = [
     cfg.StrOpt('ca_bundle',
                default=None,
                help="The CA certificate bundle to use when verifying "
-                    "SSL certificates."),
+                    "SSL certificates. Or True/False to pass to botocore."),
     cfg.StrOpt('aws_secret',
                default=None,
                help="AWS Secret Key",

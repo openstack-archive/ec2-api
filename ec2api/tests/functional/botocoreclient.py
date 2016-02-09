@@ -14,6 +14,7 @@
 #    under the License.
 
 import botocore.session
+from oslo_config import types
 
 
 def _get_client(client_name, url, region, access, secret, ca_bundle):
@@ -29,9 +30,10 @@ def _get_client(client_name, url, region, access, secret, ca_bundle):
         'aws_secret_access_key': secret
     }
     if ca_bundle:
-        kwargs['verify'] = ca_bundle
-    else:
-        kwargs['verify'] = False
+        try:
+            kwargs['verify'] = types.Boolean()(ca_bundle)
+        except Exception:
+            kwargs['verify'] = ca_bundle
     return session.create_client(client_name, **kwargs)
 
 
