@@ -81,9 +81,10 @@ class InstanceAttributeTest(base.EC2TestCase):
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_disable_api_termination_attribute(self):
         instance_id = self.run_instance(DisableApiTermination=True)
-        self.addResourceCleanUp(self.client.modify_instance_attribute,
-                                InstanceId=instance_id,
-                                DisableApiTermination={'Value': False})
+        res_clean = self.addResourceCleanUp(
+            self.client.modify_instance_attribute,
+            InstanceId=instance_id,
+            DisableApiTermination={'Value': False})
 
         data = self.client.describe_instance_attribute(
             InstanceId=instance_id, Attribute='disableApiTermination')
@@ -114,6 +115,7 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.assertFalse(data['DisableApiTermination']['Value'])
 
         self.client.terminate_instances(InstanceIds=[instance_id])
+        self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
