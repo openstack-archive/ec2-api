@@ -57,35 +57,32 @@ function recreate_endpoint {
     local port=$3
     local protocol=$4
 
-    if [[ "$KEYSTONE_CATALOG_BACKEND" = 'sql' ]]; then
-
-        # Remove nova's service/endpoint
-        local endpoint_ids=$(openstack --os-identity-api-version 3 endpoint list \
-            --service "$endpoint" --region "$REGION_NAME" -c ID -f value)
-        if [[ -n "$endpoint_ids" ]]; then
-            for endpoint_id in $endpoint_ids ; do
-                openstack --os-identity-api-version 3 endpoint delete $endpoint_id
-            done
-        fi
-        local service_id=$(openstack --os-identity-api-version 3 service list \
-            -c "ID" -c "Name" \
-            | grep " $endpoint " | get_field 1)
-        if [[ -n "$service_id" ]]; then
-            openstack --os-identity-api-version 3 service delete $service_id
-        fi
-
-        local service_id=$(openstack service create \
-            $endpoint \
-            --name "$endpoint" \
-            --description="$description" \
-            -f value -c id)
-        openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
-            $service_id public "$protocol://$SERVICE_HOST:$port/"
-        openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
-            $service_id admin "$protocol://$SERVICE_HOST:$port/"
-        openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
-            $service_id internal "$protocol://$SERVICE_HOST:$port/"
+    # Remove nova's service/endpoint
+    local endpoint_ids=$(openstack --os-identity-api-version 3 endpoint list \
+        --service "$endpoint" --region "$REGION_NAME" -c ID -f value)
+    if [[ -n "$endpoint_ids" ]]; then
+        for endpoint_id in $endpoint_ids ; do
+            openstack --os-identity-api-version 3 endpoint delete $endpoint_id
+        done
     fi
+    local service_id=$(openstack --os-identity-api-version 3 service list \
+        -c "ID" -c "Name" \
+        | grep " $endpoint " | get_field 1)
+    if [[ -n "$service_id" ]]; then
+        openstack --os-identity-api-version 3 service delete $service_id
+    fi
+
+    local service_id=$(openstack service create \
+        $endpoint \
+        --name "$endpoint" \
+        --description="$description" \
+        -f value -c id)
+    openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
+        $service_id public "$protocol://$SERVICE_HOST:$port/"
+    openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
+        $service_id admin "$protocol://$SERVICE_HOST:$port/"
+    openstack --os-identity-api-version 3 endpoint create --region "$REGION_NAME" \
+        $service_id internal "$protocol://$SERVICE_HOST:$port/"
 }
 
 
