@@ -189,6 +189,11 @@ class VolumeTest(base.EC2TestCase):
         self.assertIn('DeviceName', bdms[0])
         self.assertIn('Ebs', bdms[0])
 
+        # stop instance to prevent 'busy' state of detached volume
+        data = self.client.stop_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('stopped'))
+
         self.client.detach_volume(VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_delete(volume_id)
         self.cancelResourceCleanUp(clean_vi)
@@ -244,6 +249,11 @@ class VolumeTest(base.EC2TestCase):
         clean_i = self.addResourceCleanUp(self.client.terminate_instances,
                                           InstanceIds=[instance_id])
 
+        # stop instance to prevent 'busy' state of detached volume
+        data = self.client.stop_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('stopped'))
+
         self.client.detach_volume(VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_delete(volume_id)
         self.cancelResourceCleanUp(clean_vi)
@@ -295,6 +305,11 @@ class VolumeTest(base.EC2TestCase):
         self.assertRaises('VolumeInUse',
                           self.client.delete_volume,
                           VolumeId=volume_id)
+
+        # stop instance to prevent 'busy' state of detached volume
+        data = self.client.stop_instances(InstanceIds=[instance_id])
+        self.get_instance_waiter().wait_available(instance_id,
+                                                  final_set=('stopped'))
 
         self.client.detach_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_vi)
