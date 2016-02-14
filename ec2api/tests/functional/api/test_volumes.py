@@ -138,10 +138,11 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
-    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "ebs image id is not defined")
     def test_attach_detach_volume(self):
         clean_dict = {}
-        instance_id = self.run_instance(clean_dict=clean_dict)
+        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id,
+                                        clean_dict=clean_dict)
         clean_i = clean_dict['instance']
 
         kwargs = {
@@ -212,10 +213,11 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_i)
         self.get_instance_waiter().wait_delete(instance_id)
 
-    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_attaching_stage(self):
         clean_dict = {}
-        instance_id = self.run_instance(clean_dict=clean_dict)
+        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id,
+                                        clean_dict=clean_dict)
         clean_i = clean_dict['instance']
 
         data = self.client.create_volume(
@@ -268,9 +270,9 @@ class VolumeTest(base.EC2TestCase):
 
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "Volume statuses are not implemented")
-    @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
+    @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_delete_detach_attached_volume(self):
-        instance_id = self.run_instance()
+        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id)
 
         kwargs = {
             'Size': 1,
