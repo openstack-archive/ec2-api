@@ -18,8 +18,8 @@ import os
 
 from oslo_log import log
 import six
-from tempest_lib.common import ssh
-from tempest_lib.common.utils import data_utils
+from tempest.lib.common import ssh
+from tempest.lib.common.utils import data_utils
 import testtools
 
 from ec2api.tests.functional import base

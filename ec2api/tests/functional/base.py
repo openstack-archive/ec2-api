@@ -22,8 +22,8 @@ import traceback
 import botocore.exceptions
 from oslo_log import log
 import six
-from tempest_lib import base
-from tempest_lib import exceptions
+from tempest.lib import base
+from tempest.lib import exceptions
 import testtools
 
 from ec2api.tests.functional import botocoreclient

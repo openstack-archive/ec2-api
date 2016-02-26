@@ -14,8 +14,8 @@
 #    under the License.
 
 from oslo_log import log
-from tempest_lib.common import ssh
-from tempest_lib.common.utils import data_utils
+from tempest.lib.common import ssh
+from tempest.lib.common.utils import data_utils
 import testtools
 
 from ec2api.tests.functional import base
