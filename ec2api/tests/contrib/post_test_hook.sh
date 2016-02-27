@@ -54,6 +54,7 @@ sudo virtualenv .venv --system-site-package
 sudo chown -R $USER .venv
 source .venv/bin/activate
 pip install -r test-requirements.txt
+pip install git+https://github.com/openstack/tempest.git@master
 sudo OS_STDOUT_CAPTURE=-1 OS_STDERR_CAPTURE=-1 OS_TEST_TIMEOUT=500 OS_TEST_LOCK_PATH=${TMPDIR:-'/tmp'} \
   python -m subunit.run discover -t ./ ./ec2api/tests/functional | subunit-2to1 | tools/colorizer.py
 RETVAL=$?
