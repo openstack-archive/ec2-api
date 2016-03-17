@@ -33,17 +33,27 @@ if [[ "$?" -ne "0" ]]; then
   die $LINENO  "OpenStack CLI doesn't work. Looks like credentials are absent."
 fi
 
+EC2_URL=`openstack endpoint list --service ec2 --interface public --os-identity-api-version=3 -c URL -f value`
+S3_URL=`openstack endpoint list --service s3 --interface public --os-identity-api-version=3 -c URL -f value`
+
 # in some cases these packages can present in the system but don't work
 # reinstalling can help
-euca-describe-images
+aws --version
 if [[ "$?" -ne "0" ]]; then
-  sudo apt-get purge euca2ools python-requestbuilder -fy
-  sudo apt-get install euca2ools python-requestbuilder -fy
-  euca-describe-images
+  sudo pip install awscli --upgrade
+  aws --version
   if [[ "$?" -ne "0" ]]; then
-    die $LINENO "Looks like euca2ools is not correctly installed."
+    die $LINENO "Looks like awscli is not correctly installed."
   fi
 fi
+
+project_id=`openstack project show $OS_PROJECT_NAME -c id -f value`
+openstack ec2 credentials create 1>&2
+line=`openstack ec2 credentials list | grep " $project_id "`
+read ec2_access_key ec2_secret_key <<< `echo $line | awk '{print $2 " " $4 }'`
+aws configure set aws_access_key_id $ec2_access_key --profile admin
+aws configure set aws_secret_access_key $ec2_secret_key --profile admin
+AWS_PARAMS="--region $REGION_NAME --endpoint-url $EC2_URL"
 
 neutron_item=$(openstack service list | grep neutron)
 
@@ -57,7 +67,7 @@ wget -nv -P /tmp $CIRROS_IMAGE_URL &
 cirros_image_wget_pid=$!
 
 # find simple image
-image_id=$(euca-describe-images --show-empty-fields | grep "cirros" | grep "ami-" | head -n 1 | awk '{print $2}')
+image_id=`aws $AWS_PARAMS --profile admin ec2 describe-images --filters Name=image-type,Values=machine Name=name,Values=cirros* --query 'Images[0].ImageId' --output text`
 
 # prepare ubuntu image
 if [[ $RUN_LONG_TESTS == "1" ]]; then
@@ -107,8 +117,9 @@ fi
 openstack ec2 credentials create --user $user_id --project $project_id 1>&2
 line=`openstack ec2 credentials list --user $user_id | grep " $project_id "`
 read ec2_access_key ec2_secret_key <<< `echo $line | awk '{print $2 " " $4 }'`
+aws configure set aws_access_key_id $ec2_access_key --profile user
+aws configure set aws_secret_access_key $ec2_secret_key --profile user
 
-ec2_auth="-I $ec2_access_key -S $ec2_secret_key"
 auth="--os-project-name $project_name --os-username $user_name --os-password password"
 
 # create EBS image
@@ -166,7 +177,7 @@ if [[ -n "$openstack_image_id" ]]; then
   if [[ "$?" -ne "0" ]]; then
     die $LINENO "Image creation from instance fails"
   fi
-  ebs_image_id=$(euca-describe-images $ec2_auth --show-empty-fields | grep $image_name | awk '{print $2}')
+  ebs_image_id=`aws $AWS_PARAMS --profile user ec2 describe-images --filters Name=image-type,Values=machine Name=name,Values=$image_name --query 'Images[0].ImageId' --output text`
   nova $auth delete $instance_id
 fi
 
@@ -184,7 +195,9 @@ if [[ -n "$neutron_item" ]]; then
 fi
 
 wait $cirros_image_wget_pid
-if [[ "$?" -eq "0" ]]; then
+#if [[ "$?" -eq "0" ]]; then
+#TODO:
+if [[ "$?" -eq "1000" ]]; then
   mkdir -p /tmp/cirros
   # do it under sudo because admin-pk is not accessible under user
   sudo euca-bundle-image -i /tmp/$CIRROS_IMAGE_FNAME -d /tmp/cirrosimage -r x86_64 -c $EC2_CERT -k $EC2_PRIVATE_KEY --ec2cert $EUCALYPTUS_CERT --user $EC2_USER_ID

@@ -72,6 +72,7 @@ class ImageTest(base.EC2TestCase):
         self.assertEqual(1, len(data['Images']))
         self.assertEqual(image_id, data['Images'][0]['ImageId'])
 
+    @testtools.skipUnless(CONF.aws.image_id, "Image id is not defined")
     def test_check_image_operations_negative(self):
         # NOTE(andrey-mp): image_id is a public image created by admin
         image_id = CONF.aws.image_id

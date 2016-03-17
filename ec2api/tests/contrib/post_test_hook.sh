@@ -61,10 +61,24 @@ RETVAL=$?
 deactivate
 
 # list resources to check what left after tests
-euca-describe-instances
-euca-describe-images
-euca-describe-volumes
-euca-describe-snapshots
+EC2_URL=`openstack endpoint list --service ec2 --interface public --os-identity-api-version=3 -c URL -f value`
+AWS_PARAMS="--region $REGION_NAME --endpoint-url $EC2_URL"
+echo "========================================================================================================"
+echo "==================================================================================== Admin resources ==="
+echo "========================================================================================================"
+aws $AWS_PARAMS --profile admin ec2 describe-instances
+aws $AWS_PARAMS --profile admin ec2 describe-images
+aws $AWS_PARAMS --profile admin ec2 describe-volumes
+aws $AWS_PARAMS --profile admin ec2 describe-snashots
+
+echo "========================================================================================================"
+echo "===================================================================================== User resources ==="
+echo "========================================================================================================"
+aws $AWS_PARAMS --profile user ec2 describe-instances
+aws $AWS_PARAMS --profile user ec2 describe-images
+aws $AWS_PARAMS --profile user ec2 describe-volumes
+aws $AWS_PARAMS --profile user ec2 describe-snashots
+
 openstack server list --all-projects
 openstack image list
 openstack volume list --all-projects
