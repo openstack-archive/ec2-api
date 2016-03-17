@@ -335,7 +335,8 @@ def _are_identical_rules(rule1, rule2):
         for key, value in rule.items():
             if (value is not None and value != -1 and
                     value != '0.0.0.0/0' and
-                    key not in ['id', 'tenant_id', 'security_group_id']):
+                    key not in ['id', 'tenant_id', 'security_group_id',
+                                'description']):
                 dict[key] = str(value)
         return dict
 
