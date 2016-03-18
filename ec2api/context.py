@@ -23,7 +23,6 @@ import six
 from ec2api import clients
 from ec2api import exception
 from ec2api.i18n import _LW
-from ec2api.openstack.common import timeutils as ec2api_timeutils
 
 
 CONF = cfg.CONF
@@ -100,7 +99,7 @@ class RequestContext(context.RequestContext):
             'is_admin': getattr(self, 'is_admin', None),
             'remote_address': getattr(self, 'remote_address', None),
             'timestamp': self.timestamp.strftime(
-                ec2api_timeutils.PERFECT_TIME_FORMAT) if hasattr(
+                timeutils.PERFECT_TIME_FORMAT) if hasattr(
                 self, 'timestamp') else None,
             'request_id': getattr(self, 'request_id', None),
             'quota_class': getattr(self, 'quota_class', None),

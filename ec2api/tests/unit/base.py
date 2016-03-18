@@ -172,7 +172,7 @@ class ApiTestCase(BaseTestCase):
         super(ApiTestCase, self).setUp()
         self.mock_all_os()
         self.db_api = self.mock_db()
-        self.isotime = self.mock('ec2api.openstack.common.timeutils.isotime')
+        self.isotime = self.mock('oslo_utils.timeutils.isotime')
 
     def execute(self, action, args):
         status_code, response = self._execute(action, args)

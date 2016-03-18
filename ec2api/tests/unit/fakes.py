@@ -20,7 +20,8 @@ import uuid
 
 from lxml import etree
 
-from ec2api.openstack.common import timeutils
+from oslo_utils import timeutils
+
 from ec2api.tests.unit import tools
 
 
