@@ -38,12 +38,12 @@ import os.path
 
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_utils import fileutils
 import routes
 import six
 from six.moves.urllib import parse
 import webob
 
-from ec2api.openstack.common import fileutils
 from ec2api import paths
 from ec2api import utils
 from ec2api import wsgi
