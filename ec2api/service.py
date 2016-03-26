@@ -17,11 +17,11 @@
 from oslo_concurrency import processutils
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_service import service
 from oslo_utils import importutils
 
 from ec2api import exception
 from ec2api.i18n import _
-from ec2api.openstack.common import service
 from ec2api import wsgi
 
 LOG = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ CONF = cfg.CONF
 CONF.register_opts(service_opts)
 
 
-class WSGIService(object):
+class WSGIService(service.ServiceBase):
     """Provides ability to launch API from a 'paste' configuration."""
 
     def __init__(self, name, loader=None, max_url_len=None):
@@ -169,7 +169,7 @@ def serve(server, workers=None):
     if _launcher:
         raise RuntimeError(_('serve() can only be called once'))
 
-    _launcher = service.launch(server, workers=workers)
+    _launcher = service.launch(CONF, server, workers=workers)
 
 
 def wait():
