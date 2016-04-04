@@ -25,6 +25,7 @@ import eventlet.wsgi
 import greenlet
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_service.service import ServiceBase
 from oslo_utils import excutils
 from paste import deploy
 import routes.middleware
@@ -71,7 +72,7 @@ CONF.register_opts(wsgi_opts)
 LOG = logging.getLogger(__name__)
 
 
-class Server(object):
+class Server(ServiceBase):
     """Server class to manage a WSGI server, serving a WSGI application."""
 
     default_pool_size = CONF.wsgi_default_pool_size
