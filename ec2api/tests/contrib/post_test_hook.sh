@@ -48,9 +48,13 @@ if [[ ! -f $EC2API_DIR/$TEST_CONFIG ]]; then
   fi
 fi
 
+echo "---------------------------------------------------------- Config -"
+cat $EC2API_DIR/$TEST_CONFIG
+echo "-------------------------------------------------------------------"
+
 sudo pip install virtualenv
 sudo rm -rf .venv
-sudo virtualenv .venv --system-site-package
+sudo virtualenv .venv
 sudo chown -R $USER .venv
 source .venv/bin/activate
 pip install -r test-requirements.txt
@@ -62,7 +66,7 @@ deactivate
 
 # list resources to check what left after tests
 EC2_URL=`openstack endpoint list --service ec2 --interface public --os-identity-api-version=3 -c URL -f value`
-AWS_PARAMS="--region $REGION_NAME --endpoint-url $EC2_URL"
+AWS_PARAMS="--region RegionOne --endpoint-url $EC2_URL"
 echo "========================================================================================================"
 echo "==================================================================================== Admin resources ==="
 echo "========================================================================================================"
