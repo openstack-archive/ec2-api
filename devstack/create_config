@@ -83,7 +83,7 @@ if [[ $RUN_LONG_TESTS == "1" ]]; then
     exit 1
   fi
   # find this image
-  image_id_ubuntu=$(euca-describe-images --show-empty-fields | grep "$REGULAR_IMAGE_NAME" | grep "ami-" | head -n 1 | awk '{print $2}')
+  image_id_ubuntu=`aws $AWS_PARAMS --profile admin ec2 describe-images --filters Name=image-type,Values=machine Name=name,Values=$REGULAR_IMAGE_NAME --query 'Images[0].ImageId' --output text`
 fi
 
 # create separate user/project
