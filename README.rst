@@ -8,9 +8,6 @@ This project provides a standalone EC2 API service which pursues two goals:
 not only the VPC API but the rest of the EC2 API currently present in nova as
 well.
 
-It doesn't replace existing nova EC2 API service in deployment, it gets
-installed to a different port (8788 by default).
-
 Installation
 =====
 
