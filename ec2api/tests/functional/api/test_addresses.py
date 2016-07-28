@@ -304,6 +304,8 @@ class AddressTest(base.EC2TestCase):
         self.get_vpc_waiter().wait_delete(vpc_id)
 
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
+    # skip this test for nova network due to bug #1607350
+    @base.skip_without_vpc()
     def test_associate_disassociate_standard_addresses(self):
         instance_id = self.run_instance()
 
