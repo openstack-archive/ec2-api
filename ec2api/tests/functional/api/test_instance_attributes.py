@@ -128,9 +128,10 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.assertRaises('InvalidInstanceID.NotFound',
             self.client.describe_instance_attribute,
             InstanceId='i-0', Attribute='disableApiTermination')
-        self.assertRaises('InvalidParameterCombination',
-            self.client.describe_instance_attribute,
-            InstanceId=instance_id, Attribute='sourceDestCheck')
+        if base.TesterStateHolder().get_ec2_enabled():
+            self.assertRaises('InvalidParameterCombination',
+                self.client.describe_instance_attribute,
+                InstanceId=instance_id, Attribute='sourceDestCheck')
 
         self.assertRaises('InvalidParameterValue',
             self.client.modify_instance_attribute,
@@ -146,12 +147,17 @@ class InstanceAttributeTest(base.EC2TestCase):
             InstanceId=instance_id, Attribute='disableApiTermination',
             Value='True', DisableApiTermination={'Value': False})
 
-        self.assertRaises('InvalidParameterCombination',
+        ex_str = ('InvalidParameterCombination'
+                  if base.TesterStateHolder().get_ec2_enabled() else
+                  'InvalidGroup.NotFound')
+        self.assertRaises(ex_str,
             self.client.modify_instance_attribute,
             InstanceId=instance_id, Groups=['sg-0'])
-        self.assertRaises('InvalidParameterCombination',
-            self.client.modify_instance_attribute,
-            InstanceId=instance_id, Attribute='sourceDestCheck', Value='False')
+        if base.TesterStateHolder().get_ec2_enabled():
+            self.assertRaises('InvalidParameterCombination',
+                self.client.modify_instance_attribute,
+                InstanceId=instance_id, Attribute='sourceDestCheck',
+                Value='False')
 
         self.assertRaises('InvalidParameterValue',
             self.client.reset_instance_attribute,
@@ -169,9 +175,10 @@ class InstanceAttributeTest(base.EC2TestCase):
             self.client.reset_instance_attribute,
             InstanceId=instance_id, Attribute='instanceType')
 
-        self.assertRaises('InvalidParameterCombination',
-            self.client.reset_instance_attribute,
-            InstanceId=instance_id, Attribute='sourceDestCheck')
+        if base.TesterStateHolder().get_ec2_enabled():
+            self.assertRaises('InvalidParameterCombination',
+                self.client.reset_instance_attribute,
+                InstanceId=instance_id, Attribute='sourceDestCheck')
 
         self.assertRaises('IncorrectInstanceState',
             self.client.modify_instance_attribute,

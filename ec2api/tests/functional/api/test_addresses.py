@@ -42,6 +42,7 @@ class AddressTest(base.EC2TestCase):
         data = self.client.release_address(AllocationId=id)
         self.cancelResourceCleanUp(res_clean)
 
+    @base.skip_without_ec2()
     def test_create_delete_standard_address(self):
         data = self.client.allocate_address()
         ip = data['PublicIp']
@@ -183,6 +184,7 @@ class AddressTest(base.EC2TestCase):
         self.client.release_address(AllocationId=id2)
         self.cancelResourceCleanUp(res_clean2)
 
+    @base.skip_without_ec2()
     def test_describe_standard_addresses(self):
         data = self.client.allocate_address(*[], **{})
         ip = data['PublicIp']
@@ -306,6 +308,8 @@ class AddressTest(base.EC2TestCase):
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     # skip this test for nova network due to bug #1607350
     @base.skip_without_vpc()
+    # this is a correct skip
+    @base.skip_without_ec2()
     def test_associate_disassociate_standard_addresses(self):
         instance_id = self.run_instance()
 
@@ -382,6 +386,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_vpc)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
+    @base.skip_without_ec2()
     def test_disassociate_not_associated_standard_addresses(self):
         data = self.client.allocate_address(Domain='standard')
         ip = data['PublicIp']

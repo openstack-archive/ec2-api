@@ -54,9 +54,12 @@ class InstanceTest(base.EC2TestCase):
         self.assertEqual(1, len(instances))
         self.assertEqual(1, len(instances[0]['SecurityGroups']))
         groups = reservations[0].get('Groups', [])
-        self.assertEqual(1, len(groups))
-        self.assertEqual(groups[0]['GroupName'],
-                         instances[0]['SecurityGroups'][0]['GroupName'])
+        if base.TesterStateHolder().get_ec2_enabled():
+            self.assertEqual(1, len(groups))
+            self.assertEqual(groups[0]['GroupName'],
+                             instances[0]['SecurityGroups'][0]['GroupName'])
+        else:
+            self.assertEqual(0, len(groups))
 
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.cancelResourceCleanUp(res_clean)

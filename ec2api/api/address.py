@@ -18,6 +18,7 @@ except ImportError:
     pass  # clients will log absense of neutronclient in this case
 from novaclient import exceptions as nova_exception
 from oslo_config import cfg
+from oslo_log import log as logging
 
 from ec2api.api import common
 from ec2api.api import ec2utils
@@ -28,6 +29,7 @@ from ec2api import exception
 from ec2api.i18n import _
 
 CONF = cfg.CONF
+LOG = logging.getLogger(__name__)
 
 """Address related API implementation
 """
@@ -266,7 +268,7 @@ class AddressEngineNeutron(object):
         if instance_id:
             # TODO(ft): implement search in DB layer
             for eni in db_api.get_items(context, 'eni'):
-                if instance_id and eni.get('instance_id') == instance_id:
+                if eni.get('instance_id') == instance_id:
                     instance_network_interfaces.append(eni)
 
         neutron = clients.neutron(context)

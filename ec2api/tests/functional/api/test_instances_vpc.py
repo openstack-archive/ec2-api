@@ -209,7 +209,10 @@ class InstanceInVPCTest(base.EC2TestCase):
             'MaxCount': 1,
             'PrivateIpAddress': '10.16.1.2'
         }
-        self.assertRaises('InvalidParameterCombination',
+        ex_str = ('InvalidParameterCombination'
+                  if base.TesterStateHolder().get_ec2_enabled() else
+                  'InvalidParameterValue')
+        self.assertRaises(ex_str,
             self.client.run_instances, rollback_fn=_rollback,
             **kwargs)
 

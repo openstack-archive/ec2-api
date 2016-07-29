@@ -32,6 +32,13 @@ class TagsPagingTest(scenario_base.BaseScenarioTest):
     # NOTE(andrey-mp): limit for tags for one resource in amazon
     TAGS_COUNT = 10
 
+    @classmethod
+    @base.safe_setup
+    def setUpClass(cls):
+        super(TagsPagingTest, cls).setUpClass()
+        if 'amazon' in CONF.aws.ec2_url:
+            raise cls.skipException('Paging is broken in Amazon.')
+
     def _create_volume_and_tags(self):
         data = self.client.create_volume(
             Size=1, AvailabilityZone=CONF.aws.aws_zone)
@@ -147,6 +154,9 @@ class VolumesPagingTest(scenario_base.BaseScenarioTest):
     @base.safe_setup
     def setUpClass(cls):
         super(VolumesPagingTest, cls).setUpClass()
+        if 'amazon' in CONF.aws.ec2_url:
+            raise cls.skipException('Paging is broken in Amazon.')
+
         zone = CONF.aws.aws_zone
         cls.ids = list()
         for dummy in xrange(0, cls.VOLUMES_COUNT):
@@ -216,6 +226,9 @@ class SnapshotPagingTest(scenario_base.BaseScenarioTest):
     @base.safe_setup
     def setUpClass(cls):
         super(SnapshotPagingTest, cls).setUpClass()
+        if 'amazon' in CONF.aws.ec2_url:
+            raise cls.skipException('Paging is broken in Amazon.')
+
         zone = CONF.aws.aws_zone
 
         data = cls.client.create_volume(Size=1, AvailabilityZone=zone)
@@ -294,6 +307,8 @@ class InstancePagingTest(scenario_base.BaseScenarioTest):
     @base.safe_setup
     def setUpClass(cls):
         super(InstancePagingTest, cls).setUpClass()
+        if 'amazon' in CONF.aws.ec2_url:
+            raise cls.skipException('Paging is broken in Amazon.')
         if not CONF.aws.image_id:
             raise cls.skipException('aws image_id does not provided')
 
@@ -339,7 +354,6 @@ class InstancePagingTest(scenario_base.BaseScenarioTest):
         self.assertEqual(max_results, self._count_instances(data))
 
     def test_instances_paging(self):
-        real_count = 0
         max_results = 5
         kwargs = {'MaxResults': max_results}
         instances = set()

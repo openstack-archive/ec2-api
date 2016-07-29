@@ -189,12 +189,21 @@ class TesterStateHolder(object):
                 cls, *args, **kwargs)
         return cls._instance
 
+    _ec2_enabled = None
     _vpc_enabled = None
 
-    def get_vpc_enabled(self):
-        if self._vpc_enabled:
-            return self._vpc_enabled
+    def get_ec2_enabled(self):
+        if self._ec2_enabled is None:
+            self._fill_attributes()
+        return self._ec2_enabled
 
+    def get_vpc_enabled(self):
+        if self._vpc_enabled is None:
+            self._fill_attributes()
+        return self._vpc_enabled
+
+    def _fill_attributes(self):
+        self._ec2_enabled = False
         self._vpc_enabled = False
         data = self.ec2_client.describe_account_attributes()
         for item in data.get('AccountAttributes', []):
@@ -202,8 +211,21 @@ class TesterStateHolder(object):
                 for value in item['AttributeValues']:
                     if value['AttributeValue'] == 'VPC':
                         self._vpc_enabled = True
+                    if value['AttributeValue'] == 'EC2':
+                        self._ec2_enabled = True
 
-        return self._vpc_enabled
+
+def skip_without_ec2(*args, **kwargs):
+    """A decorator useful to skip tests if EC2-classic is not supported."""
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *func_args, **func_kwargs):
+            if not TesterStateHolder().get_ec2_enabled():
+                msg = "Skipped because EC2-classic is not enabled"
+                raise testtools.TestCase.skipException(msg)
+            return f(self, *func_args, **func_kwargs)
+        return wrapper
+    return decorator
 
 
 def skip_without_vpc(*args, **kwargs):

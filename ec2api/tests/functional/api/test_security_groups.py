@@ -235,6 +235,13 @@ class SecurityGroupInVPCTest(SecurityGroupBaseTest):
 
 class SecurityGroupEC2ClassicTest(SecurityGroupBaseTest):
 
+    @classmethod
+    @base.safe_setup
+    def setUpClass(cls):
+        super(SecurityGroupEC2ClassicTest, cls).setUpClass()
+        if not base.TesterStateHolder().get_ec2_enabled():
+            raise cls.skipException('EC2-classic is disabled')
+
     def test_create_delete_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
