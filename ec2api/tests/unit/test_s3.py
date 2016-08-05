@@ -16,9 +16,8 @@
 """
 Unittets for S3 objectstore clone.
 """
-import boto
-from boto import exception as boto_exception
-from boto.s3 import connection as s3
+from botocore import exceptions as botocore_exception
+import botocore.session
 import fixtures
 from oslo_config import cfg
 from oslo_config import fixture as config_fixture
@@ -48,16 +47,16 @@ class S3APITestCase(test_base.BaseTestCase):
         self.server.start()
         self.addCleanup(self.server.stop)
 
-        if not boto.config.has_section('Boto'):
-            boto.config.add_section('Boto')
-
-        boto.config.set('Boto', 'num_retries', '0')
-        conn = s3.S3Connection(aws_access_key_id='fake',
-                               aws_secret_access_key='fake',
-                               host=CONF.s3_listen,
-                               port=self.server.port,
-                               is_secure=False,
-                               calling_format=s3.OrdinaryCallingFormat())
+        s3_url = 'http://' + CONF.s3_listen + ':' + str(self.server.port)
+        region = 'FakeRegion'
+        connection_data = {
+            'config_file': (None, 'AWS_CONFIG_FILE', None, None),
+            'region': ('region', 'BOTO_DEFAULT_REGION', region, None),
+        }
+        session = botocore.session.get_session(connection_data)
+        conn = session.create_client(
+            's3', region_name=region, endpoint_url=s3_url,
+            aws_access_key_id='fake', aws_secret_access_key='fake')
         self.conn = conn
 
         def get_http_connection(*args):
@@ -67,69 +66,55 @@ class S3APITestCase(test_base.BaseTestCase):
         self.conn.get_http_connection = get_http_connection
 
     def _ensure_no_buckets(self, buckets):
-        self.assertEqual(len(buckets), 0, "Bucket list was not empty")
+        self.assertEqual(len(buckets['Buckets']), 0,
+                         "Bucket list was not empty")
         return True
 
     def _ensure_one_bucket(self, buckets, name):
-        self.assertEqual(len(buckets), 1,
+        self.assertEqual(len(buckets['Buckets']), 1,
                          "Bucket list didn't have exactly one element in it")
-        self.assertEqual(buckets[0].name, name, "Wrong name")
+        self.assertEqual(buckets['Buckets'][0]['Name'], name, "Wrong name")
         return True
 
     def test_list_buckets(self):
-        # Make sure we are starting with no buckets.
-        self._ensure_no_buckets(self.conn.get_all_buckets())
+        # Make sure we started with no buckets.
+        self._ensure_no_buckets(self.conn.list_buckets())
 
     def test_create_and_delete_bucket(self):
         # Test bucket creation and deletion.
         bucket_name = 'testbucket'
 
-        self.conn.create_bucket(bucket_name)
-        self._ensure_one_bucket(self.conn.get_all_buckets(), bucket_name)
-        self.conn.delete_bucket(bucket_name)
-        self._ensure_no_buckets(self.conn.get_all_buckets())
+        self.conn.create_bucket(Bucket=bucket_name)
+        self._ensure_one_bucket(self.conn.list_buckets(), bucket_name)
+        self.conn.delete_bucket(Bucket=bucket_name)
+        self._ensure_no_buckets(self.conn.list_buckets())
 
-    def test_create_bucket_and_key_and_delete_key_again(self):
+    def test_create_bucket_and_key_and_delete_key(self):
         # Test key operations on buckets.
         bucket_name = 'testbucket'
         key_name = 'somekey'
         key_contents = b'somekey'
 
-        b = self.conn.create_bucket(bucket_name)
-        k = b.new_key(key_name)
-        k.set_contents_from_string(key_contents)
-
-        bucket = self.conn.get_bucket(bucket_name)
+        self.conn.create_bucket(Bucket=bucket_name)
+        self.conn.put_object(Bucket=bucket_name, Key=key_name,
+                             Body=key_contents)
 
         # make sure the contents are correct
-        key = bucket.get_key(key_name)
-        self.assertEqual(key.get_contents_as_string(), key_contents,
+        key = self.conn.get_object(Bucket=bucket_name, Key=key_name)
+        self.assertEqual(key['Body'].read(), key_contents,
                          "Bad contents")
 
         # delete the key
-        key.delete()
+        self.conn.delete_object(Bucket=bucket_name, Key=key_name)
 
-        self._ensure_no_buckets(bucket.get_all_keys())
+        self.assertRaises(botocore_exception.ClientError, self.conn.get_object,
+                          Bucket=bucket_name, Key=key_name)
 
     def test_unknown_bucket(self):
-        # NOTE(unicell): Since Boto v2.25.0, the underlying implementation
-        # of get_bucket method changed from GET to HEAD.
-        #
-        # Prior to v2.25.0, default validate=True fetched a list of keys in the
-        # bucket and raises S3ResponseError. As a side effect of switching to
-        # HEAD request, get_bucket call now generates less error message.
-        #
-        # To keep original semantics, additional get_all_keys call is
-        # suggestted per Boto document. This case tests both validate=False and
-        # validate=True case for completeness.
-        #
-        # http://docs.pythonboto.org/en/latest/releasenotes/v2.25.0.html
-        # http://docs.pythonboto.org/en/latest/s3_tut.html#accessing-a-bucket
         bucket_name = 'falalala'
-        self.assertRaises(boto_exception.S3ResponseError,
-                          self.conn.get_bucket,
-                          bucket_name)
-        bucket = self.conn.get_bucket(bucket_name, validate=False)
-        self.assertRaises(boto_exception.S3ResponseError,
-                          bucket.get_all_keys,
-                          maxkeys=0)
+        self.assertRaises(botocore_exception.ClientError,
+                          self.conn.head_bucket,
+                          Bucket=bucket_name)
+        self.assertRaises(botocore_exception.ClientError,
+                          self.conn.list_objects,
+                          Bucket=bucket_name, MaxKeys=0)

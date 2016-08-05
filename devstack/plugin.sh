@@ -196,12 +196,13 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE DEFAULT ec2api_listen_port "$EC2API_SERVICE_PORT"
     iniset $EC2API_CONF_FILE DEFAULT ec2_port "$EC2API_SERVICE_PORT"
 
+    local s3_port="$EC2API_S3_SERVICE_PORT"
+    local s3_protocol="http"
     if is_service_enabled swift3; then
-        iniset $EC2API_CONF_FILE DEFAULT s3_port "$S3_SERVICE_PORT"
-    else
-        iniset $EC2API_CONF_FILE DEFAULT s3_port "$EC2API_S3_SERVICE_PORT"
+        s3_port="$S3_SERVICE_PORT"
+        s3_protocol="$SWIFT_SERVICE_PROTOCOL"
     fi
-    iniset $EC2API_CONF_FILE DEFAULT s3_host "$SERVICE_HOST"
+    iniset $EC2API_CONF_FILE DEFAULT s3_url "$s3_protocol://$SERVICE_HOST:$s3_port"
 
     configure_ec2api_rpc_backend
 

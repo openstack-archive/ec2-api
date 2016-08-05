@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from boto import exception as boto_exception
+from botocore import exceptions as botocore_exceptions
 from cinderclient import exceptions as cinder_exception
 from glanceclient.common import exceptions as glance_exception
 from keystoneclient import exceptions as keystone_exception
@@ -100,5 +100,9 @@ class ApiInitTestCase(base.BaseTestCase):
                  400, 'BadRequest', 'fake_msg')
         do_check(keystone_exception.BadRequest(message='fake_msg'),
                  400, 'BadRequest', 'fake_msg (HTTP 400)')
-        do_check(boto_exception.S3ResponseError(400, '', 'fake_msg'),
-                 400, 'S3ResponseError', 'fake_msg')
+        do_check(botocore_exceptions.ClientError({'Error':
+                                                  {'Code': '', 'Message': ''},
+                                                  'Code': 'FakeCode',
+                                                  'Message': 'fake_msg'},
+                                                 'register_image'),
+                 400, 'FakeCode', 'fake_msg')
