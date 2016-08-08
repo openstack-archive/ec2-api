@@ -152,6 +152,20 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         instance_id = self.run_instance(ImageId=image_id,
                                         SecurityGroups=[sec_group_name])
 
+        waiter = base.EC2Waiter(self.client.get_console_output)
+        waiter.wait_no_exception(InstanceId=instance_id)
+
+        def _compare_console_output():
+            data = self.client.get_console_output(InstanceId=instance_id)
+            self.assertEqual(instance_id, data['InstanceId'])
+            self.assertIsNotNone(data['Timestamp'])
+            self.assertIn('Output', data)
+            self.assertNotEqual('', data['Output'])
+
+        waiter = base.EC2Waiter(_compare_console_output)
+        waiter.wait_no_exception()
+
+        # check ping
         ip_address = self.get_instance_ip(instance_id)
 
         def _ping():

@@ -195,23 +195,40 @@ if [[ -n "$neutron_item" ]]; then
 fi
 
 wait $cirros_image_wget_pid
-#if [[ "$?" -eq "0" ]]; then
-#TODO:
-if [[ "$?" -eq "1000" ]]; then
-  mkdir -p /tmp/cirros
-  # do it under sudo because admin-pk is not accessible under user
-  sudo euca-bundle-image -i /tmp/$CIRROS_IMAGE_FNAME -d /tmp/cirrosimage -r x86_64 -c $EC2_CERT -k $EC2_PRIVATE_KEY --ec2cert $EUCALYPTUS_CERT --user $EC2_USER_ID
+if [[ "$?" -eq "0" ]]; then
+  ID="$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
+  WORKING_DIR="/tmp/bi-$ID"
+  mkdir -p $WORKING_DIR
+  wget -t 2 -T 60 -q -P $WORKING_DIR http://s3.amazonaws.com/ec2-downloads/ec2-ami-tools.zip
+  unzip -d $WORKING_DIR $WORKING_DIR/ec2-ami-tools.zip
+  TOOLS_DIR="$WORKING_DIR/$(ls $WORKING_DIR | grep -Eo "ec2-ami-tools-[0-9\.]*")"
+
+  IMAGES_DIR="$WORKING_DIR/images"
+  # IMPORTANT! bucket name should contain '.' - in this case ami-tools will not build s3 url with bucket name.
+  AWS_AMI_BUCKET="tmp-bundle.$ID"
+
+  nova x509-get-root-cert $WORKING_DIR/cacert.pem
+  nova x509-create-cert $WORKING_DIR/pk.pem $WORKING_DIR/cert.pem
+
+  export EC2_USER_ID=42424242424242 # ec2api does not use user id, but bundling requires it
+  export EC2_PRIVATE_KEY=$WORKING_DIR/pk.pem
+  export EC2_CERT=$WORKING_DIR/cert.pem
+  export NOVA_CERT=$WORKING_DIR/cacert.pem
+
+  mkdir -p "$IMAGES_DIR"
+  $TOOLS_DIR/bin/ec2-bundle-image --cert $EC2_CERT --privatekey $EC2_PRIVATE_KEY --ec2cert $NOVA_CERT --image /tmp/$CIRROS_IMAGE_FNAME --prefix $CIRROS_IMAGE_FNAME --user $EC2_USER_ID --destination "$IMAGES_DIR" --arch x86_64
   if [[ "$?" -eq "0" ]]; then
-    sudo chmod a+r /tmp/cirrosimage/*
-    euca-upload-bundle $ec2_auth -b cirrosimage -m /tmp/cirrosimage/$CIRROS_IMAGE_FNAME.manifest.xml --acl public-read  --debug
+    $TOOLS_DIR/bin/ec2-upload-bundle --url "$S3_URL" --region "RegionOne" --access-key $ec2_access_key --secret-key $ec2_secret_key --bucket "$AWS_AMI_BUCKET" --manifest "$IMAGES_DIR/$CIRROS_IMAGE_FNAME.manifest.xml" --acl "public-read" --batch
     if [[ "$?" -eq "0" ]]; then
-      cirros_image_manifest="cirrosimage/$CIRROS_IMAGE_FNAME.manifest.xml"
+      cirros_image_manifest="$AWS_AMI_BUCKET/$CIRROS_IMAGE_FNAME.manifest.xml"
     else
       warn $LINENO "Uploading of image $CIRROS_IMAGE_URL to S3 failed."
     fi
   else
     warn $LINENO "Bundling of image $CIRROS_IMAGE_URL failed."
   fi
+  # next line is example how to register this image in the cloud
+  #aws --endpoint-url $EC2_URL --region RegionOne --profile admin ec2 register-image --image-location "$AWS_AMI_BUCKET/$CIRROS_IMAGE_FNAME.manifest.xml" --name "$CIRROS_IMAGE_FNAME" --architecture x86_64
 else
   warn $LINENO "Downloading of image $CIRROS_IMAGE_URL failed."
 fi

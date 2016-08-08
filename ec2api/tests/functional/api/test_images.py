@@ -335,7 +335,5 @@ class ImageRegisterTest(base.EC2TestCase):
         self.get_image_waiter().wait_available(image_id)
 
         self.client.deregister_image(ImageId=image_id)
-        self.assertRaises('InvalidAMIID.NotFound',
-                          self.client.describe_images,
-                          ImageIds=[image_id])
         self.cancelResourceCleanUp(image_clean)
+        self.get_image_waiter().wait_delete(image_id)
