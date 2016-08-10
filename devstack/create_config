@@ -218,7 +218,7 @@ if [[ "$?" -eq "0" ]]; then
   mkdir -p "$IMAGES_DIR"
   $TOOLS_DIR/bin/ec2-bundle-image --cert $EC2_CERT --privatekey $EC2_PRIVATE_KEY --ec2cert $NOVA_CERT --image /tmp/$CIRROS_IMAGE_FNAME --prefix $CIRROS_IMAGE_FNAME --user $EC2_USER_ID --destination "$IMAGES_DIR" --arch x86_64
   if [[ "$?" -eq "0" ]]; then
-    $TOOLS_DIR/bin/ec2-upload-bundle --url "$S3_URL" --region "RegionOne" --access-key $ec2_access_key --secret-key $ec2_secret_key --bucket "$AWS_AMI_BUCKET" --manifest "$IMAGES_DIR/$CIRROS_IMAGE_FNAME.manifest.xml" --acl "public-read" --batch
+    $TOOLS_DIR/bin/ec2-upload-bundle --url "$S3_URL" --access-key $ec2_access_key --secret-key $ec2_secret_key --bucket "$AWS_AMI_BUCKET" --manifest "$IMAGES_DIR/$CIRROS_IMAGE_FNAME.manifest.xml" --acl "public-read" --sigv 2
     if [[ "$?" -eq "0" ]]; then
       cirros_image_manifest="$AWS_AMI_BUCKET/$CIRROS_IMAGE_FNAME.manifest.xml"
     else
