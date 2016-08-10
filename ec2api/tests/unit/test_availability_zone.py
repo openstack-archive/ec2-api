@@ -56,7 +56,7 @@ class AvailabilityZoneCase(base.ApiTestCase):
 
     def test_regions(self):
         resp = self.execute('DescribeRegions', {})
-        self.assertEqual(resp['regionInfo'][0]['regionName'], 'nova')
+        self.assertEqual(resp['regionInfo'][0]['regionName'], 'RegionOne')
         self.assertTrue(resp['regionInfo'][0].get('regionEndpoint')
                         is not None)
 

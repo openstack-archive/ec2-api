@@ -20,7 +20,7 @@ from oslo_config import types
 def _get_client(client_name, url, region, access, secret, ca_bundle):
     connection_data = {
         'config_file': (None, 'AWS_CONFIG_FILE', None, None),
-        'region': ('region', 'BOTO_DEFAULT_REGION', region, None),
+        'region': ('region', 'AWS_DEFAULT_REGION', region, None),
     }
     session = botocore.session.get_session(connection_data)
     kwargs = {

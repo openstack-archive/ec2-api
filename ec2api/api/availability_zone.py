@@ -120,7 +120,9 @@ def describe_regions(context, region_name=None, filter=None):
             regions.append({'regionName': name,
                             'regionEndpoint': endpoint})
     else:
-        regions = [{'regionName': 'nova',
+        # NOTE(andrey-mp): RegionOne is a default region name that is used
+        # in keystone, nova and some other projects
+        regions = [{'regionName': 'RegionOne',
                     'regionEndpoint': '%s://%s:%s%s' % (CONF.ec2_scheme,
                                                         CONF.ec2_host,
                                                         CONF.ec2_port,
