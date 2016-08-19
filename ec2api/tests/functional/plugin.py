@@ -30,9 +30,16 @@ class AWSTempestPlugin(plugins.TempestPlugin):
         return full_test_dir, base_path
 
     def register_opts(self, conf):
+        config.register_opt_group(
+            conf, aws_config.service_available_group,
+            aws_config.ServiceAvailableGroup)
+
         if aws_config.aws_group.name not in conf:
             config.register_opt_group(conf, aws_config.aws_group,
                                       aws_config.AWSGroup)
 
     def get_opt_lists(self):
-        return [(aws_config.aws_group.name, aws_config.AWSGroup)]
+        return [
+            ('service_available', aws_config.ServiceAvailableGroup),
+            (aws_config.aws_group.name, aws_config.AWSGroup)
+        ]

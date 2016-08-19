@@ -15,6 +15,15 @@
 
 from oslo_config import cfg
 
+service_available_group = cfg.OptGroup(name="service_available",
+                                       title="Available OpenStack Services")
+
+ServiceAvailableGroup = [
+    cfg.BoolOpt("ec2api",
+                default=True,
+                help="Whether or not ec2-api is expected to be available"),
+]
+
 
 aws_group = cfg.OptGroup(name='aws',
                          title='AWS options')
