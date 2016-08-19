@@ -35,4 +35,4 @@ class AWSTempestPlugin(plugins.TempestPlugin):
                                       aws_config.AWSGroup)
 
     def get_opt_lists(self):
-        return [(aws_config.aws_group.name, config.AWSGroup)]
+        return [(aws_config.aws_group.name, aws_config.AWSGroup)]
