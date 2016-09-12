@@ -4,6 +4,9 @@
 
 1. Download DevStack
 
+    git clone https://git.openstack.org/openstack-dev/devstack
+    cd devstack
+
 2. Add this repo as an external repository::
 
      > cat local.conf
