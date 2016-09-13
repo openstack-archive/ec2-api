@@ -42,7 +42,7 @@ ec2_opts = [
                     'If it is obsolete v2, a lot of useful EC2 compliant '
                     'instance properties will be unavailable.'),
     cfg.StrOpt('cinder_service_type',
-               default='volume',
+               default='volumev2',
                help='Service type of Volume API, registered in Keystone '
                     'catalog.'),
     # TODO(andrey-mp): keystone v3 allows to pass domain_name

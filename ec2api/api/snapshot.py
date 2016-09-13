@@ -48,6 +48,8 @@ def create_snapshot(context, volume_id, description=None):
         cleaner.addCleanup(db_api.delete_item, context, snapshot['id'])
         os_snapshot.update(display_name=snapshot['id'],
                            display_description=description)
+        # NOTE(andrey-mp): to re-read description in version dependent format
+        os_snapshot.get()
 
     return _format_snapshot(context, snapshot, os_snapshot,
                             volume_id=volume_id)
