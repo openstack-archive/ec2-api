@@ -28,6 +28,7 @@ EC2API_CONF_DIR=${EC2API_CONF_DIR:-/etc/ec2api}
 EC2API_CONF_FILE=${EC2API_CONF_DIR}/ec2api.conf
 EC2API_DEBUG=${EC2API_DEBUG:-True}
 EC2API_STATE_PATH=${EC2API_STATE_PATH:=$DATA_DIR/ec2api}
+EC2API_AUTH_CACHE_DIR=${EC2API_AUTH_CACHE_DIR:-/var/cache/ec2api}
 
 EC2API_SERVICE_PORT=${EC2API_SERVICE_PORT:-8788}
 EC2API_S3_SERVICE_PORT=${EC2API_S3_SERVICE_PORT:-3334}
@@ -178,12 +179,9 @@ function configure_ec2api {
     # ec2api Api Configuration
     #-------------------------
 
-    iniset $EC2API_CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT_NAME
-    iniset $EC2API_CONF_FILE DEFAULT admin_user $EC2API_ADMIN_USER
-    iniset $EC2API_CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
+    configure_auth_token_middleware $EC2API_CONF_FILE $EC2API_ADMIN_USER $EC2API_AUTH_CACHE_DIR
 
     iniset $EC2API_CONF_FILE DEFAULT ec2api_workers "$API_WORKERS"
-    iniset $EC2API_CONF_FILE DEFAULT keystone_url "$KEYSTONE_SERVICE_URI"
     iniset $EC2API_CONF_FILE DEFAULT keystone_ec2_tokens_url "$KEYSTONE_SERVICE_URI_V3/ec2tokens"
     iniset $EC2API_CONF_FILE DEFAULT region_list "$REGION_NAME"
 

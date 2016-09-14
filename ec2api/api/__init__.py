@@ -47,6 +47,10 @@ LOG = logging.getLogger(__name__)
 ec2_opts = [
     cfg.StrOpt('keystone_url',
                default='http://localhost:5000/',
+               deprecated_for_removal=True,
+               deprecated_reason='code was switched to common section '
+                                 '"keystone_authtoken"',
+               deprecated_since='Newton',
                help='URL for getting admin session.'),
     cfg.StrOpt('keystone_ec2_tokens_url',
                default='http://localhost:5000/v3/ec2tokens',

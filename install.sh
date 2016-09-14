@@ -4,6 +4,8 @@
 SERVICE_USERNAME=ec2api
 SERVICE_PASSWORD=ec2api
 SERVICE_TENANT=service
+# this domain name will be used for project and user
+SERVICE_DOMAIN_NAME=Default
 EC2API_PORT=8788
 CONNECTION="mysql://ec2api:ec2api@127.0.0.1/ec2api?charset=utf8"
 LOG_DIR=/var/log/ec2api
@@ -267,15 +269,22 @@ iniset $CONF_FILE DEFAULT api_paste_config $APIPASTE_FILE
 iniset $CONF_FILE DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [%(request_id)s %(user_name)s %(project_name)s] %(instance)s%(message)s"
 iniset $CONF_FILE DEFAULT log_dir "$LOG_DIR"
 iniset $CONF_FILE DEFAULT verbose True
-iniset $CONF_FILE DEFAULT keystone_url "$OS_AUTH_URL"
 iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL/v3/ec2tokens"
 iniset $CONF_FILE database connection "$CONNECTION"
 iniset $CONF_FILE DEFAULT full_vpc_support "$VPC_SUPPORT"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
 
-iniset $CONF_FILE DEFAULT admin_user $SERVICE_USERNAME
-iniset $CONF_FILE DEFAULT admin_password $SERVICE_PASSWORD
-iniset $CONF_FILE DEFAULT admin_tenant_name $SERVICE_TENANT
+GROUP_AUTHTOKEN="keystone_authtoken"
+iniset $CONF_FILE $GROUP_AUTHTOKEN signing_dir "$AUTH_CACHE_DIR"
+iniset $CONF_FILE $GROUP_AUTHTOKEN auth_uri "$OS_AUTH_URL"
+iniset $CONF_FILE $GROUP_AUTHTOKEN auth_url "$OS_AUTH_URL"
+iniset $CONF_FILE $GROUP_AUTHTOKEN username $SERVICE_USERNAME
+iniset $CONF_FILE $GROUP_AUTHTOKEN password $SERVICE_PASSWORD
+iniset $CONF_FILE $GROUP_AUTHTOKEN project_name $SERVICE_TENANT
+iniset $CONF_FILE $GROUP_AUTHTOKEN project_domain_name $SERVICE_DOMAIN_NAME
+iniset $CONF_FILE $GROUP_AUTHTOKEN user_domain_name $SERVICE_DOMAIN_NAME
+iniset $CONF_FILE $GROUP_AUTHTOKEN auth_type password
+
 
 if [[ -f "$NOVA_CONF" ]]; then
     # NOTE(ft): use swift instead internal s3 server if enabled
