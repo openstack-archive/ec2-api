@@ -22,7 +22,6 @@ import traceback
 import botocore.exceptions
 from oslo_log import log
 import six
-from tempest import config as tempest_config
 from tempest.lib import base
 from tempest.lib import exceptions
 import testtools
@@ -31,7 +30,6 @@ from ec2api.tests.functional import botocoreclient
 from ec2api.tests.functional import config as cfg
 
 CONF = cfg.CONF
-CONF_TEMPEST = tempest_config.CONF
 LOG = log.getLogger(__name__)
 
 logging.getLogger('botocore').setLevel(logging.INFO)
@@ -255,7 +253,7 @@ class EC2TestCase(base.BaseTestCase):
     @safe_setup
     def setUpClass(cls):
         super(EC2TestCase, cls).setUpClass()
-        if not CONF_TEMPEST.service_available.ec2api:
+        if not CONF.service_available.ec2api:
             raise cls.skipException("ec2api is disabled")
 
         cls.client = botocoreclient.get_ec2_client(

@@ -38,6 +38,7 @@ class ConfigPrivate(object):
         # if this was run from tempest runner then config already parsed
         if config_opts.aws_group.name in cfg.CONF:
             self.aws = cfg.CONF.aws
+            self.service_available = cfg.CONF.service_available
             return
 
         # Environment variables override defaults...
@@ -58,11 +59,18 @@ class ConfigPrivate(object):
         LOG.info("Using ec2api config file %s" % path)
         conf = cfg.CONF
         conf([], project='ec2api', default_config_files=[path])
+
         conf.register_group(config_opts.aws_group)
         group_name = config_opts.aws_group.name
         for opt in config_opts.AWSGroup:
             conf.register_opt(opt, group=group_name)
         self.aws = cfg.CONF.aws
+
+        conf.register_group(config_opts.service_available_group)
+        group_name = config_opts.service_available_group.name
+        for opt in config_opts.ServiceAvailableGroup:
+            conf.register_opt(opt, group=group_name)
+        self.service_available = cfg.CONF.service_available
 
         conf.log_opt_values(LOG, std_logging.DEBUG)
 

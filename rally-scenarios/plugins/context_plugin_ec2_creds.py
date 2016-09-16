@@ -40,11 +40,12 @@ class PrepareEC2ClientContext(context.Context):
         """This method is called before the task start."""
         try:
             for user in self.context['users']:
-                osclient = osclients.Clients(user['credential'])
-                keystone = osclient.keystone()
-                creds = keystone.ec2.list(user['id'])
+                clients = osclients.Clients(user['credential'])
+                keystone = clients.keystone
+                creds = keystone().ec2.list(user['id'])
                 if not creds:
-                    creds = keystone.ec2.create(user['id'], user['tenant_id'])
+                    creds = keystone().ec2.create(user['id'],
+                                                  user['tenant_id'])
                 else:
                     creds = creds[0]
                 url = keystone.service_catalog.url_for(service_type='ec2')
