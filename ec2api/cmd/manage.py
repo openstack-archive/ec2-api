@@ -17,7 +17,6 @@
   CLI interface for EC2 API management.
 """
 
-import os
 import sys
 
 from oslo_config import cfg
@@ -25,7 +24,6 @@ from oslo_log import log
 
 from ec2api import config
 from ec2api.db import migration
-from ec2api.i18n import _
 
 
 CONF = cfg.CONF
@@ -62,21 +60,8 @@ command_opt = cfg.SubCommandOpt('command',
 
 def main():
     CONF.register_cli_opt(command_opt)
-    try:
-        config.parse_args(sys.argv)
-        log.setup(CONF, "ec2api")
-    except cfg.ConfigFilesNotFoundError:
-        cfgfile = CONF.config_file[-1] if CONF.config_file else None
-        if cfgfile and not os.access(cfgfile, os.R_OK):
-            st = os.stat(cfgfile)
-            print(_("Could not read %s. Re-running with sudo") % cfgfile)
-            try:
-                os.execvp('sudo', ['sudo', '-u', '#%s' % st.st_uid] + sys.argv)
-            except Exception:
-                print(_('sudo failed, continuing as if nothing happened'))
-
-        print(_('Please re-run ec2-api-manage as root.'))
-        return(2)
+    config.parse_args(sys.argv)
+    log.setup(CONF, "ec2api")
 
     try:
         CONF.command.func()
