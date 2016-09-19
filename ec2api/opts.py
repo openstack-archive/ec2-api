@@ -11,6 +11,10 @@
 # limitations under the License.
 
 import itertools
+import operator
+
+from keystoneauth1 import loading as ks_loading
+from oslo_config import cfg
 
 import ec2api.clients
 import ec2api.db.api
@@ -19,6 +23,9 @@ import ec2api.paths
 import ec2api.service
 import ec2api.utils
 import ec2api.wsgi
+
+
+CONF = cfg.CONF
 
 
 def list_opts():
@@ -34,3 +41,20 @@ def list_opts():
              ec2api.wsgi.wsgi_opts,
          )),
     ]
+
+
+GROUP_AUTHTOKEN = 'keystone_authtoken'
+
+
+def list_auth_opts():
+    opt_list = ks_loading.register_session_conf_options(CONF, GROUP_AUTHTOKEN)
+    opt_list.insert(0, ks_loading.get_auth_common_conf_options()[0])
+    # NOTE(mhickey): There are a lot of auth plugins, we just generate
+    # the config options for a few common ones
+    plugins = ['password', 'v2password', 'v3password']
+    for name in plugins:
+        for plugin_option in ks_loading.get_auth_plugin_conf_options(name):
+            if all(option.name != plugin_option.name for option in opt_list):
+                opt_list.append(plugin_option)
+    opt_list.sort(key=operator.attrgetter('name'))
+    return [(GROUP_AUTHTOKEN, opt_list)]

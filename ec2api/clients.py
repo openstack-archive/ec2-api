@@ -14,6 +14,7 @@
 
 from cinderclient import client as cinderclient
 from glanceclient import client as glanceclient
+from keystoneauth1 import loading as ks_loading
 from keystoneclient.auth.identity.generic import password as keystone_auth
 from keystoneclient import client as keystoneclient
 from keystoneclient import session as keystone_session
@@ -31,8 +32,16 @@ logger = logging.getLogger(__name__)
 ec2_opts = [
     cfg.BoolOpt('ssl_insecure',
                 default=False,
+                deprecated_for_removal=True,
+                deprecated_reason='code was switched to common section '
+                                  '"keystone_authtoken"',
+                deprecated_since='Newton',
                 help="Verify HTTPS connections."),
     cfg.StrOpt('ssl_ca_file',
+               deprecated_for_removal=True,
+               deprecated_reason='code was switched to common section '
+                                 '"keystone_authtoken"',
+               deprecated_since='Newton',
                help="CA certificate file to use to verify "
                     "connecting clients"),
     cfg.StrOpt('nova_service_type',
@@ -45,19 +54,33 @@ ec2_opts = [
                default='volumev2',
                help='Service type of Volume API, registered in Keystone '
                     'catalog.'),
-    # TODO(andrey-mp): keystone v3 allows to pass domain_name
-    # or domain_id to auth. This code should support this feature.
     cfg.StrOpt('admin_user',
+               deprecated_for_removal=True,
+               deprecated_reason='code was switched to common section '
+                                 '"keystone_authtoken"',
+               deprecated_since='Newton',
                help=_("Admin user to access specific cloud resourses")),
     cfg.StrOpt('admin_password',
+               deprecated_for_removal=True,
+               deprecated_reason='code was switched to common section '
+                                 '"keystone_authtoken"',
+               deprecated_since='Newton',
                help=_("Admin password"),
                secret=True),
     cfg.StrOpt('admin_tenant_name',
+               deprecated_for_removal=True,
+               deprecated_reason='code was switched to common section '
+                                 '"keystone_authtoken"',
+               deprecated_since='Newton',
                help=_("Admin tenant name")),
 ]
 
 CONF = cfg.CONF
 CONF.register_opts(ec2_opts)
+
+GROUP_AUTHTOKEN = 'keystone_authtoken'
+ks_loading.register_session_conf_options(CONF, GROUP_AUTHTOKEN)
+ks_loading.register_auth_conf_options(CONF, GROUP_AUTHTOKEN)
 
 
 # Nova API version with microversions support
@@ -106,8 +129,8 @@ def cinder(context):
 
 
 def keystone(context):
-    auth_url = context.session.get_endpoint(service_type='identity')
-    return keystoneclient.Client(auth_url=auth_url,
+    url = context.session.get_endpoint(service_type='identity')
+    return keystoneclient.Client(auth_url=url,
                                  session=context.session)
 
 
@@ -202,27 +225,41 @@ class _rpc_RequestContextSerializer(messaging.NoOpSerializer):
 _admin_session = None
 
 
+def get_session_from_deprecated():
+    auth = keystone_auth.Password(
+        username=CONF.admin_user,
+        password=CONF.admin_password,
+        project_name=CONF.admin_tenant_name,
+        tenant_name=CONF.admin_tenant_name,
+        auth_url=CONF.keystone_url,
+    )
+    params = {'auth': auth}
+    update_request_params_with_ssl(params)
+    return keystone_session.Session(**params)
+
+
 def get_os_admin_session():
     """Create a context to interact with OpenStack as an administrator."""
     # NOTE(ft): this is a singletone because keystone's session looks thread
     # safe for both regular and token renewal requests
     global _admin_session
     if not _admin_session:
-        auth = keystone_auth.Password(
-            username=CONF.admin_user,
-            password=CONF.admin_password,
-            project_name=CONF.admin_tenant_name,
-            tenant_name=CONF.admin_tenant_name,
-            auth_url=CONF.keystone_url,
-        )
-        params = {'auth': auth}
-        update_request_params_with_ssl(params)
-        _admin_session = keystone_session.Session(**params)
+        if not CONF[GROUP_AUTHTOKEN].auth_type:
+            _admin_session = get_session_from_deprecated()
+        else:
+            auth_plugin = ks_loading.load_auth_from_conf_options(
+                CONF, GROUP_AUTHTOKEN)
+            _admin_session = ks_loading.load_session_from_conf_options(
+                CONF, GROUP_AUTHTOKEN, auth=auth_plugin)
 
     return _admin_session
 
 
 def update_request_params_with_ssl(params):
-    verify = CONF.ssl_ca_file or not CONF.ssl_insecure
+    if not CONF[GROUP_AUTHTOKEN].auth_type:
+        verify = CONF.ssl_ca_file or not CONF.ssl_insecure
+    else:
+        verify = (CONF[GROUP_AUTHTOKEN].cafile or
+                  not CONF[GROUP_AUTHTOKEN].insecure)
     if verify is not True:
         params['verify'] = verify
