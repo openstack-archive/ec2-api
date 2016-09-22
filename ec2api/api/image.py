@@ -196,6 +196,89 @@ def create_image(context, instance_id, name=None, description=None,
     return {'imageId': image['id']}
 
 
+def import_image(context, architecture=None, client_data=None,
+                 client_token=None, description=None, disk_container=None,
+                 hypervisor=None, license_type=None, platform=None,
+                 role_name=None):
+    # Check architecture
+    validate_enum(architecture, ('i386', 'x86_64'), 'architecture',
+                  allow_empty=True)
+
+    # Ignore client_data...?
+    if client_data is not None:
+        raise exception.Unsupported(reason='Client data is not supported')
+
+    # Ignore client_token...?
+    if client_token is not None:
+        raise exception.Unsupported(reason='Client token is not supported')
+
+    # Description retrieved below
+
+    # Check disk_container
+    disk = disk_container[0]
+
+    url = disk.get('url')
+    disk_format = disk.get('format', 'RAW')
+
+    if disk.get('snapshotid') is not None:
+        raise exception.Unsupported(reason='Snapshot IDs not supported')
+
+    if url is None or disk.get('userbucket') is not None:
+        raise exception.Unsupported(reason='Buckets not implemented. Need URL')
+
+    # disk_container descrption overrides default descrption
+    description = disk.get('description') or description
+
+    # hypervisor set below
+
+    # Ignore license_type
+    validate_enum(license_type, ('AWS', 'BYOL'), 'license_type', allow_empty=True)
+
+    # Check platform
+    validate_enum(platform, ('Linux', 'Windows'), 'platform', allow_empty=True)
+
+    if role_name is not None:
+        raise exception.Unsupported(reason='Buckets not implemented. Need URL')
+
+    # Create EC2 image
+    ec2_image = { 'is_public': False }
+    if description is not None:
+        ec2_image['description'] = description
+    ec2_image = db_api.add_item(context, 'ami', ec2_image)
+
+    # Create properties for openstack
+    properties = {}
+    if architecture is not None:
+        properties['architecture'] = architecture
+    if hypervisor is not None:
+        properties['hypervisor_type'] = hypervisor
+    if license_type is not None:
+        properties['license_type'] = license_type
+    if platform is not None:
+        properties['os_type'] = platform
+    if description is not None:
+        properties['description'] = description
+
+    # Set EC2 id for retrieval on the way back
+    properties['ec2_id'] = ec2_image['id']
+
+    # Connect to glance
+    glance = clients.glance(context)
+
+    # NOTE: container_format is not currently used, so we can always default
+    #       to bare. Read more here:
+    #       http://docs.openstack.org/developer/glance/formats.html
+    os_image = glance.images.create(
+            name=ec2_image['id'], copy_from=url, disk_format=disk_format,
+            container_format='bare', properties=properties, is_public=False)
+
+    # Update EC2 id
+    ec2_image['os_id'] = os_image.id
+    db_api.update_item(context, ec2_image)
+
+    return {'imageId': ec2_image['id']}
+
+
 def register_image(context, name=None, image_location=None,
                    description=None, architecture=None,
                    root_device_name=None, block_device_mapping=None,
