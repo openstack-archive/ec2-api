@@ -197,4 +197,4 @@ class KeystoneAuthTestCase(test_base.BaseTestCase):
                 'path': '/test',
                 'body_hash': 'e3b0c44298fc1c149afbf4c8996fb924'
                              '27ae41e4649b934ca495991b7852b855'}}
-        self.assertDictEqual(expected_data, data)
+        self.assertEqual(expected_data, data)
