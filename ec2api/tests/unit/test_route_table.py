@@ -955,7 +955,7 @@ class RouteTableTestCase(base.ApiTestCase):
                              'nexthop': '127.0.0.1'},
                             {'destination': '169.254.169.254/32',
                              'nexthop': fakes.IP_GATEWAY_SUBNET_1}]))
-        self.assertEqual(None, gateway_ip)
+        self.assertIsNone(gateway_ip)
 
         host_routes, gateway_ip = (
             route_table_api._get_subnet_host_routes_and_gateway_ip(
