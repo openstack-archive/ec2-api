@@ -31,6 +31,7 @@ class CustomerGatewayTest(base.EC2TestCase):
         super(CustomerGatewayTest, cls).setUpClass()
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
+        base.check_network_feature_enabled('vpnaas')
 
     def test_create_delete_customer_gateway(self):
         data = self.client.create_customer_gateway(

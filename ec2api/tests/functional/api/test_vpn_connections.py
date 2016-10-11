@@ -35,6 +35,7 @@ class VpnConnectionTest(base.EC2TestCase):
         super(VpnConnectionTest, cls).setUpClass()
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
+        base.check_network_feature_enabled('vpnaas')
 
         data = cls.client.create_customer_gateway(
             Type='ipsec.1', PublicIp=cls.CUSTOMER_GATEWAY_IP, BgpAsn=65000)

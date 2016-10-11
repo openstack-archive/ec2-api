@@ -46,6 +46,7 @@ class VpnTest(scenario_base.BaseScenarioTest):
         super(VpnTest, cls).setUpClass()
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
+        base.check_network_feature_enabled('vpnaas')
 
     def test_vpn_routing(self):
         vpc_id, _subnet_id = self.create_vpc_and_subnet('10.42.0.0/20')
