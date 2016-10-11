@@ -241,6 +241,27 @@ def skip_without_vpc(*args, **kwargs):
     return decorator
 
 
+def check_network_feature_enabled(ext_name):
+    if hasattr(CONF, 'network_feature_enabled'):
+        ext_list = CONF.network_feature_enabled.api_extensions
+    else:
+        ext_list = ['all']
+    if 'all' not in ext_list and ext_name not in ext_list:
+        msg = ("Skipped network test as %s is not available" % ext_name)
+        raise testtools.TestCase.skipException(msg)
+
+
+def skip_without_network_feature(ext_name, *args, **kwargs):
+    """A decorator useful to skip tests without specified network extension."""
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, *func_args, **func_kwargs):
+            check_network_feature_enabled(ext_name)
+            return f(self, *func_args, **func_kwargs)
+        return wrapper
+    return decorator
+
+
 class EC2TestCase(base.BaseTestCase):
     """Recommended to use as base class for boto related test."""
 

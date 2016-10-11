@@ -73,7 +73,7 @@ echo "==========================================================================
 aws $AWS_PARAMS --profile admin ec2 describe-instances
 aws $AWS_PARAMS --profile admin ec2 describe-images
 aws $AWS_PARAMS --profile admin ec2 describe-volumes
-aws $AWS_PARAMS --profile admin ec2 describe-snashots
+aws $AWS_PARAMS --profile admin ec2 describe-snapshots
 
 echo "========================================================================================================"
 echo "===================================================================================== User resources ==="
@@ -81,7 +81,7 @@ echo "==========================================================================
 aws $AWS_PARAMS --profile user ec2 describe-instances
 aws $AWS_PARAMS --profile user ec2 describe-images
 aws $AWS_PARAMS --profile user ec2 describe-volumes
-aws $AWS_PARAMS --profile user ec2 describe-snashots
+aws $AWS_PARAMS --profile user ec2 describe-snapshots
 
 openstack server list --all-projects
 openstack image list

@@ -441,6 +441,7 @@ class TagTest(base.EC2TestCase):
         self._test_tag_resource(cgw_id, 'customer-gateway', describe_func)
 
     @base.skip_without_vpc()
+    @base.skip_without_network_feature('vpnaas')
     def test_tag_vpn_gateway(self):
         data = self.client.create_vpn_gateway(Type='ipsec.1')
         vgw_id = data['VpnGateway']['VpnGatewayId']
@@ -456,6 +457,7 @@ class TagTest(base.EC2TestCase):
         self._test_tag_resource(vgw_id, 'vpn-gateway', describe_func)
 
     @base.skip_without_vpc()
+    @base.skip_without_network_feature('vpnaas')
     def test_tag_vpn_connection(self):
         data = self.client.create_customer_gateway(
             Type='ipsec.1', PublicIp='198.51.100.77', BgpAsn=65000)

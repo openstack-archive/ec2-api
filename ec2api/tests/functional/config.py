@@ -39,6 +39,7 @@ class ConfigPrivate(object):
         if config_opts.aws_group.name in cfg.CONF:
             self.aws = cfg.CONF.aws
             self.service_available = cfg.CONF.service_available
+            self.network_feature_enabled = cfg.CONF['network-feature-enabled']
             return
 
         # Environment variables override defaults...
