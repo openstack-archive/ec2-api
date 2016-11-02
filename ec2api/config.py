@@ -41,8 +41,7 @@ _DEFAULT_LOGGING_CONTEXT_FORMAT = ('%(asctime)s.%(msecs)03d %(process)d '
 def parse_args(argv, default_config_files=None):
     log.set_defaults(_DEFAULT_LOGGING_CONTEXT_FORMAT, _DEFAULT_LOG_LEVELS)
     log.register_options(CONF)
-    options.set_defaults(CONF, connection=_DEFAULT_SQL_CONNECTION,
-                         sqlite_db='ec2api.sqlite')
+    options.set_defaults(CONF, connection=_DEFAULT_SQL_CONNECTION)
 
     cfg.CONF(argv[1:],
              project='ec2api',
