@@ -17,6 +17,7 @@ import time
 
 from oslo_log import log
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -28,6 +29,7 @@ LOG = log.getLogger(__name__)
 
 class InstanceAttributeTest(base.EC2TestCase):
 
+    @decorators.idempotent_id('485107d8-f65f-4441-9558-2ff783e52e22')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_describe_instance_attributes(self):
         instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id)
@@ -78,6 +80,7 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('391f6645-d014-42c7-a727-f3a6e7a13a4c')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_disable_api_termination_attribute(self):
         instance_id = self.run_instance(DisableApiTermination=True)
@@ -118,6 +121,7 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('50671a21-99bf-4514-acb0-97617f92e868')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_instance_attributes_negative(self):
         instance_id = self.run_instance()
@@ -193,6 +197,7 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('6fd2c8eb-f7f9-420d-a8ae-5d5af3a49a35')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_attributes_for_multiple_interfaces_negative(self):
         vpc_id, subnet_id = self.create_vpc_and_subnet('10.30.0.0/24')
@@ -242,6 +247,7 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('da26cc0d-6c2d-4638-97f1-1abfae8f00b5')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_group_set_attribute(self):
         vpc_id, subnet_id = self.create_vpc_and_subnet('10.30.0.0/24')
@@ -289,6 +295,7 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('8e7b37b5-1f2d-4c38-b51e-dcd0e726edb3')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_source_dest_check_attribute(self):
         vpc_id, subnet_id = self.create_vpc_and_subnet('10.30.0.0/24')
@@ -320,6 +327,7 @@ class InstanceAttributeTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('a2640ab1-6aaa-4626-9f23-4aba52e3b88a')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     @testtools.skipUnless(CONF.aws.instance_type_alt,
                           "Alternative instance type is not defined")

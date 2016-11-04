@@ -15,6 +15,7 @@
 
 import botocore.exceptions
 from lxml import etree
+from tempest.lib import decorators
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -51,6 +52,7 @@ class VpnConnectionTest(base.EC2TestCase):
             cls.client.delete_vpn_gateway, VpnGatewayId=cls.vgw_id)
         cls.get_vpn_gateway_waiter().wait_available(cls.vgw_id)
 
+    @decorators.idempotent_id('57426aab-cf2d-4114-a11d-2bd6642ac606')
     def test_create_delete_vpn_connection(self):
         data = self.client.create_vpn_connection(
             CustomerGatewayId=self.cgw_id, VpnGatewayId=self.vgw_id,
@@ -80,6 +82,7 @@ class VpnConnectionTest(base.EC2TestCase):
             self.assertEqual('InvalidVpnConnectionID.NotFound',
                              ex.response['Error']['Code'])
 
+    @decorators.idempotent_id('6fa8c58d-876b-4d3f-85ba-e972a9d6db3b')
     def test_create_delete_vpn_connection_route(self):
         data = self.client.create_vpn_connection(
             CustomerGatewayId=self.cgw_id, VpnGatewayId=self.vgw_id,

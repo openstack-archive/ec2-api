@@ -14,6 +14,7 @@
 #    under the License.
 
 from oslo_log import log
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -51,6 +52,7 @@ class InstanceInVPCTest(base.EC2TestCase):
                                      SubnetId=cls.subnet_id)
         cls.get_subnet_waiter().wait_available(cls.subnet_id)
 
+    @decorators.idempotent_id('af8bd493-4a68-49e7-a3d1-326251b8d16e')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_delete_instance(self):
         instance_id = self.run_instance(SubnetId=self.subnet_id)
@@ -81,6 +83,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         # Amazon returns instance in 'terminated' state some time after
         # instance deletion. But Openstack doesn't return such instance.
 
+    @decorators.idempotent_id('17ba6206-3044-4e51-9e9b-f5d5728cc047')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_describe_instances_filter(self):
         instance_id = self.run_instance(SubnetId=self.subnet_id)
@@ -137,6 +140,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.assertNotEmpty(instances)
         self.assertEqual(instance_id, instances[0]['InstanceId'])
 
+    @decorators.idempotent_id('60ceda8b-85ae-47a7-807b-c4a4dd05a13b')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_instance_with_two_interfaces(self):
         kwargs = {
@@ -183,6 +187,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_ni1)
         self.get_network_interface_waiter().wait_delete(ni_id1)
 
+    @decorators.idempotent_id('a7dc520a-e828-4347-91e1-385c4e0e6070')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_instance_with_private_ip(self):
         ip = '10.16.0.12'
@@ -196,6 +201,7 @@ class InstanceInVPCTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('582ac8ed-58e7-4f27-bd65-35b999241c63')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_create_instance_with_invalid_params(self):
         def _rollback(fn_data):

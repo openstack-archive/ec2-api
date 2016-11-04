@@ -16,6 +16,7 @@
 import time
 
 from oslo_log import log
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -50,6 +51,7 @@ class InternetGatewayTest(base.EC2TestCase):
         cls.addResourceCleanUpStatic(cls.client.delete_vpc,
                                      VpcId=cls.vpc_id_alt)
 
+    @decorators.idempotent_id('f2d40306-4b18-4e17-90a5-371db0ddc7cb')
     def test_create_attach_internet_gateway(self):
         data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
@@ -70,6 +72,7 @@ class InternetGatewayTest(base.EC2TestCase):
                           self.client.describe_internet_gateways,
                           InternetGatewayIds=[gw_id])
 
+    @decorators.idempotent_id('f092b63d-9460-4d8f-ba8a-bcd380666033')
     def test_delete_attached_internet_gateway(self):
         data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
@@ -90,6 +93,7 @@ class InternetGatewayTest(base.EC2TestCase):
         data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('89700013-5753-4608-8245-4fc99fbb67ea')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "Another error code returned - InvalidParameterValue")
     def test_attach_detach_invalid_internet_gateway(self):
@@ -102,6 +106,7 @@ class InternetGatewayTest(base.EC2TestCase):
                           self.client.detach_internet_gateway,
                           VpcId=self.vpc_id, InternetGatewayId=gw_id)
 
+    @decorators.idempotent_id('e3e4d8c4-8f62-43e8-a24d-bfd292b4144c')
     def test_double_attach_internet_gateway(self):
         data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
@@ -122,6 +127,7 @@ class InternetGatewayTest(base.EC2TestCase):
         data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('d8f3a488-a4ba-4ed5-998c-3dc6f43d6d9e')
     def test_attach_one_internet_gateway_to_two_vpcs(self):
         data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
@@ -142,6 +148,7 @@ class InternetGatewayTest(base.EC2TestCase):
         data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('b86f338c-613e-4cd7-9742-07c86864b0da')
     def test_describe_internet_gateways_base(self):
         data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
@@ -172,6 +179,7 @@ class InternetGatewayTest(base.EC2TestCase):
         data = self.client.delete_internet_gateway(InternetGatewayId=gw_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('3f141c56-9ee6-46bf-9c14-0d922ed8a482')
     def test_describe_internet_gateways_filters(self):
         # NOTE(andrey-mp): by filter real vpc-id before creation
         data = self.client.describe_internet_gateways(

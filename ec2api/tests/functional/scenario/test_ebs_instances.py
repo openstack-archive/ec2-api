@@ -16,6 +16,7 @@ import math
 
 from oslo_log import log
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -51,6 +52,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
             assert 1 == len(data['Snapshots'])
             cls.root_device_size = data['Snapshots'][0]['VolumeSize']
 
+    @decorators.idempotent_id('2f51dd78-ff1e-494a-bcbc-f47580df17cb')
     def test_launch_ebs_instance_with_persistent_root_device(self):
         """
 
@@ -81,6 +83,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean_vol)
         self.get_volume_waiter().wait_delete(volume_id)
 
+    @decorators.idempotent_id('0c820ed3-2e2f-4384-9649-cea907f00bf4')
     def test_launch_ebs_instance_with_resized_root_device(self):
         """Launch EBS-backed instance with resizing root device."""
         new_size = int(math.ceil(self.root_device_size * 1.1))
@@ -103,6 +106,7 @@ class EC2_EBSInstanceTuneBDM(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('a0dbb3bd-167f-4f35-bb9d-aa53233e3123')
     def test_launch_ebs_instance_with_creating_blank_volume(self):
         """Launch instance with creating blank volume."""
         device_name_prefix = base.get_device_name_prefix(self.root_device_name)
@@ -270,11 +274,13 @@ class EC2_EBSInstanceAttaching(base.EC2TestCase):
         bdt = self.get_instance_bdm(self.instance_id, new_device_name)
         self.assertIsNotNone(bdt)
 
+    @decorators.idempotent_id('2176d935-5254-4e2a-9eb4-fc899f63c530')
     def test_attaching_by_full_name(self):
         """Attach and reattach device by full name."""
         self._test_attaching(self.volume_id1, self.device1_name,
                              self.full_device_name_prefix, "e")
 
+    @decorators.idempotent_id('43af092e-3f04-45a7-bec7-8da39cde1f4c')
     def test_attaching_by_short_name(self):
         """Attach and reattach device by short name."""
         self._test_attaching(self.volume_id2, self.device2_name,
@@ -298,6 +304,7 @@ class EC2_EBSInstanceSnapshot(base.EC2TestCase):
         cls.image_id = CONF.aws.ebs_image_id
         cls.zone = CONF.aws.aws_zone
 
+    @decorators.idempotent_id('07caac78-750c-48a1-975d-d3a6bd988108')
     def test_create_ebs_instance_snapshot(self):
         """Create snapshot of EBS-backed instance and check it."""
 
@@ -372,6 +379,7 @@ class EC2_EBSInstanceResizeRootDevice(base.EC2TestCase):
         cls.image_id = CONF.aws.ebs_image_id
         cls.zone = CONF.aws.aws_zone
 
+    @decorators.idempotent_id('0ea1dee6-c2c3-4cad-9676-5bf6e7ae54a8')
     @testtools.skipUnless(
         CONF.aws.run_incompatible_tests,
         "Error from nova: "

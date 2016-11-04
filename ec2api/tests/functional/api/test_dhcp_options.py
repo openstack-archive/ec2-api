@@ -16,6 +16,7 @@
 import time
 
 from oslo_log import log
+from tempest.lib import decorators
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -33,6 +34,7 @@ class DhcpOptionsTest(base.EC2TestCase):
         if not base.TesterStateHolder().get_vpc_enabled():
             raise cls.skipException('VPC is disabled')
 
+    @decorators.idempotent_id('2331fc49-50e0-4df3-8c45-bd6f61cc86bf')
     def test_create_delete_dhcp_options(self):
         kwargs = {
             'DhcpConfigurations': [
@@ -81,6 +83,7 @@ class DhcpOptionsTest(base.EC2TestCase):
         data = self.client.delete_dhcp_options(DhcpOptionsId=id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('ff1d4f6e-97fc-4053-b98f-ff59e7e8d061')
     def test_invalid_create_delete(self):
         def _rollback(fn_data):
             self.client.delete_dhcp_options(
@@ -108,6 +111,7 @@ class DhcpOptionsTest(base.EC2TestCase):
             self.client.create_dhcp_options, rollback_fn=_rollback,
             **kwargs)
 
+    @decorators.idempotent_id('1c3e8ff9-bb3b-40ba-889e-d2306a92f418')
     def test_describe_dhcp_options(self):
         kwargs = {
             'DhcpConfigurations': [
@@ -140,6 +144,7 @@ class DhcpOptionsTest(base.EC2TestCase):
         data = self.client.delete_dhcp_options(DhcpOptionsId=id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('1b4d678a-c2a2-4c73-9e62-789fe2f6b173')
     def test_associate_dhcp_options(self):
         kwargs = {
             'DhcpConfigurations': [

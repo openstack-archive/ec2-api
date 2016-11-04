@@ -17,6 +17,7 @@ import time
 
 from oslo_log import log
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -125,6 +126,7 @@ class SecurityGroupInVPCTest(SecurityGroupBaseTest):
         cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
+    @decorators.idempotent_id('f8354908-1b3a-4e7b-89e3-6956850bbbfb')
     def test_create_delete_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
@@ -147,6 +149,7 @@ class SecurityGroupInVPCTest(SecurityGroupBaseTest):
                           self.client.delete_security_group,
                           GroupId=group_id)
 
+    @decorators.idempotent_id('fe209503-c348-4456-94b4-a77e68fabcbb')
     def test_create_duplicate_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
@@ -165,6 +168,7 @@ class SecurityGroupInVPCTest(SecurityGroupBaseTest):
         data = self.client.delete_security_group(GroupId=group_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('ffe5084a-2d05-42d1-ae8d-edcb0af27909')
     def test_create_duplicate_security_group_in_another_vpc(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
@@ -194,6 +198,7 @@ class SecurityGroupInVPCTest(SecurityGroupBaseTest):
         data = self.client.delete_security_group(GroupId=group_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('524993f7-a8d3-4ffc-bbf1-6a3014377181')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "MismatchError: 'InvalidParameterValue' != 'ValidationError'")
     def test_create_invalid_name_desc(self):
@@ -222,11 +227,13 @@ class SecurityGroupInVPCTest(SecurityGroupBaseTest):
                           self.client.create_security_group,
                           VpcId=self.vpc_id, GroupName='', Description=valid)
 
+    @decorators.idempotent_id('3460cefd-c759-4738-ba75-b275939aad1d')
     def test_ingress_rules(self):
         self._test_rules(self.client.authorize_security_group_ingress,
                          self.client.revoke_security_group_ingress,
                          'IpPermissions', self.vpc_id)
 
+    @decorators.idempotent_id('74a5de83-69b4-4cc5-9431-e4c1f691f0c1')
     def test_egress_rules(self):
         self._test_rules(self.client.authorize_security_group_egress,
                          self.client.revoke_security_group_egress,
@@ -242,6 +249,7 @@ class SecurityGroupEC2ClassicTest(SecurityGroupBaseTest):
         if not base.TesterStateHolder().get_ec2_enabled():
             raise cls.skipException('EC2-classic is disabled')
 
+    @decorators.idempotent_id('eb097f7c-4b10-4365-aa34-c17e5769f4a7')
     def test_create_delete_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
@@ -263,6 +271,7 @@ class SecurityGroupEC2ClassicTest(SecurityGroupBaseTest):
         self.client.delete_security_group(GroupName=name)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('b97b8b4a-811e-4584-8e79-086499459aca')
     def test_create_duplicate_security_group(self):
         name = data_utils.rand_name('sgName')
         desc = data_utils.rand_name('sgDesc')
@@ -280,6 +289,7 @@ class SecurityGroupEC2ClassicTest(SecurityGroupBaseTest):
         self.client.delete_security_group(GroupId=group_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('b80c578d-0c0d-4c7e-b0ee-a7ed23b6b209')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "MismatchError: 'MissingParameter' != 'ValidationError'")
     def test_create_invalid_name_desc(self):
@@ -297,11 +307,13 @@ class SecurityGroupEC2ClassicTest(SecurityGroupBaseTest):
             self.client.create_security_group,
             GroupName='default', Description='default')
 
+    @decorators.idempotent_id('eba8a7c4-3781-4562-b137-dbe8037395a3')
     def test_ingress_rules(self):
         self._test_rules(self.client.authorize_security_group_ingress,
                          self.client.revoke_security_group_ingress,
                          'IpPermissions')
 
+    @decorators.idempotent_id('435d5e53-060f-455a-9317-60177246e04d')
     def test_egress_rules(self):
         def _test():
             self._test_rules(

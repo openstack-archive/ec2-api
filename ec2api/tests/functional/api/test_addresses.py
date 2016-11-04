@@ -17,6 +17,7 @@ import time
 
 import botocore.exceptions
 from oslo_log import log
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -29,6 +30,7 @@ LOG = log.getLogger(__name__)
 class AddressTest(base.EC2TestCase):
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('218a4b6b-c3a9-44b0-8148-4bd0bc36bd7d')
     def test_create_delete_vpc_address(self):
         kwargs = {
             'Domain': 'vpc',
@@ -43,6 +45,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
 
     @base.skip_without_ec2()
+    @decorators.idempotent_id('285b8b4e-5aef-4e7f-be9e-37e6475be21b')
     def test_create_delete_standard_address(self):
         data = self.client.allocate_address()
         ip = data['PublicIp']
@@ -53,6 +56,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('5be3ad8d-b071-472b-b92a-7199c82334a2')
     def test_invalid_delete_vpc_address(self):
         kwargs = {
             'Domain': 'vpc',
@@ -96,6 +100,7 @@ class AddressTest(base.EC2TestCase):
                 self.client.release_address,
                 PublicIp='ip')
 
+    @decorators.idempotent_id('e8171637-9ccd-471a-97da-c78a36ba3c4b')
     def test_invalid_create_address(self):
         kwargs = {
             'Domain': 'invalid',
@@ -113,6 +118,7 @@ class AddressTest(base.EC2TestCase):
                              e.response['Error']['Code'])
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('b0d0b498-1fe2-479e-995c-80ace2f339a7')
     def test_describe_vpc_addresses(self):
         kwargs = {
             'Domain': 'vpc',
@@ -185,6 +191,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean2)
 
     @base.skip_without_ec2()
+    @decorators.idempotent_id('a5c09f47-3be3-4d46-b59d-25195d67e6d5')
     def test_describe_standard_addresses(self):
         data = self.client.allocate_address(*[], **{})
         ip = data['PublicIp']
@@ -220,6 +227,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('6f154e48-f260-4d8d-b1d1-a1cf174f58fa')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_associate_disassociate_vpc_addresses(self):
         aws_zone = CONF.aws.aws_zone
@@ -305,6 +313,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_vpc)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
+    @decorators.idempotent_id('4aaf01d2-ade5-4e8b-b24a-ab22448b3236')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     # skip this test for nova network due to bug #1607350
     @base.skip_without_vpc()
@@ -343,6 +352,7 @@ class AddressTest(base.EC2TestCase):
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('3c0ab7f5-ee9c-4966-8d43-e89f5520f245')
     def test_disassociate_not_associated_vpc_addresses(self):
         aws_zone = CONF.aws.aws_zone
 
@@ -387,6 +397,7 @@ class AddressTest(base.EC2TestCase):
         self.get_vpc_waiter().wait_delete(vpc_id)
 
     @base.skip_without_ec2()
+    @decorators.idempotent_id('a70babef-18ec-4340-a3a2-63388cfc3cb5')
     def test_disassociate_not_associated_standard_addresses(self):
         data = self.client.allocate_address(Domain='standard')
         ip = data['PublicIp']
@@ -399,6 +410,7 @@ class AddressTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_a)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('91b971f5-2674-478e-84df-115fef506c5b')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           'preliminary address association is not supported')
     def test_preliminary_associate_address(self):

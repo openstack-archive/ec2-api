@@ -18,6 +18,7 @@ import time
 import botocore.exceptions
 from oslo_log import log
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -61,6 +62,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         # to wait this request
         time.sleep(5)
 
+    @decorators.idempotent_id('d03f49b1-a77e-439b-96e2-5e152b968863')
     def test_delete_subnet_with_network_interface(self):
         data = self.client.create_subnet(VpcId=self.vpc_id,
                                               CidrBlock='10.7.1.0/28')
@@ -88,6 +90,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean_subnet)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
+    @decorators.idempotent_id('e19e450d-5c24-47b1-9814-4a65a78e5a31')
     def test_create_network_interface(self):
         desc = data_utils.rand_name('ni')
         data = self.client.create_network_interface(SubnetId=self.subnet_id,
@@ -128,6 +131,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
 
     # TODO(andrey-mp): add creation with addresses
 
+    @decorators.idempotent_id('61e16648-7736-4647-b618-27d3f4f0c9c6')
     def test_create_max_network_interface(self):
         # NOTE(andrey-mp): wait some time while all ports will be deleted
         # for this subnet(that are deleting after previous test)
@@ -163,6 +167,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
             self.cancelResourceCleanUp(addr[1])
             self.get_network_interface_waiter().wait_delete(addr[0])
 
+    @decorators.idempotent_id('8c174e5f-e377-4bf2-9315-b868a8199c17')
     def test_unassign_primary_addresses(self):
         data = self.client.create_network_interface(SubnetId=self.subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
@@ -180,6 +185,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @decorators.idempotent_id('de0d0375-d99a-476c-939a-0e15c4e431a8')
     def test_assign_unassign_private_addresses_by_count(self):
         data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count = data['Subnets'][0]['AvailableIpAddressCount']
@@ -220,6 +226,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @decorators.idempotent_id('5d7bda42-d23e-4cbf-9e66-8ca052ac28ff')
     def test_assign_unassign_private_addresses_by_addresses(self):
         data = self.client.describe_subnets(SubnetIds=[self.subnet_id])
         count = data['Subnets'][0]['AvailableIpAddressCount']
@@ -263,6 +270,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @decorators.idempotent_id('0c514bb4-5800-4db0-9032-0aa3ab998612')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_attach_network_interface(self):
         data = self.client.create_network_interface(SubnetId=self.subnet_id)
@@ -310,6 +318,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('381c9995-bc83-4e7e-b716-25a451660ace')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_network_interfaces_are_not_deleted_on_termination(self):
         instance_id = self.run_instance(SubnetId=self.subnet_id)
@@ -368,6 +377,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_ni2)
         self.get_network_interface_waiter().wait_delete(ni_id2)
 
+    @decorators.idempotent_id('de910bc7-008a-40c2-b4b2-4587a489fc1c')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_network_interfaces_are_deleted_on_termination(self):
         instance_id = self.run_instance(SubnetId=self.subnet_id)
@@ -406,6 +416,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.get_network_interface_waiter().wait_delete(ni_id)
         self.get_network_interface_waiter().wait_delete(ni_id2)
 
+    @decorators.idempotent_id('028eb864-59e9-4ed6-a062-9d5de9eba652')
     def test_network_interface_attribute_description(self):
         desc = data_utils.rand_name('ni')
         data = self.client.create_network_interface(
@@ -431,6 +442,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @decorators.idempotent_id('9428b5e6-42f2-495f-a535-df53d1fcf4af')
     def test_network_interface_attribute_source_dest_check(self):
         data = self.client.create_network_interface(SubnetId=self.subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
@@ -459,6 +471,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @decorators.idempotent_id('19d25f59-5b32-4314-b4da-7c8f679b7a96')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_network_interface_attribute_attachment(self):
         instance_id = self.run_instance(SubnetId=self.subnet_id)
@@ -481,6 +494,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('74967cd0-155f-4cfe-994e-2c6803dad04c')
     def test_network_interface_attribute_empty_attachment(self):
         data = self.client.create_network_interface(SubnetId=self.subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
@@ -496,6 +510,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @decorators.idempotent_id('a55f1169-d302-4166-b74e-e84a0d79129c')
     def test_network_interface_attribute_group_set(self):
         data = self.client.create_network_interface(SubnetId=self.subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']
@@ -513,6 +528,7 @@ class NetworkInterfaceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_network_interface_waiter().wait_delete(ni_id)
 
+    @decorators.idempotent_id('7832976f-27cb-405e-ab05-466b102d86f8')
     def test_instance_attributes_negative(self):
         data = self.client.create_network_interface(SubnetId=self.subnet_id)
         ni_id = data['NetworkInterface']['NetworkInterfaceId']

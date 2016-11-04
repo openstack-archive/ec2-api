@@ -16,6 +16,7 @@
 import time
 
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -39,6 +40,7 @@ class TagTest(base.EC2TestCase):
                                      VolumeId=cls.volume_id)
         cls.get_volume_waiter().wait_available(cls.volume_id)
 
+    @decorators.idempotent_id('249f59cf-2fcd-47ac-a233-682f17fc3129')
     def test_create_get_delete_tag(self):
         tag_key = data_utils.rand_name('tag-key')
         self.client.create_tags(Resources=[self.volume_id],
@@ -58,6 +60,7 @@ class TagTest(base.EC2TestCase):
             Filters=[{'Name': 'resource-id', 'Values': [self.volume_id]}])
         self.assertEqual(0, len(data['Tags']))
 
+    @decorators.idempotent_id('41dec90b-a878-4367-ba95-83757281e343')
     def test_describe_tags(self):
         tag_key = data_utils.rand_name('tag-key')
         self.client.create_tags(Resources=[self.volume_id],
@@ -149,6 +152,7 @@ class TagTest(base.EC2TestCase):
                           Resources=[resource_id],
                           Tags=[{'Key': tag_key, 'Value': 'fake_value'}])
 
+    @decorators.idempotent_id('36478dc6-cf3f-4a4b-b275-282ba147822b')
     def test_tag_image(self):
         image_id = CONF.aws.ebs_image_id
         if not image_id:
@@ -173,6 +177,7 @@ class TagTest(base.EC2TestCase):
             self._test_tag_resource(image_id, 'image', describe_func)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('adc459f3-858d-4ce8-a097-549ab9350b18')
     def test_tag_dhcp_options(self):
         kwargs = {
             'DhcpConfigurations': [
@@ -196,6 +201,7 @@ class TagTest(base.EC2TestCase):
         self.client.delete_dhcp_options(DhcpOptionsId=res_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('afa064b2-8caf-442d-b001-b6cb8120e57e')
     def test_tag_volume(self):
         def describe_func(*args, **kwargs):
             data = self.client.describe_volumes(*args, **kwargs)
@@ -205,6 +211,7 @@ class TagTest(base.EC2TestCase):
         self._test_tag_resource(self.volume_id, 'volume', describe_func)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('96e581c6-8f38-41f9-9126-e35215c83d3e')
     def test_tag_address(self):
         kwargs = {
             'Domain': 'vpc',
@@ -220,6 +227,7 @@ class TagTest(base.EC2TestCase):
         self.client.release_address(AllocationId=res_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('f9a6dd26-b26f-4482-aad3-0b4f0e7cc3dd')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_tag_instance(self):
         instance_id = self.run_instance()
@@ -237,6 +245,7 @@ class TagTest(base.EC2TestCase):
         self.get_instance_waiter().wait_delete(instance_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('a223af28-b355-4404-a465-7fc9e9d71ad7')
     def test_tag_internet_gateway(self):
         data = self.client.create_internet_gateway()
         gw_id = data['InternetGateway']['InternetGatewayId']
@@ -255,6 +264,7 @@ class TagTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('4691eefb-c118-4595-a386-8a2abd5c0d77')
     def test_tag_network_interface(self):
         cidr = '10.1.0.0/16'
         data = self.client.create_vpc(CidrBlock=cidr)
@@ -297,6 +307,7 @@ class TagTest(base.EC2TestCase):
         self.get_vpc_waiter().wait_delete(vpc_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('384083a0-d492-4620-8093-166cd339ffaa')
     def test_tag_route_table(self):
         cidr = '10.1.0.0/16'
         data = self.client.create_vpc(CidrBlock=cidr)
@@ -324,6 +335,7 @@ class TagTest(base.EC2TestCase):
         self.get_vpc_waiter().wait_delete(vpc_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('03b8cd38-3017-4a8f-b2e0-1c4ac5e7333d')
     def test_tag_security_group(self):
         cidr = '10.1.0.0/16'
         data = self.client.create_vpc(CidrBlock=cidr)
@@ -356,6 +368,7 @@ class TagTest(base.EC2TestCase):
         self.cancelResourceCleanUp(dv_clean)
         self.get_vpc_waiter().wait_delete(vpc_id)
 
+    @decorators.idempotent_id('bed98f9c-f987-4192-afd8-4bdf35ac916e')
     def test_tag_snapshot(self):
         data = self.client.create_snapshot(VolumeId=self.volume_id)
         snapshot_id = data['SnapshotId']
@@ -376,6 +389,7 @@ class TagTest(base.EC2TestCase):
         self.get_snapshot_waiter().wait_delete(snapshot_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('3a6f64fc-d2d4-496d-bf30-3ee0efe04e42')
     def test_tag_subnet(self):
         cidr = '10.1.0.0/16'
         data = self.client.create_vpc(CidrBlock=cidr)
@@ -406,6 +420,7 @@ class TagTest(base.EC2TestCase):
         self.get_vpc_waiter().wait_delete(vpc_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('0667c68b-9d3c-4599-9335-0cee68ba5d80')
     def test_tag_vpc(self):
         cidr = '10.1.0.0/16'
         data = self.client.create_vpc(CidrBlock=cidr)
@@ -425,6 +440,7 @@ class TagTest(base.EC2TestCase):
         self.get_vpc_waiter().wait_delete(vpc_id)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('07b2f20d-6b26-4c3d-9d32-93f98f187d78')
     def test_tag_customer_gateway(self):
         data = self.client.create_customer_gateway(
             Type='ipsec.1', PublicIp='198.51.100.77', BgpAsn=65000)
@@ -442,6 +458,7 @@ class TagTest(base.EC2TestCase):
 
     @base.skip_without_vpc()
     @base.skip_without_network_feature('vpnaas')
+    @decorators.idempotent_id('a0437171-81a1-4871-9b71-c7629b25c337')
     def test_tag_vpn_gateway(self):
         data = self.client.create_vpn_gateway(Type='ipsec.1')
         vgw_id = data['VpnGateway']['VpnGatewayId']
@@ -458,6 +475,7 @@ class TagTest(base.EC2TestCase):
 
     @base.skip_without_vpc()
     @base.skip_without_network_feature('vpnaas')
+    @decorators.idempotent_id('ecd343b4-f448-4990-880d-02a68febc9cf')
     def test_tag_vpn_connection(self):
         data = self.client.create_customer_gateway(
             Type='ipsec.1', PublicIp='198.51.100.77', BgpAsn=65000)

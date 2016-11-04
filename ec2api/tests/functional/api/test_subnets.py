@@ -14,6 +14,7 @@
 #    under the License.
 
 from oslo_log import log
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -41,6 +42,7 @@ class SubnetTest(base.EC2TestCase):
         cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
+    @decorators.idempotent_id('506993c3-aff6-48ea-8916-da8a4f199a66')
     def test_create_delete_subnet(self):
         cidr = self.BASE_CIDR + '/24'
         data = self.client.create_subnet(VpcId=self.vpc_id,
@@ -65,6 +67,7 @@ class SubnetTest(base.EC2TestCase):
                           self.client.delete_subnet,
                           SubnetId=subnet_id)
 
+    @decorators.idempotent_id('4d27f078-46d2-4e2c-87c4-b5ba4589c2aa')
     def test_dependency_subnet_to_vpc(self):
         data = self.client.create_vpc(CidrBlock=self.VPC_CIDR)
         vpc_id = data['Vpc']['VpcId']
@@ -90,6 +93,7 @@ class SubnetTest(base.EC2TestCase):
         self.client.delete_vpc(VpcId=vpc_id)
         self.cancelResourceCleanUp(vpc_clean)
 
+    @decorators.idempotent_id('85ee17ca-5e2c-4d54-84ca-efcca8f94ff9')
     @testtools.skipUnless(
         CONF.aws.run_incompatible_tests,
         "bug with overlapped subnets")
@@ -113,6 +117,7 @@ class SubnetTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
+    @decorators.idempotent_id('20ea7ea4-67e6-42ed-9b91-e7b4b8d82605')
     def test_create_subnet_invalid_cidr(self):
         def _rollback(fn_data):
             self.client.delete_subnet(SubnetId=fn_data['Subnet']['SubnetId'])
@@ -135,6 +140,7 @@ class SubnetTest(base.EC2TestCase):
                           self.client.create_subnet, rollback_fn=_rollback,
                           VpcId=self.vpc_id, CidrBlock=cidr)
 
+    @decorators.idempotent_id('8f0f2637-118f-4307-8585-7470808b3a86')
     def test_describe_subnets_base(self):
         cidr = self.BASE_CIDR + '/24'
         data = self.client.create_subnet(VpcId=self.vpc_id, CidrBlock=cidr)
@@ -156,6 +162,7 @@ class SubnetTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
+    @decorators.idempotent_id('182d151c-2dca-46bd-b137-1dece7276e1f')
     def test_describe_subnets_filters(self):
         cidr = self.BASE_CIDR + '/24'
         data = self.client.create_subnet(VpcId=self.vpc_id, CidrBlock=cidr)

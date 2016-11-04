@@ -14,6 +14,7 @@
 #    under the License.
 
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -24,6 +25,7 @@ CONF = config.CONF
 
 class ImageTest(base.EC2TestCase):
 
+    @decorators.idempotent_id('19a2fda6-0b78-4544-a6c5-ac16f39811c8')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_check_ebs_image_type(self):
         image_id = CONF.aws.ebs_image_id
@@ -33,6 +35,7 @@ class ImageTest(base.EC2TestCase):
         self.assertEqual("ebs", image['RootDeviceType'],
                          "Image is not EBS image")
 
+    @decorators.idempotent_id('d45be578-5968-4189-8f25-56bf8ef23d20')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_check_ebs_image_volume_properties(self):
         image_id = CONF.aws.ebs_image_id
@@ -56,6 +59,7 @@ class ImageTest(base.EC2TestCase):
             self.assertFalse(ebs.get('Encrypted'))
             self.assertIsNotNone(ebs.get('VolumeType'))
 
+    @decorators.idempotent_id('a139f5ea-45fd-4b3e-9a52-32de0f8c3bca')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_describe_image_with_filters(self):
         image_id = CONF.aws.ebs_image_id
@@ -72,6 +76,7 @@ class ImageTest(base.EC2TestCase):
         self.assertEqual(1, len(data['Images']))
         self.assertEqual(image_id, data['Images'][0]['ImageId'])
 
+    @decorators.idempotent_id('743e1f87-e0b6-4787-ab22-176379030007')
     @testtools.skipUnless(CONF.aws.image_id, "Image id is not defined")
     def test_check_image_operations_negative(self):
         # NOTE(andrey-mp): image_id is a public image created by admin
@@ -125,6 +130,7 @@ class ImageTest(base.EC2TestCase):
             self.client.deregister_image,
             ImageId=image_id)
 
+    @decorators.idempotent_id('a948dad1-9128-446b-86ee-82db13342054')
     @testtools.skipUnless(CONF.aws.image_id, 'image id is not defined')
     def test_create_image_from_non_ebs_instance(self):
         image_id = CONF.aws.image_id
@@ -179,6 +185,7 @@ class ImageTest(base.EC2TestCase):
 
         return image_id, image_clean
 
+    @decorators.idempotent_id('f4fbb311-8a59-443d-a60a-11779917c757')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_create_image_from_ebs_instance(self):
         name = data_utils.rand_name('image')
@@ -202,6 +209,7 @@ class ImageTest(base.EC2TestCase):
         data = self.client.deregister_image(ImageId=image_id)
         self.cancelResourceCleanUp(image_clean)
 
+    @decorators.idempotent_id('b9aba1f7-0a7e-4717-b879-efe3bbea74e2')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_check_simple_image_attributes(self):
         name = data_utils.rand_name('image')
@@ -236,6 +244,7 @@ class ImageTest(base.EC2TestCase):
         data = self.client.deregister_image(ImageId=image_id)
         self.cancelResourceCleanUp(image_clean)
 
+    @decorators.idempotent_id('680963cf-84f2-488d-bcdb-fc6f9b39f78c')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_check_bdm_in_image(self):
         image_id = CONF.aws.ebs_image_id
@@ -261,6 +270,7 @@ class ImageTest(base.EC2TestCase):
         data = self.client.deregister_image(ImageId=image_id)
         self.cancelResourceCleanUp(image_clean)
 
+    @decorators.idempotent_id('1c244c9a-af3e-47f0-bc85-034e24b051e4')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         'By default glance is configured as "publicize_image": "role:admin"')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
@@ -316,6 +326,7 @@ class ImageRegisterTest(base.EC2TestCase):
         if not cls.image_location:
             raise cls.skipException('Image materials are not ready in S3')
 
+    @decorators.idempotent_id('3e25269d-c8a2-4438-ab25-c343cb53db79')
     def test_register_get_deregister_ami_image(self):
         image_name = data_utils.rand_name("ami-name")
         data = self.client.register_image(

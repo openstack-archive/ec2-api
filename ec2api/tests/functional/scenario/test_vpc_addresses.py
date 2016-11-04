@@ -16,6 +16,7 @@
 import time
 
 from oslo_log import log
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -29,6 +30,7 @@ LOG = log.getLogger(__name__)
 class VpcAddressTest(scenario_base.BaseScenarioTest):
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('aa667fc6-fd9e-4664-92b8-23263d643d9e')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_auto_diassociate_address(self):
         vpc_id, subnet_id = self.create_vpc_and_subnet('10.3.0.0/20')

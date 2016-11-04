@@ -14,6 +14,7 @@
 #    under the License.
 
 import botocore.exceptions
+from tempest.lib import decorators
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -33,6 +34,7 @@ class CustomerGatewayTest(base.EC2TestCase):
             raise cls.skipException('VPC is disabled')
         base.check_network_feature_enabled('vpnaas')
 
+    @decorators.idempotent_id('54a40b66-1675-44b1-938d-0cad2eb6afe4')
     def test_create_delete_customer_gateway(self):
         data = self.client.create_customer_gateway(
             Type='ipsec.1', PublicIp=self.CUSTOMER_GATEWAY_IP, BgpAsn=65000)

@@ -14,6 +14,7 @@
 #    under the License.
 
 from oslo_log import log
+from tempest.lib import decorators
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -40,6 +41,7 @@ class RouteTest(base.EC2TestCase):
         cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
 
+    @decorators.idempotent_id('69c04d14-5603-4a98-9331-739821b98b10')
     def test_create_delete_route_table(self):
         data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
@@ -63,6 +65,7 @@ class RouteTest(base.EC2TestCase):
                           self.client.delete_route_table,
                           RouteTableId=rt_id)
 
+    @decorators.idempotent_id('d8051b30-eb70-4c4b-988b-56078a125af3')
     def test_describe_route_tables_base(self):
         data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
@@ -81,6 +84,7 @@ class RouteTest(base.EC2TestCase):
         data = self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('77a53f3e-437a-45ed-b3b5-e6b7ab2c9407')
     def test_describe_route_tables_filters(self):
         data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
@@ -133,6 +137,7 @@ class RouteTest(base.EC2TestCase):
                           self.client.describe_route_tables,
                           Filters=[{'Name': 'fake', 'Values': ['fake']}])
 
+    @decorators.idempotent_id('55361f57-331a-43b8-8729-efee2d1c0dc9')
     def test_associate_disassociate_route_table(self):
         data = self.client.create_route_table(VpcId=self.vpc_id)
         rt_id = data['RouteTable']['RouteTableId']
@@ -162,6 +167,7 @@ class RouteTest(base.EC2TestCase):
         data = self.client.delete_route_table(RouteTableId=rt_id)
         self.cancelResourceCleanUp(res_clean_rt)
 
+    @decorators.idempotent_id('b1a07211-6e9a-41db-8017-47e7c4b9c043')
     def test_replace_route_table(self):
         data = self.client.create_subnet(VpcId=self.vpc_id,
                                          CidrBlock=self.SUBNET_CIDR)
@@ -224,6 +230,7 @@ class RouteTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean_subnet)
         self.get_subnet_waiter().wait_delete(subnet_id)
 
+    @decorators.idempotent_id('c112ecdb-dce3-4497-b11b-5349a2d89336')
     def test_create_delete_route(self):
         data = self.client.create_subnet(VpcId=self.vpc_id,
                                          CidrBlock=self.SUBNET_CIDR)

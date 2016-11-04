@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -23,6 +24,7 @@ CONF = config.CONF
 
 class VolumeTest(base.EC2TestCase):
 
+    @decorators.idempotent_id('51fd4d06-7b00-427a-9d69-6ecd076c219a')
     def test_create_delete_volume(self):
         kwargs = {
             'Size': 1,
@@ -55,6 +57,7 @@ class VolumeTest(base.EC2TestCase):
                           self.client.delete_volume,
                           VolumeId=volume_id)
 
+    @decorators.idempotent_id('a7f1c4f8-2153-4d09-b5d5-bf087ea2f6ed')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "Encryption is not implemented")
     def test_create_encrypted_volume(self):
@@ -76,6 +79,7 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
+    @decorators.idempotent_id('16c97f73-c4f2-4e91-9506-4f6da4a33f8a')
     def test_describe_volumes(self):
         kwargs = {
             'Size': 1,
@@ -112,6 +116,7 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
+    @decorators.idempotent_id('30697dd5-12e7-4dd3-8cf8-5bdb296f26d8')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "Volume statuses are not implemented")
     def test_describe_volume_status(self):
@@ -138,6 +143,7 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_volume_waiter().wait_delete(volume_id)
 
+    @decorators.idempotent_id('b0116edc-250c-4083-b1ad-66c0eb984415')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "ebs image id is not defined")
     def test_attach_detach_volume(self):
         clean_dict = {}
@@ -213,6 +219,7 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_i)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('c4b470b7-0825-418f-bc76-533f84247878')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_attaching_stage(self):
         clean_dict = {}
@@ -268,6 +275,7 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_i)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('949ced35-fb66-4e87-afd8-f64de3dd20e9')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "Volume statuses are not implemented")
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
@@ -332,6 +340,7 @@ class VolumeTest(base.EC2TestCase):
         self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('c37b01f7-5b27-4773-9278-9e0b8eaccb5f')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_volume_auto_termination_swithed_off(self):
         instance_id = self.run_instance()
@@ -370,6 +379,7 @@ class VolumeTest(base.EC2TestCase):
         self.cancelResourceCleanUp(clean_v)
         self.get_volume_waiter().wait_delete(volume_id)
 
+    @decorators.idempotent_id('c8649cab-e1f4-42f7-9578-8e72d06534ba')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "modify_instance_attribute is not implemented")
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")

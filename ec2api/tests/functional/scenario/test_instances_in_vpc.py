@@ -17,6 +17,7 @@ import netaddr
 from oslo_log import log
 from tempest.lib.common import ssh
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 from tempest.lib import exceptions
 import testtools
 
@@ -59,18 +60,21 @@ class InstancesInVPCTest(scenario_base.BaseScenarioTest):
         waiter.wait_no_exception('ping %s -c 1' % last_ip)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('b986708e-9559-493d-aeb3-97fc992a65cf')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_instances_in_min_subnet(self):
         self._test_instances(28)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('7bf8e80c-cd05-4ccb-944a-e4b09825d151')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_instances_in_max_subnet(self):
         self._test_instances(16)
 
     @base.skip_without_vpc()
+    @decorators.idempotent_id('9c3a8066-68b2-4bd0-85e0-6d4a0d7cb053')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_default_gateway(self):

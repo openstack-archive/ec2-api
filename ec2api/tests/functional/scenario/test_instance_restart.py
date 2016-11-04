@@ -16,6 +16,7 @@
 from oslo_log import log
 from tempest.lib.common import ssh
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -28,6 +29,7 @@ LOG = log.getLogger(__name__)
 
 class InstanceRestartTest(scenario_base.BaseScenarioTest):
 
+    @decorators.idempotent_id('8ae801a5-3e4a-4a34-903a-45e34ff9eccd')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.run_long_tests, 'Slow test has skipped.')
     @testtools.skipUnless(CONF.aws.image_id_ubuntu,
@@ -60,6 +62,7 @@ class InstanceRestartTest(scenario_base.BaseScenarioTest):
         data = ssh_client.exec_command('last -x')
         self.assertIn("shutdown", data)
 
+    @decorators.idempotent_id('ae1cce79-882c-4f37-b9e9-2f7156712721')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.run_long_tests, 'Slow test has skipped.')
     @testtools.skipUnless(CONF.aws.image_id_ubuntu,

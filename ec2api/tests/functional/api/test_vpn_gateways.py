@@ -14,6 +14,7 @@
 #    under the License.
 
 import botocore.exceptions
+from tempest.lib import decorators
 
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
@@ -39,6 +40,7 @@ class VpnGatewayTest(base.EC2TestCase):
         cls.get_vpc_waiter().wait_available(cls.vpc_id)
         cls.addResourceCleanUpStatic(cls.client.delete_vpc, VpcId=cls.vpc_id)
 
+    @decorators.idempotent_id('d38c0185-782c-4da3-b02c-9cd7bf91b001')
     def test_create_delete_vpn_gateway(self):
         data = self.client.create_vpn_gateway(
             Type='ipsec.1', AvailabilityZone=CONF.aws.aws_zone)
@@ -60,6 +62,7 @@ class VpnGatewayTest(base.EC2TestCase):
             self.assertEqual('InvalidVpnGatewayID.NotFound',
                              ex.response['Error']['Code'])
 
+    @decorators.idempotent_id('1d76b335-57ba-449a-9751-af75a8a7d11c')
     def test_attach_detach_vpn_gateway(self):
         data = self.client.create_vpn_gateway(
             Type='ipsec.1', AvailabilityZone=CONF.aws.aws_zone)
