@@ -23,6 +23,7 @@ from oslo_log import log
 import paramiko
 from tempest.lib.common import ssh
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -48,6 +49,7 @@ class VpnTest(scenario_base.BaseScenarioTest):
             raise cls.skipException('VPC is disabled')
         base.check_network_feature_enabled('vpnaas')
 
+    @decorators.idempotent_id('63c2ac38-cfee-45d3-b765-c9b43859660d')
     def test_vpn_routing(self):
         vpc_id, _subnet_id = self.create_vpc_and_subnet('10.42.0.0/20')
 
@@ -70,6 +72,7 @@ class VpnTest(scenario_base.BaseScenarioTest):
         self.assertNotEmpty(data['PropagatingVgws'])
         self.assertEqual(vgw_id, data['PropagatingVgws'][0]['GatewayId'])
 
+    @decorators.idempotent_id('9e284d9e-8fee-43c7-bcfb-8ed0dfa27dbc')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.run_long_tests, 'Slow test has skipped.')
     @testtools.skipUnless(CONF.aws.image_id_ubuntu,

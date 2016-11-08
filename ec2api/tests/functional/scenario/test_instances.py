@@ -20,6 +20,7 @@ from oslo_log import log
 import six
 from tempest.lib.common import ssh
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -71,6 +72,7 @@ PUBLIC_KEY_MATERIAL = (
 
 class InstancesTest(scenario_base.BaseScenarioTest):
 
+    @decorators.idempotent_id('c25defc4-b075-4794-9fa6-3b67353c4079')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_metadata(self):
@@ -109,6 +111,7 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         # compare only keys. without 'sha-rsa' and owner
         self.assertEqual(PUBLIC_KEY_MATERIAL.split()[1], data.split()[1])
 
+    @decorators.idempotent_id('9fd254b1-dad1-4bb6-959f-f2cf937873c7')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.image_id, "image id is not defined")
     def test_compare_console_output(self):
@@ -137,6 +140,7 @@ class InstancesTest(scenario_base.BaseScenarioTest):
         waiter = base.EC2Waiter(_compare_console_output)
         waiter.wait_no_exception()
 
+    @decorators.idempotent_id('df1bb8f2-193c-46ba-aa99-3981bbc367db')
     @testtools.skipUnless(CONF.aws.run_ssh, 'SSH tests are disabled.')
     @testtools.skipUnless(CONF.aws.ami_image_location, "Image is absent in S3")
     def test_run_and_ping_registered_image(self):

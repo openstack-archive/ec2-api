@@ -13,6 +13,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from tempest.lib import decorators
+
 from ec2api.tests.functional import base
 from ec2api.tests.functional import config
 
@@ -21,6 +23,7 @@ CONF = config.CONF
 
 class RegionTest(base.EC2TestCase):
 
+    @decorators.idempotent_id('f303e87e-4e5f-4110-a5da-5f690acb44ba')
     def test_describe_regions(self):
         data = self.client.describe_regions()
         self.assertNotEmpty(data['Regions'])
@@ -32,6 +35,7 @@ class RegionTest(base.EC2TestCase):
         regions = [r['RegionName'] for r in data['Regions']]
         self.assertIn(region, regions)
 
+    @decorators.idempotent_id('be38f383-4637-4581-bb62-b47c1463f0a1')
     def test_describe_zones(self):
         data = self.client.describe_availability_zones()
         self.assertNotEmpty(data['AvailabilityZones'])

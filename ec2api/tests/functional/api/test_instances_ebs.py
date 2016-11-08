@@ -14,6 +14,7 @@
 #    under the License.
 
 from oslo_log import log
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -25,6 +26,7 @@ LOG = log.getLogger(__name__)
 
 class InstanceWithEBSTest(base.EC2TestCase):
 
+    @decorators.idempotent_id('a5cad848-bed2-4dcb-8ba0-987bb7e9c487')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_create_get_delete_ebs_instance(self):
         """Launch EBS-backed instance, check results, and terminate it."""
@@ -53,6 +55,7 @@ class InstanceWithEBSTest(base.EC2TestCase):
         data = self.client.terminate_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('b6226b7b-d965-4c3a-b2a8-48add794c194')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_create_root_volume_snapshot(self):
         """Create snapshot of root volume of EBS-backed instance."""

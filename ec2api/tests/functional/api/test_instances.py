@@ -15,6 +15,7 @@
 
 from oslo_log import log
 from tempest.lib.common.utils import data_utils
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -34,6 +35,7 @@ class InstanceTest(base.EC2TestCase):
             raise cls.skipException('aws image_id does not provided')
         cls.zone = CONF.aws.aws_zone
 
+    @decorators.idempotent_id('5604e461-c36a-4fea-84bc-eddfe702ae4f')
     def test_create_delete_instance(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id
@@ -69,6 +71,7 @@ class InstanceTest(base.EC2TestCase):
         # Amazon returns instance in 'terminated' state some time after
         # instance deletion. But Openstack doesn't return such instance.
 
+    @decorators.idempotent_id('40b273e5-3d43-4529-99b0-da5dd7e6764e')
     def test_create_idempotent_instance(self):
         client_token = data_utils.rand_name('t')
         instance_type = CONF.aws.instance_type
@@ -103,6 +106,7 @@ class InstanceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('4c3c709a-72e2-4c87-bab2-e3a16fc5d1fe')
     def test_describe_instances_filter(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id
@@ -156,6 +160,7 @@ class InstanceTest(base.EC2TestCase):
         self.assertNotEmpty(instances)
         self.assertEqual(instance_id, instances[0]['InstanceId'])
 
+    @decorators.idempotent_id('d40bf881-4220-46a9-b04a-fca9054c9731')
     def test_get_password_data_and_console_output(self):
         instance_type = CONF.aws.instance_type
         image_id = CONF.aws.image_id
@@ -189,6 +194,7 @@ class InstanceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('5947ccaa-a519-46f4-9d58-ceb79042266a')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_stop_instance(self):
         instance_type = CONF.aws.instance_type
@@ -218,6 +224,7 @@ class InstanceTest(base.EC2TestCase):
         self.cancelResourceCleanUp(res_clean)
         self.get_instance_waiter().wait_delete(instance_id)
 
+    @decorators.idempotent_id('0f29affb-eae5-42be-9b52-d28a17ba7107')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
         "Openstack doesn't assign public ip automatically for new instance")
     def test_public_ip_is_assigned(self):

@@ -13,6 +13,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from tempest.lib import decorators
 import testtools
 
 from ec2api.tests.functional import base
@@ -23,6 +24,7 @@ CONF = config.CONF
 
 class KeyPairTest(base.EC2TestCase):
 
+    @decorators.idempotent_id('15cfd866-d6bb-473a-9b8a-6420900a5ca3')
     def test_create_delete_key_pair(self):
         keyName = 'Test key'
         data = self.client.create_key_pair(KeyName=keyName)
@@ -37,6 +39,7 @@ class KeyPairTest(base.EC2TestCase):
         data = self.client.delete_key_pair(KeyName=keyName)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('05478a51-1505-42a8-8c7d-4fd7e32c467e')
     def test_create_duplicate_key_pair(self):
         keyName = 'Test key'
         self.client.create_key_pair(KeyName=keyName)
@@ -50,6 +53,7 @@ class KeyPairTest(base.EC2TestCase):
         self.client.delete_key_pair(KeyName=keyName)
         self.cancelResourceCleanUp(res_clean)
 
+    @decorators.idempotent_id('43d87b6e-6667-4d19-8c0b-e73901105bb7')
     def test_describe_key_pairs(self):
         keyName = 'Test key'
         data = self.client.create_key_pair(KeyName=keyName)
@@ -91,6 +95,7 @@ class KeyPairTest(base.EC2TestCase):
         # NOTE(andrey-mp): Amazon allows to delete absent key and returns 200
         self.client.delete_key_pair(KeyName=keyName)
 
+    @decorators.idempotent_id('0e51eec5-3f61-4d8a-89c9-8d098f381682')
     def test_import_empty_key_pair(self):
         keyName = 'Test key'
         publicKey = ''
@@ -103,6 +108,7 @@ class KeyPairTest(base.EC2TestCase):
                           rollback_fn=_rollback,
                           KeyName=keyName, PublicKeyMaterial=publicKey)
 
+    @decorators.idempotent_id('478c17e6-b7ca-4115-bee2-be279bdd0f65')
     @testtools.skipUnless(CONF.aws.run_incompatible_tests,
                           "Different error code")
     def test_import_invalid_key_pair(self):
@@ -117,6 +123,7 @@ class KeyPairTest(base.EC2TestCase):
                           rollback_fn=_rollback,
                           KeyName=keyName, PublicKeyMaterial=publicKey)
 
+    @decorators.idempotent_id('eda525d6-144b-4840-b6ba-e18d93e3589f')
     def test_import_key_pair(self):
         keyName = 'Test key'
         publicKey = ("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs"
