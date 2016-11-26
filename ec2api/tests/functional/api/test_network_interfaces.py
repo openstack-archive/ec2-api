@@ -236,7 +236,19 @@ class NetworkInterfaceTest(base.EC2TestCase):
             self.client.delete_network_interface, NetworkInterfaceId=ni_id)
         self.get_network_interface_waiter().wait_available(ni_id)
 
-        addresses = ['10.7.0.10', '10.7.0.11']
+        ni = self.client.describe_network_interfaces(
+            NetworkInterfaceIds=[ni_id])['NetworkInterfaces']
+        ni_addr = ni[0]['PrivateIpAddresses'][0]['PrivateIpAddress']
+
+        # add two more addresses to interface.
+        # check that they does not equal to current.
+        addresses = []
+        for i in range(10, 13):
+            addr = '10.7.0.%d' % i
+            if addr != ni_addr:
+                addresses.append(addr)
+            if len(addresses) >= 2:
+                break
         data = self.client.assign_private_ip_addresses(
             NetworkInterfaceId=ni_id,
             PrivateIpAddresses=addresses)
