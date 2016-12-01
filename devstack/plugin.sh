@@ -284,6 +284,7 @@ elif [[ "$1" == "stack" && "$2" == "extra" ]]; then
     echo_summary "Initializing ec2-api"
     init_ec2api
     start_ec2api
+elif [[ "$1" == "stack" && "$2" == "test-config" ]]; then
     configure_functional_tests
 fi
 
