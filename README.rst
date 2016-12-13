@@ -8,15 +8,16 @@ Team and repository tags
 .. Change things from this point on
 
 OpenStack EC2 API README
------------------------------
+------------------------
 
 Support of EC2 API for OpenStack.
 This project provides a standalone EC2 API service which pursues two goals:
+
  1. Implement VPC API
  2. Create a standalone service for EC2 API support.
 
 Installation
-=====
+============
 
 Run install.sh
 
@@ -148,7 +149,7 @@ General:
 +----------+------------------------------------------+-----------------+----------------------------------------+
 | EC2, VPC | AuthorizeSecurityGroupEgress             | security groups | EC2 classic way to pass cidr, protocol,|
 |          |                                          |                 | sourceGroup, ports parameters          |
-+-[21~---------+------------------------------------------+-----------------+----------------------------------------+
++----------+------------------------------------------+-----------------+----------------------------------------+
 | EC2, VPC | AuthorizeSecurityGroupIngress            | security groups | EC2 classic way to pass cidr, protocol,|
 |          |                                          |                 | sourceGroup, ports parameters          |
 +----------+------------------------------------------+-----------------+----------------------------------------+
@@ -598,21 +599,6 @@ General:
 |          | *UnmonitorInstances*                     | monitoring      | not supported                          |
 +----------+------------------------------------------+-----------------+----------------------------------------+
 
-Legacy OpenStack release notice
-===============================
-
-
-EC2 API supports Nova client (>=2.16.0) with no microversion support.
-
-Preferred way to run EC2 API in older releases is to run it in virtual environment:
- * create virtual environment by running command 'python tools/install_venv.py'
- * run install inside venv 'tools/with_venv.sh ./install.sh'
- * and then you need to run EC2 API services: 'ec2-api', 'ec2-api-metadata', and 'ec2-api-s3'
-Also you need to reconfigure metadata ports in nova(and neutron) config files
-if you want metadata to work correctly. (See 'Installation' section).
-After these steps you will have working EC2 API services at ports:
-8788 for EC2 API and 3334 for S3 API. Don't forget to change keystone endpoints
-if you want to run some automated scripts relying on keystone information.
 
 References
 ==========
