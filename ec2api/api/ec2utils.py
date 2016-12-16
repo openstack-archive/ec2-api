@@ -482,6 +482,18 @@ def get_attached_gateway(context, vpc_id, gateway_kind):
                  if gw['vpc_id'] == vpc_id), None)
 
 
+_check_and_create_default_vpc = None
+
+
+def check_and_create_default_vpc(context):
+    return _check_and_create_default_vpc(context)
+
+
+def set_check_and_create_default_vpc(check_and_create_default_vpc):
+    global _check_and_create_default_vpc
+    _check_and_create_default_vpc = check_and_create_default_vpc
+
+
 # NOTE(ft): following functions are copied from various parts of Nova
 
 _ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')

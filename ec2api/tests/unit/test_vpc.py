@@ -218,14 +218,16 @@ class VpcTestCase(base.ApiTestCase):
 
     def test_describe_vpcs(self):
         self.neutron.list_routers.return_value = (
-            {'routers': [fakes.OS_ROUTER_1, fakes.OS_ROUTER_2]})
-        self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_VPC_2)
+            {'routers': [fakes.OS_ROUTER_DEFAULT,
+                         fakes.OS_ROUTER_1, fakes.OS_ROUTER_2]})
+        self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
+                               fakes.DB_VPC_1, fakes.DB_VPC_2)
 
         resp = self.execute('DescribeVpcs', {})
         self.assertThat(resp['vpcSet'],
-                        matchers.ListMatches([fakes.EC2_VPC_1,
+                        matchers.ListMatches([fakes.EC2_VPC_DEFAULT,
+                                              fakes.EC2_VPC_1,
                                               fakes.EC2_VPC_2]))
-        self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')
 
         resp = self.execute('DescribeVpcs',
                             {'VpcId.1': fakes.ID_EC2_VPC_1})
@@ -247,10 +249,29 @@ class VpcTestCase(base.ApiTestCase):
 
     def test_describe_vpcs_no_router(self):
         self.neutron.list_routers.return_value = {'routers': []}
-        self.set_mock_db_items(fakes.DB_VPC_1)
+        self.set_mock_db_items(fakes.DB_VPC_DEFAULT, fakes.DB_VPC_1)
 
         resp = self.execute('DescribeVpcs', {})
 
         self.assertThat(resp['vpcSet'],
-                        matchers.ListMatches([fakes.EC2_VPC_1]))
-        self.db_api.get_items.assert_called_once_with(mock.ANY, 'vpc')
+                        matchers.ListMatches([fakes.EC2_VPC_DEFAULT,
+                                              fakes.EC2_VPC_1]))
+
+    @mock.patch('ec2api.api.vpc._check_and_create_default_vpc')
+    def test_describe_vpcs_no_default_vpc(self, check_and_create):
+        def mock_check_and_create(context):
+            self.set_mock_db_items(fakes.DB_VPC_DEFAULT)
+        check_and_create.side_effect = mock_check_and_create
+
+        resp = self.execute('DescribeVpcs', {})
+        self.assertEqual(resp['vpcSet'], [fakes.EC2_VPC_DEFAULT])
+
+        check_and_create.assert_called_once_with(mock.ANY)
+
+    def test_describe_vpcs_with_default_vpc(self):
+        self.set_mock_db_items(fakes.DB_VPC_DEFAULT)
+
+        resp = self.execute('DescribeVpcs', {})
+        self.assertEqual(resp['vpcSet'], [fakes.EC2_VPC_DEFAULT])
+
+        self.db_api.add_item.assert_not_called()

@@ -40,27 +40,11 @@ LOG = logging.getLogger(__name__)
 
 Validator = common.Validator
 
+DEFAULT_VPC_CIDR_BLOCK = '172.31.0.0/16'
+
 
 def create_vpc(context, cidr_block, instance_tenancy='default'):
-    neutron = clients.neutron(context)
-    with common.OnCrashCleaner() as cleaner:
-        os_router_body = {'router': {}}
-        try:
-            os_router = neutron.create_router(os_router_body)['router']
-        except neutron_exception.OverQuotaClient:
-            raise exception.VpcLimitExceeded()
-        cleaner.addCleanup(neutron.delete_router, os_router['id'])
-        vpc = db_api.add_item(context, 'vpc',
-                              {'os_id': os_router['id'],
-                               'cidr_block': cidr_block})
-        cleaner.addCleanup(db_api.delete_item, context, vpc['id'])
-        route_table = route_table_api._create_route_table(context, vpc)
-        cleaner.addCleanup(route_table_api._delete_route_table,
-                           context, route_table['id'])
-        vpc['route_table_id'] = route_table['id']
-        db_api.update_item(context, vpc)
-        neutron.update_router(os_router['id'], {'router': {'name': vpc['id']}})
-        security_group_api._create_default_security_group(context, vpc)
+    vpc = _create_vpc(context, cidr_block)
     return {'vpc': _format_vpc(vpc)}
 
 
@@ -130,15 +114,49 @@ class VpcDescriber(common.TaggableItemsDescriber,
 
 
 def describe_vpcs(context, vpc_id=None, filter=None):
+    _check_and_create_default_vpc(context)
     formatted_vpcs = VpcDescriber().describe(
         context, ids=vpc_id, filter=filter)
     return {'vpcSet': formatted_vpcs}
+
+
+def _create_vpc(context, cidr_block, is_default=False):
+    neutron = clients.neutron(context)
+    with common.OnCrashCleaner() as cleaner:
+        os_router_body = {'router': {}}
+        try:
+            os_router = neutron.create_router(os_router_body)['router']
+        except neutron_exception.OverQuotaClient:
+            raise exception.VpcLimitExceeded()
+        cleaner.addCleanup(neutron.delete_router, os_router['id'])
+        vpc = db_api.add_item(context, 'vpc',
+                              {'os_id': os_router['id'],
+                               'cidr_block': cidr_block,
+                               'is_default': is_default})
+        cleaner.addCleanup(db_api.delete_item, context, vpc['id'])
+        route_table = route_table_api._create_route_table(context, vpc)
+        cleaner.addCleanup(route_table_api._delete_route_table,
+                           context, route_table['id'])
+        vpc['route_table_id'] = route_table['id']
+        db_api.update_item(context, vpc)
+        neutron.update_router(os_router['id'], {'router': {'name': vpc['id']}})
+        security_group_api._create_default_security_group(context, vpc)
+    return vpc
+
+
+def _check_and_create_default_vpc(context):
+    if not any(vpc.get('is_default')
+               for vpc in db_api.get_items(context, 'vpc')):
+        _create_vpc(context, DEFAULT_VPC_CIDR_BLOCK, is_default=True)
+
+
+ec2utils.set_check_and_create_default_vpc(_check_and_create_default_vpc)
 
 
 def _format_vpc(vpc):
     return {'vpcId': vpc['id'],
             'state': "available",
             'cidrBlock': vpc['cidr_block'],
-            'isDefault': False,
+            'isDefault': vpc.get('is_default', False),
             'dhcpOptionsId': vpc.get('dhcp_options_id', 'default'),
             }
