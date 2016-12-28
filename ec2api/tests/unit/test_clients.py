@@ -54,7 +54,7 @@ class ClientsTestCase(base.BaseTestCase):
                           links=[{'href': 'http://host:port/path/v2/'}])
         v2_1 = mock.NonCallableMock()
         v2_1.configure_mock(id='v2.1',
-                            version='2.11',
+                            version='2.40',
                             links=[{'href': 'http://host:port/path/v2.1/'}])
 
         # test normal flow

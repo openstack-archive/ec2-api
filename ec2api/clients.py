@@ -68,7 +68,10 @@ LEGACY_NOVA_API_VERSION = '2'
 # properties
 # Nova API's 2.10 microversion provides admin access to users keypairs,
 # which allows metadata service to expose openssh part of an instance key
-REQUIRED_NOVA_API_MICROVERSION = '2.10'
+# Nova API's 2.32 microversion allows 'tag' field of bdm v2, which may be
+# contained in image bdms, defined by users or autocreated with instance
+# snapshot
+REQUIRED_NOVA_API_MICROVERSION = '2.32'
 _nova_api_version = None
 
 
