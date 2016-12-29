@@ -173,6 +173,7 @@ class SubnetDescriber(common.TaggableItemsDescriber):
 
 
 def describe_subnets(context, subnet_id=None, filter=None):
+    ec2utils.check_and_create_default_vpc(context)
     formatted_subnets = SubnetDescriber().describe(context, ids=subnet_id,
                                                    filter=filter)
     return {'subnetSet': formatted_subnets}

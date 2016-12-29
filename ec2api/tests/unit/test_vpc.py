@@ -115,7 +115,8 @@ class VpcTestCase(base.ApiTestCase):
         self.db_api.delete_item.assert_any_call(mock.ANY,
                                                 fakes.ID_EC2_ROUTE_TABLE_1)
 
-    def test_delete_vpc(self):
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_delete_vpc(self, check_and_create):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1,
                                fakes.DB_SECURITY_GROUP_1)
 
@@ -142,7 +143,8 @@ class VpcTestCase(base.ApiTestCase):
         self.assertEqual(0, self.neutron.delete_router.call_count)
         self.assertEqual(0, self.db_api.delete_item.call_count)
 
-    def test_delete_vpc_dependency_violation(self):
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_delete_vpc_dependency_violation(self, check_and_create):
         def do_check():
             self.assert_execution_error('DependencyViolation', 'DeleteVpc',
                                         {'VpcId': fakes.ID_EC2_VPC_1})
@@ -178,7 +180,8 @@ class VpcTestCase(base.ApiTestCase):
                                fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1, )
         do_check()
 
-    def test_delete_vpc_not_conststent_os_vpc(self):
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_delete_vpc_not_conststent_os_vpc(self, check_and_create):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
 
         def check_response(resp):
@@ -204,7 +207,8 @@ class VpcTestCase(base.ApiTestCase):
         check_response(resp)
 
     @tools.screen_unexpected_exception_logs
-    def test_delete_vpc_rollback(self):
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_delete_vpc_rollback(self, check_and_create):
         self.set_mock_db_items(fakes.DB_VPC_1, fakes.DB_ROUTE_TABLE_1)
         self.neutron.delete_router.side_effect = Exception()
 
