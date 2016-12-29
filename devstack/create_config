@@ -40,7 +40,7 @@ S3_URL=`openstack endpoint list --service s3 --interface public --os-identity-ap
 # reinstalling can help
 aws --version
 if [[ "$?" -ne "0" ]]; then
-  sudo pip install awscli --upgrade
+  sudo pip install awscli --upgrade --upgrade-strategy only-if-needed
   aws --version
   if [[ "$?" -ne "0" ]]; then
     die $LINENO "Looks like awscli is not correctly installed."

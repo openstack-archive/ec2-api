@@ -7,3 +7,5 @@ enable_service n-crt
 enable_service ec2-api
 enable_service ec2-api-metadata
 enable_service ec2-api-s3
+
+IPSEC_PACKAGE=strongswan
