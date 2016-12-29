@@ -53,11 +53,14 @@ TIME_ATTACH_NETWORK_INTERFACE = timeutils.isotime(None, True)
 MAC_ADDRESS = 'fb:10:2e:b2:ba:b7'
 
 # vpc constants
+ID_EC2_VPC_DEFAULT = random_ec2_id('vpc')
 ID_EC2_VPC_1 = random_ec2_id('vpc')
 ID_EC2_VPC_2 = random_ec2_id('vpc')
+ID_OS_ROUTER_DEFAULT = random_os_id()
 ID_OS_ROUTER_1 = random_os_id()
 ID_OS_ROUTER_2 = random_os_id()
 
+CIDR_VPC_DEFAULT = '172.31.0.0/16'
 CIDR_VPC_1 = '10.10.0.0/16'
 CIDR_VPC_2 = '10.20.0.0/16'
 ID_OS_PUBLIC_NETWORK = random_os_id()
@@ -156,6 +159,7 @@ NAME_DEFAULT_OS_SECURITY_GROUP = 'default'
 
 
 # route table constants
+ID_EC2_ROUTE_TABLE_DEFAULT = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_1 = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_2 = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_3 = random_ec2_id('rtb')
@@ -377,9 +381,16 @@ CUSTOMER_GATEWAY_CONFIGURATION_2 = etree.tostring(
 
 # vpc objects
 # 2 vpcs in normal state
+DB_VPC_DEFAULT = {'id': ID_EC2_VPC_DEFAULT,
+                  'os_id': ID_OS_ROUTER_DEFAULT,
+                  'vpc_id': None,
+                  'is_default': True,
+                  'cidr_block': CIDR_VPC_DEFAULT,
+                  'route_table_id': ID_EC2_ROUTE_TABLE_DEFAULT}
 DB_VPC_1 = {'id': ID_EC2_VPC_1,
             'os_id': ID_OS_ROUTER_1,
             'vpc_id': None,
+            'is_default': False,
             'cidr_block': CIDR_VPC_1,
             'route_table_id': ID_EC2_ROUTE_TABLE_1}
 DB_VPC_2 = {'id': ID_EC2_VPC_2,
@@ -387,6 +398,11 @@ DB_VPC_2 = {'id': ID_EC2_VPC_2,
             'vpc_id': None,
             'cidr_block': CIDR_VPC_2}
 
+EC2_VPC_DEFAULT = {'vpcId': ID_EC2_VPC_DEFAULT,
+                   'cidrBlock': CIDR_VPC_DEFAULT,
+                   'isDefault': True,
+                   'state': 'available',
+                   'dhcpOptionsId': 'default'}
 EC2_VPC_1 = {'vpcId': ID_EC2_VPC_1,
              'cidrBlock': CIDR_VPC_1,
              'isDefault': False,
@@ -398,6 +414,9 @@ EC2_VPC_2 = {'vpcId': ID_EC2_VPC_2,
              'state': 'available',
              'dhcpOptionsId': 'default'}
 
+OS_ROUTER_DEFAULT = {'id': ID_OS_ROUTER_DEFAULT,
+                     'name': ID_EC2_VPC_DEFAULT,
+                     'external_gateway_info': None}
 OS_ROUTER_1 = {'id': ID_OS_ROUTER_1,
                'name': ID_EC2_VPC_1,
                'external_gateway_info': {
@@ -1159,6 +1178,13 @@ EC2_NOVA_SECURITY_GROUP_2 = {
 
 
 # route table objects
+DB_ROUTE_TABLE_DEFAULT = {
+    'id': ID_EC2_ROUTE_TABLE_DEFAULT,
+    'vpc_id': ID_EC2_VPC_DEFAULT,
+    'routes': [{'destination_cidr_block': CIDR_VPC_DEFAULT,
+                'gateway_id': None}],
+}
+
 DB_ROUTE_TABLE_1 = {
     'id': ID_EC2_ROUTE_TABLE_1,
     'vpc_id': ID_EC2_VPC_1,
