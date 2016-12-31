@@ -70,6 +70,7 @@ IP_ROUTER_1_EXTERNAL_V6 = '::ffff:172.20.12.25'
 
 
 # internet gateway constants
+ID_EC2_IGW_DEFAULT = random_ec2_id('igw')
 ID_EC2_IGW_1 = random_ec2_id('igw')
 ID_EC2_IGW_2 = random_ec2_id('igw')
 
@@ -439,6 +440,9 @@ OS_ROUTER_2 = {'id': ID_OS_ROUTER_2,
 
 # internet gateway objects
 # 2 internate gateway, the first is attached to the first vpc
+DB_IGW_DEFAULT = {'id': ID_EC2_IGW_DEFAULT,
+                  'os_id': None,
+                  'vpc_id': ID_EC2_VPC_DEFAULT}
 DB_IGW_1 = {'id': ID_EC2_IGW_1,
             'os_id': None,
             'vpc_id': ID_EC2_VPC_1}
@@ -446,6 +450,9 @@ DB_IGW_2 = {'id': ID_EC2_IGW_2,
             'os_id': None,
             'vpc_id': None}
 
+EC2_IGW_DEFAULT = {'internetGatewayId': ID_EC2_IGW_DEFAULT,
+                   'attachmentSet': [{'vpcId': ID_EC2_VPC_DEFAULT,
+                                      'state': 'available'}]}
 EC2_IGW_1 = {'internetGatewayId': ID_EC2_IGW_1,
              'attachmentSet': [{'vpcId': ID_EC2_VPC_1,
                                 'state': 'available'}]}

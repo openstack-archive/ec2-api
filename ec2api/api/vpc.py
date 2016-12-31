@@ -147,6 +147,14 @@ def _create_vpc(context, cidr_block, is_default=False):
         if is_default:
             subnet = subnet_api.create_subnet(context, vpc['id'],
                 DEFAULT_SUBNET_CIDR_BLOCK)['subnet']
+            cleaner.addCleanup(subnet_api.delete_subnet, context,
+                               subnet['subnetId'])
+            igw_id = internet_gateway_api.create_internet_gateway(
+                context)['internetGateway']['internetGatewayId']
+            cleaner.addCleanup(internet_gateway_api.delete_internet_gateway,
+                               context, igw_id)
+            internet_gateway_api.attach_internet_gateway(context, igw_id,
+                                                         vpc['id'])
     return vpc
 
 

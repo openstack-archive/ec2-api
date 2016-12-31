@@ -118,6 +118,7 @@ class InternetGatewayDescriber(common.TaggableItemsDescriber,
 
 def describe_internet_gateways(context, internet_gateway_id=None,
                                filter=None):
+    ec2utils.check_and_create_default_vpc(context)
     formatted_igws = InternetGatewayDescriber().describe(
             context, ids=internet_gateway_id, filter=filter)
     return {'internetGatewaySet': formatted_igws}
