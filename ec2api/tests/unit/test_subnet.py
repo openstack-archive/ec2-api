@@ -253,7 +253,8 @@ class SubnetTestCase(base.ApiTestCase):
         self.neutron.add_interface_router.assert_called_once_with(
                 fakes.ID_OS_ROUTER_1, {'subnet_id': fakes.ID_OS_SUBNET_1})
 
-    def test_describe_subnets(self):
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_describe_subnets(self, check_and_create):
         self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_SUBNET_2)
         self.neutron.list_subnets.return_value = (
                 {'subnets': [fakes.OS_SUBNET_1, fakes.OS_SUBNET_2]})
@@ -289,7 +290,8 @@ class SubnetTestCase(base.ApiTestCase):
             'DescribeSubnets', 'subnetSet',
             fakes.ID_EC2_SUBNET_2, 'subnetId')
 
-    def test_describe_subnets_not_consistent_os_subnet(self):
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_describe_subnets_not_consistent_os_subnet(self, check_and_create):
         self.set_mock_db_items(fakes.DB_SUBNET_1, fakes.DB_SUBNET_2)
         self.neutron.list_subnets.return_value = (
                 {'subnets': [fakes.OS_SUBNET_2]})
@@ -298,3 +300,19 @@ class SubnetTestCase(base.ApiTestCase):
 
         resp = self.execute('DescribeSubnets', {})
         self.assertEqual([], resp['subnetSet'])
+
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_describe_subnets_no_default_vpc(self, check_and_create):
+        def mock_check_and_create(context):
+            self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
+                                   fakes.DB_SUBNET_DEFAULT)
+            self.neutron.list_subnets.return_value = (
+                {'subnets': [fakes.OS_SUBNET_DEFAULT]})
+            self.neutron.list_networks.return_value = (
+                {'networks': [fakes.OS_NETWORK_DEFAULT]})
+        check_and_create.side_effect = mock_check_and_create
+
+        resp = self.execute('DescribeSubnets', {})
+        self.assertEqual(resp['subnetSet'], [fakes.EC2_SUBNET_DEFAULT])
+
+        check_and_create.assert_called_once_with(mock.ANY)

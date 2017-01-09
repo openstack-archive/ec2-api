@@ -75,13 +75,17 @@ ID_EC2_IGW_2 = random_ec2_id('igw')
 
 
 # subnet constants
+ID_EC2_SUBNET_DEFAULT = random_ec2_id('subnet')
 ID_EC2_SUBNET_1 = random_ec2_id('subnet')
 ID_EC2_SUBNET_2 = random_ec2_id('subnet')
+ID_OS_SUBNET_DEFAULT = random_os_id()
 ID_OS_SUBNET_1 = random_os_id()
 ID_OS_SUBNET_2 = random_os_id()
+ID_OS_NETWORK_DEFAULT = random_os_id()
 ID_OS_NETWORK_1 = random_os_id()
 ID_OS_NETWORK_2 = random_os_id()
 
+CIDR_SUBNET_DEFAULT = '172.31.0.0/20'
 CIDR_SUBNET_1 = '10.10.1.0/24'
 IP_FIRST_SUBNET_1 = '10.10.1.4'
 IP_LAST_SUBNET_1 = '10.10.1.254'
@@ -145,6 +149,7 @@ IP_ADDRESS_NOVA_1 = '192.168.2.100'
 
 
 # security group constants
+ID_EC2_SECURITY_GROUP_DEFAULT = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_1 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_3 = random_ec2_id('sg')
@@ -396,6 +401,7 @@ DB_VPC_1 = {'id': ID_EC2_VPC_1,
 DB_VPC_2 = {'id': ID_EC2_VPC_2,
             'os_id': ID_OS_ROUTER_2,
             'vpc_id': None,
+            # is_default is false by default, omit it to check this
             'cidr_block': CIDR_VPC_2}
 
 EC2_VPC_DEFAULT = {'vpcId': ID_EC2_VPC_DEFAULT,
@@ -446,6 +452,9 @@ EC2_IGW_2 = {'internetGatewayId': ID_EC2_IGW_2,
 
 # subnet objects
 # 2 subnets in the first vpc
+DB_SUBNET_DEFAULT = {'id': ID_EC2_SUBNET_DEFAULT,
+                     'os_id': ID_OS_SUBNET_DEFAULT,
+                     'vpc_id': ID_EC2_VPC_DEFAULT}
 DB_SUBNET_1 = {'id': ID_EC2_SUBNET_1,
                'os_id': ID_OS_SUBNET_1,
                'vpc_id': ID_EC2_VPC_1,
@@ -456,6 +465,13 @@ DB_SUBNET_2 = {'id': ID_EC2_SUBNET_2,
                'route_table_id': ID_EC2_ROUTE_TABLE_3,
                'os_vpnservice_id': ID_OS_VPNSERVICE_2}
 
+EC2_SUBNET_DEFAULT = {'subnetId': ID_EC2_SUBNET_DEFAULT,
+                      'state': 'available',
+                      'vpcId': ID_EC2_VPC_DEFAULT,
+                      'cidrBlock': CIDR_SUBNET_DEFAULT,
+                      'defaultForAz': False,
+                      'availableIpAddressCount': 4093,
+                      'mapPublicIpOnLaunch': False}
 EC2_SUBNET_1 = {'subnetId': ID_EC2_SUBNET_1,
                 'state': 'available',
                 'vpcId': ID_EC2_VPC_1,
@@ -471,6 +487,13 @@ EC2_SUBNET_2 = {'subnetId': ID_EC2_SUBNET_2,
                 'availableIpAddressCount': 253,
                 'mapPublicIpOnLaunch': False}
 
+OS_SUBNET_DEFAULT = {'id': ID_OS_SUBNET_DEFAULT,
+                     'network_id': ID_OS_NETWORK_DEFAULT,
+                     'name': ID_EC2_SUBNET_DEFAULT,
+                     'ip_version': '4',
+                     'cidr': CIDR_SUBNET_DEFAULT,
+                     'host_routes': [],
+                     'gateway_ip': None}
 OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
                'network_id': ID_OS_NETWORK_1,
                'name': ID_EC2_SUBNET_1,
@@ -488,6 +511,9 @@ OS_SUBNET_2 = {'id': ID_OS_SUBNET_2,
                'cidr': CIDR_SUBNET_2,
                'host_routes': [],
                'gateway_ip': None}
+OS_NETWORK_DEFAULT = {'id': ID_OS_NETWORK_DEFAULT,
+                      'name': ID_EC2_SUBNET_DEFAULT,
+                      'status': 'available'}
 OS_NETWORK_1 = {'id': ID_OS_NETWORK_1,
                 'name': ID_EC2_SUBNET_1,
                 'status': 'available'}

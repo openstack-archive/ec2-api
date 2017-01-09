@@ -41,6 +41,7 @@ LOG = logging.getLogger(__name__)
 Validator = common.Validator
 
 DEFAULT_VPC_CIDR_BLOCK = '172.31.0.0/16'
+DEFAULT_SUBNET_CIDR_BLOCK = '172.31.0.0/20'
 
 
 def create_vpc(context, cidr_block, instance_tenancy='default'):
@@ -141,14 +142,21 @@ def _create_vpc(context, cidr_block, is_default=False):
         db_api.update_item(context, vpc)
         neutron.update_router(os_router['id'], {'router': {'name': vpc['id']}})
         security_group_api._create_default_security_group(context, vpc)
+        cleaner.addCleanup(security_group_api.delete_security_group, context,
+                           group_name=vpc['id'], delete_default=True)
+        if is_default:
+            subnet = subnet_api.create_subnet(context, vpc['id'],
+                DEFAULT_SUBNET_CIDR_BLOCK)['subnet']
     return vpc
 
 
 def _check_and_create_default_vpc(context):
     if not any(vpc.get('is_default')
                for vpc in db_api.get_items(context, 'vpc')):
-        _create_vpc(context, DEFAULT_VPC_CIDR_BLOCK, is_default=True)
-
+        try:
+            vpc = _create_vpc(context, DEFAULT_VPC_CIDR_BLOCK, is_default=True)
+        except Exception:
+            LOG.exception('Failed to create default vpc')
 
 ec2utils.set_check_and_create_default_vpc(_check_and_create_default_vpc)
 
