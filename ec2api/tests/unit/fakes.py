@@ -151,10 +151,10 @@ IP_ADDRESS_NOVA_1 = '192.168.2.100'
 
 
 # security group constants
-ID_EC2_SECURITY_GROUP_DEFAULT = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_1 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_3 = random_ec2_id('sg')
+ID_OS_SECURITY_GROUP_DEFAULT = random_os_id()
 ID_OS_SECURITY_GROUP_1 = random_os_id()
 ID_OS_SECURITY_GROUP_2 = random_os_id()
 ID_OS_SECURITY_GROUP_3 = random_os_id()
@@ -497,17 +497,15 @@ EC2_SUBNET_2 = {'subnetId': ID_EC2_SUBNET_2,
                 'availableIpAddressCount': 253,
                 'mapPublicIpOnLaunch': False}
 
-OS_SUBNET_HOST_ROUTE_NEXTHOP = '169.254.169.254/32'
 OS_SUBNET_DEFAULT = {'id': ID_OS_SUBNET_DEFAULT,
                      'network_id': ID_OS_NETWORK_DEFAULT,
                      'name': ID_EC2_SUBNET_DEFAULT,
                      'ip_version': '4',
                      'cidr': CIDR_SUBNET_DEFAULT,
                      'host_routes': [{'nexthop': IP_GATEWAY_SUBNET_DEFAULT,
-                                      'destination': '172.31.0.0/16'},
+                                      'destination': CIDR_VPC_DEFAULT},
                                      {'nexthop': IP_GATEWAY_SUBNET_DEFAULT,
-                                      'destination':
-                                          OS_SUBNET_HOST_ROUTE_NEXTHOP}],
+                                      'destination': '0.0.0.0/0'}],
                      'gateway_ip': None}
 OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
                'network_id': ID_OS_NETWORK_1,
@@ -517,7 +515,7 @@ OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
                'host_routes': [{'nexthop': IP_GATEWAY_SUBNET_1,
                                 'destination': '10.10.0.0/16'},
                                {'nexthop': IP_GATEWAY_SUBNET_1,
-                                'destination': OS_SUBNET_HOST_ROUTE_NEXTHOP}],
+                                'destination': '169.254.169.254/32'}],
                'gateway_ip': IP_GATEWAY_SUBNET_1}
 OS_SUBNET_2 = {'id': ID_OS_SUBNET_2,
                'network_id': ID_OS_NETWORK_2,
@@ -1047,6 +1045,16 @@ OS_SECURITY_GROUP_RULE_2 = {
     'remote_ip_prefix': None,
     'security_group_id': ID_OS_SECURITY_GROUP_2
 }
+OS_SECURITY_GROUP_DEFAULT = {
+    'id': ID_OS_SECURITY_GROUP_DEFAULT,
+    'name': ID_EC2_VPC_DEFAULT,
+    'security_group_rules': [
+        OS_SECURITY_GROUP_RULE_1,
+        OS_SECURITY_GROUP_RULE_2
+    ],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
 OS_SECURITY_GROUP_1 = {
     'id': ID_OS_SECURITY_GROUP_1,
     'name': ID_EC2_VPC_1,
@@ -1223,7 +1231,9 @@ DB_ROUTE_TABLE_DEFAULT = {
     'id': ID_EC2_ROUTE_TABLE_DEFAULT,
     'vpc_id': ID_EC2_VPC_DEFAULT,
     'routes': [{'destination_cidr_block': CIDR_VPC_DEFAULT,
-                'gateway_id': None}],
+                'gateway_id': None},
+               {'destination_cidr_block': '0.0.0.0/0',
+                'gateway_id': ID_EC2_IGW_DEFAULT}],
 }
 
 DB_ROUTE_TABLE_1 = {
@@ -1258,7 +1268,11 @@ EC2_ROUTE_TABLE_DEFAULT = {
         {'destinationCidrBlock': CIDR_VPC_DEFAULT,
          'gatewayId': 'local',
          'state': 'active',
-         'origin': 'CreateRouteTable'}],
+         'origin': 'CreateRouteTable'},
+        {'destinationCidrBlock': '0.0.0.0/0',
+         'gatewayId': ID_EC2_IGW_DEFAULT,
+         'state': 'active',
+         'origin': 'CreateRoute'}],
     'associationSet': [
         {'routeTableAssociationId': ID_EC2_ROUTE_TABLE_ASSOCIATION_DEFAULT,
          'routeTableId': ID_EC2_ROUTE_TABLE_DEFAULT,
