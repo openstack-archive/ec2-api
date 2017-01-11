@@ -89,6 +89,7 @@ CIDR_SUBNET_DEFAULT = '172.31.0.0/20'
 CIDR_SUBNET_1 = '10.10.1.0/24'
 IP_FIRST_SUBNET_1 = '10.10.1.4'
 IP_LAST_SUBNET_1 = '10.10.1.254'
+IP_GATEWAY_SUBNET_DEFAULT = '172.31.0.1'
 IP_GATEWAY_SUBNET_1 = '10.10.1.1'
 IP_GATEWAY_SUBNET_2 = '10.10.2.1'
 CIDR_SUBNET_2 = '10.10.2.0/24'
@@ -487,12 +488,17 @@ EC2_SUBNET_2 = {'subnetId': ID_EC2_SUBNET_2,
                 'availableIpAddressCount': 253,
                 'mapPublicIpOnLaunch': False}
 
+OS_SUBNET_HOST_ROUTE_NEXTHOP = '169.254.169.254/32'
 OS_SUBNET_DEFAULT = {'id': ID_OS_SUBNET_DEFAULT,
                      'network_id': ID_OS_NETWORK_DEFAULT,
                      'name': ID_EC2_SUBNET_DEFAULT,
                      'ip_version': '4',
                      'cidr': CIDR_SUBNET_DEFAULT,
-                     'host_routes': [],
+                     'host_routes': [{'nexthop': IP_GATEWAY_SUBNET_DEFAULT,
+                                      'destination': '172.31.0.0/16'},
+                                     {'nexthop': IP_GATEWAY_SUBNET_DEFAULT,
+                                      'destination':
+                                          OS_SUBNET_HOST_ROUTE_NEXTHOP}],
                      'gateway_ip': None}
 OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
                'network_id': ID_OS_NETWORK_1,
@@ -502,7 +508,7 @@ OS_SUBNET_1 = {'id': ID_OS_SUBNET_1,
                'host_routes': [{'nexthop': IP_GATEWAY_SUBNET_1,
                                 'destination': '10.10.0.0/16'},
                                {'nexthop': IP_GATEWAY_SUBNET_1,
-                                'destination': '169.254.169.254/32'}],
+                                'destination': OS_SUBNET_HOST_ROUTE_NEXTHOP}],
                'gateway_ip': IP_GATEWAY_SUBNET_1}
 OS_SUBNET_2 = {'id': ID_OS_SUBNET_2,
                'network_id': ID_OS_NETWORK_2,
