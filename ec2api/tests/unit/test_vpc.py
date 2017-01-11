@@ -299,20 +299,25 @@ class VpcPrivateTestCase(base.BaseTestCase):
                                      {'status': 'available'}))
         neutron.create_subnet.side_effect = (
             tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_DEFAULT))
+        neutron.list_networks.return_value = (
+            {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
 
         db_api.add_item.side_effect = (
             tools.get_db_api_add_item({
                 'vpc': fakes.ID_EC2_VPC_DEFAULT,
                 'rtb': fakes.ID_EC2_ROUTE_TABLE_DEFAULT,
                 'sg': fakes.ID_EC2_SECURITY_GROUP_DEFAULT,
-                'subnet': fakes.ID_EC2_SUBNET_DEFAULT}))
+                'subnet': fakes.ID_EC2_SUBNET_DEFAULT,
+                'igw': fakes.ID_EC2_IGW_DEFAULT}))
 
-        db_api.set_mock_items(fakes.DB_ROUTE_TABLE_DEFAULT,
-                              fakes.DB_SUBNET_DEFAULT)
-
+        DB_IGW_DEFAULT_DETACHED = (
+            {'id': fakes.ID_EC2_IGW_DEFAULT,
+            'os_id': None,
+            'vpc_id': None})
         db_api.get_item_by_id.side_effect = (
             tools.get_db_api_get_item_by_id(fakes.DB_VPC_DEFAULT,
-                                            fakes.DB_ROUTE_TABLE_DEFAULT))
+                                            fakes.DB_ROUTE_TABLE_DEFAULT,
+                                            DB_IGW_DEFAULT_DETACHED))
 
         vpc_api._check_and_create_default_vpc(context)
 
@@ -328,13 +333,15 @@ class VpcPrivateTestCase(base.BaseTestCase):
             mock.ANY, 'rtb',
             tools.purge_dict(fakes.DB_ROUTE_TABLE_DEFAULT,
                              ('id',)))
-        db_api.update_item.assert_called_once_with(
-            mock.ANY,
-            fakes.DB_VPC_DEFAULT)
-
         db_api.add_item.assert_any_call(
             mock.ANY, 'subnet',
             tools.purge_dict(fakes.DB_SUBNET_DEFAULT, ('id',)))
+        db_api.add_item.assert_any_call(
+            mock.ANY, 'igw', {})
+        db_api.update_item.assert_has_calls([
+            mock.call(mock.ANY, fakes.DB_VPC_DEFAULT),
+            mock.call(mock.ANY, fakes.DB_IGW_DEFAULT)])
+
         neutron.create_network.assert_called_once_with(
             {'network': {'name': 'subnet-0'}})
         neutron.update_network.assert_called_once_with(
@@ -350,3 +357,6 @@ class VpcPrivateTestCase(base.BaseTestCase):
         neutron.add_interface_router.assert_called_once_with(
             fakes.ID_OS_ROUTER_DEFAULT,
             {'subnet_id': fakes.ID_OS_SUBNET_DEFAULT})
+        neutron.add_gateway_router.assert_called_once_with(
+            fakes.ID_OS_ROUTER_DEFAULT,
+            {'network_id': fakes.ID_OS_PUBLIC_NETWORK})
