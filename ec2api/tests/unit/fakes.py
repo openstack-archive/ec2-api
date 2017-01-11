@@ -169,6 +169,8 @@ ID_EC2_ROUTE_TABLE_DEFAULT = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_1 = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_2 = random_ec2_id('rtb')
 ID_EC2_ROUTE_TABLE_3 = random_ec2_id('rtb')
+ID_EC2_ROUTE_TABLE_ASSOCIATION_DEFAULT = ID_EC2_VPC_DEFAULT.replace('vpc',
+                                                                    'rtbassoc')
 ID_EC2_ROUTE_TABLE_ASSOCIATION_1 = ID_EC2_VPC_1.replace('vpc', 'rtbassoc')
 ID_EC2_ROUTE_TABLE_ASSOCIATION_2 = ID_EC2_SUBNET_2.replace('subnet',
                                                            'rtbassoc')
@@ -1241,6 +1243,21 @@ DB_ROUTE_TABLE_3 = {
                 'gateway_id': None},
                {'destination_cidr_block': CIDR_VPN_1_STATIC,
                 'gateway_id': ID_EC2_VPN_GATEWAY_1}],
+}
+EC2_ROUTE_TABLE_DEFAULT = {
+    'routeTableId': ID_EC2_ROUTE_TABLE_DEFAULT,
+    'vpcId': ID_EC2_VPC_DEFAULT,
+    'routeSet': [
+        {'destinationCidrBlock': CIDR_VPC_DEFAULT,
+         'gatewayId': 'local',
+         'state': 'active',
+         'origin': 'CreateRouteTable'}],
+    'associationSet': [
+        {'routeTableAssociationId': ID_EC2_ROUTE_TABLE_ASSOCIATION_DEFAULT,
+         'routeTableId': ID_EC2_ROUTE_TABLE_DEFAULT,
+         'main': True}],
+    'propagatingVgwSet': [],
+    'tagSet': [],
 }
 EC2_ROUTE_TABLE_1 = {
     'routeTableId': ID_EC2_ROUTE_TABLE_1,

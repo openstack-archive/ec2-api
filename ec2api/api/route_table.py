@@ -296,6 +296,7 @@ class RouteTableDescriber(common.TaggableItemsDescriber,
 
 
 def describe_route_tables(context, route_table_id=None, filter=None):
+    ec2utils.check_and_create_default_vpc(context)
     formatted_route_tables = RouteTableDescriber().describe(
             context, ids=route_table_id, filter=filter)
     return {'routeTableSet': formatted_route_tables}
