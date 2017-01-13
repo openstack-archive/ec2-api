@@ -134,8 +134,7 @@ class AddressTestCase(base.ApiTestCase):
             fakes.ID_OS_INSTANCE_1,
             fakes.IP_ADDRESS_1)
 
-    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
-    def test_associate_address_vpc(self, check_and_create):
+    def test_associate_address_vpc(self):
         address.address_engine = (
             address.AddressEngineNeutron())
 
@@ -262,8 +261,7 @@ class AddressTestCase(base.ApiTestCase):
                                     {'PublicIp': fakes.IP_ADDRESS_1,
                                      'InstanceId': fakes.ID_EC2_INSTANCE_2})
 
-    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
-    def test_associate_address_invalid_vpc_parameters(self, check_and_create):
+    def test_associate_address_invalid_vpc_parameters(self):
         address.address_engine = (
             address.AddressEngineNeutron())
 
@@ -341,8 +339,7 @@ class AddressTestCase(base.ApiTestCase):
                                      'InstanceId': fakes.ID_EC2_INSTANCE_1})
 
     @tools.screen_unexpected_exception_logs
-    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
-    def test_associate_address_vpc_rollback(self, check_and_create):
+    def test_associate_address_vpc_rollback(self):
         address.address_engine = (
             address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_ADDRESS_1, fakes.DB_IGW_1,

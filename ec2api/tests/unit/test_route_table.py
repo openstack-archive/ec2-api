@@ -726,8 +726,7 @@ class RouteTableTestCase(base.ApiTestCase):
             'DependencyViolation', 'DeleteRouteTable',
             {'RouteTableId': fakes.ID_EC2_ROUTE_TABLE_2})
 
-    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
-    def test_describe_route_tables(self, check_and_create):
+    def test_describe_route_tables(self):
         self.set_mock_db_items(
             fakes.DB_ROUTE_TABLE_1, fakes.DB_ROUTE_TABLE_2,
             fakes.DB_ROUTE_TABLE_3, fakes.DB_SUBNET_1, fakes.DB_SUBNET_2,
@@ -770,8 +769,7 @@ class RouteTableTestCase(base.ApiTestCase):
             'DescribeRouteTables', 'routeTableSet',
             fakes.ID_EC2_ROUTE_TABLE_1, 'routeTableId')
 
-    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
-    def test_describe_route_tables_variations(self, check_and_create):
+    def test_describe_route_tables_variations(self):
         igw_1 = tools.purge_dict(fakes.DB_IGW_1, ('vpc_id',))
         igw_2 = tools.update_dict(fakes.DB_IGW_2,
                                   {'vpc_id': fakes.ID_EC2_VPC_2})
@@ -1133,6 +1131,8 @@ class RouteTableTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_describe_route_tables_no_default_vpc(self, check_and_create):
+        self.configure(disable_ec2_classic=True)
+
         def mock_check_and_create(context):
             self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
                                    fakes.DB_IGW_DEFAULT,

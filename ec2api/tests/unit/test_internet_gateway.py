@@ -220,8 +220,7 @@ class IgwTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_IGW_1)
         do_check('DependencyViolation')
 
-    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
-    def test_describe_igw(self, check_and_create):
+    def test_describe_igw(self):
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2)
 
         resp = self.execute('DescribeInternetGateways', {})
@@ -247,6 +246,8 @@ class IgwTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_describe_internet_gateways_no_default_vpc(self, check_and_create):
+        self.configure(disable_ec2_classic=True)
+
         def mock_check_and_create(context):
             self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
                                    fakes.DB_IGW_DEFAULT)
