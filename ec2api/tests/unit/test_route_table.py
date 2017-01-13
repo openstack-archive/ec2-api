@@ -1135,6 +1135,7 @@ class RouteTableTestCase(base.ApiTestCase):
     def test_describe_route_tables_no_default_vpc(self, check_and_create):
         def mock_check_and_create(context):
             self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
+                                   fakes.DB_IGW_DEFAULT,
                                    fakes.DB_ROUTE_TABLE_DEFAULT)
         check_and_create.side_effect = mock_check_and_create
 

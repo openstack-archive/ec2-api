@@ -15,6 +15,7 @@
 
 import copy
 
+import fixtures
 import mock
 from neutronclient.common import exceptions as neutron_exception
 
@@ -27,43 +28,17 @@ from ec2api.tests.unit import tools
 
 class VpcTestCase(base.ApiTestCase):
 
-    def test_create_vpc(self):
-        self.neutron.create_router.side_effect = (
-            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
-        self.db_api.add_item.side_effect = (
-            tools.get_db_api_add_item({
-                'vpc': fakes.ID_EC2_VPC_1,
-                'rtb': fakes.ID_EC2_ROUTE_TABLE_1,
-                'sg': fakes.ID_EC2_SECURITY_GROUP_1}))
-        self.set_mock_db_items(fakes.DB_VPC_1)
-        self.nova.security_groups.create.return_value = (
-            fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1))
+    @mock.patch('ec2api.api.vpc._create_vpc')
+    def test_create_vpc(self, create_vpc):
+        create_vpc.return_value = fakes.DB_VPC_1
 
         def check_response(response):
             self.assertIn('vpc', response)
             vpc = resp['vpc']
             self.assertThat(fakes.EC2_VPC_1, matchers.DictMatches(vpc))
-            self.neutron.create_router.assert_called_with({'router': {}})
-            self.neutron.update_router.assert_called_once_with(
-                fakes.ID_OS_ROUTER_1,
-                {'router': {'name': fakes.EC2_VPC_1['vpcId']}})
-            self.db_api.add_item.assert_any_call(
-                mock.ANY, 'vpc',
-                tools.purge_dict(fakes.DB_VPC_1,
-                                 ('id', 'vpc_id', 'route_table_id')))
-            self.db_api.add_item.assert_any_call(
-                mock.ANY, 'rtb',
-                tools.purge_dict(fakes.DB_ROUTE_TABLE_1,
-                                 ('id',)))
-            # checking that no default vpc related stuff is added
-            self.assertEqual(2, self.db_api.add_item.call_count)
-            self.db_api.update_item.assert_called_once_with(
-                mock.ANY,
-                fakes.DB_VPC_1)
+            create_vpc.assert_called_once_with(mock.ANY, fakes.CIDR_VPC_1)
 
-            self.neutron.reset_mock()
-            self.db_api.reset_mock()
-            self.db_api.update_item.reset_mock()
+            create_vpc.reset_mock()
 
         resp = self.execute('CreateVpc', {'CidrBlock': fakes.CIDR_VPC_1})
         check_response(resp)
@@ -98,25 +73,6 @@ class VpcTestCase(base.ApiTestCase):
                                     {'CidrBlock': fakes.CIDR_VPC_1})
         self.neutron.create_router.assert_called_with({'router': {}})
         self.assertEqual(0, self.db_api.add_item.call_count)
-
-    @tools.screen_unexpected_exception_logs
-    def test_create_vpc_rollback(self):
-        self.neutron.create_router.side_effect = (
-            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
-        self.db_api.add_item.side_effect = (
-            tools.get_db_api_add_item({
-                'vpc': fakes.ID_EC2_VPC_1,
-                'rtb': fakes.ID_EC2_ROUTE_TABLE_1}))
-        self.neutron.update_router.side_effect = Exception()
-
-        self.assert_execution_error(self.ANY_EXECUTE_ERROR, 'CreateVpc',
-                                    {'CidrBlock': fakes.CIDR_VPC_1})
-
-        self.neutron.delete_router.assert_called_once_with(
-            fakes.ID_OS_ROUTER_1)
-        self.db_api.delete_item.assert_any_call(mock.ANY, fakes.ID_EC2_VPC_1)
-        self.db_api.delete_item.assert_any_call(mock.ANY,
-                                                fakes.ID_EC2_ROUTE_TABLE_1)
 
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_delete_vpc(self, check_and_create):
@@ -286,77 +242,158 @@ class VpcTestCase(base.ApiTestCase):
 
 class VpcPrivateTestCase(base.BaseTestCase):
 
-    def test_check_and_create_default_vpc(self):
-        context = base.create_context()
-        nova = self.mock_nova()
-        neutron = self.mock_neutron()
-        db_api = self.mock_db()
+    def setUp(self):
+        super(VpcPrivateTestCase, self).setUp()
+        self.context = base.create_context()
+        self.nova, self.nova_admin = self.mock_nova()
+        self.neutron = self.mock_neutron()
+        self.db_api = self.mock_db()
 
-        neutron.create_router.side_effect = (
-            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_DEFAULT))
-        neutron.create_network.side_effect = (
-            tools.get_neutron_create('network', fakes.ID_OS_NETWORK_DEFAULT,
-                                     {'status': 'available'}))
-        neutron.create_subnet.side_effect = (
-            tools.get_neutron_create('subnet', fakes.ID_OS_SUBNET_DEFAULT))
-        neutron.list_networks.return_value = (
-            {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
-
-        db_api.add_item.side_effect = (
+    @mock.patch('ec2api.api.internet_gateway.attach_internet_gateway')
+    @mock.patch('ec2api.api.internet_gateway.create_internet_gateway')
+    @mock.patch('ec2api.api.subnet.create_subnet')
+    @mock.patch('ec2api.api.security_group._create_default_security_group')
+    @mock.patch('ec2api.api.route_table._create_route_table')
+    def test_create_vpc(self, create_route_table,
+                        create_default_security_group, create_subnet,
+                        create_internet_gateway, attach_internet_gateway):
+        self.neutron.create_router.side_effect = (
+            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_1))
+        self.db_api.add_item.side_effect = (
             tools.get_db_api_add_item({
-                'vpc': fakes.ID_EC2_VPC_DEFAULT,
-                'rtb': fakes.ID_EC2_ROUTE_TABLE_DEFAULT,
-                'sg': fakes.ID_EC2_SECURITY_GROUP_DEFAULT,
-                'subnet': fakes.ID_EC2_SUBNET_DEFAULT,
-                'igw': fakes.ID_EC2_IGW_DEFAULT}))
+                'vpc': fakes.ID_EC2_VPC_1}))
+        self.db_api.set_mock_items(fakes.DB_VPC_1)
+        create_route_table.return_value = fakes.DB_ROUTE_TABLE_1
+
+        resp = vpc_api._create_vpc(self.context, fakes.CIDR_VPC_1)
+
+        # Check creation of vpc
+        self.neutron.create_router.assert_called_with({'router': {}})
+        self.neutron.update_router.assert_called_once_with(
+            fakes.ID_OS_ROUTER_1,
+            {'router': {'name': fakes.EC2_VPC_1['vpcId']}})
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'vpc',
+            tools.purge_dict(fakes.DB_VPC_1,
+                             ('id', 'vpc_id', 'route_table_id')))
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
+            fakes.DB_VPC_1)
+
+        create_route_table.assert_called_once_with(mock.ANY, fakes.DB_VPC_1)
+        create_default_security_group.assert_called_once_with(mock.ANY,
+            fakes.DB_VPC_1)
+        # checking that no default vpc related stuff is added
+        create_subnet.assert_not_called()
+        create_internet_gateway.assert_not_called()
+        attach_internet_gateway.assert_not_called()
+
+        self.neutron.reset_mock()
+        self.db_api.reset_mock()
+        create_route_table.reset_mock()
+        create_default_security_group.reset_mock()
+
+        # Creation of default vpc
+        self.neutron.create_router.side_effect = (
+            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_DEFAULT))
+        self.db_api.add_item.side_effect = (
+            tools.get_db_api_add_item({
+                'vpc': fakes.ID_EC2_VPC_DEFAULT}))
+        self.db_api.set_mock_items(fakes.DB_VPC_DEFAULT)
+        create_route_table.return_value = fakes.DB_ROUTE_TABLE_DEFAULT
+        create_subnet.return_value = {'subnet': fakes.EC2_SUBNET_DEFAULT}
+        create_internet_gateway.return_value = {'internetGateway':
+                                                fakes.EC2_IGW_DEFAULT}
+
+        vpc_api._create_vpc(self.context, fakes.CIDR_VPC_DEFAULT,
+                            is_default=True)
+
+        self.neutron.create_router.assert_called_with({'router': {}})
+        self.neutron.update_router.assert_called_once_with(
+            fakes.ID_OS_ROUTER_DEFAULT,
+            {'router': {'name': fakes.EC2_VPC_DEFAULT['vpcId']}})
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'vpc',
+            tools.purge_dict(fakes.DB_VPC_DEFAULT,
+                             ('id', 'vpc_id', 'route_table_id')))
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
+            fakes.DB_VPC_DEFAULT)
+
+        create_route_table.assert_called_once_with(mock.ANY,
+            fakes.DB_VPC_DEFAULT)
+        create_default_security_group.assert_called_once_with(mock.ANY,
+            fakes.DB_VPC_DEFAULT)
+        create_subnet.assert_called_once_with(mock.ANY,
+            fakes.ID_EC2_VPC_DEFAULT,
+            fakes.CIDR_SUBNET_DEFAULT)
+        create_internet_gateway.assert_called_once_with(mock.ANY)
+        attach_internet_gateway.assert_called_once_with(mock.ANY,
+            fakes.ID_EC2_IGW_DEFAULT,
+            fakes.ID_EC2_VPC_DEFAULT)
+
+    @mock.patch('ec2api.api.vpc._create_vpc')
+    def test_check_and_create_default_vpc(self, create_vpc):
+        vpc_api._check_and_create_default_vpc(self.context)
+
+        create_vpc.assert_called_once_with(mock.ANY, fakes.CIDR_VPC_DEFAULT,
+                                           is_default=True)
+
+    @tools.screen_logs('ec2api.api.vpc')
+    @mock.patch('ec2api.api.internet_gateway.attach_internet_gateway')
+    @mock.patch('ec2api.api.internet_gateway.create_internet_gateway')
+    @mock.patch('ec2api.api.subnet.create_subnet')
+    @mock.patch('ec2api.api.security_group._create_default_security_group')
+    @mock.patch('ec2api.api.route_table._create_route_table')
+    def test_create_vpc_rollback(self, create_route_table,
+                                 create_default_security_group, create_subnet,
+                                 create_internet_gateway,
+                                 attach_internet_gateway):
+
+        self.neutron.create_router.side_effect = (
+            tools.get_neutron_create('router', fakes.ID_OS_ROUTER_DEFAULT))
+        self.nova.security_groups.list.return_value = (
+            [fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_DEFAULT)])
+
+        self.db_api.add_item.side_effect = (
+            tools.get_db_api_add_item({'vpc': fakes.ID_EC2_VPC_DEFAULT}))
 
         DB_IGW_DEFAULT_DETACHED = (
             {'id': fakes.ID_EC2_IGW_DEFAULT,
             'os_id': None,
             'vpc_id': None})
-        db_api.get_item_by_id.side_effect = (
+        self.db_api.get_item_by_id.side_effect = (
             tools.get_db_api_get_item_by_id(fakes.DB_VPC_DEFAULT,
-                                            fakes.DB_ROUTE_TABLE_DEFAULT,
+                                            fakes.DB_SUBNET_DEFAULT,
                                             DB_IGW_DEFAULT_DETACHED))
+        create_route_table.return_value = fakes.DB_ROUTE_TABLE_DEFAULT
+        create_subnet.return_value = {'subnet': fakes.EC2_SUBNET_DEFAULT}
+        create_internet_gateway.return_value = {'internetGateway':
+                                                fakes.EC2_IGW_DEFAULT}
 
-        vpc_api._check_and_create_default_vpc(context)
+        # exception during attaching internet gateway
+        attach_internet_gateway.side_effect = Exception()
 
-        neutron.create_router.assert_called_with({'router': {}})
-        neutron.update_router.assert_called_once_with(
-            fakes.ID_OS_ROUTER_DEFAULT,
-            {'router': {'name': fakes.EC2_VPC_DEFAULT['vpcId']}})
-        db_api.add_item.assert_any_call(
-            mock.ANY, 'vpc',
-            tools.purge_dict(fakes.DB_VPC_DEFAULT,
-                             ('id', 'vpc_id', 'route_table_id')))
-        db_api.add_item.assert_any_call(
-            mock.ANY, 'rtb',
-            tools.purge_dict(fakes.DB_ROUTE_TABLE_DEFAULT,
-                             ('id',)))
-        db_api.add_item.assert_any_call(
-            mock.ANY, 'subnet',
-            tools.purge_dict(fakes.DB_SUBNET_DEFAULT, ('id',)))
-        db_api.add_item.assert_any_call(
-            mock.ANY, 'igw', {})
-        db_api.update_item.assert_has_calls([
-            mock.call(mock.ANY, fakes.DB_VPC_DEFAULT),
-            mock.call(mock.ANY, fakes.DB_IGW_DEFAULT)])
+        vpc_api._check_and_create_default_vpc(self.context)
 
-        neutron.create_network.assert_called_once_with(
-            {'network': {'name': 'subnet-0'}})
-        neutron.update_network.assert_called_once_with(
-            fakes.ID_OS_NETWORK_DEFAULT,
-            {'network': {'name': fakes.ID_EC2_SUBNET_DEFAULT}})
-        neutron.create_subnet.assert_called_once_with(
-            {'subnet': tools.purge_dict(fakes.OS_SUBNET_DEFAULT,
-                                        ('id', 'name', 'gateway_ip'))})
-        neutron.update_subnet.assert_called_once_with(
-            fakes.ID_OS_SUBNET_DEFAULT,
-            {'subnet': {'name': fakes.ID_EC2_SUBNET_DEFAULT,
-                        'gateway_ip': None}})
-        neutron.add_interface_router.assert_called_once_with(
-            fakes.ID_OS_ROUTER_DEFAULT,
-            {'subnet_id': fakes.ID_OS_SUBNET_DEFAULT})
-        neutron.add_gateway_router.assert_called_once_with(
-            fakes.ID_OS_ROUTER_DEFAULT,
-            {'network_id': fakes.ID_OS_PUBLIC_NETWORK})
+        self.db_api.delete_item.assert_any_call(mock.ANY,
+            fakes.ID_EC2_IGW_DEFAULT)
+        self.db_api.delete_item.assert_any_call(mock.ANY,
+            fakes.ID_EC2_SUBNET_DEFAULT)
+        self.nova.security_groups.delete.assert_any_call(
+            fakes.ID_OS_SECURITY_GROUP_DEFAULT)
+        self.db_api.delete_item.assert_any_call(mock.ANY,
+            fakes.ID_EC2_ROUTE_TABLE_DEFAULT)
+        self.db_api.delete_item.assert_any_call(mock.ANY,
+            fakes.ID_EC2_VPC_DEFAULT)
+        self.neutron.delete_router.assert_called_once_with(
+            fakes.ID_OS_ROUTER_DEFAULT)
+
+    @mock.patch('ec2api.api.vpc._create_vpc')
+    def test_check_and_create_default_vpc_failed(self, create_vpc):
+        create_vpc.side_effect = Exception()
+        with fixtures.LoggerFixture(
+                format='[%(levelname)s] %(message)s') as log:
+            vpc_api._check_and_create_default_vpc(self.context)
+        self.assertTrue(log.output.startswith(
+            '[ERROR] Failed to create default vpc'))
