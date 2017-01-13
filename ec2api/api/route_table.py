@@ -639,6 +639,10 @@ def _get_subnet_host_routes_and_gateway_ip(context, route_table, cidr_block,
                      get('cidrs', [])))
 
     if not subnet_gateway_is_used:
+        # NOTE(andrey-mp): add route to metadata server
+        host_routes.append(
+            {'destination': '169.254.169.254/32',
+             'nexthop': gateway_ip})
         # NOTE(ft): gateway_ip is set to None to allow correct handling
         # of 0.0.0.0/0 route by Neutron.
         gateway_ip = None

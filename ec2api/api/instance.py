@@ -1003,6 +1003,8 @@ def _build_block_device_mapping(context, block_device_mapping, os_image):
 
                 _populate_parsed_bdm_parameter(bdm, short_root_device_name)
             else:
+                image_bdm = {k: v for k, v in six.iteritems(image_bdm)
+                             if v is not None}
                 image_bdm.update(bdm)
                 bdm = image_bdm
 
