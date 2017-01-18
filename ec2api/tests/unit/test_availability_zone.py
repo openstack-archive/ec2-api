@@ -60,7 +60,8 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.assertTrue(resp['regionInfo'][0].get('regionEndpoint')
                         is not None)
 
-    def test_describe_account_attributes(self):
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_describe_account_attributes(self, check_and_create):
         self.nova.quotas.get.return_value = mock.Mock(instances=77)
 
         availability_zone.account_attribute_engine = (
@@ -114,3 +115,27 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.assert_execution_error('InvalidParameter',
                                     'DescribeAccountAttributes',
                                     {'AttributeName.1': 'fake'})
+
+        self.configure(disable_ec2_classic=True)
+        availability_zone.account_attribute_engine = (
+            availability_zone.AccountAttributeEngineNeutron())
+
+        def mock_check_and_create(context):
+            self.set_mock_db_items(fakes.DB_VPC_DEFAULT)
+        check_and_create.side_effect = mock_check_and_create
+
+        resp = self.execute('DescribeAccountAttributes', {})
+        self.assertThat(resp['accountAttributeSet'],
+                        matchers.ListMatches(
+                            [{'attributeName': 'supported-platforms',
+                              'attributeValueSet': [
+                                  {'attributeValue': 'VPC'}]},
+                             {'attributeName': 'default-vpc',
+                              'attributeValueSet': [
+                                  {'attributeValue':
+                                   fakes.ID_EC2_VPC_DEFAULT}]},
+                             {'attributeName': 'max-instances',
+                              'attributeValueSet': [
+                                  {'attributeValue': 77}]}],
+                            orderless_lists=True))
+        check_and_create.assert_called_once_with(mock.ANY)

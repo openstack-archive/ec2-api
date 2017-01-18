@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
+
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import netutils
 
 from ec2api.api import common
+from ec2api.api import ec2utils
 from ec2api import clients
+from ec2api.db import api as db_api
 from ec2api import exception
 
 
@@ -139,7 +143,8 @@ def describe_account_attributes(context, attribute_name=None):
     attribute_getters = {
         'supported-platforms': (
             account_attribute_engine.get_supported_platforms),
-        'default-vpc': account_attribute_engine.get_default_vpc,
+        'default-vpc': functools.partial(
+            account_attribute_engine.get_default_vpc, context),
         'max-instances': get_max_instances,
     }
 
@@ -197,9 +202,18 @@ def _describe_verbose(context):
 class AccountAttributeEngineNeutron(object):
 
     def get_supported_platforms(self):
-        return ['EC2', 'VPC']
+        if CONF.disable_ec2_classic:
+            return ['VPC']
+        else:
+            return ['EC2', 'VPC']
 
-    def get_default_vpc(self):
+    def get_default_vpc(self, context):
+        if CONF.disable_ec2_classic:
+            ec2utils.check_and_create_default_vpc(context)
+            vpc = next((vpc for vpc in db_api.get_items(context, 'vpc')
+                        if vpc.get('is_default')), None)
+            if vpc:
+                return vpc['id']
         return 'none'
 
 
@@ -208,7 +222,7 @@ class AccountAttributeEngineNova(object):
     def get_supported_platforms(self):
         return ['EC2']
 
-    def get_default_vpc(self):
+    def get_default_vpc(self, context):
         return 'none'
 
 
