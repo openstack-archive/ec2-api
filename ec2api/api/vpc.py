@@ -145,16 +145,21 @@ def _create_vpc(context, cidr_block, is_default=False):
         cleaner.addCleanup(security_group_api.delete_security_group, context,
                            group_name=vpc['id'], delete_default=True)
         if is_default:
-            subnet = subnet_api.create_subnet(context, vpc['id'],
-                DEFAULT_SUBNET_CIDR_BLOCK)['subnet']
-            cleaner.addCleanup(subnet_api.delete_subnet, context,
-                               subnet['subnetId'])
             igw_id = internet_gateway_api.create_internet_gateway(
                 context)['internetGateway']['internetGatewayId']
             cleaner.addCleanup(internet_gateway_api.delete_internet_gateway,
                                context, igw_id)
             internet_gateway_api.attach_internet_gateway(context, igw_id,
                                                          vpc['id'])
+            cleaner.addCleanup(internet_gateway_api.detach_internet_gateway,
+                               context, igw_id, vpc['id'])
+            subnet = subnet_api.create_subnet(
+                context, vpc['id'],
+                DEFAULT_SUBNET_CIDR_BLOCK)['subnet']
+            cleaner.addCleanup(subnet_api.delete_subnet, context,
+                               subnet['subnetId'])
+            route_table_api.create_route(context, route_table['id'],
+                                         '0.0.0.0/0', gateway_id=igw_id)
     return vpc
 
 
@@ -162,7 +167,7 @@ def _check_and_create_default_vpc(context):
     if not any(vpc.get('is_default')
                for vpc in db_api.get_items(context, 'vpc')):
         try:
-            vpc = _create_vpc(context, DEFAULT_VPC_CIDR_BLOCK, is_default=True)
+            _create_vpc(context, DEFAULT_VPC_CIDR_BLOCK, is_default=True)
         except Exception:
             LOG.exception('Failed to create default vpc')
 
