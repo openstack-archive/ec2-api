@@ -313,6 +313,27 @@ class SecurityGroupTestCase(base.ApiTestCase):
                              fakes.EC2_NOVA_SECURITY_GROUP_2],
                             orderless_lists=True))
 
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    def test_describe_security_groups_no_default_vpc(self, check_and_create):
+        self.configure(disable_ec2_classic=True)
+        security_group.security_group_engine = (
+            security_group.SecurityGroupEngineNeutron())
+
+        def mock_check_and_create(context):
+            self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
+                                   fakes.DB_SECURITY_GROUP_DEFAULT)
+            self.neutron.list_security_groups.return_value = (
+                {'security_groups': [fakes.OS_SECURITY_GROUP_DEFAULT]})
+        check_and_create.side_effect = mock_check_and_create
+
+        resp = self.execute('DescribeSecurityGroups', {})
+        self.assertThat(resp['securityGroupInfo'],
+                        matchers.ListMatches([
+                            fakes.EC2_SECURITY_GROUP_DEFAULT],
+                        orderless_lists=True))
+
+        check_and_create.assert_called_once_with(mock.ANY)
+
     def test_repair_default_security_group(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNeutron())

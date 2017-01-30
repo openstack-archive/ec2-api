@@ -151,6 +151,7 @@ IP_ADDRESS_NOVA_1 = '192.168.2.100'
 
 
 # security group constants
+ID_EC2_SECURITY_GROUP_DEFAULT = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_1 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_3 = random_ec2_id('sg')
@@ -1008,6 +1009,11 @@ class NovaSecurityGroup(object):
         self.tenant_id = ID_OS_PROJECT
         self.rules = nova_group_dict['security_group_rules']
 
+DB_SECURITY_GROUP_DEFAULT = {
+    'id': ID_EC2_SECURITY_GROUP_DEFAULT,
+    'os_id': ID_OS_SECURITY_GROUP_DEFAULT,
+    'vpc_id': ID_EC2_VPC_DEFAULT,
+}
 DB_SECURITY_GROUP_1 = {
     'id': ID_EC2_SECURITY_GROUP_1,
     'os_id': ID_OS_SECURITY_GROUP_1,
@@ -1048,10 +1054,16 @@ OS_SECURITY_GROUP_RULE_2 = {
 OS_SECURITY_GROUP_DEFAULT = {
     'id': ID_OS_SECURITY_GROUP_DEFAULT,
     'name': ID_EC2_VPC_DEFAULT,
-    'security_group_rules': [
-        OS_SECURITY_GROUP_RULE_1,
-        OS_SECURITY_GROUP_RULE_2
-    ],
+    'security_group_rules':
+    [{'remote_group_id': None,
+      'direction': 'egress',
+      'remote_ip_prefix': None,
+      'protocol': None,
+      'port_range_max': None,
+      'security_group_id': ID_OS_SECURITY_GROUP_DEFAULT,
+      'port_range_min': None,
+      'ethertype': 'IPv4',
+      'id': random_os_id()}],
     'description': 'Group description',
     'tenant_id': ID_OS_PROJECT
 }
@@ -1095,6 +1107,18 @@ OS_SECURITY_GROUP_3 = {
     'name': 'groupname3',
     'description': 'Group description',
     'tenant_id': ID_OS_PROJECT
+}
+EC2_SECURITY_GROUP_DEFAULT = {
+    'vpcId': ID_EC2_VPC_DEFAULT,
+    'groupDescription': 'Group description',
+    'ipPermissions': None,
+    'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+    'ipPermissionsEgress':
+    [{'toPort': -1,
+      'ipProtocol': -1,
+      'fromPort': -1}],
+    'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_DEFAULT
 }
 EC2_SECURITY_GROUP_1 = {
     'vpcId': ID_EC2_VPC_1,
