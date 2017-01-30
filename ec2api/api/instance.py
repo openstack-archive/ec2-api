@@ -1163,6 +1163,12 @@ class InstanceEngineNeutron(object):
             subnet_id, private_ip_address, security_group_id,
             network_interface)
 
+        if not vpc_network_parameters and CONF.disable_ec2_classic:
+            ec2utils.check_and_create_default_vpc(context)
+            subnet_id = self.get_default_subnet(context)
+            vpc_network_parameters = [{'device_index': 0,
+                                       'subnet_id': subnet_id}]
+
         self.check_network_interface_parameters(vpc_network_parameters,
                                                 multiple_instances)
 
@@ -1184,6 +1190,21 @@ class InstanceEngineNeutron(object):
                                                            neutron)['id']}]
 
         return vpc_id, launch_context
+
+    def get_default_subnet(self, context):
+        default_vpc = next(
+            (vpc for vpc in db_api.get_items(context, 'vpc')
+             if vpc.get('is_default')), None)
+        if not default_vpc:
+            raise exception.VPCIdNotSpecified()
+        subnet = next(
+            (subnet for subnet in db_api.get_items(context, 'subnet')
+             if subnet['vpc_id'] == default_vpc['id']), None)
+        if not subnet:
+            raise exception.MissingInput(
+                _("No subnets found for the default VPC '%s'. "
+                  "Please specify a subnet.") % default_vpc['id'])
+        return subnet['id']
 
     def get_launch_extra_parameters(self, context, cleaner, launch_context):
         if 'ec2_classic_nics' in launch_context:

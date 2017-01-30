@@ -99,13 +99,16 @@ IP_LAST_SUBNET_2 = '10.10.2.254'
 
 
 # network interface constants
+ID_EC2_NETWORK_INTERFACE_DEFAULT = random_ec2_id('eni')
 ID_EC2_NETWORK_INTERFACE_1 = random_ec2_id('eni')
 ID_EC2_NETWORK_INTERFACE_2 = random_ec2_id('eni')
 ID_EC2_NETWORK_INTERFACE_2_ATTACH = (
     ID_EC2_NETWORK_INTERFACE_2.replace('eni', 'eni-attach'))
+ID_OS_PORT_DEFAULT = random_os_id()
 ID_OS_PORT_1 = random_os_id()
 ID_OS_PORT_2 = random_os_id()
 
+IP_NETWORK_INTERFACE_DEFAULT = '172.31.0.4'
 IP_NETWORK_INTERFACE_1 = '10.10.1.4'
 IP_NETWORK_INTERFACE_2 = '10.10.2.254'
 IP_NETWORK_INTERFACE_2_EXT_1 = '10.10.2.4'
@@ -113,15 +116,19 @@ IP_NETWORK_INTERFACE_2_EXT_2 = '10.10.2.5'
 IPS_NETWORK_INTERFACE_2 = (IP_NETWORK_INTERFACE_2,
                            IP_NETWORK_INTERFACE_2_EXT_1,
                            IP_NETWORK_INTERFACE_2_EXT_2)
+DESCRIPTION_NETWORK_INTERFACE_DEFAULT = 'descriptionDefault'
 DESCRIPTION_NETWORK_INTERFACE_1 = 'description1'
 DESCRIPTION_NETWORK_INTERFACE_2 = 'description2'
 
 
 # instance constants
+ID_EC2_INSTANCE_DEFAULT = random_ec2_id('i')
 ID_EC2_INSTANCE_1 = random_ec2_id('i')
 ID_EC2_INSTANCE_2 = random_ec2_id('i')
+ID_OS_INSTANCE_DEFAULT = random_os_id()
 ID_OS_INSTANCE_1 = random_os_id()
 ID_OS_INSTANCE_2 = random_os_id()
+ID_EC2_RESERVATION_DEFAULT = random_ec2_id('r')
 ID_EC2_RESERVATION_1 = random_ec2_id('r')
 ID_EC2_RESERVATION_2 = random_ec2_id('r')
 
@@ -538,6 +545,14 @@ OS_NETWORK_2 = {'id': ID_OS_NETWORK_2,
 
 # network interface objects
 # 2 ports in both subnets, the second is attached to the first instance
+DB_NETWORK_INTERFACE_DEFAULT = {'id': ID_EC2_NETWORK_INTERFACE_DEFAULT,
+                                'os_id': ID_OS_PORT_DEFAULT,
+                                'vpc_id': ID_EC2_VPC_DEFAULT,
+                                'subnet_id': ID_EC2_SUBNET_DEFAULT,
+                                'description': (
+                                    DESCRIPTION_NETWORK_INTERFACE_DEFAULT),
+                                'private_ip_address': (
+                                    IP_NETWORK_INTERFACE_DEFAULT)}
 DB_NETWORK_INTERFACE_1 = {'id': ID_EC2_NETWORK_INTERFACE_1,
                           'os_id': ID_OS_PORT_1,
                           'vpc_id': ID_EC2_VPC_1,
@@ -555,6 +570,24 @@ DB_NETWORK_INTERFACE_2 = {'id': ID_EC2_NETWORK_INTERFACE_2,
                           'delete_on_termination': False,
                           'attach_time': TIME_ATTACH_NETWORK_INTERFACE}
 
+EC2_NETWORK_INTERFACE_DEFAULT = {
+    'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_DEFAULT,
+    'status': 'available',
+    'vpcId': ID_EC2_VPC_DEFAULT,
+    'subnetId': ID_EC2_SUBNET_DEFAULT,
+    'description': DESCRIPTION_NETWORK_INTERFACE_DEFAULT,
+    'macAddress': MAC_ADDRESS,
+    'privateIpAddress': IP_NETWORK_INTERFACE_DEFAULT,
+    'privateIpAddressesSet': [
+        {'privateIpAddress': IP_NETWORK_INTERFACE_DEFAULT,
+         'primary': True}],
+    'sourceDestCheck': True,
+    'ownerId': ID_OS_PROJECT,
+    'requesterManaged': False,
+    'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+                  'groupId': ID_EC2_SECURITY_GROUP_DEFAULT}],
+    'tagSet': [],
+}
 EC2_NETWORK_INTERFACE_1 = {
     'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_1,
     'status': 'available',
@@ -650,6 +683,13 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
 TIME_CREATE_INSTANCE_1 = timeutils.isotime(None, True)
 TIME_CREATE_INSTANCE_2 = timeutils.isotime(None, True)
 
+DB_INSTANCE_DEFAULT = {
+    'id': ID_EC2_INSTANCE_DEFAULT,
+    'os_id': ID_OS_INSTANCE_DEFAULT,
+    'vpc_id': ID_EC2_VPC_DEFAULT,
+    'reservation_id': ID_EC2_RESERVATION_DEFAULT,
+    'launch_index': 0,
+}
 DB_INSTANCE_1 = {
     'id': ID_EC2_INSTANCE_1,
     'os_id': ID_OS_INSTANCE_1,
@@ -666,6 +706,68 @@ DB_INSTANCE_2 = {
     'client_token': CLIENT_TOKEN_INSTANCE_2,
 }
 
+EC2_INSTANCE_DEFAULT = {
+    'instanceId': ID_EC2_INSTANCE_DEFAULT,
+    'privateIpAddress': IP_NETWORK_INTERFACE_2,
+    'vpcId': ID_EC2_VPC_DEFAULT,
+    'subnetId': ID_EC2_SUBNET_DEFAULT,
+    'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+                  'groupId': ID_EC2_SECURITY_GROUP_1}],
+    'networkInterfaceSet': [
+        {'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_2,
+         'status': 'in-use',
+         'vpcId': ID_EC2_VPC_DEFAULT,
+         'subnetId': ID_EC2_SUBNET_DEFAULT,
+         'description': DESCRIPTION_NETWORK_INTERFACE_2,
+         'macAddress': MAC_ADDRESS,
+         'privateIpAddress': IP_NETWORK_INTERFACE_2,
+         'association': {
+             'ipOwnerId': ID_OS_PROJECT,
+             'publicDnsName': None,
+             'publicIp': IP_ADDRESS_2,
+         },
+         'privateIpAddressesSet': [
+             {'privateIpAddress': IP_NETWORK_INTERFACE_2,
+              'primary': True,
+              'association': {
+                  'ipOwnerId': ID_OS_PROJECT,
+                  'publicDnsName': None,
+                  'publicIp': IP_ADDRESS_2}},
+             {'privateIpAddress': IP_NETWORK_INTERFACE_2_EXT_1,
+              'primary': False},
+             {'privateIpAddress': IP_NETWORK_INTERFACE_2_EXT_2,
+              'primary': False},
+         ],
+         'attachment': {
+             'status': 'attached',
+             'deviceIndex': 0,
+             'attachTime': TIME_ATTACH_NETWORK_INTERFACE,
+             'deleteOnTermination': False,
+             'attachmentId': ID_EC2_NETWORK_INTERFACE_2_ATTACH,
+         },
+         'sourceDestCheck': True,
+         'ownerId': ID_OS_PROJECT,
+         'requesterManaged': False,
+         'groupSet': [{'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+                       'groupId': ID_EC2_SECURITY_GROUP_1}]},
+    ],
+    'amiLaunchIndex': 0,
+    'placement': {'availabilityZone': None},
+    'dnsName': None,
+    'instanceState': {'code': 0, 'name': 'pending'},
+    'imageId': ID_EC2_IMAGE_1,
+    'kernelId': ID_EC2_IMAGE_AKI_1,
+    'ramdiskId': ID_EC2_IMAGE_ARI_1,
+    'productCodesSet': [],
+    'privateDnsName': '%s-%s' % (ID_EC2_RESERVATION_DEFAULT, 0),
+    'keyName': NAME_KEY_PAIR,
+    'launchTime': TIME_CREATE_INSTANCE_1,
+    'rootDeviceType': 'instance-store',
+    'instanceType': 'fake_flavor',
+    'ipAddress': IP_ADDRESS_2,
+    'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_1,
+    'sourceDestCheck': True,
+}
 EC2_INSTANCE_1 = {
     'instanceId': ID_EC2_INSTANCE_1,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
@@ -753,6 +855,12 @@ EC2_INSTANCE_2 = {
     'ipAddress': IP_ADDRESS_NOVA_1,
     'rootDeviceName': ROOT_DEVICE_NAME_INSTANCE_2,
     'clientToken': CLIENT_TOKEN_INSTANCE_2,
+}
+EC2_RESERVATION_DEFAULT = {
+    'reservationId': ID_EC2_RESERVATION_DEFAULT,
+    'ownerId': ID_OS_PROJECT,
+    'instancesSet': [EC2_INSTANCE_DEFAULT],
+    'groupSet': [],
 }
 EC2_RESERVATION_1 = {
     'reservationId': ID_EC2_RESERVATION_1,
