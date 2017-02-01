@@ -381,17 +381,28 @@ class SecurityGroupTestCase(base.ApiTestCase):
     def test_describe_security_groups_nova(self):
         security_group.security_group_engine = (
             security_group.SecurityGroupEngineNova())
-        self.set_mock_db_items(fakes.NOVA_DB_SECURITY_GROUP_1,
-                               fakes.NOVA_DB_SECURITY_GROUP_2)
-        self.nova.security_groups.list.return_value = (
-            [fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_1),
-             fakes.NovaSecurityGroup(fakes.NOVA_SECURITY_GROUP_2)])
+        self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
+                               fakes.DB_SECURITY_GROUP_2,
+                               fakes.DB_SECURITY_GROUP_3,
+                               fakes.DB_SECURITY_GROUP_4,
+                               fakes.DB_SECURITY_GROUP_5,)
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1),
+                                 fakes.OS_SECURITY_GROUP_2,
+                                 fakes.OS_SECURITY_GROUP_3,
+                                 fakes.OS_SECURITY_GROUP_4,
+                                 fakes.OS_SECURITY_GROUP_5]})
         resp = self.execute('DescribeSecurityGroups', {})
         self.assertThat(resp['securityGroupInfo'],
                         matchers.ListMatches(
-                            [fakes.EC2_NOVA_SECURITY_GROUP_1,
-                             fakes.EC2_NOVA_SECURITY_GROUP_2],
+                            [fakes.EC2_SECURITY_GROUP_1,
+                             fakes.EC2_SECURITY_GROUP_2,
+                             fakes.EC2_SECURITY_GROUP_3,
+                             fakes.EC2_SECURITY_GROUP_4,
+                             fakes.EC2_SECURITY_GROUP_5],
                             orderless_lists=True))
+        self.neutron.list_security_groups.assert_called_once_with(
+            tenant_id=fakes.ID_OS_PROJECT)
 
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_describe_security_groups_no_default_vpc(self, check_and_create):
