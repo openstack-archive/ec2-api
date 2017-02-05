@@ -494,6 +494,14 @@ def set_check_and_create_default_vpc(check_and_create_default_vpc):
     _check_and_create_default_vpc = check_and_create_default_vpc
 
 
+def get_default_vpc(context):
+    check_and_create_default_vpc(context)
+    default_vpc = next((vpc for vpc in db_api.get_items(context, 'vpc')
+                        if vpc.get('is_default')), None)
+    if not default_vpc:
+        raise exception.VPCIdNotSpecified()
+    return default_vpc
+
 # NOTE(ft): following functions are copied from various parts of Nova
 
 _ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')

@@ -20,7 +20,6 @@ import random
 
 import mock
 from novaclient import exceptions as nova_exception
-from oslotest import base as test_base
 import six
 
 from ec2api.api import instance as instance_api
@@ -1169,98 +1168,138 @@ class InstanceTestCase(base.ApiTestCase):
 
 # TODO(ft): add tests for get_vpc_default_security_group_id,
 
-class InstancePrivateTestCase(test_base.BaseTestCase):
+class InstancePrivateTestCase(base.BaseTestCase):
 
     def test_merge_network_interface_parameters(self):
+        fake_context = base.create_context()
         engine = instance_api.InstanceEngineNeutron()
 
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, 'subnet-1', None, None,
+            fake_context, None, 'subnet-1', None, None,
             [{'device_index': 0, 'private_ip_address': '10.10.10.10'}])
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, None, '10.10.10.10', None,
+            fake_context, None, None, '10.10.10.10', None,
             [{'device_index': 0, 'subnet_id': 'subnet-1'}])
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            ['default'], None, None, None,
+            fake_context, ['default'], None, None, None,
             [{'device_index': 0, 'subnet_id': 'subnet-1'}])
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, None, None, ['sg-1'],
+            fake_context, None, None, None, ['sg-1'],
             [{'device_index': 0, 'subnet_id': 'subnet-1'}])
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, 'subnet-1', None, None,
+            fake_context, None, 'subnet-1', None, None,
             [{'device_index': 1, 'associate_public_ip_address': True}])
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, 'subnet-1', None, None,
+            fake_context, None, 'subnet-1', None, None,
             [{'device_index': 0, 'associate_public_ip_address': True},
              {'device_index': 1, 'subnet_id': 'subnet-2'}])
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, 'subnet-1', None, None,
+            fake_context, None, 'subnet-1', None, None,
             [{'device_index': 0}])
 
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            ['default'], 'subnet-1', None, None, None)
+            fake_context, ['default'], 'subnet-1', None, None, None)
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, None, '10.10.10.10', None, None)
+            fake_context, None, None, '10.10.10.10', None, None)
         self.assertRaises(
             exception.InvalidParameterCombination,
             engine.merge_network_interface_parameters,
-            None, None, None, ['sg-1'], None)
+            fake_context, None, None, None, ['sg-1'], None)
 
         self.assertEqual(
-            ([{'device_index': 0,
-               'subnet_id': 'subnet-1'}]),
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1'}]),
             engine.merge_network_interface_parameters(
-                None, 'subnet-1', None, None, None))
+                fake_context, None, 'subnet-1', None, None, None))
         self.assertEqual(
-            ([{'device_index': 0,
-               'subnet_id': 'subnet-1',
-               'private_ip_address': '10.10.10.10'}]),
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1',
+                     'private_ip_address': '10.10.10.10'}]),
             engine.merge_network_interface_parameters(
-                None, 'subnet-1', '10.10.10.10', None, None))
+                fake_context, None, 'subnet-1', '10.10.10.10', None, None))
         self.assertEqual(
-            ([{'device_index': 0,
-               'subnet_id': 'subnet-1',
-               'private_ip_address': '10.10.10.10',
-               'security_group_id': ['sg-1']}]),
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1',
+                     'private_ip_address': '10.10.10.10',
+                     'security_group_id': ['sg-1']}]),
             engine.merge_network_interface_parameters(
-                None, 'subnet-1', '10.10.10.10', ['sg-1'], None))
+                fake_context, None, 'subnet-1', '10.10.10.10', ['sg-1'], None))
         self.assertEqual(
-            ([{'device_index': 0,
-               'subnet_id': 'subnet-1',
-               'security_group_id': ['sg-1']}]),
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1',
+                     'security_group_id': ['sg-1']}]),
             engine.merge_network_interface_parameters(
-                None, 'subnet-1', None, ['sg-1'], None))
+                fake_context, None, 'subnet-1', None, ['sg-1'], None))
 
         self.assertEqual(
-            ([{'device_index': 0,
-               'subnet_id': 'subnet-1'}]),
+            (None, [{'device_index': 0,
+                     'subnet_id': 'subnet-1'}]),
             engine.merge_network_interface_parameters(
-                None, None, None, None,
+                fake_context, None, None, None, None,
                 [{'device_index': 0, 'subnet_id': 'subnet-1'}]))
-        self.assertEqual([],
+        self.assertEqual((['default'], []),
                          engine.merge_network_interface_parameters(
-                                ['default'], None, None, None, None))
-        self.assertEqual([],
+                                fake_context, ['default'], None, None, None,
+                                None))
+        self.assertEqual((None, []),
                          engine.merge_network_interface_parameters(
-                                None, None, None, None, None))
+                                fake_context, None, None, None, None, None))
+
+        self.configure(disable_ec2_classic=True)
+        self.db_api = self.mock_db()
+        self.db_api.set_mock_items(fakes.DB_VPC_DEFAULT,
+                                   fakes.DB_SUBNET_DEFAULT)
+
+        self.assertEqual(
+            (None, [{'device_index': 0,
+                     'subnet_id': fakes.ID_EC2_SUBNET_DEFAULT}]),
+            engine.merge_network_interface_parameters(
+                fake_context, None, None, None, None, None))
+        self.assertEqual(
+            (None, [{'device_index': 0,
+                     'subnet_id': fakes.ID_EC2_SUBNET_DEFAULT,
+                     'security_group_id': ['sg-id'],
+                     'associate_public_ip_address': True}]),
+            engine.merge_network_interface_parameters(
+                fake_context, None, None, None, None,
+                [{'device_index': 0,
+                  'associate_public_ip_address': True,
+                  'security_group_id': ['sg-id']}]))
+
+        with mock.patch('ec2api.api.security_group.describe_security_groups'
+                        ) as describe_sg:
+
+            describe_sg.return_value = {
+                'securityGroupInfo': [{'groupId': 'sg-named-id'}]
+                }
+            self.assertEqual((None, [{'device_index': 0,
+                                      'subnet_id': fakes.ID_EC2_SUBNET_DEFAULT,
+                                      'security_group_id': ['sg-id',
+                                                            'sg-named-id'],
+                                      'private_ip_address': 'private-ip'}]),
+                             engine.merge_network_interface_parameters(
+                                    fake_context, ['sg-name'], None,
+                                    'private-ip', ['sg-id'], None))
+            describe_sg.assert_called_once_with(mock.ANY,
+                                                group_name=['sg-name'])
 
     def test_check_network_interface_parameters(self):
         engine = instance_api.InstanceEngineNeutron()

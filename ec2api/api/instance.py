@@ -1158,16 +1158,11 @@ class InstanceEngineNeutron(object):
             network_interface, multiple_instances):
         # TODO(ft): support auto_assign_floating_ip
 
-        vpc_network_parameters = self.merge_network_interface_parameters(
-            security_group,
+        (security_group,
+         vpc_network_parameters) = self.merge_network_interface_parameters(
+            context, security_group,
             subnet_id, private_ip_address, security_group_id,
             network_interface)
-
-        if not vpc_network_parameters and CONF.disable_ec2_classic:
-            ec2utils.check_and_create_default_vpc(context)
-            subnet_id = self.get_default_subnet(context)
-            vpc_network_parameters = [{'device_index': 0,
-                                       'subnet_id': subnet_id}]
 
         self.check_network_interface_parameters(vpc_network_parameters,
                                                 multiple_instances)
@@ -1190,21 +1185,6 @@ class InstanceEngineNeutron(object):
                                                            neutron)['id']}]
 
         return vpc_id, launch_context
-
-    def get_default_subnet(self, context):
-        default_vpc = next(
-            (vpc for vpc in db_api.get_items(context, 'vpc')
-             if vpc.get('is_default')), None)
-        if not default_vpc:
-            raise exception.VPCIdNotSpecified()
-        subnet = next(
-            (subnet for subnet in db_api.get_items(context, 'subnet')
-             if subnet['vpc_id'] == default_vpc['id']), None)
-        if not subnet:
-            raise exception.MissingInput(
-                _("No subnets found for the default VPC '%s'. "
-                  "Please specify a subnet.") % default_vpc['id'])
-        return subnet['id']
 
     def get_launch_extra_parameters(self, context, cleaner, launch_context):
         if 'ec2_classic_nics' in launch_context:
@@ -1255,39 +1235,39 @@ class InstanceEngineNeutron(object):
         return ec2_network_interfaces
 
     def merge_network_interface_parameters(self,
+                                           context,
                                            security_group_names,
                                            subnet_id,
                                            private_ip_address,
                                            security_group_ids,
                                            network_interfaces):
-        network_interfaces = network_interfaces or []
 
         if ((subnet_id or private_ip_address or security_group_ids or
-                security_group_names) and
-                (len(network_interfaces) > 1 or
-                 # NOTE(ft): the only case in AWS when simple subnet_id
-                 # and/or private_ip_address parameters are compatible with
-                 # network_interface parameter is default behavior change of
-                 # public IP association for passed subnet_id by specifying
-                 # the only element in network_interfaces:
-                 # {"device_index": 0,
-                 #  "associate_public_ip_address": <boolean>}
-                 # Both keys must be in the dict, and no other keys
-                 # are allowed
-                 # We should support such combination of parameters for
-                 # compatibility purposes, even if we ignore
-                 # associate_public_ip_address in all other code
-                 len(network_interfaces) == 1 and
-                 (len(network_interfaces[0]) != 2 or
-                     ('associate_public_ip_address' not in
-                      network_interfaces[0]) or
-                     network_interfaces[0].get('device_index') != 0))):
+                security_group_names) and network_interfaces):
             msg = _(' Network interfaces and an instance-level subnet ID or '
                     'private IP address or security groups may not be '
                     'specified on the same request')
             raise exception.InvalidParameterCombination(msg)
 
-        if subnet_id:
+        if network_interfaces:
+            if (CONF.disable_ec2_classic and
+                len(network_interfaces) == 1 and
+                 # NOTE(tikitavi): the case in AWS CLI when security_group_ids
+                 # and/or private_ip_address parameters are set with
+                 # network_interface parameter having
+                 # associate_public_ip_address setting
+                 # private_ip_address and security_group_ids in that case
+                 # go to network_interface parameter
+                'associate_public_ip_address' in network_interfaces[0] and
+                'device_index' in network_interfaces[0] and
+                network_interfaces[0]['device_index'] == 0 and
+                ('subnet_id' not in network_interfaces[0] or
+                 'network_interface_id' not in network_interfaces[0])):
+
+                subnet_id = self.get_default_subnet(context)['id']
+                network_interfaces[0]['subnet_id'] = subnet_id
+            return None, network_interfaces
+        elif subnet_id:
             if security_group_names:
                 msg = _('The parameter groupName cannot be used with '
                         'the parameter subnet')
@@ -1298,7 +1278,25 @@ class InstanceEngineNeutron(object):
                 param['private_ip_address'] = private_ip_address
             if security_group_ids:
                 param['security_group_id'] = security_group_ids
-            return [param]
+            return None, [param]
+        elif CONF.disable_ec2_classic:
+            subnet_id = self.get_default_subnet(context)['id']
+            param = {'device_index': 0,
+                     'subnet_id': subnet_id}
+            if security_group_ids or security_group_names:
+                security_group_id = security_group_ids or []
+                if security_group_names:
+                    security_groups = (
+                        security_group_api.describe_security_groups(
+                            context, group_name=security_group_names)
+                        ['securityGroupInfo'])
+                    security_group_id.extend(sg['groupId']
+                                             for sg in security_groups)
+
+                param['security_group_id'] = security_group_id
+            if private_ip_address:
+                param['private_ip_address'] = private_ip_address
+            return None, [param]
         elif private_ip_address:
             msg = _('Specifying an IP address is only valid for VPC instances '
                     'and thus requires a subnet in which to launch')
@@ -1307,8 +1305,18 @@ class InstanceEngineNeutron(object):
             msg = _('VPC security groups may not be used for a non-VPC launch')
             raise exception.InvalidParameterCombination(msg)
         else:
-            # NOTE(ft): only one of this variables is not empty
-            return network_interfaces
+            return security_group_names, []
+
+    def get_default_subnet(self, context):
+        default_vpc = ec2utils.get_default_vpc(context)
+        subnet = next(
+            (subnet for subnet in db_api.get_items(context, 'subnet')
+             if subnet['vpc_id'] == default_vpc['id']), None)
+        if not subnet:
+            raise exception.MissingInput(
+                _("No subnets found for the default VPC '%s'. "
+                  "Please specify a subnet.") % default_vpc['id'])
+        return subnet
 
     def check_network_interface_parameters(self, params, multiple_instances):
         # NOTE(ft): we ignore associate_public_ip_address
