@@ -439,7 +439,7 @@ class EC2TestCase(base.BaseTestCase):
                     try:
                         waiter().wait_delete(obj_id)
                     except botocore.exceptions.ClientError as e:
-                        LOG.exception('Exception occured in cleanup waiting')
+                        LOG.exception('Exception occurred in cleanup waiting')
                         return False
             except botocore.exceptions.ClientError as e:
                 error_code = e.response['Error']['Code']
@@ -780,7 +780,7 @@ class EC2TestCase(base.BaseTestCase):
                 )['RouteTables']))
             return True
         except Exception:
-            LOG.exception('Error occured during "delete_vpc_failed" hook')
+            LOG.exception('Error occurred during "delete_vpc_failed" hook')
         return False
 
     def assertEmpty(self, list_obj, msg=None):

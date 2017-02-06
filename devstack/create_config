@@ -157,7 +157,7 @@ if [[ -n "$openstack_image_id" ]]; then
   fail=0
   while [[ true ]] ; do
     if ((fail >= MAX_FAIL)); then
-      die $LINENO "Instance active status wait timeout occured"
+      die $LINENO "Instance active status wait timeout occurred"
     fi
     echo "attempt "$fail" of "$MAX_FAIL
     status=$(instance_status $instance_id)
