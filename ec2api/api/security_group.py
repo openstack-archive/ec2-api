@@ -197,6 +197,7 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
 
 def describe_security_groups(context, group_name=None, group_id=None,
                              filter=None):
+    ec2utils.check_and_create_default_vpc(context)
     formatted_security_groups = SecurityGroupDescriber().describe(
         context, group_id, group_name, filter)
     return {'securityGroupInfo': formatted_security_groups}
