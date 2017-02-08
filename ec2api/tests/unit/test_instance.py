@@ -515,6 +515,91 @@ class InstanceTestCase(base.ApiTestCase):
                                     {'ImageId': fakes.ID_EC2_IMAGE_1,
                                      'MinCount': '2', 'MaxCount': '1'})
 
+    @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
+    @mock.patch('ec2api.api.instance.describe_instances')
+    @mock.patch('ec2api.api.instance.InstanceEngineNeutron.'
+                'get_vpc_default_security_group_id')
+    def test_run_instances_without_network_parameters(
+            self, get_vpc_default_security_group_id, describe_instances,
+            check_and_create):
+        """Run instance without network interface settings."""
+        self.configure(disable_ec2_classic=True)
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
+        self.set_mock_db_items(fakes.DB_IMAGE_2,
+                               fakes.DB_NETWORK_INTERFACE_DEFAULT)
+
+        def mock_check_and_create(context):
+            self.add_mock_db_items(fakes.DB_VPC_DEFAULT,
+                                   fakes.DB_SUBNET_DEFAULT)
+        check_and_create.side_effect = mock_check_and_create
+
+        self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_2)
+        self.network_interface_api.create_network_interface.return_value = (
+            {'networkInterface': fakes.EC2_NETWORK_INTERFACE_DEFAULT})
+
+        self.db_api.add_item.return_value = fakes.DB_INSTANCE_DEFAULT
+        self.nova.servers.create.return_value = (
+            fakes.OSInstance({
+                'id': fakes.ID_OS_INSTANCE_DEFAULT,
+                'flavor': {'id': 'fakeFlavorId'},
+                'image': {'id': fakes.ID_OS_IMAGE_2}}))
+        self.utils_generate_uid.return_value = fakes.ID_EC2_RESERVATION_DEFAULT
+
+        get_vpc_default_security_group_id.return_value = None
+
+        describe_instances.return_value = {
+            'reservationSet': [fakes.EC2_RESERVATION_DEFAULT]}
+
+        params = {'ImageId': fakes.ID_EC2_IMAGE_2,
+                  'InstanceType': 'fake_flavor',
+                  'MinCount': '1', 'MaxCount': '1'}
+        resp = self.execute('RunInstances', params)
+
+        self.assertThat(resp, matchers.DictMatches(
+            fakes.EC2_RESERVATION_DEFAULT))
+        check_and_create.assert_called_once_with(mock.ANY)
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'i',
+            tools.purge_dict(fakes.DB_INSTANCE_DEFAULT, ('id',)))
+        self.nova.servers.create.assert_called_once_with(
+            fakes.EC2_INSTANCE_DEFAULT['privateDnsName'],
+            fakes.ID_OS_IMAGE_2, self.fake_flavor,
+            min_count=1, max_count=1,
+            kernel_id=None, ramdisk_id=None,
+            availability_zone=None,
+            block_device_mapping_v2=[],
+            security_groups=None,
+            nics=[{'port-id': fakes.ID_OS_PORT_DEFAULT}],
+            key_name=None, userdata=None)
+        (self.network_interface_api.create_network_interface.
+            assert_called_once_with(mock.ANY, fakes.ID_EC2_SUBNET_DEFAULT))
+        (self.network_interface_api._attach_network_interface_item.
+            assert_called_once_with(
+                 mock.ANY, fakes.DB_NETWORK_INTERFACE_DEFAULT,
+                 fakes.ID_EC2_INSTANCE_DEFAULT, 0,
+                 delete_on_termination=True))
+
+    def test_run_instances_inconsistent_default_vpc(self):
+        """Run instance without network interface settings. """
+        """No default vpc"""
+        self.configure(disable_ec2_classic=True)
+        instance_api.instance_engine = (
+            instance_api.InstanceEngineNeutron())
+        self.set_mock_db_items(fakes.DB_IMAGE_2)
+        self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_2)
+
+        params = {'ImageId': fakes.ID_EC2_IMAGE_2,
+                  'InstanceType': 'fake_flavor',
+                  'MinCount': '1', 'MaxCount': '1'}
+
+        with mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc'):
+            self.assert_execution_error('VPCIdNotSpecified',
+                                        'RunInstances', params)
+
+        self.add_mock_db_items(fakes.DB_VPC_DEFAULT)
+        self.assert_execution_error('MissingInput', 'RunInstances', params)
+
     @mock.patch.object(fakes.OSInstance, 'delete', autospec=True)
     @mock.patch.object(fakes.OSInstance, 'get', autospec=True)
     def test_terminate_instances(self, os_instance_get, os_instance_delete):

@@ -198,6 +198,10 @@ class ValidationError(EC2InvalidException):
                 "specified by an AWS service: '%(reason)s'")
 
 
+class MissingInput(EC2InvalidException):
+    pass
+
+
 class MissingParameter(EC2InvalidException):
     msg_fmt = _("The required parameter '%(param)s' is missing")
 
@@ -492,3 +496,7 @@ class VpnGatewayAttachmentLimitExceeded(EC2OverlimitException):
 class InvalidGroupReserved(EC2InvalidException):
     ec2_code = 'InvalidGroup.Reserved'
     msg_fmt = _("The security group '%(group_name)' is reserved.")
+
+
+class VPCIdNotSpecified(EC2InvalidException):
+    msg_fmt = _("No default VPC for this user.")
