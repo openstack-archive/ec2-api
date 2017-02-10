@@ -141,9 +141,9 @@ def _create_vpc(context, cidr_block, is_default=False):
         vpc['route_table_id'] = route_table['id']
         db_api.update_item(context, vpc)
         neutron.update_router(os_router['id'], {'router': {'name': vpc['id']}})
-        security_group_api._create_default_security_group(context, vpc)
+        sg_id = security_group_api._create_default_security_group(context, vpc)
         cleaner.addCleanup(security_group_api.delete_security_group, context,
-                           group_name=vpc['id'], delete_default=True)
+                           group_id=sg_id, delete_default=True)
         if is_default:
             igw_id = internet_gateway_api.create_internet_gateway(
                 context)['internetGateway']['internetGatewayId']

@@ -343,8 +343,6 @@ class VpcPrivateTestCase(base.BaseTestCase):
 
         self.neutron.create_router.side_effect = (
             tools.get_neutron_create('router', fakes.ID_OS_ROUTER_DEFAULT))
-        self.nova.security_groups.list.return_value = (
-            [fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_DEFAULT)])
 
         self.db_api.add_item.side_effect = (
             tools.get_db_api_add_item({'vpc': fakes.ID_EC2_VPC_DEFAULT}))
@@ -356,11 +354,14 @@ class VpcPrivateTestCase(base.BaseTestCase):
         self.db_api.get_item_by_id.side_effect = (
             tools.get_db_api_get_item_by_id(fakes.DB_VPC_DEFAULT,
                                             fakes.DB_SUBNET_DEFAULT,
+                                            fakes.DB_SECURITY_GROUP_DEFAULT,
                                             DB_IGW_DEFAULT_DETACHED))
         create_route_table.return_value = fakes.DB_ROUTE_TABLE_DEFAULT
         create_internet_gateway.return_value = {'internetGateway':
                                                 fakes.EC2_IGW_DEFAULT}
         create_subnet.return_value = {'subnet': fakes.EC2_SUBNET_DEFAULT}
+        create_default_security_group.return_value = (
+            fakes.ID_EC2_SECURITY_GROUP_DEFAULT)
 
         # exception during attaching internet gateway
         create_route.side_effect = Exception()
@@ -374,7 +375,7 @@ class VpcPrivateTestCase(base.BaseTestCase):
             fakes.ID_EC2_SUBNET_DEFAULT)
         self.db_api.delete_item.assert_any_call(mock.ANY,
             fakes.ID_EC2_IGW_DEFAULT)
-        self.nova.security_groups.delete.assert_any_call(
+        self.neutron.delete_security_group.assert_any_call(
             fakes.ID_OS_SECURITY_GROUP_DEFAULT)
         self.db_api.delete_item.assert_any_call(mock.ANY,
             fakes.ID_EC2_ROUTE_TABLE_DEFAULT)
