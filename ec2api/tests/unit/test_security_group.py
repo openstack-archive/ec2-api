@@ -245,38 +245,45 @@ class SecurityGroupTestCase(base.ApiTestCase):
             security_group.SecurityGroupEngineNeutron())
         self.set_mock_db_items(fakes.DB_SECURITY_GROUP_1,
                                fakes.DB_SECURITY_GROUP_2,
-                               fakes.DB_SECURITY_GROUP_3)
+                               fakes.DB_SECURITY_GROUP_3,
+                               fakes.DB_SECURITY_GROUP_4,
+                               fakes.DB_SECURITY_GROUP_5,)
         self.neutron.list_security_groups.return_value = (
             {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1),
                                  fakes.OS_SECURITY_GROUP_2,
-                                 fakes.OS_SECURITY_GROUP_3]})
+                                 fakes.OS_SECURITY_GROUP_3,
+                                 fakes.OS_SECURITY_GROUP_4,
+                                 fakes.OS_SECURITY_GROUP_5]})
 
         resp = self.execute('DescribeSecurityGroups', {})
         self.assertThat(resp['securityGroupInfo'],
                         matchers.ListMatches(
                             [fakes.EC2_SECURITY_GROUP_1,
                              fakes.EC2_SECURITY_GROUP_2,
-                             fakes.EC2_SECURITY_GROUP_3],
+                             fakes.EC2_SECURITY_GROUP_3,
+                             fakes.EC2_SECURITY_GROUP_4,
+                             fakes.EC2_SECURITY_GROUP_5],
                             orderless_lists=True))
 
         resp = self.execute('DescribeSecurityGroups',
                             {'GroupName.1': 'groupname2'})
         self.assertThat(resp['securityGroupInfo'],
                         matchers.ListMatches(
-                            [fakes.EC2_SECURITY_GROUP_2],
+                            [fakes.EC2_SECURITY_GROUP_4],
                             orderless_lists=True))
         self.assertEqual(0, self.db_api.delete_item.call_count)
 
         self.db_api.get_items_by_ids = tools.CopyingMock(
-            return_value=[fakes.DB_SECURITY_GROUP_2])
+            return_value=[fakes.DB_SECURITY_GROUP_4])
+
         resp = self.execute('DescribeSecurityGroups',
-                            {'GroupId.1': fakes.ID_EC2_SECURITY_GROUP_2})
+                            {'GroupId.1': fakes.ID_EC2_SECURITY_GROUP_4})
         self.assertThat(resp['securityGroupInfo'],
                         matchers.ListMatches(
-                            [fakes.EC2_SECURITY_GROUP_2],
+                            [fakes.EC2_SECURITY_GROUP_4],
                             orderless_lists=True))
         self.db_api.get_items_by_ids.assert_called_once_with(
-            mock.ANY, set([fakes.ID_EC2_SECURITY_GROUP_2]))
+            mock.ANY, set([fakes.ID_EC2_SECURITY_GROUP_4]))
         self.assertEqual(0, self.db_api.delete_item.call_count)
 
         self.check_filtering(
@@ -296,7 +303,17 @@ class SecurityGroupTestCase(base.ApiTestCase):
              ('owner-id', fakes.ID_OS_PROJECT)])
         self.check_tag_support(
             'DescribeSecurityGroups', 'securityGroupInfo',
-            fakes.ID_EC2_SECURITY_GROUP_2, 'groupId')
+            fakes.ID_EC2_SECURITY_GROUP_4, 'groupId')
+
+        self.configure(disable_ec2_classic=True)
+        self.add_mock_db_items(fakes.DB_VPC_DEFAULT,
+                               fakes.DB_SECURITY_GROUP_6)
+        resp = self.execute('DescribeSecurityGroups',
+                            {'GroupName.1': 'groupname2'})
+        self.assertThat(resp['securityGroupInfo'],
+                        matchers.ListMatches(
+                            [fakes.EC2_SECURITY_GROUP_5],
+                            orderless_lists=True))
 
     def test_describe_security_groups_nova(self):
         security_group.security_group_engine = (

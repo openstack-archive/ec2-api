@@ -387,6 +387,10 @@ class UniversalDescriber(object):
 
         return formatted_items
 
+    def is_selected_item(self, context, os_item_name, item):
+        return (os_item_name in self.names or
+                (item and item['id'] in self.ids))
+
     def handle_unpaired_item(self, item):
         self.delete_obsolete_item(item)
 
@@ -415,8 +419,7 @@ class UniversalDescriber(object):
                 paired_items_ids.add(item['id'])
             # NOTE(Alex): Filter out items not requested in names or ids
             if (self.selective_describe and
-                    not (os_item_name in self.names or
-                         (item and item['id'] in self.ids))):
+                    not self.is_selected_item(context, os_item_name, item)):
                 continue
             # NOTE(Alex): Autoupdate DB for autoupdatable items
             item = self.auto_update_db(item, os_item)

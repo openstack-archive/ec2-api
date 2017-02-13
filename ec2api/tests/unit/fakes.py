@@ -162,10 +162,15 @@ ID_EC2_SECURITY_GROUP_DEFAULT = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_1 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_2 = random_ec2_id('sg')
 ID_EC2_SECURITY_GROUP_3 = random_ec2_id('sg')
+ID_EC2_SECURITY_GROUP_4 = random_ec2_id('sg')
+ID_EC2_SECURITY_GROUP_5 = random_ec2_id('sg')
+ID_EC2_SECURITY_GROUP_6 = random_ec2_id('sg')
 ID_OS_SECURITY_GROUP_DEFAULT = random_os_id()
 ID_OS_SECURITY_GROUP_1 = random_os_id()
 ID_OS_SECURITY_GROUP_2 = random_os_id()
 ID_OS_SECURITY_GROUP_3 = random_os_id()
+ID_OS_SECURITY_GROUP_4 = random_os_id()
+ID_OS_SECURITY_GROUP_5 = random_os_id()
 
 ID_NOVA_OS_SECURITY_GROUP_1 = 1
 ID_NOVA_OS_SECURITY_GROUP_2 = 2
@@ -1137,6 +1142,21 @@ DB_SECURITY_GROUP_3 = {
     'os_id': ID_OS_SECURITY_GROUP_3,
     'vpc_id': None,
 }
+DB_SECURITY_GROUP_4 = {
+    'id': ID_EC2_SECURITY_GROUP_4,
+    'os_id': ID_OS_SECURITY_GROUP_4,
+    'vpc_id': None,
+}
+DB_SECURITY_GROUP_5 = {
+    'id': ID_EC2_SECURITY_GROUP_5,
+    'os_id': ID_OS_SECURITY_GROUP_5,
+    'vpc_id': ID_EC2_VPC_DEFAULT,
+}
+DB_SECURITY_GROUP_6 = {
+    'id': ID_EC2_SECURITY_GROUP_6,
+    'os_id': None,
+    'vpc_id': None,
+}
 OS_SECURITY_GROUP_RULE_1 = {
     'direction': 'ingress',
     'ethertype': 'IPv4',
@@ -1216,6 +1236,38 @@ OS_SECURITY_GROUP_3 = {
     'description': 'Group description',
     'tenant_id': ID_OS_PROJECT
 }
+OS_SECURITY_GROUP_4 = {
+    'id': ID_OS_SECURITY_GROUP_4,
+    'name': 'groupname2',
+    'security_group_rules': [
+        {'direction': 'ingress',
+         'ethertype': 'IPv4',
+         'id': random_os_id(),
+         'port_range_min': 10,
+         'port_range_max': 10,
+         'protocol': 'tcp',
+         'remote_group_id': None,
+         'remote_ip_prefix': '192.168.1.0/24',
+         'security_group_id': ID_OS_SECURITY_GROUP_4},
+        {'direction': 'egress',
+         'ethertype': 'IPv4',
+         'id': random_os_id(),
+         'port_range_min': 10,
+         'port_range_max': None,
+         'protocol': 100,
+         'remote_group_id': ID_OS_SECURITY_GROUP_1,
+         'remote_ip_prefix': None,
+         'security_group_id': ID_OS_SECURITY_GROUP_4}
+    ],
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
+OS_SECURITY_GROUP_5 = {
+    'id': ID_OS_SECURITY_GROUP_5,
+    'name': 'groupname2',
+    'description': 'Group description',
+    'tenant_id': ID_OS_PROJECT
+}
 EC2_SECURITY_GROUP_DEFAULT = {
     'vpcId': ID_EC2_VPC_DEFAULT,
     'groupDescription': 'Group description',
@@ -1270,6 +1322,37 @@ EC2_SECURITY_GROUP_3 = {
     'groupName': 'groupname3',
     'ownerId': ID_OS_PROJECT,
     'groupId': ID_EC2_SECURITY_GROUP_3
+}
+EC2_SECURITY_GROUP_4 = {
+    'groupDescription': 'Group description',
+    'ipPermissions':
+    [{'toPort': 10,
+      'ipProtocol': 'tcp',
+      'fromPort': 10,
+      'ipRanges':
+      [{'cidrIp': '192.168.1.0/24'}]
+      }],
+    'groupName': 'groupname2',
+    'ipPermissionsEgress':
+    [{'toPort': -1,
+      'ipProtocol': 100,
+      'fromPort': 10,
+      'groups':
+      [{'groupId': ID_EC2_SECURITY_GROUP_1,
+        'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
+        'userId': ID_OS_PROJECT}]
+      }],
+    'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_4
+}
+EC2_SECURITY_GROUP_5 = {
+    'vpcId': ID_EC2_VPC_DEFAULT,
+    'groupDescription': 'Group description',
+    'ipPermissions': None,
+    'ipPermissionsEgress': None,
+    'groupName': 'groupname2',
+    'ownerId': ID_OS_PROJECT,
+    'groupId': ID_EC2_SECURITY_GROUP_5
 }
 
 NOVA_DB_SECURITY_GROUP_1 = {

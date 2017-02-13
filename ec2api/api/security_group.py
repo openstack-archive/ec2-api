@@ -82,7 +82,6 @@ def create_security_group(context, group_name, group_description,
                            if sg.get('vpcId') is None]
     if security_groups:
         raise exception.InvalidGroupDuplicate(name=group_name)
-
     return _create_security_group(context, group_name, group_description,
                                   vpc_id)
 
@@ -158,9 +157,10 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
                   'vpc-id': 'vpcId',
     }
 
-    def __init__(self):
+    def __init__(self, default_vpc_id):
         super(SecurityGroupDescriber, self).__init__()
         self.all_db_items = None
+        self.default_vpc_id = default_vpc_id
 
     def format(self, item=None, os_item=None):
         return _format_security_group(item, os_item,
@@ -196,12 +196,26 @@ class SecurityGroupDescriber(common.TaggableItemsDescriber):
                 had_to_repair = True
         return had_to_repair
 
+    def is_selected_item(self, context, os_item_name, item):
+        if item and item['id'] in self.ids:
+            return True
+        if os_item_name in self.names:
+            if not CONF.disable_ec2_classic:
+                return (not item or not item['vpc_id'])
+            else:
+                return (self.default_vpc_id and item and
+                        item['vpc_id'] == self.default_vpc_id)
+        return False
+
 
 def describe_security_groups(context, group_name=None, group_id=None,
                              filter=None):
-    ec2utils.check_and_create_default_vpc(context)
-    formatted_security_groups = SecurityGroupDescriber().describe(
-        context, group_id, group_name, filter)
+    default_vpc_id = None
+    default_vpc = ec2utils.check_and_create_default_vpc(context)
+    if default_vpc:
+        default_vpc_id = default_vpc['id']
+    formatted_security_groups = SecurityGroupDescriber(
+        default_vpc_id).describe(context, group_id, group_name, filter)
     return {'securityGroupInfo': formatted_security_groups}
 
 
@@ -648,7 +662,7 @@ class SecurityGroupEngineNova(object):
         nova_group = next((g for g in nova_security_groups
                            if g.name == group_name), None)
         if nova_group is None:
-            raise exception.InvalidGroupNotFound(sg_id=group_name)
+            raise exception.InvalidGroupNotFound(id=group_name)
         return nova_group
 
 
