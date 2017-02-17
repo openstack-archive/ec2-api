@@ -1265,6 +1265,17 @@ OS_SECURITY_GROUP_4 = {
 OS_SECURITY_GROUP_5 = {
     'id': ID_OS_SECURITY_GROUP_5,
     'name': 'groupname2',
+    'security_group_rules': [
+        {'remote_group_id': None,
+         'direction': 'egress',
+         'remote_ip_prefix': None,
+         'protocol': None,
+         'port_range_max': None,
+         'security_group_id': ID_OS_SECURITY_GROUP_5,
+         'port_range_min': None,
+         'ethertype': 'IPv4',
+         'id': random_os_id()}
+    ],
     'description': 'Group description',
     'tenant_id': ID_OS_PROJECT
 }
@@ -1349,7 +1360,10 @@ EC2_SECURITY_GROUP_5 = {
     'vpcId': ID_EC2_VPC_DEFAULT,
     'groupDescription': 'Group description',
     'ipPermissions': None,
-    'ipPermissionsEgress': None,
+    'ipPermissionsEgress':
+    [{'toPort': -1,
+      'ipProtocol': -1,
+      'fromPort': -1}],
     'groupName': 'groupname2',
     'ownerId': ID_OS_PROJECT,
     'groupId': ID_EC2_SECURITY_GROUP_5
