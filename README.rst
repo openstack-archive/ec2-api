@@ -89,7 +89,8 @@ Create configuration file for aws cli in your home directory ~/.aws/config:
 
 Change the aws_access_key_id and aws_secret_acces_key above to the values
 appropriate for your cloud (can be obtained by "keystone ec2-credentials-list"
-command).
+command or by "openstack ec2 credentials list" command". Create credentials
+if list is empty).
 
 Run aws cli commands using new EC2 API endpoint URL (can be obtained from
 keystone with the new port 8788) like this:
