@@ -72,6 +72,28 @@ class AddressTestCase(base.ApiTestCase):
         self.neutron.list_networks.assert_called_once_with(
             **{'router:external': True,
                'name': fakes.NAME_OS_PUBLIC_NETWORK})
+        self.db_api.reset_mock()
+        self.neutron.create_floatingip.reset_mock()
+        self.neutron.list_networks.reset_mock()
+
+        self.configure(disable_ec2_classic=True)
+        resp = self.execute('AllocateAddress', {})
+
+        self.assertEqual(fakes.IP_ADDRESS_1, resp['publicIp'])
+        self.assertEqual('vpc', resp['domain'])
+        self.assertEqual(fakes.ID_EC2_ADDRESS_1,
+                         resp['allocationId'])
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'eipalloc',
+            tools.purge_dict(fakes.DB_ADDRESS_1,
+                             ('id', 'vpc_id')))
+        self.neutron.create_floatingip.assert_called_once_with(
+            {'floatingip': {
+                'floating_network_id':
+                fakes.ID_OS_PUBLIC_NETWORK}})
+        self.neutron.list_networks.assert_called_once_with(
+            **{'router:external': True,
+               'name': fakes.NAME_OS_PUBLIC_NETWORK})
 
     def test_allocate_address_invalid_parameters(self):
         address.address_engine = (
@@ -190,6 +212,14 @@ class AddressTestCase(base.ApiTestCase):
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_1,
                   'InstanceId': fakes.ID_EC2_INSTANCE_1,
                   'AllowReassociation': 'True'},
+                 fakes.IP_NETWORK_INTERFACE_2)
+
+        self.configure(disable_ec2_classic=True)
+        self.set_mock_db_items(
+            fakes.DB_VPC_DEFAULT, fakes.DB_ADDRESS_1, fakes.DB_IGW_1,
+            fakes.DB_NETWORK_INTERFACE_2)
+        do_check({'PublicIp': fakes.IP_ADDRESS_1,
+                  'InstanceId': fakes.ID_EC2_INSTANCE_1},
                  fakes.IP_NETWORK_INTERFACE_2)
 
     def test_associate_address_vpc_idempotent(self):
@@ -338,6 +368,17 @@ class AddressTestCase(base.ApiTestCase):
                                     {'AllocationId': fakes.ID_EC2_ADDRESS_1,
                                      'InstanceId': fakes.ID_EC2_INSTANCE_1})
 
+        # NOTE(tikitavi): associate to wrong public ip
+        self.configure(disable_ec2_classic=True)
+        self.set_mock_db_items(
+            fakes.DB_VPC_DEFAULT, fakes.DB_IGW_DEFAULT, fakes.DB_ADDRESS_1,
+            fakes.DB_INSTANCE_DEFAULT, tools.update_dict(
+                fakes.DB_NETWORK_INTERFACE_DEFAULT,
+                {'instance_id': fakes.ID_EC2_INSTANCE_DEFAULT}))
+        do_check({'PublicIp': '0.0.0.0',
+                  'InstanceId': fakes.ID_EC2_INSTANCE_DEFAULT},
+                 'AuthFailure')
+
     @tools.screen_unexpected_exception_logs
     def test_associate_address_vpc_rollback(self):
         address.address_engine = (
@@ -386,6 +427,22 @@ class AddressTestCase(base.ApiTestCase):
 
         resp = self.execute('DisassociateAddress',
                             {'AssociationId': fakes.ID_EC2_ASSOCIATION_2})
+        self.assertEqual(True, resp['return'])
+
+        self.neutron.update_floatingip.assert_called_once_with(
+            fakes.ID_OS_FLOATING_IP_2,
+            {'floatingip': {'port_id': None}})
+        self.db_api.update_item.assert_called_once_with(
+            mock.ANY,
+            tools.purge_dict(fakes.DB_ADDRESS_2, ['network_interface_id',
+                                                  'private_ip_address']))
+        self.neutron.update_floatingip.reset_mock()
+        self.db_api.update_item.reset_mock()
+
+        self.configure(disable_ec2_classic=True)
+
+        resp = self.execute('DisassociateAddress',
+                            {'PublicIp': fakes.IP_ADDRESS_2})
         self.assertEqual(True, resp['return'])
 
         self.neutron.update_floatingip.assert_called_once_with(
@@ -448,6 +505,18 @@ class AddressTestCase(base.ApiTestCase):
         do_check({'AssociationId': fakes.ID_EC2_ASSOCIATION_2},
                  'InvalidAssociationID.NotFound')
 
+        # NOTE(tikitavi): disassociate to wrong public ip
+        self.configure(disable_ec2_classic=True)
+        self.set_mock_db_items()
+        self.assert_execution_error('AuthFailure', 'DisassociateAddress',
+                                    {'PublicIp': fakes.IP_ADDRESS_2})
+
+        # NOTE(tikitavi): disassociate to unassociated ip
+        self.set_mock_db_items(fakes.DB_ADDRESS_1)
+        self.assert_execution_error('InvalidParameterValue',
+                                    'DisassociateAddress',
+                                    {'PublicIp': fakes.IP_ADDRESS_1})
+
     @tools.screen_unexpected_exception_logs
     def test_dissassociate_address_vpc_rollback(self):
         address.address_engine = (
@@ -496,6 +565,28 @@ class AddressTestCase(base.ApiTestCase):
         self.db_api.delete_item.assert_called_once_with(
             mock.ANY, fakes.ID_EC2_ADDRESS_1)
 
+    @mock.patch('ec2api.api.address.AddressEngineNeutron.disassociate_address')
+    def test_release_address_default_vpc(self, disassociate_address):
+        address.address_engine = (
+            address.AddressEngineNeutron())
+        self.configure(disable_ec2_classic=True)
+        self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
+                               fakes.DB_ADDRESS_DEFAULT,
+                               fakes.DB_NETWORK_INTERFACE_DEFAULT)
+        self.neutron.show_floatingip.return_value = (
+            {'floatingip': fakes.OS_FLOATING_IP_2})
+
+        resp = self.execute('ReleaseAddress',
+                            {'AllocationId': fakes.ID_EC2_ADDRESS_DEFAULT})
+        self.assertEqual(True, resp['return'])
+
+        disassociate_address.assert_called_once_with(
+            mock.ANY, association_id=fakes.ID_EC2_ASSOCIATION_DEFAULT)
+        self.neutron.delete_floatingip.assert_called_once_with(
+            fakes.ID_OS_FLOATING_IP_2)
+        self.db_api.delete_item.assert_called_once_with(
+            mock.ANY, fakes.ID_EC2_ADDRESS_DEFAULT)
+
     def test_release_address_invalid_parameters(self):
         address.address_engine = (
             address.AddressEngineNeutron())
@@ -538,6 +629,18 @@ class AddressTestCase(base.ApiTestCase):
         self.set_mock_db_items(fakes.DB_ADDRESS_2)
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_2})
+        do_check({'AllocationId': fakes.ID_EC2_ADDRESS_2},
+                 'InvalidIPAddress.InUse')
+
+        # NOTE(tikitavi): address is in use in not default vpc
+        self.configure(disable_ec2_classic=True)
+        self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
+                               fakes.DB_VPC_1,
+                               fakes.DB_ADDRESS_2,
+                               fakes.DB_NETWORK_INTERFACE_2)
+        self.neutron.show_floatingip.return_value = (
+            {'floatingip': fakes.OS_FLOATING_IP_2})
+
         do_check({'AllocationId': fakes.ID_EC2_ADDRESS_2},
                  'InvalidIPAddress.InUse')
 

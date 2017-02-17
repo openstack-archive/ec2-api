@@ -145,8 +145,11 @@ ID_EC2_DHCP_OPTIONS_2 = random_ec2_id('dopt')
 
 
 # address constants
+ID_EC2_ADDRESS_DEFAULT = random_ec2_id('eipalloc')
 ID_EC2_ADDRESS_1 = random_ec2_id('eipalloc')
 ID_EC2_ADDRESS_2 = random_ec2_id('eipalloc')
+ID_EC2_ASSOCIATION_DEFAULT = ID_EC2_ADDRESS_DEFAULT.replace('eipalloc',
+                                                            'eipassoc')
 ID_EC2_ASSOCIATION_1 = ID_EC2_ADDRESS_1.replace('eipalloc', 'eipassoc')
 ID_EC2_ASSOCIATION_2 = ID_EC2_ADDRESS_2.replace('eipalloc', 'eipassoc')
 ID_OS_FLOATING_IP_1 = random_os_id()
@@ -1043,6 +1046,14 @@ class NovaFloatingIp(object):
         self.fixed_ip = nova_ip_dict['fixed_ip']
         self.instance_id = nova_ip_dict['instance_id']
 
+DB_ADDRESS_DEFAULT = {
+    'id': ID_EC2_ADDRESS_DEFAULT,
+    'os_id': ID_OS_FLOATING_IP_2,
+    'vpc_id': None,
+    'public_ip': IP_ADDRESS_2,
+    'network_interface_id': ID_EC2_NETWORK_INTERFACE_DEFAULT,
+    'private_ip_address': IP_NETWORK_INTERFACE_DEFAULT,
+}
 DB_ADDRESS_1 = {
     'id': ID_EC2_ADDRESS_1,
     'os_id': ID_OS_FLOATING_IP_1,
@@ -1081,6 +1092,16 @@ EC2_ADDRESS_2 = {
     'associationId': ID_EC2_ASSOCIATION_2,
     'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_2,
     'privateIpAddress': IP_NETWORK_INTERFACE_2,
+    'networkInterfaceOwnerId': ID_OS_PROJECT,
+}
+EC2_ADDRESS_DEFAULT = {
+    'allocationId': ID_EC2_ADDRESS_DEFAULT,
+    'publicIp': IP_ADDRESS_2,
+    'domain': 'vpc',
+    'instanceId': ID_EC2_INSTANCE_DEFAULT,
+    'associationId': ID_EC2_ASSOCIATION_DEFAULT,
+    'networkInterfaceId': ID_EC2_NETWORK_INTERFACE_DEFAULT,
+    'privateIpAddress': IP_NETWORK_INTERFACE_DEFAULT,
     'networkInterfaceOwnerId': ID_OS_PROJECT,
 }
 

@@ -210,7 +210,8 @@ def _disassociate_address_item(context, address):
 class AddressEngineNeutron(object):
 
     def allocate_address(self, context, domain=None):
-        if not domain or domain == 'standard':
+        if ((not domain or domain == 'standard') and
+                not CONF.disable_ec2_classic):
             return AddressEngineNova().allocate_address(context)
         os_public_network = ec2utils.get_os_public_network(context)
         neutron = clients.neutron(context)
@@ -248,9 +249,27 @@ class AddressEngineNeutron(object):
         if not _is_address_valid(context, neutron, address):
             raise exception.InvalidAllocationIDNotFound(
                 id=allocation_id)
+
         if 'network_interface_id' in address:
-            raise exception.InvalidIPAddressInUse(
-                ip_address=address['public_ip'])
+            if CONF.disable_ec2_classic:
+                network_interface_id = address['network_interface_id']
+                network_interface = db_api.get_item_by_id(context,
+                                                          network_interface_id)
+                default_vpc = ec2utils.check_and_create_default_vpc(context)
+                if default_vpc:
+                    default_vpc_id = default_vpc['id']
+                if (network_interface and
+                        network_interface['vpc_id'] == default_vpc_id):
+                    association_id = ec2utils.change_ec2_id_kind(address['id'],
+                                                                 'eipassoc')
+                    self.disassociate_address(
+                        context, association_id=association_id)
+                else:
+                    raise exception.InvalidIPAddressInUse(
+                        ip_address=address['public_ip'])
+            else:
+                raise exception.InvalidIPAddressInUse(
+                    ip_address=address['public_ip'])
 
         with common.OnCrashCleaner() as cleaner:
             db_api.delete_item(context, address['id'])
@@ -272,28 +291,37 @@ class AddressEngineNeutron(object):
                     instance_network_interfaces.append(eni)
 
         neutron = clients.neutron(context)
+
         if public_ip:
-            if instance_network_interfaces:
-                msg = _('You must specify an allocation id when mapping '
-                        'an address to a VPC instance')
-                raise exception.InvalidParameterCombination(msg)
             # TODO(ft): implement search in DB layer
             address = next((addr for addr in db_api.get_items(context,
                                                               'eipalloc')
                             if addr['public_ip'] == public_ip), None)
-            if address and _is_address_valid(context, neutron, address):
+
+            if not CONF.disable_ec2_classic:
+                if instance_network_interfaces:
+                    msg = _('You must specify an allocation id when mapping '
+                            'an address to a VPC instance')
+                    raise exception.InvalidParameterCombination(msg)
+                if address and _is_address_valid(context, neutron, address):
+                    msg = _(
+                        "The address '%(public_ip)s' does not belong to you.")
+                    raise exception.AuthFailure(msg % {'public_ip': public_ip})
+
+                # NOTE(ft): in fact only the first two parameters are used to
+                # associate an address in EC2 Classic mode. Other parameters
+                # are sent to validate their emptiness in one place
+                return AddressEngineNova().associate_address(
+                        context, public_ip=public_ip, instance_id=instance_id,
+                        allocation_id=allocation_id,
+                        network_interface_id=network_interface_id,
+                        private_ip_address=private_ip_address,
+                        allow_reassociation=allow_reassociation)
+
+            if not address:
                 msg = _("The address '%(public_ip)s' does not belong to you.")
                 raise exception.AuthFailure(msg % {'public_ip': public_ip})
-
-            # NOTE(ft): in fact only the first two parameters are used to
-            # associate an address in EC2 Classic mode. Other parameters are
-            # sent to validate their emptiness in one place
-            return AddressEngineNova().associate_address(
-                    context, public_ip=public_ip, instance_id=instance_id,
-                    allocation_id=allocation_id,
-                    network_interface_id=network_interface_id,
-                    private_ip_address=private_ip_address,
-                    allow_reassociation=allow_reassociation)
+            allocation_id = address['id']
 
         if instance_id:
             if not instance_network_interfaces:
@@ -355,20 +383,33 @@ class AddressEngineNeutron(object):
     def disassociate_address(self, context, public_ip=None,
                              association_id=None):
         neutron = clients.neutron(context)
+
         if public_ip:
             # TODO(ft): implement search in DB layer
             address = next((addr for addr in db_api.get_items(context,
                                                               'eipalloc')
                             if addr['public_ip'] == public_ip), None)
-            if address and _is_address_valid(context, neutron, address):
+
+            if not CONF.disable_ec2_classic:
+                if address and _is_address_valid(context, neutron, address):
+                    msg = _('You must specify an association id when '
+                            'unmapping an address from a VPC instance')
+                    raise exception.InvalidParameterValue(msg)
+                # NOTE(ft): association_id is unused in EC2 Classic mode,
+                # but it's passed there to validate its emptiness in one place
+                return AddressEngineNova().disassociate_address(
+                        context, public_ip=public_ip,
+                        association_id=association_id)
+
+            if not address:
+                msg = _("The address '%(public_ip)s' does not belong to you.")
+                raise exception.AuthFailure(msg % {'public_ip': public_ip})
+            if 'network_interface_id' not in address:
                 msg = _('You must specify an association id when unmapping '
                         'an address from a VPC instance')
                 raise exception.InvalidParameterValue(msg)
-            # NOTE(ft): association_id is unused in EC2 Classic mode, but it's
-            # passed there to validate its emptiness in one place
-            return AddressEngineNova().disassociate_address(
-                    context, public_ip=public_ip,
-                    association_id=association_id)
+            association_id = ec2utils.change_ec2_id_kind(address['id'],
+                                                         'eipassoc')
 
         address = db_api.get_item_by_id(
             context, ec2utils.change_ec2_id_kind(association_id, 'eipalloc'))
