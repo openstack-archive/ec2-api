@@ -72,6 +72,29 @@ class SecurityGroupTestCase(base.ApiTestCase):
             tools.purge_dict(fakes.DB_SECURITY_GROUP_2, ('id',)))
         self.nova.security_groups.create.assert_called_once_with(
             'groupname', 'Group description')
+        self.nova.security_groups.reset_mock()
+        self.db_api.add_item.reset_mock()
+
+        self.configure(disable_ec2_classic=True)
+        self.add_mock_db_items(fakes.DB_VPC_DEFAULT,
+                               fakes.DB_SECURITY_GROUP_DEFAULT)
+        self.nova.security_groups.create.return_value = (
+            fakes.NovaSecurityGroup(fakes.OS_SECURITY_GROUP_5))
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1),
+                                 fakes.OS_SECURITY_GROUP_DEFAULT]})
+        self.db_api.add_item.return_value = fakes.DB_SECURITY_GROUP_5
+
+        resp = self.execute(
+            'CreateSecurityGroup',
+            {'GroupName': 'groupname2',
+             'GroupDescription': 'Group description'})
+        self.assertEqual(fakes.ID_EC2_SECURITY_GROUP_5, resp['groupId'])
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'sg',
+            tools.purge_dict(fakes.DB_SECURITY_GROUP_5, ('id',)))
+        self.nova.security_groups.create.assert_called_once_with(
+            'groupname2', 'Group description')
 
     def test_create_security_group_invalid(self):
         security_group.security_group_engine = (
@@ -177,6 +200,46 @@ class SecurityGroupTestCase(base.ApiTestCase):
             fakes.ID_EC2_SECURITY_GROUP_1)
         self.neutron.delete_security_group.assert_called_once_with(
             fakes.ID_OS_SECURITY_GROUP_1)
+
+        self.db_api.delete_item.reset_mock()
+        self.neutron.delete_security_group.reset_mock()
+
+        self.configure(disable_ec2_classic=True)
+        self.add_mock_db_items(fakes.DB_VPC_DEFAULT,
+                               fakes.DB_SECURITY_GROUP_DEFAULT,
+                               fakes.DB_SECURITY_GROUP_2,
+                               fakes.DB_SECURITY_GROUP_6)
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1),
+                                 fakes.OS_SECURITY_GROUP_2,
+                                 fakes.OS_SECURITY_GROUP_4,
+                                 fakes.OS_SECURITY_GROUP_DEFAULT]})
+        self.assert_execution_error(
+            'InvalidGroup.NotFound', 'DeleteSecurityGroup',
+            {'GroupName': 'groupname2'})
+
+        self.db_api.delete_item.reset_mock()
+        self.neutron.delete_security_group.reset_mock()
+
+        self.add_mock_db_items(fakes.DB_SECURITY_GROUP_5)
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [copy.deepcopy(fakes.OS_SECURITY_GROUP_1),
+                                 fakes.OS_SECURITY_GROUP_2,
+                                 fakes.OS_SECURITY_GROUP_4,
+                                 fakes.OS_SECURITY_GROUP_5,
+                                 fakes.OS_SECURITY_GROUP_DEFAULT]})
+        resp = self.execute(
+            'DeleteSecurityGroup',
+            {'GroupName': 'groupname2'})
+        self.assertEqual(True, resp['return'])
+        self.db_api.get_item_by_id.assert_any_call(
+            mock.ANY,
+            fakes.ID_EC2_SECURITY_GROUP_5)
+        self.db_api.delete_item.assert_called_with(
+            mock.ANY,
+            fakes.ID_EC2_SECURITY_GROUP_5)
+        self.neutron.delete_security_group.assert_called_once_with(
+            fakes.ID_OS_SECURITY_GROUP_5)
 
     def test_delete_security_group_nova(self):
         security_group.security_group_engine = (
@@ -475,6 +538,33 @@ class SecurityGroupTestCase(base.ApiTestCase):
              tools.patch_dict(
                  fakes.OS_SECURITY_GROUP_RULE_1, {'remote_ip_prefix': '::/0'},
                  {'id', 'remote_group_id', 'tenant_id'})})
+
+        self.configure(disable_ec2_classic=True)
+        self.add_mock_db_items(fakes.DB_VPC_DEFAULT,
+                               fakes.DB_SECURITY_GROUP_4,
+                               fakes.DB_SECURITY_GROUP_5,
+                               fakes.DB_SECURITY_GROUP_6)
+        self.neutron.list_security_groups.return_value = (
+            {'security_groups': [fakes.OS_SECURITY_GROUP_4,
+                                 fakes.OS_SECURITY_GROUP_5]})
+
+        self.execute(
+            'AuthorizeSecurityGroupIngress',
+            {'GroupName': 'groupname2',
+             'IpPermissions.1.FromPort': '10',
+             'IpPermissions.1.ToPort': '10',
+             'IpPermissions.1.IpProtocol': 'tcp',
+             'IpPermissions.1.IpRanges.1.CidrIp': '::/0'})
+        security_group_rule = {
+            'direction': 'ingress',
+            'ethertype': 'IPv4',
+            'port_range_min': 10,
+            'port_range_max': 10,
+            'protocol': 'tcp',
+            'remote_ip_prefix': '::/0',
+            'security_group_id': fakes.ID_OS_SECURITY_GROUP_5}
+        self.neutron.create_security_group_rule.assert_called_with(
+            {'security_group_rule': security_group_rule})
 
     def test_authorize_security_group_ip_ranges_nova(self):
         security_group.security_group_engine = (
