@@ -120,9 +120,7 @@ class AvailabilityZoneCase(base.ApiTestCase):
         availability_zone.account_attribute_engine = (
             availability_zone.AccountAttributeEngineNeutron())
 
-        def mock_check_and_create(context):
-            self.set_mock_db_items(fakes.DB_VPC_DEFAULT)
-        check_and_create.side_effect = mock_check_and_create
+        check_and_create.return_value = fakes.DB_VPC_DEFAULT
 
         resp = self.execute('DescribeAccountAttributes', {})
         self.assertThat(resp['accountAttributeSet'],

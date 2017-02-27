@@ -21,7 +21,6 @@ from oslo_utils import netutils
 from ec2api.api import common
 from ec2api.api import ec2utils
 from ec2api import clients
-from ec2api.db import api as db_api
 from ec2api import exception
 
 
@@ -209,11 +208,9 @@ class AccountAttributeEngineNeutron(object):
 
     def get_default_vpc(self, context):
         if CONF.disable_ec2_classic:
-            ec2utils.check_and_create_default_vpc(context)
-            vpc = next((vpc for vpc in db_api.get_items(context, 'vpc')
-                        if vpc.get('is_default')), None)
-            if vpc:
-                return vpc['id']
+            default_vpc = ec2utils.check_and_create_default_vpc(context)
+            if default_vpc:
+                return default_vpc['id']
         return 'none'
 
 

@@ -500,6 +500,7 @@ def get_default_vpc(context):
         raise exception.VPCIdNotSpecified()
     return default_vpc
 
+
 # NOTE(ft): following functions are copied from various parts of Nova
 
 _ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
