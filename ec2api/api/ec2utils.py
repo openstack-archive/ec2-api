@@ -495,9 +495,7 @@ def set_check_and_create_default_vpc(check_and_create_default_vpc):
 
 
 def get_default_vpc(context):
-    check_and_create_default_vpc(context)
-    default_vpc = next((vpc for vpc in db_api.get_items(context, 'vpc')
-                        if vpc.get('is_default')), None)
+    default_vpc = check_and_create_default_vpc(context)
     if not default_vpc:
         raise exception.VPCIdNotSpecified()
     return default_vpc

@@ -164,13 +164,17 @@ def _create_vpc(context, cidr_block, is_default=False):
 
 
 def _check_and_create_default_vpc(context):
-    if (CONF.disable_ec2_classic and
-            not any(vpc.get('is_default')
-                    for vpc in db_api.get_items(context, 'vpc'))):
+    if (CONF.disable_ec2_classic):
+        for vpc in db_api.get_items(context, 'vpc'):
+            if vpc.get('is_default'):
+                return vpc
         try:
-            _create_vpc(context, DEFAULT_VPC_CIDR_BLOCK, is_default=True)
+            default_vpc = _create_vpc(context, DEFAULT_VPC_CIDR_BLOCK,
+                                      is_default=True)
+            return default_vpc
         except Exception:
             LOG.exception('Failed to create default vpc')
+        return None
 
 ec2utils.set_check_and_create_default_vpc(_check_and_create_default_vpc)
 

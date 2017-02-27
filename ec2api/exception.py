@@ -387,7 +387,7 @@ class InvalidSecurityGroupIDNotFound(EC2NotFoundException):
 
 class InvalidGroupNotFound(EC2NotFoundException):
     ec2_code = 'InvalidGroup.NotFound'
-    msg_fmg = _("The security group ID '%(id)s' does not exist")
+    msg_fmt = _("The security group ID '%(id)s' does not exist")
 
 
 class InvalidPermissionNotFound(EC2NotFoundException):

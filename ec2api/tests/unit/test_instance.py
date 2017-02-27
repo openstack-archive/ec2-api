@@ -526,12 +526,10 @@ class InstanceTestCase(base.ApiTestCase):
         instance_api.instance_engine = (
             instance_api.InstanceEngineNeutron())
         self.set_mock_db_items(fakes.DB_IMAGE_2,
+                               fakes.DB_SUBNET_DEFAULT,
                                fakes.DB_NETWORK_INTERFACE_DEFAULT)
 
-        def mock_check_and_create(context):
-            self.add_mock_db_items(fakes.DB_VPC_DEFAULT,
-                                   fakes.DB_SUBNET_DEFAULT)
-        check_and_create.side_effect = mock_check_and_create
+        check_and_create.return_value = fakes.DB_VPC_DEFAULT
 
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_2)
         self.network_interface_api.create_network_interface.return_value = (
@@ -592,7 +590,9 @@ class InstanceTestCase(base.ApiTestCase):
                   'InstanceType': 'fake_flavor',
                   'MinCount': '1', 'MaxCount': '1'}
 
-        with mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc'):
+        with mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc'
+                        ) as check_and_create:
+            check_and_create.return_value = None
             self.assert_execution_error('VPCIdNotSpecified',
                                         'RunInstances', params)
 
