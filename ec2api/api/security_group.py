@@ -69,6 +69,8 @@ def create_security_group(context, group_name, group_description,
             raise exception.InvalidGroupReserved(group_name=group_name)
     filter = [{'name': 'group-name',
                'value': [group_name]}]
+    if not vpc_id and CONF.disable_ec2_classic:
+        vpc_id = ec2utils.get_default_vpc(context)['id']
     if vpc_id and group_name != vpc_id:
         filter.append({'name': 'vpc-id',
                        'value': [vpc_id]})
@@ -115,15 +117,15 @@ def _create_default_security_group(context, vpc):
     # NOTE(Alex): OpenStack doesn't allow creation of another group
     # named 'default' hence vpc-id is used.
     try:
-        _create_security_group(context, vpc['id'],
+        sg_id = _create_security_group(context, vpc['id'],
                                'Default VPC security group', vpc['id'],
-                               default=True)
+                               default=True)['groupId']
     except (exception.EC2DBDuplicateEntry, exception.InvalidVpcIDNotFound):
         # NOTE(andrey-mp): when this thread tries to recreate default group
         # but another thread tries to delete vpc we should pass vpc not found
         LOG.exception('Failed to create default security group.')
-        return False
-    return True
+        return None
+    return sg_id
 
 
 def delete_security_group(context, group_name=None, group_id=None,
@@ -211,6 +213,12 @@ def describe_security_groups(context, group_name=None, group_id=None,
 
 def authorize_security_group_ingress(context, group_id=None,
                                      group_name=None, ip_permissions=None):
+    if group_name and not group_id and CONF.disable_ec2_classic:
+        sg = describe_security_groups(
+            context,
+            group_name=[group_name])['securityGroupInfo'][0]
+        group_id = sg['groupId']
+        group_name = None
     return _authorize_security_group(context, group_id, group_name,
                                      ip_permissions, 'ingress')
 
@@ -472,6 +480,12 @@ class SecurityGroupEngineNeutron(object):
     def delete_group(self, context, group_name=None, group_id=None,
                      delete_default=False):
         neutron = clients.neutron(context)
+        if CONF.disable_ec2_classic and group_name:
+            sg = describe_security_groups(
+                context,
+                group_name=[group_name])['securityGroupInfo'][0]
+            group_id = sg['groupId']
+            group_name = None
         if group_id is None or not group_id.startswith('sg-'):
             return SecurityGroupEngineNova().delete_group(context,
                                                           group_name,
