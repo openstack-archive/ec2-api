@@ -217,8 +217,10 @@ function copynovaopt() {
 
 if [[ -n $(openstack catalog show network) ]]; then
     VPC_SUPPORT="True"
+    DISABLE_EC2_CLASSIC="True"
 else
     VPC_SUPPORT="False"
+    DISABLE_EC2_CLASSIC="False"
 fi
 if [[ "$VPC_SUPPORT" == "True" && -z "$EXTERNAL_NETWORK" ]]; then
     declare -a newtron_output
@@ -272,6 +274,7 @@ iniset $CONF_FILE DEFAULT verbose True
 iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL/v3/ec2tokens"
 iniset $CONF_FILE database connection "$CONNECTION"
 iniset $CONF_FILE DEFAULT full_vpc_support "$VPC_SUPPORT"
+iniset $CONF_FILE DEFAULT disable_ec2_classic "$DISABLE_EC2_CLASSIC"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
 
 GROUP_AUTHTOKEN="keystone_authtoken"
