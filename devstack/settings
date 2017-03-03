@@ -8,4 +8,5 @@ enable_service ec2-api
 enable_service ec2-api-metadata
 enable_service ec2-api-s3
 
+# Enable VPNAAS service and set type of ipsec package
 IPSEC_PACKAGE=strongswan
