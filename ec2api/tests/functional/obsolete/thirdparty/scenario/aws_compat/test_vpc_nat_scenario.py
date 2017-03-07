@@ -16,8 +16,8 @@ from boto.ec2 import networkinterface
 import netaddr
 
 import tempest.cloudscaling.thirdparty.scenario.aws_compat.base as aws_base
-from tempest.common.utils import data_utils
 from tempest.common.utils.linux import remote_client
+from tempest.lib.common.utils import data_utils
 from tempest import test
 
 import logging

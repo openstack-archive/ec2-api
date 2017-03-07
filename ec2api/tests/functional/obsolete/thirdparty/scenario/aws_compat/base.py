@@ -21,9 +21,9 @@ from tempest import auth
 from tempest import clients as base_clients
 from tempest.cloudscaling import base
 from tempest.cloudscaling.thirdparty.scenario.aws_compat import clients
-from tempest.common.utils import data_utils
 from tempest import config
 from tempest import exceptions
+from tempest.lib.common.utils import data_utils
 from tempest import test as base_test
 from tempest.thirdparty.boto import test
 from tempest.thirdparty.boto.utils import wait as boto_wait
