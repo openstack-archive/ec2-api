@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import datetime
 import json
 import re
@@ -373,13 +372,14 @@ def get_os_image(context, ec2_image_id):
 
 def deserialize_os_image_properties(os_image):
     def prepare_property(property_name):
-        if property_name in properties:
-            properties[property_name] = json.loads(properties[property_name])
+        if property_name in os_image_dict:
+            os_image_dict[property_name] = json.loads(
+                os_image_dict[property_name])
 
-    properties = copy.copy(os_image.properties)
+    os_image_dict = dict(os_image)
     prepare_property('mappings')
     prepare_property('block_device_mapping')
-    return properties
+    return os_image_dict
 
 
 def create_virtual_bdm(device_name, virtual_name):

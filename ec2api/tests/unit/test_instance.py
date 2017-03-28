@@ -1363,8 +1363,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         # NOTE(ft): check cases of not available image
         os_image = fakes.OSImage({
             'id': fakes.random_os_id(),
-            'status': None,
-            'properties': {}})
+            'status': None})
         get_os_image.return_value = os_image
 
         self.assertRaises(
@@ -1373,7 +1372,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
             fake_context, fakes.random_ec2_id('ami'), None, None)
 
         os_image.status = 'active'
-        os_image.properties['image_state'] = 'decrypting'
+        os_image.image_state = 'decrypting'
 
         self.assertRaises(
             exception.InvalidAMIIDUnavailable,
@@ -1498,12 +1497,12 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
 
         fake_image_template = {
             'id': fakes.random_os_id(),
-            'properties': {'root_device_name': '/dev/vda',
-                           'bdm_v2': True,
-                           'block_device_mapping': []}}
+            'root_device_name': '/dev/vda',
+            'bdm_v2': True,
+            'block_device_mapping': []}
 
         # check merging with image bdms
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'boot_index': 0,
              'device_name': '/dev/vda',
              'source_type': 'snapshot',
@@ -1552,7 +1551,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual(expected, result)
 
         # check result order for adjusting some bdm of all
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'device_name': '/dev/vdc',
              'source_type': 'blank',
              'volume_size': 10},
@@ -1598,7 +1597,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
         self.assertEqual(expected, result)
 
         # check conflict of short and full device names
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'device_name': '/dev/vdc',
              'source_type': 'blank',
              'volume_size': 10},
@@ -1613,7 +1612,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                           fakes.OSImage(fake_image_template))
 
         # opposit combination of the same case
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'device_name': 'vdc',
              'source_type': 'blank',
              'volume_size': 10},
@@ -1628,7 +1627,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                           fakes.OSImage(fake_image_template))
 
         # check fault on root device snapshot changing
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'boot_index': 0,
              'source_type': 'snapshot',
              'snapshot_id': fakes.ID_EC2_SNAPSHOT_1},
@@ -1643,11 +1642,11 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                           fakes.OSImage(fake_image_template))
 
         # same case for legacy bdm
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'device_name': '/dev/vda',
              'snapshot_id': fakes.ID_EC2_SNAPSHOT_1},
         ]
-        fake_image_template['properties']['bdm_v2'] = False
+        fake_image_template['bdm_v2'] = False
         bdms = [
             {'device_name': '/dev/vda',
              'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2}},
@@ -1658,11 +1657,11 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                           fakes.OSImage(fake_image_template))
 
         # same case for legacy bdm with short names
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'device_name': 'vda',
              'snapshot_id': fakes.ID_EC2_SNAPSHOT_1},
         ]
-        fake_image_template['properties']['bdm_v2'] = False
+        fake_image_template['bdm_v2'] = False
         bdms = [
             {'device_name': 'vda',
              'ebs': {'snapshot_id': fakes.ID_EC2_SNAPSHOT_2}},
@@ -1672,10 +1671,10 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                           fake_context, bdms,
                           fakes.OSImage(fake_image_template))
 
-        fake_image_template['properties']['bdm_v2'] = True
+        fake_image_template['bdm_v2'] = True
 
         # check fault on reduce volume size
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'device_name': 'vdc',
              'source_type': 'blank',
              'volume_size': 15},
@@ -1690,7 +1689,7 @@ class InstancePrivateTestCase(test_base.BaseTestCase):
                           fakes.OSImage(fake_image_template))
 
         # check fault on set snapshot id if bdm doesn't have one
-        fake_image_template['properties']['block_device_mapping'] = [
+        fake_image_template['block_device_mapping'] = [
             {'device_name': 'vdc',
              'source_type': 'blank',
              'volume_size': 10},

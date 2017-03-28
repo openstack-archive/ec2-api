@@ -76,9 +76,7 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             'owner': image_project_id,
             'is_public': True,
             'container_format': 'ami',
-            'properties': {
-                'kernel_id': os_aki_image_id,
-            },
+            'kernel_id': os_aki_image_id,
         }
         os_aki_image = {
             'id': os_aki_image_id,
@@ -173,16 +171,14 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             'owner': image_project_id,
             'is_public': True,
             'container_format': 'ami',
-            'properties': {
-                'bdm_v2': True,
-                'block_device_mapping': [{'device_name': '/dev/vds',
+            'bdm_v2': True,
+            'block_device_mapping': [{'device_name': '/dev/vds',
                                           'source_type': 'snapshot',
                                           'destination_type': 'volume',
                                           'snapshot_id': os_snapshot_id}],
-            },
         }
         if os_bdm_image_id:
-            os_image['properties']['block_device_mapping'].append({
+            os_image['block_device_mapping'].append({
                 'device_name': '/dev/vdi',
                 'source_type': 'image',
                 'destination_type': 'volume',
@@ -263,7 +259,7 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
         os_image = {
             'id': os_image_id,
             'owner': image_project_id,
-            'is_public': True,
+            'visibility': 'public',
         }
         self.nova_admin.servers.list.return_value = [
             fakes.OSInstance_full(os_instance)]

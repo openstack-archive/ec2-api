@@ -1489,7 +1489,7 @@ def _cloud_get_image_state(image):
     state = image.status
     if state == 'active':
         state = 'available'
-    return image.properties.get('image_state', state)
+    return getattr(image, 'image_state', state)
 
 
 def _cloud_format_kernel_id(context, os_instance, image_ids=None):

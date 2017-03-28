@@ -213,18 +213,17 @@ def register_image(context, name=None, image_location=None,
         raise exception.MissingParameter(msg)
 
     # TODO(ft): check parameters
-    properties = {}
-    metadata = {'properties': properties}
+    metadata = {}
     if name:
         # TODO(ft): check the name is unique (at least for EBS image case)
         metadata['name'] = name
     if image_location:
-        properties['image_location'] = image_location
+        metadata['image_location'] = image_location
         if 'name' not in metadata:
             # NOTE(ft): it's needed for backward compatibility
             metadata['name'] = image_location
     if root_device_name:
-        properties['root_device_name'] = root_device_name
+        metadata['root_device_name'] = root_device_name
     cinder = clients.cinder(context)
     if block_device_mapping:
         mappings = instance_api._parse_block_device_mapping(
@@ -246,27 +245,28 @@ def register_image(context, name=None, image_location=None,
                     bdm['volume_size'] = volume.size
             except cinder_exception.NotFound:
                 pass
-        properties['bdm_v2'] = True
-        properties['block_device_mapping'] = json.dumps(mappings)
+        metadata['bdm_v2'] = 'True'
+        metadata['block_device_mapping'] = json.dumps(mappings)
     if architecture is not None:
-        properties['architecture'] = architecture
+        metadata['architecture'] = architecture
     if kernel_id:
-        properties['kernel_id'] = ec2utils.get_os_image(context,
+        metadata['kernel_id'] = ec2utils.get_os_image(context,
                                                         kernel_id).id
     if ramdisk_id:
-        properties['ramdisk_id'] = ec2utils.get_os_image(context,
+        metadata['ramdisk_id'] = ec2utils.get_os_image(context,
                                                          ramdisk_id).id
 
     with common.OnCrashCleaner() as cleaner:
-        if 'image_location' in properties:
+        glance = clients.glance(context)
+        if 'image_location' in metadata:
             os_image = _s3_create(context, metadata)
         else:
-            metadata.update({'size': 0,
-                             'is_public': False})
-            # TODO(ft): set default values of image properties
-            glance = clients.glance(context)
+            metadata.update({'visibility': 'private',
+                             'container_format': 'bare',
+                             'disk_format': 'raw'})
             os_image = glance.images.create(**metadata)
-        cleaner.addCleanup(os_image.delete)
+            glance.images.upload(os_image.id, '', image_size=0)
+        cleaner.addCleanup(glance.images.delete, os_image.id)
         kind = _get_os_image_kind(os_image)
         image = db_api.add_item(context, kind, {'os_id': os_image.id,
                                                 'is_public': False,
@@ -366,9 +366,9 @@ class ImageDescriber(common.TaggableItemsDescriber):
     def get_os_items(self):
         os_images = list(clients.glance(self.context).images.list())
         self.ec2_created_os_images = {
-            os_image.properties['ec2_id']: os_image
+            os_image.ec2_id: os_image
             for os_image in os_images
-            if (os_image.properties.get('ec2_id') and
+            if (hasattr(os_image, 'ec2_id') and
                 self.context.project_id == os_image.owner)}
         return os_images
 
@@ -376,12 +376,12 @@ class ImageDescriber(common.TaggableItemsDescriber):
         if not image:
             kind = _get_os_image_kind(os_image)
             if self.context.project_id == os_image.owner:
-                if os_image.properties.get('ec2_id') in self.pending_images:
+                if getattr(os_image, 'ec2_id', None) in self.pending_images:
                     # NOTE(ft): the image is being creating, Glance had created
                     # image, but creating thread doesn't yet update db item
-                    image = self.pending_images[os_image.properties['ec2_id']]
+                    image = self.pending_images[os_image.ec2_id]
                     image['os_id'] = os_image.id
-                    image['is_public'] = os_image.is_public
+                    image['is_public'] = os_image.visibility == 'public'
                     db_api.update_item(self.context, image)
                 else:
                     image = ec2utils.get_db_item_by_os_id(
@@ -394,8 +394,8 @@ class ImageDescriber(common.TaggableItemsDescriber):
                 image = {'id': image_id,
                          'os_id': os_image.id}
         elif (self.context.project_id == os_image.owner and
-                image.get('is_public') != os_image.is_public):
-            image['is_public'] = os_image.is_public
+                image.get('is_public') != os_image.visibility == 'public'):
+            image['is_public'] = os_image.visibility == 'public'
             if image['id'] in self.local_images_os_ids:
                 db_api.update_item(self.context, image)
             else:
@@ -430,7 +430,7 @@ class ImageDescriber(common.TaggableItemsDescriber):
         os_image = self.ec2_created_os_images.get(item['id'])
         if os_image:
             item['os_id'] = os_image.id
-            item['is_public'] = os_image.is_public
+            item['is_public'] = os_image.visibility == 'public'
             db_api.update_item(self.context, item)
             image = self.format(item, os_image)
         else:
@@ -468,18 +468,18 @@ def describe_image_attribute(context, image_id, attribute):
 
     def _launch_permission_attribute(os_image, image, result):
         result['launchPermission'] = []
-        if os_image.is_public:
+        if os_image.visibility == 'public':
             result['launchPermission'].append({'group': 'all'})
 
     def _kernel_attribute(os_image, image, result):
-        kernel_id = os_image.properties.get('kernel_id')
+        kernel_id = getattr(os_image, 'kernel_id', None)
         if kernel_id:
             result['kernel'] = {
                 'value': ec2utils.os_id_to_ec2_id(context, 'aki', kernel_id)
             }
 
     def _ramdisk_attribute(os_image, image, result):
-        ramdisk_id = os_image.properties.get('ramdisk_id')
+        ramdisk_id = getattr(os_image, 'ramdisk_id', None)
         if ramdisk_id:
             result['ramdisk'] = {
                 'value': ec2utils.os_id_to_ec2_id(context, 'ari', ramdisk_id)
@@ -589,7 +589,9 @@ def modify_image_attribute(context, image_id, attribute=None,
                                                   reason=msg)
 
         _check_owner(context, os_image)
-        os_image.update(is_public=(operation_type == 'add'))
+        glance = clients.glance(context)
+        visibility = 'public' if operation_type == 'add' else 'private'
+        glance.images.update(os_image.id, visibility=visibility)
         return True
 
     if 'description' in attributes:
@@ -610,8 +612,8 @@ def reset_image_attribute(context, image_id, attribute):
 
     os_image = ec2utils.get_os_image(context, image_id)
     _check_owner(context, os_image)
-
-    os_image.update(is_public=False)
+    glance = clients.glance(context)
+    glance.images.update(os_image.id, visibility='private')
     return True
 
 
@@ -627,8 +629,8 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
                  'imageOwnerId': os_image.owner,
                  'imageType': IMAGE_TYPES[
                                    ec2utils.get_ec2_id_kind(image['id'])],
-                 'isPublic': os_image.is_public,
-                 'architecture': os_image.properties.get('architecture'),
+                 'isPublic': os_image.visibility == 'public',
+                 'architecture': getattr(os_image, 'architecture', None),
                  'creationDate': os_image.created_at
                  }
     if 'description' in image:
@@ -638,23 +640,23 @@ def _format_image(context, image, os_image, images_dict, ids_dict,
     else:
         state = GLANCE_STATUS_TO_EC2.get(os_image.status, 'error')
     if state in ('available', 'pending'):
-        state = _s3_image_state_map.get(os_image.properties.get('image_state'),
+        state = _s3_image_state_map.get(getattr(os_image, 'image_state', None),
                                         state)
     ec2_image['imageState'] = state
 
-    kernel_id = os_image.properties.get('kernel_id')
+    kernel_id = getattr(os_image, 'kernel_id', None)
     if kernel_id:
         ec2_image['kernelId'] = ec2utils.os_id_to_ec2_id(
                 context, 'aki', kernel_id,
                 items_by_os_id=images_dict, ids_by_os_id=ids_dict)
-    ramdisk_id = os_image.properties.get('ramdisk_id')
+    ramdisk_id = getattr(os_image, 'ramdisk_id', None)
     if ramdisk_id:
         ec2_image['ramdiskId'] = ec2utils.os_id_to_ec2_id(
                 context, 'ari', ramdisk_id,
                 items_by_os_id=images_dict, ids_by_os_id=ids_dict)
 
     name = os_image.name
-    img_loc = os_image.properties.get('image_location')
+    img_loc = getattr(os_image, 'image_location', None)
     if img_loc:
         ec2_image['imageLocation'] = img_loc
     else:
@@ -783,7 +785,7 @@ def _get_os_image_kind(os_image):
 
 
 def _auto_create_image_extension(context, image, os_image):
-    image['is_public'] = os_image.is_public
+    image['is_public'] = os_image.visibility == 'public'
 
 
 ec2utils.register_auto_create_db_item_extension(
@@ -810,7 +812,7 @@ _s3_image_state_map = {'downloading': 'pending',
 
 def _s3_create(context, metadata):
     """Gets a manifest from s3 and makes an image."""
-    image_location = metadata['properties']['image_location'].lstrip('/')
+    image_location = metadata['image_location'].lstrip('/')
     bucket_name = image_location.split('/')[0]
     manifest_path = image_location[len(bucket_name) + 1:]
     bucket = _s3_conn(context).get_bucket(bucket_name)
@@ -819,12 +821,9 @@ def _s3_create(context, metadata):
 
     (image_metadata, image_parts,
      encrypted_key, encrypted_iv) = _s3_parse_manifest(context, manifest)
-    properties = metadata['properties']
-    properties.update(image_metadata['properties'])
-    properties['image_state'] = 'pending'
     metadata.update(image_metadata)
-    metadata.update({'properties': properties,
-                     'is_public': False})
+    metadata.update({'image_state': 'pending',
+                     'visibility': 'private'})
 
     # TODO(bcwaldon): right now, this removes user-defined ids
     # We need to re-enable this.
@@ -834,7 +833,7 @@ def _s3_create(context, metadata):
     image = glance.images.create(**metadata)
 
     def _update_image_state(image_state):
-        image.update(properties={'image_state': image_state})
+        glance.images.update(image.id, image_state=image_state)
 
     def delayed_create():
         """This handles the fetching and decrypting of the part files."""
@@ -887,7 +886,7 @@ def _s3_create(context, metadata):
             _update_image_state('uploading')
             try:
                 with open(unz_filename) as image_file:
-                    image.update(data=image_file)
+                    glance.images.upload(image.id, image_file)
             except Exception:
                 LOG.exception(_LE('Failed to upload %(image_location)s '
                                   'to %(image_path)s'), log_vars)
@@ -916,7 +915,7 @@ def _s3_parse_manifest(context, manifest):
     except Exception:
         arch = 'x86_64'
 
-    properties = {'architecture': arch}
+    metadata = {'architecture': arch}
 
     mappings = []
     try:
@@ -930,7 +929,7 @@ def _s3_parse_manifest(context, manifest):
         mappings = []
 
     if mappings:
-        properties['mappings'] = mappings
+        metadata['mappings'] = mappings
 
     def set_dependent_image_id(image_key):
         try:
@@ -942,7 +941,7 @@ def _s3_parse_manifest(context, manifest):
         if image_id == 'true':
             return True
         os_image = ec2utils.get_os_image(context, image_id)
-        properties[image_key] = os_image.id
+        metadata[image_key] = os_image.id
 
     image_format = 'ami'
     if set_dependent_image_id('kernel_id'):
@@ -950,9 +949,8 @@ def _s3_parse_manifest(context, manifest):
     if set_dependent_image_id('ramdisk_id'):
         image_format = 'ari'
 
-    metadata = {'disk_format': image_format,
-                'container_format': image_format,
-                'properties': properties}
+    metadata.update({'disk_format': image_format,
+                     'container_format': image_format})
     image_parts = [
            fn_element.text
            for fn_element in manifest.find('image').getiterator('filename')]
