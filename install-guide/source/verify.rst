@@ -36,7 +36,7 @@ Verify operation of the ec2-api service.
 
    Change the aws_access_key_id and aws_secret_acces_key above to the values
    appropriate for your cloud (can be obtained by
-   **"keystone ec2-credentials-list"** command).
+   **"openstack ec2 credentials list"** command).
 
 #. Run aws cli commands using new EC2 API endpoint URL (can be obtained from
    keystone with the new port 8788) like this:

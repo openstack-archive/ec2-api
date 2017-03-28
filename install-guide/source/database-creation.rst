@@ -22,7 +22,7 @@ To create the database manually, complete these steps:
 
 * Grant proper access to the ``ec2api`` database:
 
-  .. code-block:: mysql
+  .. code-block:: console
 
      GRANT ALL PRIVILEGES ON ec2api.* TO 'ec2api'@'localhost' \
       IDENTIFIED BY 'EC2-API_DBPASS';
