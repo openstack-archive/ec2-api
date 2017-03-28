@@ -117,7 +117,7 @@ def neutron(context):
 
 
 def glance(context):
-    return glanceclient.Client('1', service_type='image',
+    return glanceclient.Client(version='2', service_type='image',
                                session=context.session)
 
 

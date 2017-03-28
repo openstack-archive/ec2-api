@@ -99,6 +99,6 @@ class ApiInitTestCase(base.BaseTestCase):
         do_check(neutron_exception.BadRequest(message='fake_msg'),
                  400, 'BadRequest', 'fake_msg')
         do_check(keystone_exception.BadRequest(message='fake_msg'),
-                 400, 'BadRequest', 'fake_msg')
+                 400, 'BadRequest', 'fake_msg (HTTP 400)')
         do_check(boto_exception.S3ResponseError(400, '', 'fake_msg'),
                  400, 'S3ResponseError', 'fake_msg')
