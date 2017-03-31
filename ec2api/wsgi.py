@@ -29,7 +29,6 @@ from oslo_service.service import ServiceBase
 from oslo_utils import excutils
 from paste import deploy
 import routes.middleware
-import six
 import webob.dec
 import webob.exc
 
@@ -106,7 +105,7 @@ class Server(ServiceBase):
 
         if backlog < 1:
             raise exception.InvalidInput(
-                    reason='The backlog must be more than 1')
+                reason='The backlog must be more than 1')
 
         bind_addr = (host, port)
         # TODO(dims): eventlet's green dns/socket module does not actually
@@ -162,18 +161,18 @@ class Server(ServiceBase):
                 key_file = CONF.ssl_key_file
 
                 if cert_file and not os.path.exists(cert_file):
-                    raise RuntimeError(
-                          _("Unable to find cert_file : %s") % cert_file)
+                    raise RuntimeError(_("Unable to find cert_file : %s") %
+                                       cert_file)
 
                 if key_file and not os.path.exists(key_file):
-                    raise RuntimeError(
-                          _("Unable to find key_file : %s") % key_file)
+                    raise RuntimeError(_("Unable to find key_file : %s") %
+                                       key_file)
 
                 if self._use_ssl and (not cert_file or not key_file):
-                    raise RuntimeError(
-                          _("When running server in SSL mode, you must "
-                            "specify both a cert_file and key_file "
-                            "option value in your configuration file"))
+                    raise RuntimeError(_("When running server in SSL mode, "
+                                         "you must specify both a cert_file "
+                                         "and key_file option value in your "
+                                         "configuration file"))
                 ssl_kwargs = {
                     'server_side': True,
                     'certfile': cert_file,
@@ -394,7 +393,7 @@ class Debug(Middleware):
         resp = req.get_response(self.application)
 
         print(('*' * 40) + ' RESPONSE HEADERS')
-        for (key, value) in six.iteritems(resp.headers):
+        for (key, value) in resp.headers.items():
             print(key, '=', value)
         print()
 

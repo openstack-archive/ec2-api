@@ -61,7 +61,7 @@ class EC2APIException(Exception):
                 # log the issue and the kwargs
                 LOG.exception(_('Exception in string format operation for '
                                 '%s exception'), self.__class__.__name__)
-                for name, value in six.iteritems(kwargs):
+                for name, value in kwargs.items():
                     LOG.error('%s: %s' % (name, value))
 
                 if CONF.fatal_exception_format_errors:
