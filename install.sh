@@ -263,13 +263,14 @@ fi
 
 
 #update default config with some values
+OS_AUTH_URL_WO_PATH=`echo $OS_AUTH_URL | cut -f 1-3 -d /`
 iniset $CONF_FILE DEFAULT ec2api_listen_port "$EC2API_PORT"
 iniset $CONF_FILE DEFAULT ec2_port "$EC2API_PORT"
 iniset $CONF_FILE DEFAULT api_paste_config $APIPASTE_FILE
 iniset $CONF_FILE DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [%(request_id)s %(user_name)s %(project_name)s] %(instance)s%(message)s"
 iniset $CONF_FILE DEFAULT log_dir "$LOG_DIR"
 iniset $CONF_FILE DEFAULT verbose True
-iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL/v3/ec2tokens"
+iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL_WO_PATH/v3/ec2tokens"
 iniset $CONF_FILE database connection "$CONNECTION"
 iniset $CONF_FILE DEFAULT full_vpc_support "$VPC_SUPPORT"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
