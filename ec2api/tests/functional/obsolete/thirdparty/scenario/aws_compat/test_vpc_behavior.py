@@ -19,7 +19,7 @@ import netaddr
 
 from tempest.cloudscaling import base
 import tempest.cloudscaling.thirdparty.scenario.aws_compat.base as aws_base
-from tempest.common.utils.linux import remote_client
+from tempest.lib.common.utils.linux import remote_client
 from tempest import test
 from tempest.thirdparty.boto.utils import wait as boto_wait
 

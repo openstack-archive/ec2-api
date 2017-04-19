@@ -18,8 +18,8 @@ from testtools import content as test_content
 
 from tempest.cloudscaling import base
 import tempest.cloudscaling.thirdparty.scenario.aws_compat.base as aws_base
-from tempest.common.utils.linux import remote_client
 from tempest import exceptions
+from tempest.lib.common.utils.linux import remote_client
 from tempest import test
 
 import logging
