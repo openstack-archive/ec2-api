@@ -28,9 +28,9 @@ The services afterwards can be started as binaries:
 
 ::
 
- /usr/bin/ec2-api
- /usr/bin/ec2-api-metadata
- /usr/bin/ec2-api-s3
+ /usr/local/bin/ec2-api
+ /usr/local/bin/ec2-api-metadata
+ /usr/local/bin/ec2-api-s3
 
 or set up as Linux services.
 
