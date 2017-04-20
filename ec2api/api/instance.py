@@ -106,7 +106,7 @@ def run_instances(context, image_id, min_count, max_count,
             return reservations['reservationSet'][0]
 
     os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
-            context, image_id, kernel_id, ramdisk_id)
+        context, image_id, kernel_id, ramdisk_id)
 
     nova = clients.nova(context)
     os_flavor = _get_os_flavor(instance_type, nova)
@@ -302,10 +302,10 @@ class InstanceDescriber(common.TaggableItemsDescriber):
 
     def format(self, instance, os_instance):
         formatted_instance = _format_instance(
-                self.context, instance, os_instance,
-                self.ec2_network_interfaces.get(instance['id']),
-                self.image_ids, self.volumes, self.os_volumes,
-                self.os_flavors, self.groups_name_to_id)
+            self.context, instance, os_instance,
+            self.ec2_network_interfaces.get(instance['id']),
+            self.image_ids, self.volumes, self.os_volumes,
+            self.os_flavors, self.groups_name_to_id)
 
         reservation_id = instance['reservation_id']
         if reservation_id in self.reservations:
@@ -354,8 +354,8 @@ class InstanceDescriber(common.TaggableItemsDescriber):
     def auto_update_db(self, instance, os_instance):
         if not instance:
             instance = ec2utils.get_db_item_by_os_id(
-                    self.context, 'i', os_instance.id,
-                    os_instance=os_instance)
+                self.context, 'i', os_instance.id,
+                os_instance=os_instance)
         return instance
 
     def get_name(self, os_item):
@@ -434,8 +434,8 @@ def describe_instances(context, instance_id=None, filter=None,
 
     reservation_describer = ReservationDescriber()
     formatted_reservations = reservation_describer.describe(
-            context, ids=instance_id, filter=filter,
-            max_results=max_results, next_token=next_token)
+        context, ids=instance_id, filter=filter,
+        max_results=max_results, next_token=next_token)
 
     result = {'reservationSet': formatted_reservations}
     if reservation_describer.next_token:
@@ -541,8 +541,8 @@ def describe_instance_attribute(context, instance_id, attribute):
 
     def _format_attr_root_device_name(result):
         result['rootDeviceName'] = {
-                'value': getattr(os_instance,
-                                 'OS-EXT-SRV-ATTR:root_device_name', None)}
+            'value': getattr(os_instance,
+                             'OS-EXT-SRV-ATTR:root_device_name', None)}
 
     def _format_attr_user_data(result):
         user_data = getattr(os_instance, 'OS-EXT-SRV-ATTR:user_data', None)
@@ -1003,7 +1003,7 @@ def _build_block_device_mapping(context, block_device_mapping, os_image):
 
                 _populate_parsed_bdm_parameter(bdm, short_root_device_name)
             else:
-                image_bdm = {k: v for k, v in six.iteritems(image_bdm)
+                image_bdm = {k: v for k, v in image_bdm.items()
                              if v is not None}
                 image_bdm.update(bdm)
                 bdm = image_bdm
@@ -1091,7 +1091,7 @@ def _get_os_instances_by_instances(context, instances, exactly=False,
         _remove_instances(context, obsolete_instances)
         if exactly:
             raise exception.InvalidInstanceIDNotFound(
-                                id=obsolete_instances[0]['id'])
+                id=obsolete_instances[0]['id'])
 
     return os_instances
 
@@ -1170,7 +1170,7 @@ class InstanceEngineNeutron(object):
                                                 multiple_instances)
 
         (vpc_id, network_data) = self.parse_network_interface_parameters(
-                context, vpc_network_parameters)
+            context, vpc_network_parameters)
         launch_context = {'vpc_id': vpc_id,
                           'network_data': network_data,
                           'security_groups': security_group}
@@ -1226,7 +1226,7 @@ class InstanceEngineNeutron(object):
         # call of DB here to get corresponding network interfaces, but doesn't
         # lead to decrease DB and OS throughtput in called describe operation.
         enis = network_interface_api.describe_network_interfaces(
-                context)['networkInterfaceSet']
+            context)['networkInterfaceSet']
         ec2_network_interfaces = collections.defaultdict(list)
         for eni in enis:
             if (eni['status'] == 'in-use' and
@@ -1254,12 +1254,12 @@ class InstanceEngineNeutron(object):
         if network_interfaces:
             if (CONF.disable_ec2_classic and
                 len(network_interfaces) == 1 and
-                 # NOTE(tikitavi): the case in AWS CLI when security_group_ids
-                 # and/or private_ip_address parameters are set with
-                 # network_interface parameter having
-                 # associate_public_ip_address setting
-                 # private_ip_address and security_group_ids in that case
-                 # go to network_interface parameter
+                # NOTE(tikitavi): the case in AWS CLI when security_group_ids
+                # and/or private_ip_address parameters are set with
+                # network_interface parameter having
+                # associate_public_ip_address setting
+                # private_ip_address and security_group_ids in that case
+                # go to network_interface parameter
                 'associate_public_ip_address' in network_interfaces[0] and
                 'device_index' in network_interfaces[0] and
                 network_interfaces[0]['device_index'] == 0 and
@@ -1398,7 +1398,7 @@ class InstanceEngineNeutron(object):
 
         if busy_network_interfaces:
             raise exception.InvalidNetworkInterfaceInUse(
-                    interface_ids=busy_network_interfaces)
+                interface_ids=busy_network_interfaces)
 
         if len(vpc_ids) > 1:
             msg = _('Network interface attachments may not cross '
@@ -1460,12 +1460,12 @@ class InstanceEngineNeutron(object):
                                    not n.get('name').startswith('subnet-')]
         if len(ec2_classic_os_networks) == 0:
             raise exception.Unsupported(
-                    reason=_('There are no available networks '
-                             'for EC2 Classic mode'))
+                reason=_('There are no available networks '
+                         'for EC2 Classic mode'))
         if len(ec2_classic_os_networks) > 1:
             raise exception.Unsupported(
-                    reason=_('There is more than one available network '
-                             'for EC2 Classic mode'))
+                reason=_('There is more than one available network '
+                         'for EC2 Classic mode'))
         return ec2_classic_os_networks[0]
 
 
@@ -1708,7 +1708,7 @@ _NAME_TO_CODE = {
     inst_state_SUSPEND: inst_state_STOPPED_CODE,
     inst_state_RESCUE: inst_state_RUNNING_CODE,
 }
-_CODE_TO_NAMES = {code: [item[0] for item in six.iteritems(_NAME_TO_CODE)
+_CODE_TO_NAMES = {code: [item[0] for item in _NAME_TO_CODE.items()
                          if item[1] == code]
                   for code in set(six.itervalues(_NAME_TO_CODE))}
 

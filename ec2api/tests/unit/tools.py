@@ -20,7 +20,6 @@ import re
 import fixtures
 from lxml import etree
 import mock
-import six
 
 from ec2api.api import ec2utils
 
@@ -150,7 +149,7 @@ def _safe_copy_parameters(args, kwargs):
     args = [_safe_copy(arg)
             for arg in args]
     kwargs = {key: _safe_copy(val)
-              for key, val in six.iteritems(kwargs)}
+              for key, val in kwargs.items()}
     return (args, kwargs)
 
 
