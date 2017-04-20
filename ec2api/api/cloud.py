@@ -1012,6 +1012,41 @@ class CloudController(object):
         return image.create_image(context, instance_id, name, description,
                                   no_reboot, block_device_mapping)
 
+    @module_and_param_types(image, 'str', 'str', 'str', 'str',
+                            'dummy', 'str', 'str', 'str', 'str')
+    def import_image(self, context, architecture=None, client_data=None,
+                     client_token=None, description=None, disk_container=None,
+                     hypervisor=None, license_type=None, platform=None,
+                     role_name=None):
+        """Import an image using a URL
+
+        Args:
+            context (RequestContext): The request context.
+            architecture (str): optional, one of i386 x86_64
+            client_data (str): not supported
+            client_token (str): not supported
+            description (str): optional
+            disk_contianer (str): json dict
+                snapshot_id (str): not supported
+                user_bucket (str): not supported
+                format (str): qcow2, raw, etc...
+                url (str): must be set
+                description (str): optional, overrides other description if set
+            hypervisor (str): optional, one of the hypervisors in openstack
+            license_type (str): optional, one of AWS, BYOL
+            platform (str): optional, one of Linux Windows
+            role_name (str): not supported
+
+        Returns:
+            The ID of the new AMI.
+
+        """
+        return image.import_image(context, architecture, client_data,
+                                  client_token, description, disk_container,
+                                  hypervisor, license_type, platform,
+                                  role_name)
+
+
     @module_and_param_types(image, 'str', 'str',
                             'str', 'str',
                             'str', 'dummy',
