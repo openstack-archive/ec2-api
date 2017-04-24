@@ -18,6 +18,7 @@ REGULAR_IMAGE_NAME="precise"
 
 CIRROS_IMAGE_URL="http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img"
 CIRROS_IMAGE_FNAME="cirros-0.3.4-x86_64-disk.img"
+CIRROS_IMAGE_NAME="cirros"
 
 MAX_FAIL=20
 FLAVOR_NAME="m1.ec2api"
@@ -68,6 +69,17 @@ cirros_image_wget_pid=$!
 
 # find simple image
 image_id=`aws $AWS_PARAMS --profile admin ec2 describe-images --filters Name=image-type,Values=machine Name=name,Values=cirros* --query 'Images[0].ImageId' --output text`
+
+if [[ "$image_id" == 'None' || -z "$image_id" ]]; then
+  wait $cirros_image_wget_pid
+  if [[ "$?" -eq "0" ]]; then
+    openstack image create --disk-format raw --container-format bare --public --file /tmp/$CIRROS_IMAGE_FNAME $CIRROS_IMAGE_NAME
+    if [[ "$?" -ne "0" ]]; then
+      echo "Creation of openstack image failed."
+    fi
+    image_id=`aws $AWS_PARAMS --profile admin ec2 describe-images --filters Name=image-type,Values=machine Name=name,Values=cirros* --query 'Images[0].ImageId' --output text`
+  fi
+fi
 
 # prepare ubuntu image
 if [[ $RUN_LONG_TESTS == "1" ]]; then

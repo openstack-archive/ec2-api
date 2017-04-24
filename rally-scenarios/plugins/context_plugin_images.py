@@ -64,9 +64,9 @@ class FakeImageGenerator(context.Context):
                     "name": "image-" + tenant_id[0:8] + "-" + str(i),
                     "container_format": container_format,
                     "disk_format": disk_format,
-                    "size": 1000000,
                 }
                 image = glance.create(**kw)
+                glance.upload(image.id, '', image_size=1000000)
                 current_images.append(image.id)
 
             self.context["tenants"][tenant_id]["images"] = current_images
