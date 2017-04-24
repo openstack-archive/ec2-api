@@ -88,11 +88,11 @@ Create configuration file for aws cli in your home directory ~/.aws/config:
  region = us-east-1
 
 Change the aws_access_key_id and aws_secret_acces_key above to the values
-appropriate for your cloud (can be obtained by "keystone ec2-credentials-list"
+appropriate for your cloud (can be obtained by "openstack ec2 credentials list"
 command).
 
 Run aws cli commands using new EC2 API endpoint URL (can be obtained from
-keystone with the new port 8788) like this:
+openstack cli with the new port 8788) like this:
 
 aws --endpoint-url http://10.0.2.15:8788 ec2 describe-instances
 
