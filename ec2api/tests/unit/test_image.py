@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import json
 import os
 import tempfile
@@ -179,7 +178,7 @@ class ImageTestCase(base.ApiTestCase):
         s3_create.assert_called_once_with(
             mock.ANY,
             {'name': fakes.LOCATION_IMAGE_1,
-             'properties': {'image_location': fakes.LOCATION_IMAGE_1}})
+             'image_location': fakes.LOCATION_IMAGE_1})
         s3_create.reset_mock()
 
         resp = self.execute(
@@ -192,11 +191,13 @@ class ImageTestCase(base.ApiTestCase):
         s3_create.assert_called_once_with(
             mock.ANY,
             {'name': 'an image name',
-             'properties': {'image_location': fakes.LOCATION_IMAGE_1}})
+             'image_location': fakes.LOCATION_IMAGE_1})
 
     @mock.patch('ec2api.api.ec2utils.get_os_image')
     def test_register_image_by_bdm(self, get_os_image):
         self.glance.images.create.return_value = (
+            fakes.OSImage(fakes.OS_IMAGE_2))
+        self.glance.images.upload.return_value = (
             fakes.OSImage(fakes.OS_IMAGE_2))
         self.cinder.volume_snapshots.get.side_effect = (
             tools.get_by_1st_arg_getter(
@@ -235,21 +236,19 @@ class ImageTestCase(base.ApiTestCase):
                               'description': None})
         self.assertEqual(1, self.glance.images.create.call_count)
         self.assertEqual((), self.glance.images.create.call_args[0])
-        self.assertIn('properties', self.glance.images.create.call_args[1])
         self.assertIsInstance(
-            self.glance.images.create.call_args[1]['properties'],
-            dict)
-        bdm = self.glance.images.create.call_args[1]['properties'].pop(
+            self.glance.images.create.call_args[1], dict)
+        bdm = self.glance.images.create.call_args[1].pop(
             'block_device_mapping', 'null')
         self.assertEqual(
-            {'is_public': False,
-             'size': 0,
+            {'visibility': 'private',
              'name': 'fake_name',
-             'properties': {
-                 'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
-                 'kernel_id': fakes.ID_OS_IMAGE_AKI_1,
-                 'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1,
-                 'bdm_v2': True}},
+             'kernel_id': fakes.ID_OS_IMAGE_AKI_1,
+             'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1,
+             'root_device_name': fakes.ROOT_DEVICE_NAME_IMAGE_2,
+             'container_format': 'bare',
+             'disk_format': 'raw',
+             'bdm_v2': 'True'},
             self.glance.images.create.call_args[1])
         self.assertEqual([{'boot_index': 0,
                            'delete_on_termination': True,
@@ -438,8 +437,7 @@ class ImageTestCase(base.ApiTestCase):
                                     {'ImageId': image_id,
                                      'Attribute': 'kernel'})
 
-    @mock.patch.object(fakes.OSImage, 'update', autospec=True)
-    def test_modify_image_attributes(self, osimage_update):
+    def test_modify_image_attributes(self):
         self._setup_model()
 
         resp = self.execute('ModifyImageAttribute',
@@ -448,10 +446,8 @@ class ImageTestCase(base.ApiTestCase):
                              'operationType': 'add',
                              'userGroup.1': 'all'})
         self.assertThat(resp, matchers.DictMatches({'return': True}))
-        osimage_update.assert_called_once_with(
-                mock.ANY, is_public=True)
-        self.assertEqual(fakes.ID_OS_IMAGE_1,
-                         osimage_update.call_args[0][0].id)
+        self.glance.images.update.assert_called_once_with(
+                fakes.ID_OS_IMAGE_1, visibility='public')
 
     def test_modify_image_attributes_invalid_parameters(self):
         image_id = fakes.random_ec2_id('ami')
@@ -487,10 +483,16 @@ class ImagePrivateTestCase(base.BaseTestCase):
         image_ids = {fakes.ID_OS_IMAGE_1: fakes.ID_EC2_IMAGE_1,
                      fakes.ID_OS_IMAGE_AKI_1: fakes.ID_EC2_IMAGE_AKI_1,
                      fakes.ID_OS_IMAGE_ARI_1: fakes.ID_EC2_IMAGE_ARI_1}
-        os_image = copy.deepcopy(fakes.OS_IMAGE_1)
+        os_image = {'id': fakes.ID_OS_IMAGE_1,
+                    'owner': fakes.ID_OS_PROJECT,
+                    'created_at': fakes.TIME_CREATE_IMAGE,
+                    'visibility': 'private',
+                    'status': 'active',
+                    'container_format': 'ami',
+                    'name': 'fake_name'}
 
         # check name and location attributes for an unnamed image
-        os_image['properties'] = {'image_location': 'location'}
+        os_image['image_location'] = 'location'
         os_image['name'] = None
 
         image = image_api._format_image(
@@ -501,7 +503,7 @@ class ImagePrivateTestCase(base.BaseTestCase):
         self.assertEqual('location', image['name'])
 
         # check name and location attributes for complete image
-        os_image['properties'] = {}
+        os_image['image_location'] = None
         os_image['name'] = 'fake_name'
 
         image = image_api._format_image(
@@ -512,14 +514,13 @@ class ImagePrivateTestCase(base.BaseTestCase):
         self.assertEqual('fake_name', image['name'])
 
         # check ebs image type for bdm_v2 mapping type
-        os_image['properties'] = {
-            'bdm_v2': True,
-            'root_device_name': '/dev/vda',
-            'block_device_mapping': [
-                {'boot_index': 0,
-                 'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
-                 'source_type': 'snapshot',
-                 'destination_type': 'volume'}]}
+        os_image['bdm_v2'] = True
+        os_image['root_device_name'] = '/dev/vda'
+        os_image['block_device_mapping'] = [
+            {'boot_index': 0,
+             'snapshot_id': fakes.ID_OS_SNAPSHOT_2,
+             'source_type': 'snapshot',
+             'destination_type': 'volume'}]
 
         image = image_api._format_image(
                 'fake_context', fakes.DB_IMAGE_1, fakes.OSImage(os_image),
@@ -529,7 +530,9 @@ class ImagePrivateTestCase(base.BaseTestCase):
         self.assertEqual('ebs', image['rootDeviceType'])
 
         # check instance-store image attributes with no any device mappings
-        os_image['properties'] = {'root_device_name': '/dev/vda'}
+        os_image['bdm_v2'] = False
+        os_image['root_device_name'] = '/dev/vda'
+        os_image['block_device_mapping'] = []
         image = image_api._format_image(
                 'fake_context', fakes.DB_IMAGE_1, fakes.OSImage(os_image),
                 None, None)
@@ -559,7 +562,7 @@ class ImagePrivateTestCase(base.BaseTestCase):
         os_image.status = 'queued'
 
         def check_state_translation(state, expected):
-            os_image.properties['image_state'] = state
+            os_image.image_state = state
             image = image_api._format_image(
                 'fake_context', fakes.DB_IMAGE_1, os_image, None, None)
             self.assertEqual(expected, image['imageState'],
@@ -741,8 +744,8 @@ class ImagePrivateTestCase(base.BaseTestCase):
         os_image = {'id': os_image_id,
                     'owner': fakes.ID_OS_PROJECT,
                     'status': 'active',
-                    'is_public': False,
-                    'properties': {'ec2_id': image_id}}
+                    'visibility': 'private',
+                    'ec2_id': image_id}
         glance.images.list.return_value = [fakes.OSImage(os_image)]
         expected['imagesSet'] = [{
             'architecture': None,
@@ -788,14 +791,14 @@ class S3TestCase(base.BaseTestCase):
         expected_metadata = {
             'disk_format': 'ami',
             'container_format': 'ami',
-            'properties': {'architecture': 'x86_64',
-                           'kernel_id': fakes.ID_OS_IMAGE_AKI_1,
-                           'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1,
-                           'mappings': [
-                                {"device": "sda1", "virtual": "ami"},
-                                {"device": "/dev/sda1", "virtual": "root"},
-                                {"device": "sda2", "virtual": "ephemeral0"},
-                                {"device": "sda3", "virtual": "swap"}]}}
+            'architecture': 'x86_64',
+            'kernel_id': fakes.ID_OS_IMAGE_AKI_1,
+            'ramdisk_id': fakes.ID_OS_IMAGE_ARI_1,
+            'mappings': [
+                {"device": "sda1", "virtual": "ami"},
+                {"device": "/dev/sda1", "virtual": "root"},
+                {"device": "sda2", "virtual": "ephemeral0"},
+                {"device": "sda3", "virtual": "swap"}]}
         self.assertThat(metadata,
                         matchers.DictMatches(expected_metadata,
                                              orderless_lists=True))
@@ -810,8 +813,7 @@ class S3TestCase(base.BaseTestCase):
             mock.ANY, 'ari', item_ids=(fakes.ID_EC2_IMAGE_ARI_1,),
             item_os_ids=None)
 
-    @mock.patch.object(fakes.OSImage, 'update', autospec=True)
-    def test_s3_create_image_locations(self, osimage_update):
+    def test_s3_create_image_locations(self):
         self.configure(image_decryption_dir=None)
         glance = self.mock_glance()
         _handle, tempf = tempfile.mkstemp()
@@ -829,24 +831,23 @@ class S3TestCase(base.BaseTestCase):
              get_contents_as_string.return_value) = FILE_MANIFEST_XML
             s3_download_file.return_value = tempf
             s3_untarzip_image.return_value = tempf
+            os_image_id = fakes.random_os_id()
             (glance.images.create.return_value) = (
-                fakes.OSImage({'id': fakes.random_os_id(),
+                fakes.OSImage({'id': os_image_id,
                                'status': 'queued'}))
 
             data = [
-                ({'properties': {
-                    'image_location': 'testbucket_1/test.img.manifest.xml'}},
+                ({'image_location': 'testbucket_1/test.img.manifest.xml'},
                  'testbucket_1', 'test.img.manifest.xml'),
-                ({'properties': {
-                    'image_location': '/testbucket_2/test.img.manifest.xml'}},
+                ({'image_location': '/testbucket_2/test.img.manifest.xml'},
                  'testbucket_2', 'test.img.manifest.xml')]
             for mdata, bucket, manifest in data:
                 image = image_api._s3_create(fake_context, mdata)
                 eventlet.sleep()
-                osimage_update.assert_called_with(
-                    image, properties={'image_state': 'available'})
-                osimage_update.assert_any_call(
-                    image, data=mock.ANY)
+                self.glance.images.update.assert_called_with(
+                    os_image_id, image_state='available')
+                self.glance.images.upload.assert_any_call(
+                    os_image_id, mock.ANY)
                 s3_conn.return_value.get_bucket.assert_called_with(bucket)
                 (s3_conn.return_value.get_bucket.return_value.
                  get_key.assert_called_with(manifest))
@@ -865,17 +866,16 @@ class S3TestCase(base.BaseTestCase):
     @mock.patch('ec2api.api.image.eventlet.spawn_n')
     def test_s3_create_bdm(self, spawn_n):
         glance = self.mock_glance()
-        metadata = {'properties': {
-                        'image_location': 'fake_bucket/fake_manifest',
-                        'root_device_name': '/dev/sda1',
-                        'block_device_mapping': [
-                            {'device_name': '/dev/sda1',
-                             'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
-                             'delete_on_termination': True},
-                            {'device_name': '/dev/sda2',
-                             'virtual_name': 'ephemeral0'},
-                            {'device_name': '/dev/sdb0',
-                             'no_device': True}]}}
+        metadata = {'image_location': 'fake_bucket/fake_manifest',
+                    'root_device_name': '/dev/sda1',
+                    'block_device_mapping': [
+                        {'device_name': '/dev/sda1',
+                         'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                         'delete_on_termination': True},
+                        {'device_name': '/dev/sda2',
+                         'virtual_name': 'ephemeral0'},
+                        {'device_name': '/dev/sdb0',
+                         'no_device': True}]}
         fake_context = base.create_context()
         with mock.patch('ec2api.api.image._s3_conn') as s3_conn:
 
@@ -887,19 +887,17 @@ class S3TestCase(base.BaseTestCase):
             image_api._s3_create(fake_context, metadata)
 
             glance.images.create.assert_called_once_with(
-                disk_format='ami', container_format='ami', is_public=False,
-                properties={'architecture': 'x86_64',
-                            'image_state': 'pending',
-                            'root_device_name': '/dev/sda1',
-                            'block_device_mapping': [
-                                {'device_name': '/dev/sda1',
-                                 'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
-                                 'delete_on_termination': True},
-                                {'device_name': '/dev/sda2',
-                                 'virtual_name': 'ephemeral0'},
-                                {'device_name': '/dev/sdb0',
-                                 'no_device': True}],
-                            'image_location': 'fake_bucket/fake_manifest'})
+                disk_format='ami', container_format='ami',
+                visibility='private', architecture='x86_64',
+                image_state='pending', root_device_name='/dev/sda1',
+                block_device_mapping=[{'device_name': '/dev/sda1',
+                                       'snapshot_id': fakes.ID_OS_SNAPSHOT_1,
+                                       'delete_on_termination': True},
+                                      {'device_name': '/dev/sda2',
+                                       'virtual_name': 'ephemeral0'},
+                                      {'device_name': '/dev/sdb0',
+                                       'no_device': True}],
+                image_location='fake_bucket/fake_manifest')
 
     def test_s3_malicious_tarballs(self):
         self.assertRaises(

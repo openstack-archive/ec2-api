@@ -111,8 +111,9 @@ class MockOSMixin(object):
 
     def mock_glance(self):
         glance_patcher = mock.patch('glanceclient.client.Client')
-        glance = mock.create_autospec(glanceclient.Client(endpoint='v1'))
-        glance_patcher.start().return_value = glance
+        with mock.patch('glanceclient.v2.schemas.Controller'):
+            glance = mock.create_autospec(glanceclient.Client(endpoint='v2'))
+            glance_patcher.start().return_value = glance
         self.addCleanup(glance_patcher.stop)
         return glance
 

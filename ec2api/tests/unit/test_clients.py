@@ -107,7 +107,7 @@ class ClientsTestCase(base.BaseTestCase):
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.glance(context)
         self.assertEqual(glance.return_value, res)
-        glance.assert_called_with('1', service_type='image',
+        glance.assert_called_with(version='2', service_type='image',
                                   session=mock.sentinel.session)
 
     @mock.patch('cinderclient.client.Client')

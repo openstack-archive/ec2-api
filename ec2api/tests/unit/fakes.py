@@ -1251,31 +1251,33 @@ class OSImage(object):
 
     def __init__(self, image_dict, from_get=False):
 
-        def set_attr(attr):
-            if not from_get or image_dict.get(attr) is not None:
-                setattr(self, attr, image_dict.get(attr))
-
-        self.id = image_dict['id']
-        set_attr('owner')
-        set_attr('created_at')
-        set_attr('is_public')
-        set_attr('status')
-        set_attr('container_format')
-        set_attr('name')
-        self.properties = copy.deepcopy(image_dict.get('properties', {}))
+        if from_get:
+            attrs = [k for k in image_dict.keys()
+                     if image_dict[k] is not None]
+        else:
+            attrs = list(image_dict)
+            attrs.extend(
+                ['owner', 'created_at', 'visibility', 'status',
+                 'container_format', 'name'])
+        self._image_dict = {'id': image_dict['id']}
+        self._image_dict.update({k: image_dict.get(k)
+                                 for k in attrs})
         for complex_attr in ('mappings', 'block_device_mapping'):
-            if complex_attr in self.properties:
-                self.properties[complex_attr] = (
-                    json.dumps(self.properties[complex_attr]))
+            if complex_attr in self._image_dict:
+                self._image_dict[complex_attr] = json.dumps(
+                    self._image_dict[complex_attr])
+        for k in self._image_dict:
+            setattr(self, k, self._image_dict[k])
 
     def __eq__(self, other):
         return type(self) == type(other) and self.__dict__ == other.__dict__
 
-    def update(self, **kwargs):
-        pass
+    def __iter__(self):
+        for key in self._image_dict.items():
+            yield key
 
-    def delete(self):
-        pass
+    def __getitem__(self, key):
+        return self._image_dict.get(key)
 
 TIME_CREATE_IMAGE = timeutils.isotime(None, True)
 
@@ -1363,63 +1365,59 @@ OS_IMAGE_1 = {
     'id': ID_OS_IMAGE_1,
     'owner': ID_OS_PROJECT,
     'created_at': TIME_CREATE_IMAGE,
-    'is_public': False,
+    'visibility': 'private',
     'status': 'active',
     'container_format': 'ami',
     'name': 'fake_name',
-    'properties': {
-        'kernel_id': ID_OS_IMAGE_AKI_1,
-        'ramdisk_id': ID_OS_IMAGE_ARI_1,
-        'type': 'machine',
-        'image_state': 'available',
-        'image_location': LOCATION_IMAGE_1,
-        'mappings': [
-            {'device': '/dev/sda1', 'virtual': 'root'},
-            {'device': 'sdb0', 'virtual': 'ephemeral0'},
-            {'device': 'sdb1', 'virtual': 'ephemeral1'},
-            {'device': 'sdb2', 'virtual': 'ephemeral2'},
-            {'device': 'sdb3', 'virtual': 'ephemeral3'},
-            {'device': 'sdb4', 'virtual': 'ephemeral4'},
-            {'device': 'sdc0', 'virtual': 'swap'},
-            {'device': 'sdc1', 'virtual': 'swap'},
-            {'device': 'sdc2', 'virtual': 'swap'},
-            {'device': 'sdc3', 'virtual': 'swap'},
-            {'device': 'sdc4', 'virtual': 'swap'}],
-        'block_device_mapping': [
-            {'device_name': '/dev/sdb1',
-             'snapshot_id': ID_OS_SNAPSHOT_1,
-             'volume_size': 22},
-            {'device_name': '/dev/sdb2',
-             'volume_id': ID_OS_VOLUME_1},
-            {'device_name': '/dev/sdb3', 'virtual_name': 'ephemeral5'},
-            {'device_name': '/dev/sdb4', 'no_device': True},
-            {'device_name': '/dev/sdc1',
-             'snapshot_id': ID_OS_SNAPSHOT_2},
-            {'device_name': '/dev/sdc2',
-             'volume_id': ID_OS_VOLUME_2},
-            {'device_name': '/dev/sdc3', 'virtual_name': 'ephemeral6'},
-            {'device_name': '/dev/sdc4', 'no_device': True}],
-    }
+    'kernel_id': ID_OS_IMAGE_AKI_1,
+    'ramdisk_id': ID_OS_IMAGE_ARI_1,
+    'type': 'machine',
+    'image_state': 'available',
+    'image_location': LOCATION_IMAGE_1,
+    'mappings': [
+        {'device': '/dev/sda1', 'virtual': 'root'},
+        {'device': 'sdb0', 'virtual': 'ephemeral0'},
+        {'device': 'sdb1', 'virtual': 'ephemeral1'},
+        {'device': 'sdb2', 'virtual': 'ephemeral2'},
+        {'device': 'sdb3', 'virtual': 'ephemeral3'},
+        {'device': 'sdb4', 'virtual': 'ephemeral4'},
+        {'device': 'sdc0', 'virtual': 'swap'},
+        {'device': 'sdc1', 'virtual': 'swap'},
+        {'device': 'sdc2', 'virtual': 'swap'},
+        {'device': 'sdc3', 'virtual': 'swap'},
+        {'device': 'sdc4', 'virtual': 'swap'}],
+    'block_device_mapping': [
+        {'device_name': '/dev/sdb1',
+         'snapshot_id': ID_OS_SNAPSHOT_1,
+         'volume_size': 22},
+        {'device_name': '/dev/sdb2',
+         'volume_id': ID_OS_VOLUME_1},
+        {'device_name': '/dev/sdb3', 'virtual_name': 'ephemeral5'},
+        {'device_name': '/dev/sdb4', 'no_device': True},
+        {'device_name': '/dev/sdc1',
+         'snapshot_id': ID_OS_SNAPSHOT_2},
+        {'device_name': '/dev/sdc2',
+         'volume_id': ID_OS_VOLUME_2},
+        {'device_name': '/dev/sdc3', 'virtual_name': 'ephemeral6'},
+        {'device_name': '/dev/sdc4', 'no_device': True}]
 }
 OS_IMAGE_2 = {
     'id': ID_OS_IMAGE_2,
     'owner': ID_OS_PROJECT,
     'created_at': TIME_CREATE_IMAGE,
-    'is_public': True,
+    'visibility': 'public',
     'status': 'active',
     'container_format': None,
     'name': None,
-    'properties': {
-        'type': 'machine',
-        'root_device_name': '/dev/sdb1',
-        'architecture': 'x86_64',
-        'mappings': [{'device': '/dev/sda1',
-                      'virtual': 'root'}],
-        'block_device_mapping': [
-            {'device_name': '/dev/sdb1',
-             'snapshot_id': ID_OS_SNAPSHOT_1,
-             'delete_on_termination': True}],
-    }
+    'type': 'machine',
+    'root_device_name': '/dev/sdb1',
+    'architecture': 'x86_64',
+    'mappings': [{'device': '/dev/sda1',
+                  'virtual': 'root'}],
+    'block_device_mapping': [
+        {'device_name': '/dev/sdb1',
+         'snapshot_id': ID_OS_SNAPSHOT_1,
+         'delete_on_termination': True}],
 }
 OS_IMAGE_AKI_1 = {
     'id': ID_OS_IMAGE_AKI_1,

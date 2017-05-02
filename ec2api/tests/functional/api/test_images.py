@@ -218,11 +218,11 @@ class ImageTest(base.EC2TestCase):
 
         data = self.client.describe_image_attribute(
             ImageId=image_id, Attribute='kernel')
-        self.assertIn('KernelId', data)
+        self.assertNotIn('KernelId', data)
 
         data = self.client.describe_image_attribute(
             ImageId=image_id, Attribute='ramdisk')
-        self.assertIn('RamdiskId', data)
+        self.assertNotIn('RamdiskId', data)
 
         # description
         data = self.client.describe_image_attribute(
