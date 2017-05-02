@@ -574,10 +574,16 @@ class SecurityGroupEngineNova(object):
             pass
 
     def get_os_groups(self, context):
-        nova = clients.nova(context)
-        return self.convert_groups_to_neutron_format(
-                        context,
-                        nova.security_groups.list())
+        # Note(tikitavi): Using neutron engine in describing security groups.
+        # Security-group-list in nova cannot be filtered by tenant,
+        # listing all secgroups in case of big amount of groups can be slow
+        # and may have limitations in number.
+        try:
+            groups = SecurityGroupEngineNeutron().get_os_groups(context)
+        except Exception as ex:
+            groups = []
+            LOG.warning(_("Failed to get os groups."))
+        return groups
 
     def authorize_security_group(self, context, rule_body):
         nova = clients.nova(context)
