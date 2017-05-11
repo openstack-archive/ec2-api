@@ -22,7 +22,6 @@ import six
 
 from ec2api import clients
 from ec2api import exception
-from ec2api.i18n import _LW
 
 
 CONF = cfg.CONF
@@ -65,7 +64,7 @@ class RequestContext(context.RequestContext):
         kwargs.pop('user_identity', None)
         self.session = kwargs.pop('session', None)
         if kwargs:
-            LOG.warning(_LW('Arguments dropped when creating context: %s') %
+            LOG.warning('Arguments dropped when creating context: %s',
                         str(kwargs))
 
         self.user_id = user_id

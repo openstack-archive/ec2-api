@@ -26,7 +26,7 @@ import six
 from ec2api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _, _LE
+from ec2api.i18n import _
 
 LOG = logging.getLogger(__name__)
 
@@ -461,16 +461,15 @@ def get_os_public_network(context):
     if len(os_networks) != 1:
         if CONF.external_network:
             if len(os_networks) == 0:
-                msg = _LE("No external network with name '%s' is found")
+                msg = "No external network with name '%s' is found"
             else:
-                msg = _LE("More than one external network with name '%s' "
-                          "is found")
+                msg = "More than one external network with name '%s' is found"
             LOG.error(msg, CONF.external_network)
         else:
             if len(os_networks) == 0:
-                msg = _LE('No external network is found')
+                msg = 'No external network is found'
             else:
-                msg = _LE('More than one external network is found')
+                msg = 'More than one external network is found'
             LOG.error(msg)
         raise exception.Unsupported(_('Feature is restricted by OS admin'))
     return os_networks[0]

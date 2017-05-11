@@ -37,7 +37,7 @@ from ec2api.api import instance as instance_api
 from ec2api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _, _LE, _LI, _LW
+from ec2api.i18n import _
 
 
 LOG = logging.getLogger(__name__)
@@ -156,20 +156,19 @@ def create_image(context, instance_id, name=None, description=None,
             image['os_id'] = os_image_id
             db_api.update_item(context, image)
         except Exception:
-            LOG.exception(_LE('Failed to complete image %s creation'),
-                          image.id)
+            LOG.exception('Failed to complete image %s creation', image.id)
             try:
                 image['state'] = 'failed'
                 db_api.update_item(context, image)
             except Exception:
-                LOG.warning(_LW("Couldn't set 'failed' state for db image %s"),
+                LOG.warning("Couldn't set 'failed' state for db image %s",
                             image.id, exc_info=True)
 
         try:
             os_instance.start()
         except Exception:
-            LOG.warning(_LW('Failed to start instance %(i_id)s after '
-                            'completed creation of image %(image_id)s'),
+            LOG.warning('Failed to start instance %(i_id)s after '
+                        'completed creation of image %(image_id)s',
                         {'i_id': instance['id'],
                          'image_id': image['id']},
                         exc_info=True)
@@ -858,8 +857,8 @@ def _s3_create(context, metadata):
                             shutil.copyfileobj(part, combined)
 
             except Exception:
-                LOG.exception(_LE('Failed to download %(image_location)s '
-                                  'to %(image_path)s'), log_vars)
+                LOG.exception('Failed to download %(image_location)s '
+                              'to %(image_path)s', log_vars)
                 _update_image_state('failed_download')
                 return
 
@@ -869,8 +868,8 @@ def _s3_create(context, metadata):
                 _s3_decrypt_image(context, enc_filename, encrypted_key,
                                   encrypted_iv, dec_filename)
             except Exception:
-                LOG.exception(_LE('Failed to decrypt %(image_location)s '
-                                  'to %(image_path)s'), log_vars)
+                LOG.exception('Failed to decrypt %(image_location)s '
+                              'to %(image_path)s', log_vars)
                 _update_image_state('failed_decrypt')
                 return
 
@@ -878,8 +877,8 @@ def _s3_create(context, metadata):
             try:
                 unz_filename = _s3_untarzip_image(image_path, dec_filename)
             except Exception:
-                LOG.exception(_LE('Failed to untar %(image_location)s '
-                                  'to %(image_path)s'), log_vars)
+                LOG.exception('Failed to untar %(image_location)s '
+                              'to %(image_path)s', log_vars)
                 _update_image_state('failed_untar')
                 return
 
@@ -888,8 +887,8 @@ def _s3_create(context, metadata):
                 with open(unz_filename) as image_file:
                     glance.images.upload(image.id, image_file)
             except Exception:
-                LOG.exception(_LE('Failed to upload %(image_location)s '
-                                  'to %(image_path)s'), log_vars)
+                LOG.exception('Failed to upload %(image_location)s '
+                              'to %(image_path)s', log_vars)
                 _update_image_state('failed_upload')
                 return
 
@@ -897,10 +896,9 @@ def _s3_create(context, metadata):
 
             shutil.rmtree(image_path)
         except glance_exception.HTTPNotFound:
-            LOG.info(_LI('Image %swas deleted underneath us'), image.id)
+            LOG.info('Image %swas deleted underneath us', image.id)
         except Exception:
-            LOG.exception(_LE('Failed to complete image %s creation'),
-                          image.id)
+            LOG.exception('Failed to complete image %s creation', image.id)
 
     eventlet.spawn_n(delayed_create)
 
