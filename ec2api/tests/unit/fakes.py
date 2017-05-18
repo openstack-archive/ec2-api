@@ -1038,14 +1038,6 @@ OS_DHCP_OPTIONS_1 = {'extra_dhcp_opts': [{'opt_name': 'domain-name',
 
 # address objects
 
-class NovaFloatingIp(object):
-
-    def __init__(self, nova_ip_dict):
-        self.id = nova_ip_dict['id']
-        self.ip = nova_ip_dict['ip']
-        self.fixed_ip = nova_ip_dict['fixed_ip']
-        self.instance_id = nova_ip_dict['instance_id']
-
 DB_ADDRESS_DEFAULT = {
     'id': ID_EC2_ADDRESS_DEFAULT,
     'os_id': ID_OS_FLOATING_IP_2,
@@ -1118,30 +1110,8 @@ OS_FLOATING_IP_2 = {
     'fixed_ip_address': IP_NETWORK_INTERFACE_2,
 }
 
-NOVA_FLOATING_IP_1 = {
-    'id': ID_OS_FLOATING_IP_1,
-    'ip': IP_ADDRESS_1,
-    'instance_id': None,
-    'fixed_ip': None,
-}
-NOVA_FLOATING_IP_2 = {
-    'id': ID_OS_FLOATING_IP_2,
-    'ip': IP_ADDRESS_2,
-    'instance_id': ID_OS_INSTANCE_1,
-    'fixed_ip': IP_NETWORK_INTERFACE_2,
-}
-
 
 # security group objects
-
-class NovaSecurityGroup(object):
-
-    def __init__(self, nova_group_dict):
-        self.id = nova_group_dict['id']
-        self.name = nova_group_dict['name']
-        self.description = nova_group_dict['description']
-        self.tenant_id = ID_OS_PROJECT
-        self.rules = nova_group_dict['security_group_rules']
 
 DB_SECURITY_GROUP_DEFAULT = {
     'id': ID_EC2_SECURITY_GROUP_DEFAULT,

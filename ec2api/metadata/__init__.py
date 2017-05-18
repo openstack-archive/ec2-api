@@ -176,25 +176,12 @@ class MetadataRequestHandler(wsgi.Application):
             os_instance_id, project_id = (
                 api.get_os_instance_and_project_id_by_provider_id(
                     context, provider_id, remote_ip))
-        elif req.headers.get('X-Instance-ID'):
+        else:
             os_instance_id, project_id, remote_ip = (
                 self._unpack_neutron_request(req))
-        else:
-            remote_ip = self._unpack_nova_network_request(req)
-            context = ec2_context.get_os_admin_context()
-            os_instance_id, project_id = (
-                api.get_os_instance_and_project_id(context, remote_ip))
         return {'os_instance_id': os_instance_id,
                 'project_id': project_id,
                 'private_ip': remote_ip}
-
-    def _unpack_nova_network_request(self, req):
-        remote_ip = req.remote_addr
-        if CONF.use_forwarded_for:
-            remote_ip = req.headers.get('X-Forwarded-For', remote_ip)
-        if not remote_ip:
-            raise exception.EC2MetadataInvalidAddress()
-        return remote_ip
 
     def _unpack_neutron_request(self, req):
         os_instance_id = req.headers.get('X-Instance-ID')

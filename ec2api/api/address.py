@@ -16,7 +16,6 @@ try:
     from neutronclient.common import exceptions as neutron_exception
 except ImportError:
     pass  # clients will log absense of neutronclient in this case
-from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 
@@ -39,10 +38,7 @@ Validator = common.Validator
 
 
 def get_address_engine():
-    if CONF.full_vpc_support:
-        return AddressEngineNeutron()
-    else:
-        return AddressEngineNova()
+    return AddressEngineNeutron()
 
 
 def allocate_address(context, domain=None):
@@ -152,18 +148,10 @@ def _format_address(context, address, os_floating_ip, os_ports=[],
     fixed_ip_address = os_floating_ip.get('fixed_ip_address')
     if fixed_ip_address:
         ec2_address['privateIpAddress'] = fixed_ip_address
-        port_id = os_floating_ip.get('port_id')
-        os_fip = os_floating_ip.get('instance_id')
-        if port_id:
-            port = next((port for port in os_ports
-                         if port['id'] == port_id), None)
-            if port and port.get('device_id'):
-                ec2_address['instanceId'] = (
-                    _get_instance_ec2_id_by_os_id(context, port['device_id'],
-                                                  db_instances_dict))
-        elif os_fip:
+        os_instance_id = _get_os_instance_id(context, os_floating_ip, os_ports)
+        if os_instance_id:
             ec2_address['instanceId'] = (
-                _get_instance_ec2_id_by_os_id(context, os_fip,
+                _get_instance_ec2_id_by_os_id(context, os_instance_id,
                                               db_instances_dict))
     if not address:
         ec2_address['domain'] = 'standard'
@@ -207,12 +195,21 @@ def _disassociate_address_item(context, address):
     db_api.update_item(context, address)
 
 
+def _get_os_instance_id(context, os_floating_ip,
+                                       os_ports=[]):
+    port_id = os_floating_ip.get('port_id')
+    os_instance_id = None
+    if port_id:
+        port = next((port for port in os_ports
+                     if port['id'] == port_id), None)
+        if port and port.get('device_id'):
+            os_instance_id = port['device_id']
+    return os_instance_id
+
+
 class AddressEngineNeutron(object):
 
     def allocate_address(self, context, domain=None):
-        if ((not domain or domain == 'standard') and
-                not CONF.disable_ec2_classic):
-            return AddressEngineNova().allocate_address(context)
         os_public_network = ec2utils.get_os_public_network(context)
         neutron = clients.neutron(context)
 
@@ -224,6 +221,9 @@ class AddressEngineNeutron(object):
             except neutron_exception.OverQuotaClient:
                 raise exception.AddressLimitExceeded()
             os_floating_ip = os_floating_ip['floatingip']
+            if ((not domain or domain == 'standard') and
+                 not CONF.disable_ec2_classic):
+                return None, os_floating_ip
             cleaner.addCleanup(neutron.delete_floatingip, os_floating_ip['id'])
 
             address = {'os_id': os_floating_ip['id'],
@@ -242,8 +242,13 @@ class AddressEngineNeutron(object):
                 msg = _('You must specify an allocation id when releasing a '
                         'VPC elastic IP address')
                 raise exception.InvalidParameterValue(msg)
-            return AddressEngineNova().release_address(context,
-                                                       public_ip, None)
+            os_floating_ip = self.get_os_floating_ip_by_public_ip(context,
+                                                                  public_ip)
+            try:
+                neutron.delete_floatingip(os_floating_ip['id'])
+            except neutron_exception.NotFound:
+                pass
+            return
 
         address = ec2utils.get_db_item(context, allocation_id)
         if not _is_address_valid(context, neutron, address):
@@ -308,15 +313,14 @@ class AddressEngineNeutron(object):
                         "The address '%(public_ip)s' does not belong to you.")
                     raise exception.AuthFailure(msg % {'public_ip': public_ip})
 
-                # NOTE(ft): in fact only the first two parameters are used to
-                # associate an address in EC2 Classic mode. Other parameters
-                # are sent to validate their emptiness in one place
-                return AddressEngineNova().associate_address(
-                        context, public_ip=public_ip, instance_id=instance_id,
-                        allocation_id=allocation_id,
-                        network_interface_id=network_interface_id,
-                        private_ip_address=private_ip_address,
-                        allow_reassociation=allow_reassociation)
+                os_instance_id = ec2utils.get_db_item(context,
+                                                      instance_id)['os_id']
+                # NOTE(ft): check the public IP exists to raise AWS exception
+                # otherwise
+                self.get_os_floating_ip_by_public_ip(context, public_ip)
+                nova = clients.nova(context)
+                nova.servers.add_floating_ip(os_instance_id, public_ip)
+                return None
 
             if not address:
                 msg = _("The address '%(public_ip)s' does not belong to you.")
@@ -395,11 +399,18 @@ class AddressEngineNeutron(object):
                     msg = _('You must specify an association id when '
                             'unmapping an address from a VPC instance')
                     raise exception.InvalidParameterValue(msg)
-                # NOTE(ft): association_id is unused in EC2 Classic mode,
-                # but it's passed there to validate its emptiness in one place
-                return AddressEngineNova().disassociate_address(
-                        context, public_ip=public_ip,
-                        association_id=association_id)
+                # NOTE(tikitavi): check the public IP exists to raise AWS
+                # exception otherwise
+                os_floating_ip = self.get_os_floating_ip_by_public_ip(
+                    context,
+                    public_ip)
+                os_ports = self.get_os_ports(context)
+                os_instance_id = _get_os_instance_id(context, os_floating_ip,
+                                                    os_ports)
+                if os_instance_id:
+                    nova = clients.nova(context)
+                    nova.servers.remove_floating_ip(os_instance_id, public_ip)
+                return None
 
             if not address:
                 msg = _("The address '%(public_ip)s' does not belong to you.")
@@ -436,72 +447,15 @@ class AddressEngineNeutron(object):
         neutron = clients.neutron(context)
         return neutron.list_ports(tenant_id=context.project_id)['ports']
 
-
-class AddressEngineNova(object):
-    # TODO(ft): check that parameters unused in EC2 Classic mode are not
-    # specified
-
-    def allocate_address(self, context, domain=None):
-        nova = clients.nova(context)
-        try:
-            nova_floating_ip = nova.floating_ips.create()
-        except nova_exception.Forbidden:
-            raise exception.AddressLimitExceeded()
-        return None, self.convert_ips_to_neutron_format(context,
-                                                        [nova_floating_ip])[0]
-
-    def release_address(self, context, public_ip, allocation_id):
-        nova = clients.nova(context)
-        nova.floating_ips.delete(self.get_nova_ip_by_public_ip(context,
-                                                               public_ip).id)
-
-    def associate_address(self, context, public_ip=None, instance_id=None,
-                          allocation_id=None, network_interface_id=None,
-                          private_ip_address=None, allow_reassociation=False):
-        os_instance_id = ec2utils.get_db_item(context, instance_id)['os_id']
-        # NOTE(ft): check the public IP exists to raise AWS exception otherwise
-        self.get_nova_ip_by_public_ip(context, public_ip)
-        nova = clients.nova(context)
-        nova.servers.add_floating_ip(os_instance_id, public_ip)
-        return None
-
-    def disassociate_address(self, context, public_ip=None,
-                             association_id=None):
-        os_instance_id = self.get_nova_ip_by_public_ip(context,
-                                                       public_ip).instance_id
-        if os_instance_id:
-            nova = clients.nova(context)
-            nova.servers.remove_floating_ip(os_instance_id, public_ip)
-        return None
-
-    def get_os_floating_ips(self, context):
-        nova = clients.nova(context)
-        return self.convert_ips_to_neutron_format(context,
-                                                  nova.floating_ips.list())
-
-    def convert_ips_to_neutron_format(self, context, nova_ips):
-        neutron_ips = []
-        for nova_ip in nova_ips:
-            neutron_ips.append({'id': nova_ip.id,
-                                'floating_ip_address': nova_ip.ip,
-                                'fixed_ip_address': nova_ip.fixed_ip,
-                                'instance_id': nova_ip.instance_id})
-        return neutron_ips
-
-    def get_os_ports(self, context):
-        return []
-
-    def get_nova_ip_by_public_ip(self, context, public_ip,
-                                 nova_floating_ips=None):
-        if nova_floating_ips is None:
-            nova = clients.nova(context)
-            nova_floating_ips = nova.floating_ips.list()
-        nova_ip = next((ip for ip in nova_floating_ips
-                        if ip.ip == public_ip), None)
-        if nova_ip is None:
+    def get_os_floating_ip_by_public_ip(self, context, public_ip):
+        os_floating_ip = next((addr for addr in
+                               self.get_os_floating_ips(context)
+                               if addr['floating_ip_address'] == public_ip),
+                              None)
+        if not os_floating_ip:
             msg = _("The address '%(public_ip)s' does not belong to you.")
             raise exception.AuthFailure(msg % {'public_ip': public_ip})
-        return nova_ip
+        return os_floating_ip
 
 
 address_engine = get_address_engine()

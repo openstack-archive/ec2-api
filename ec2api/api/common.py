@@ -30,9 +30,6 @@ from ec2api.i18n import _, _LI, _LW
 
 
 ec2_opts = [
-    cfg.BoolOpt('full_vpc_support',
-                default=True,
-                help='True if server supports Neutron for full VPC access'),
     cfg.BoolOpt('disable_ec2_classic',
                 help='True if server does not support EC2 Classic mode '
                      'in favor of default VPC'),

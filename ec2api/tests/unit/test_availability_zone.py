@@ -14,7 +14,6 @@
 
 import mock
 
-from ec2api.api import availability_zone
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -24,11 +23,6 @@ class AvailabilityZoneCase(base.ApiTestCase):
 
     def setUp(self):
         super(AvailabilityZoneCase, self).setUp()
-        self.addCleanup(self._reset_engine)
-
-    def _reset_engine(self):
-        availability_zone.account_attribute_engine = (
-            availability_zone.AccountAttributeEngineNeutron())
 
     def test_describe_availability_zones(self):
         self.nova.availability_zones.list.return_value = [
@@ -60,12 +54,11 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.assertTrue(resp['regionInfo'][0].get('regionEndpoint')
                         is not None)
 
+    # TODO(tikitavi): Rework test to exclude nova-network
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_describe_account_attributes(self, check_and_create):
         self.nova.quotas.get.return_value = mock.Mock(instances=77)
 
-        availability_zone.account_attribute_engine = (
-            availability_zone.AccountAttributeEngineNeutron())
         resp = self.execute('DescribeAccountAttributes', {})
         self.assertThat(resp['accountAttributeSet'],
                         matchers.ListMatches(
@@ -83,43 +76,7 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.nova.quotas.get.assert_called_once_with(
             fakes.ID_OS_PROJECT, fakes.ID_OS_USER)
 
-        availability_zone.account_attribute_engine = (
-            availability_zone.AccountAttributeEngineNova())
-        resp = self.execute('DescribeAccountAttributes', {})
-        self.assertThat(resp['accountAttributeSet'],
-                        matchers.ListMatches(
-                            [{'attributeName': 'supported-platforms',
-                              'attributeValueSet': [
-                                  {'attributeValue': 'EC2'}]},
-                             {'attributeName': 'default-vpc',
-                              'attributeValueSet': [
-                                  {'attributeValue': 'none'}]},
-                             {'attributeName': 'max-instances',
-                              'attributeValueSet': [
-                                  {'attributeValue': 77}]}],
-                            orderless_lists=True))
-
-        resp = self.execute('DescribeAccountAttributes',
-                            {'AttributeName.1': 'default-vpc',
-                             'AttributeName.2': 'max-instances'})
-        self.assertThat(resp['accountAttributeSet'],
-                        matchers.ListMatches(
-                            [{'attributeName': 'default-vpc',
-                              'attributeValueSet': [
-                                  {'attributeValue': 'none'}]},
-                             {'attributeName': 'max-instances',
-                              'attributeValueSet': [
-                                  {'attributeValue': 77}]}],
-                            orderless_lists=True))
-
-        self.assert_execution_error('InvalidParameter',
-                                    'DescribeAccountAttributes',
-                                    {'AttributeName.1': 'fake'})
-
         self.configure(disable_ec2_classic=True)
-        availability_zone.account_attribute_engine = (
-            availability_zone.AccountAttributeEngineNeutron())
-
         check_and_create.return_value = fakes.DB_VPC_DEFAULT
 
         resp = self.execute('DescribeAccountAttributes', {})

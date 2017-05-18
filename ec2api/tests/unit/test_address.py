@@ -14,9 +14,7 @@
 
 import mock
 from neutronclient.common import exceptions as neutron_exception
-from novaclient import exceptions as nova_exception
 
-from ec2api.api import address
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
@@ -27,27 +25,25 @@ class AddressTestCase(base.ApiTestCase):
 
     def setUp(self):
         super(AddressTestCase, self).setUp()
-        self.addCleanup(self._reset_engine)
-
-    def _reset_engine(self):
-        address.address_engine = address.AddressEngineNeutron()
 
     def test_allocate_ec2_classic_address(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
-        self.nova.floating_ips.create.return_value = (
-            fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1))
+        self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
+        self.neutron.list_networks.return_value = (
+            {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
+        self.neutron.create_floatingip.return_value = (
+            {'floatingip': fakes.OS_FLOATING_IP_1})
 
         resp = self.execute('AllocateAddress', {})
         self.assertEqual(fakes.IP_ADDRESS_1, resp['publicIp'])
         self.assertEqual('standard', resp['domain'])
         self.assertNotIn('allocationId', resp)
         self.assertEqual(0, self.db_api.add_item.call_count)
-        self.nova.floating_ips.create.assert_called_once_with()
+        self.neutron.create_floatingip.assert_called_once_with(
+            {'floatingip': {
+                'floating_network_id':
+                fakes.ID_OS_PUBLIC_NETWORK}})
 
     def test_allocate_vpc_address(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.neutron.list_networks.return_value = (
             {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
@@ -96,16 +92,12 @@ class AddressTestCase(base.ApiTestCase):
                'name': fakes.NAME_OS_PUBLIC_NETWORK})
 
     def test_allocate_address_invalid_parameters(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.assert_execution_error('InvalidParameterValue', 'AllocateAddress',
                                     {'Domain': 'fake_domain'})
         self.assertEqual(0, self.db_api.add_item.call_count)
         self.assertEqual(0, self.neutron.create_floatingip.call_count)
 
     def test_allocate_address_overlimit(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.neutron.list_networks.return_value = (
             {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
@@ -113,18 +105,11 @@ class AddressTestCase(base.ApiTestCase):
             neutron_exception.OverQuotaClient())
         self.assert_execution_error('AddressLimitExceeded', 'AllocateAddress',
                                     {'Domain': 'vpc'})
-
-        address.address_engine = (
-            address.AddressEngineNeutron())
-        self.nova.floating_ips.create.side_effect = (
-            nova_exception.Forbidden(403))
         self.assert_execution_error('AddressLimitExceeded', 'AllocateAddress',
                                     {})
 
     @tools.screen_unexpected_exception_logs
     def test_allocate_address_vpc_rollback(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.neutron.list_networks.return_value = (
             {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
@@ -139,12 +124,10 @@ class AddressTestCase(base.ApiTestCase):
             fakes.ID_OS_FLOATING_IP_1)
 
     def test_associate_address_ec2_classic(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_INSTANCE_1)
-        self.nova.floating_ips.list.return_value = (
-            [fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
-             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)])
+        self.neutron.list_floatingips.return_value = (
+            {'floatingips': [fakes.OS_FLOATING_IP_1,
+                             fakes.OS_FLOATING_IP_2]})
         self.nova.servers.add_floating_ip.return_value = True
 
         resp = self.execute('AssociateAddress',
@@ -157,8 +140,6 @@ class AddressTestCase(base.ApiTestCase):
             fakes.IP_ADDRESS_1)
 
     def test_associate_address_vpc(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
 
         def do_check(params, fixed_ip):
             resp = self.execute('AssociateAddress', params)
@@ -223,8 +204,6 @@ class AddressTestCase(base.ApiTestCase):
                  fakes.IP_NETWORK_INTERFACE_2)
 
     def test_associate_address_vpc_idempotent(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
 
         def do_check(params):
             resp = self.execute('AssociateAddress', params)
@@ -248,8 +227,6 @@ class AddressTestCase(base.ApiTestCase):
                   'PrivateIpAddress': fakes.IP_NETWORK_INTERFACE_2})
 
     def test_associate_address_invalid_main_parameters(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
 
         def do_check(params, error):
             self.assert_execution_error(error, 'AssociateAddress', params)
@@ -268,8 +245,6 @@ class AddressTestCase(base.ApiTestCase):
                  'MissingParameter')
 
     def test_associate_address_invalid_ec2_classic_parameters(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         # NOTE(ft): ec2 classic instance vs allocation_id parameter
         self.set_mock_db_items(fakes.DB_INSTANCE_2)
         self.assert_execution_error('InvalidParameterCombination',
@@ -278,7 +253,7 @@ class AddressTestCase(base.ApiTestCase):
                                      'InstanceId': fakes.ID_EC2_INSTANCE_2})
 
         # NOTE(ft): ec2 classic instance vs not existing public IP
-        self.nova.floating_ips.list.return_value = []
+        self.neutron.list_floatingips.return_value = {'floatingips': []}
         self.assert_execution_error('AuthFailure', 'AssociateAddress',
                                     {'PublicIp': fakes.IP_ADDRESS_1,
                                      'InstanceId': fakes.ID_EC2_INSTANCE_2})
@@ -292,8 +267,6 @@ class AddressTestCase(base.ApiTestCase):
                                      'InstanceId': fakes.ID_EC2_INSTANCE_2})
 
     def test_associate_address_invalid_vpc_parameters(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
 
         def do_check(params, error):
             self.assert_execution_error(error, 'AssociateAddress', params)
@@ -381,8 +354,6 @@ class AddressTestCase(base.ApiTestCase):
 
     @tools.screen_unexpected_exception_logs
     def test_associate_address_vpc_rollback(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_ADDRESS_1, fakes.DB_IGW_1,
                                fakes.DB_NETWORK_INTERFACE_1,
                                fakes.DB_NETWORK_INTERFACE_2)
@@ -398,13 +369,15 @@ class AddressTestCase(base.ApiTestCase):
             mock.ANY, fakes.DB_ADDRESS_1)
 
     def test_dissassociate_address_ec2_classic(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
-        self.set_mock_db_items()
+        self.set_mock_db_items(fakes.DB_INSTANCE_1)
         self.nova.servers.remove_floating_ip.return_value = True
-        self.nova.floating_ips.list.return_value = (
-            [fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
-             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)])
+        self.neutron.list_floatingips.return_value = (
+            {'floatingips': [fakes.OS_FLOATING_IP_1,
+                             fakes.OS_FLOATING_IP_2]})
+        self.neutron.list_ports.return_value = (
+            {'ports': [fakes.OS_PORT_1,
+                       fakes.OS_PORT_2]})
+
         resp = self.execute('DisassociateAddress',
                             {'PublicIp': fakes.IP_ADDRESS_2})
         self.assertEqual(True, resp['return'])
@@ -419,8 +392,6 @@ class AddressTestCase(base.ApiTestCase):
         self.assertEqual(1, self.nova.servers.remove_floating_ip.call_count)
 
     def test_dissassociate_address_vpc(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_ADDRESS_2)
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_2})
@@ -454,8 +425,6 @@ class AddressTestCase(base.ApiTestCase):
                                                   'private_ip_address']))
 
     def test_dissassociate_address_vpc_idempotent(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_ADDRESS_1)
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_1})
@@ -468,8 +437,6 @@ class AddressTestCase(base.ApiTestCase):
         self.assertEqual(0, self.db_api.update_item.call_count)
 
     def test_disassociate_address_invalid_parameters(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
 
         def do_check(params, error):
             self.assert_execution_error(error, 'DisassociateAddress', params)
@@ -483,7 +450,8 @@ class AddressTestCase(base.ApiTestCase):
 
         # NOTE(ft): EC2 Classic public IP does not exists
         self.set_mock_db_items()
-        self.nova.floating_ips.list.return_value = []
+        self.neutron.list_floatingips.return_value = {'floatingips': []}
+
         self.assert_execution_error('AuthFailure', 'DisassociateAddress',
                                     {'PublicIp': fakes.IP_ADDRESS_2})
 
@@ -519,8 +487,6 @@ class AddressTestCase(base.ApiTestCase):
 
     @tools.screen_unexpected_exception_logs
     def test_dissassociate_address_vpc_rollback(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_ADDRESS_2)
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_2})
@@ -534,24 +500,20 @@ class AddressTestCase(base.ApiTestCase):
             mock.ANY, fakes.DB_ADDRESS_2)
 
     def test_release_address_ec2_classic(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items()
-        self.nova.floating_ips.delete.return_value = True
-        self.nova.floating_ips.list.return_value = (
-            [fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
-             fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)])
+        self.neutron.delete_floatingip.return_value = True
+        self.neutron.list_floatingips.return_value = (
+            {'floatingips': [fakes.OS_FLOATING_IP_1,
+                             fakes.OS_FLOATING_IP_2]})
 
         resp = self.execute('ReleaseAddress',
                             {'PublicIp': fakes.IP_ADDRESS_1})
         self.assertEqual(True, resp['return'])
 
-        self.nova.floating_ips.delete.assert_called_once_with(
-            fakes.NOVA_FLOATING_IP_1['id'])
+        self.neutron.delete_floatingip.assert_called_once_with(
+            fakes.OS_FLOATING_IP_1['id'])
 
     def test_release_address_vpc(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_ADDRESS_1)
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_1})
@@ -567,8 +529,6 @@ class AddressTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.address.AddressEngineNeutron.disassociate_address')
     def test_release_address_default_vpc(self, disassociate_address):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.configure(disable_ec2_classic=True)
         self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
                                fakes.DB_ADDRESS_DEFAULT,
@@ -588,8 +548,6 @@ class AddressTestCase(base.ApiTestCase):
             mock.ANY, fakes.ID_EC2_ADDRESS_DEFAULT)
 
     def test_release_address_invalid_parameters(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
 
         def do_check(params, error):
             self.assert_execution_error(error, 'ReleaseAddress', params)
@@ -602,7 +560,7 @@ class AddressTestCase(base.ApiTestCase):
                  'InvalidParameterCombination')
 
         # NOTE(ft): EC2 Classic public IP is not found
-        self.nova.floating_ips.list.return_value = []
+        self.neutron.list_floatingips.return_value = {'floatingips': []}
         do_check({'PublicIp': fakes.IP_ADDRESS_1},
                  'AuthFailure')
 
@@ -646,8 +604,6 @@ class AddressTestCase(base.ApiTestCase):
 
     @tools.screen_unexpected_exception_logs
     def test_release_address_vpc_rollback(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.set_mock_db_items(fakes.DB_ADDRESS_1)
         self.neutron.show_floatingip.return_value = (
             {'floatingip': fakes.OS_FLOATING_IP_1})
@@ -660,8 +616,6 @@ class AddressTestCase(base.ApiTestCase):
             mock.ANY, 'eipalloc', fakes.DB_ADDRESS_1)
 
     def test_describe_addresses_vpc(self):
-        address.address_engine = (
-            address.AddressEngineNeutron())
         self.neutron.list_floatingips.return_value = (
             {'floatingips': [fakes.OS_FLOATING_IP_1,
                              fakes.OS_FLOATING_IP_2]})
@@ -698,12 +652,13 @@ class AddressTestCase(base.ApiTestCase):
               ('public-ip', fakes.IP_ADDRESS_2)])
 
     def test_describe_addresses_ec2_classic(self):
-        address.address_engine = (
-            address.AddressEngineNova())
         self.set_mock_db_items(fakes.DB_INSTANCE_1)
-        self.nova.floating_ips.list.return_value = [
-            fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_1),
-            fakes.NovaFloatingIp(fakes.NOVA_FLOATING_IP_2)]
+        self.neutron.list_floatingips.return_value = (
+            {'floatingips': [fakes.OS_FLOATING_IP_1,
+                             fakes.OS_FLOATING_IP_2]})
+        self.neutron.list_ports.return_value = (
+            {'ports': [fakes.OS_PORT_1,
+                       fakes.OS_PORT_2]})
         resp = self.execute('DescribeAddresses', {})
         self.assertThat(resp['addressesSet'],
                         matchers.ListMatches([fakes.EC2_ADDRESS_CLASSIC_1,

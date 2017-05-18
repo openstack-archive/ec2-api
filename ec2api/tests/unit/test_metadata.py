@@ -92,36 +92,17 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.assertEqual(500, response.status_int)
             self.assertEqual(len(log.mock_calls), 2)
 
-    def test_get_requester(self):
+    def _test_get_requester(self):
         expected = {'os_instance_id': mock.sentinel.os_instance_id,
                     'project_id': mock.sentinel.project_id,
                     'private_ip': mock.sentinel.private_ip}
         req = mock.Mock(headers={})
 
-        @mock.patch('ec2api.metadata.api.get_os_instance_and_project_id')
-        @mock.patch('ec2api.context.get_os_admin_context')
-        @mock.patch.object(metadata.MetadataRequestHandler,
-                           '_unpack_nova_network_request')
-        def do_test1(unpack_request, get_context, get_ids):
-            get_context.return_value = base.create_context(is_os_admin=True)
-            unpack_request.return_value = mock.sentinel.private_ip
-            get_ids.return_value = (mock.sentinel.os_instance_id,
-                                    mock.sentinel.project_id)
-
-            retval = self.handler._get_requester(req)
-            self.assertEqual(expected, retval)
-            get_context.assert_called_with()
-            unpack_request.assert_called_with(req)
-            get_ids.assert_called_with(get_context.return_value,
-                                       mock.sentinel.private_ip)
-
-        do_test1()
-
         req.headers['X-Instance-ID'] = mock.sentinel.os_instance_id
 
         @mock.patch.object(metadata.MetadataRequestHandler,
                            '_unpack_neutron_request')
-        def do_test2(unpack_request):
+        def do_test1(unpack_request):
             unpack_request.return_value = (mock.sentinel.os_instance_id,
                                            mock.sentinel.project_id,
                                            mock.sentinel.private_ip)
@@ -130,7 +111,7 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.assertEqual(expected, retval)
             unpack_request.assert_called_with(req)
 
-        do_test2()
+        do_test1()
 
         req.headers['X-Metadata-Provider'] = mock.sentinel.provider_id
 
@@ -139,7 +120,7 @@ class ProxyTestCase(test_base.BaseTestCase):
         @mock.patch('ec2api.context.get_os_admin_context')
         @mock.patch.object(metadata.MetadataRequestHandler,
                            '_unpack_nsx_request')
-        def do_test3(unpack_request, get_context, get_ids):
+        def do_test2(unpack_request, get_context, get_ids):
             unpack_request.return_value = (mock.sentinel.provider_id,
                                            mock.sentinel.private_ip)
             get_context.return_value = base.create_context(is_os_admin=True)
@@ -154,7 +135,7 @@ class ProxyTestCase(test_base.BaseTestCase):
                                        mock.sentinel.provider_id,
                                        mock.sentinel.private_ip)
 
-        do_test3()
+        do_test2()
 
     @mock.patch('ec2api.metadata.api.get_metadata_item')
     @mock.patch('ec2api.context.get_os_admin_context')
@@ -304,24 +285,6 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.handler._sign_instance_id('foo')
         )
 
-    def test_unpack_nova_network_request(self):
-        req = mock.Mock(remote_addr='fake_addr', headers={})
-
-        self.assertEqual('fake_addr',
-                         self.handler._unpack_nova_network_request(req))
-
-        cfg.CONF.set_override('use_forwarded_for', True)
-        self.assertEqual('fake_addr',
-                         self.handler._unpack_nova_network_request(req))
-
-        req.headers['X-Forwarded-For'] = 'fake_forwarded_for'
-        self.assertEqual('fake_forwarded_for',
-                         self.handler._unpack_nova_network_request(req))
-
-        cfg.CONF.set_override('use_forwarded_for', False)
-        self.assertEqual('fake_addr',
-                         self.handler._unpack_nova_network_request(req))
-
     def test_unpack_neutron_request(self):
         sign = (
             '97e7709481495f1a3a589e5ee03f8b5d51a3e0196768e300c441b58fe0382f4d')
@@ -399,10 +362,9 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('novaclient.client.Client')
     @mock.patch('ec2api.db.api.IMPL')
     @mock.patch('ec2api.metadata.api.instance_api')
-    def test_get_metadata_items(self, instance_api, db_api, nova):
+    @mock.patch('ec2api.metadata.MetadataRequestHandler._validate_signature')
+    def test_get_metadata_items(self, validate, instance_api, db_api, nova):
         FAKE_USER_DATA = u'fake_user_data-' + six.unichr(1071)
-        nova.return_value.fixed_ips.get.return_value = (
-                mock.Mock(hostname='fake_name'))
         nova.return_value.servers.list.return_value = [
             fakes.OSInstance(fakes.OS_INSTANCE_1)]
         keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)
@@ -420,8 +382,12 @@ class ProxyTestCase(test_base.BaseTestCase):
         def _test_metadata_path(relpath):
             # recursively confirm a http 200 from all meta-data elements
             # available at relpath.
+            headers = {'X-Instance-ID': fakes.ID_EC2_INSTANCE_1,
+                       'X-Tenant-ID': fakes.ID_OS_PROJECT,
+                       'X-Forwarded-For': fakes.IP_NETWORK_INTERFACE_2}
             request = webob.Request.blank(
-                    relpath, remote_addr=fakes.IP_NETWORK_INTERFACE_2)
+                    relpath, headers=headers)
+
             response = request.get_response(self.handler)
             self.assertEqual(200, response.status_int)
             for item in response.body.decode("utf-8").split('\n'):
@@ -436,7 +402,7 @@ class ProxyTestCase(test_base.BaseTestCase):
 
                 path = relpath + '/' + item
                 request = webob.Request.blank(
-                        path, remote_addr=fakes.IP_NETWORK_INTERFACE_2)
+                        path, headers=headers)
                 response = request.get_response(self.handler)
                 self.assertEqual(200, response.status_int, message=path)
 

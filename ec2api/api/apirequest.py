@@ -45,10 +45,7 @@ class APIRequest(object):
         self.action = action
         self.version = version
         self.args = args
-        if CONF.full_vpc_support:
-            self.controller = cloud.VpcCloudController()
-        else:
-            self.controller = cloud.CloudController()
+        self.controller = cloud.VpcCloudController()
 
     def invoke(self, context):
         try:

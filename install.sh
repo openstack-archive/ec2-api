@@ -274,7 +274,6 @@ iniset $CONF_FILE DEFAULT log_dir "$LOG_DIR"
 iniset $CONF_FILE DEFAULT verbose True
 iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL_WO_PATH/v3/ec2tokens"
 iniset $CONF_FILE database connection "$CONNECTION"
-iniset $CONF_FILE DEFAULT full_vpc_support "$VPC_SUPPORT"
 iniset $CONF_FILE DEFAULT disable_ec2_classic "$DISABLE_EC2_CLASSIC"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
 

@@ -149,13 +149,6 @@ function configure_ec2api_networking {
     if [[ -n "$ext_net" ]]; then
         iniset $EC2API_CONF_FILE DEFAULT external_network $ext_net
     fi
-
-    if [[ ,${ENABLED_SERVICES} =~ ,"q-" ]]; then
-        iniset $EC2API_CONF_FILE DEFAULT full_vpc_support True
-        iniset $EC2API_CONF_FILE DEFAULT disable_ec2_api True
-    else
-        iniset $EC2API_CONF_FILE DEFAULT full_vpc_support False
-    fi
 }
 
 # Entry points

@@ -68,23 +68,6 @@ def get_version_list():
     return _format_metadata_item(VERSIONS + ["latest"])
 
 
-def get_os_instance_and_project_id(context, fixed_ip):
-    try:
-        nova = clients.nova(context)
-        os_address = nova.fixed_ips.get(fixed_ip)
-        os_instances = nova.servers.list(
-                search_opts={'hostname': os_address.hostname,
-                             'all_tenants': True})
-        return next((os_instance.id, os_instance.tenant_id)
-                    for os_instance in os_instances
-                    if any((addr['addr'] == fixed_ip and
-                            addr['OS-EXT-IPS:type'] == 'fixed')
-                           for addr in itertools.chain(
-                                *six.itervalues(os_instance.addresses))))
-    except (nova_exception.NotFound, StopIteration):
-        raise exception.EC2MetadataNotFound()
-
-
 def get_os_instance_and_project_id_by_provider_id(context, provider_id,
                                                   fixed_ip):
     neutron = clients.neutron(context)

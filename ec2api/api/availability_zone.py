@@ -61,10 +61,7 @@ Validator = common.Validator
 
 
 def get_account_attribute_engine():
-    if CONF.full_vpc_support:
-        return AccountAttributeEngineNeutron()
-    else:
-        return AccountAttributeEngineNova()
+    return AccountAttributeEngineNeutron()
 
 
 class AvailabilityZoneDescriber(common.UniversalDescriber):
@@ -211,15 +208,6 @@ class AccountAttributeEngineNeutron(object):
             default_vpc = ec2utils.check_and_create_default_vpc(context)
             if default_vpc:
                 return default_vpc['id']
-        return 'none'
-
-
-class AccountAttributeEngineNova(object):
-
-    def get_supported_platforms(self):
-        return ['EC2']
-
-    def get_default_vpc(self, context):
         return 'none'
 
 

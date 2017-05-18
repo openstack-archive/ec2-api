@@ -72,10 +72,7 @@ class Validator(common.Validator):
 
 
 def get_instance_engine():
-    if CONF.full_vpc_support:
-        return InstanceEngineNeutron()
-    else:
-        return InstanceEngineNova()
+    return InstanceEngineNeutron()
 
 
 def run_instances(context, image_id, min_count, max_count,
@@ -1467,27 +1464,6 @@ class InstanceEngineNeutron(object):
                 reason=_('There is more than one available network '
                          'for EC2 Classic mode'))
         return ec2_classic_os_networks[0]
-
-
-class InstanceEngineNova(object):
-
-    def get_vpc_and_build_launch_context(
-            self, context, security_group,
-            subnet_id, private_ip_address, security_group_id,
-            network_interface, multiple_instances):
-        # TODO(ft): check emptiness of vpc related parameters
-
-        return None, {'security_groups': security_group}
-
-    def get_launch_extra_parameters(self, context, cleaner, launch_context):
-        return {'security_groups': launch_context['security_groups']}
-
-    def post_launch_action(self, context, cleaner, launch_context,
-                           instance_id):
-        pass
-
-    def get_ec2_network_interfaces(self, context, instance_ids=None):
-        return {}
 
 
 instance_engine = get_instance_engine()

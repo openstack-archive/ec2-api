@@ -53,37 +53,6 @@ class MetadataApiTestCase(base.ApiTestCase):
         retval = api.get_version_list()
         self.assertEqual('\n'.join(api.VERSIONS + ['latest']), retval)
 
-    def test_get_instance_and_project_id(self):
-        self.nova.servers.list.return_value = [
-            fakes.OSInstance(fakes.OS_INSTANCE_1),
-            fakes.OSInstance(fakes.OS_INSTANCE_2)]
-        self.nova.fixed_ips.get.return_value = mock.Mock(hostname='fake_name')
-        self.assertEqual(
-            (fakes.ID_OS_INSTANCE_1, fakes.ID_OS_PROJECT),
-            api.get_os_instance_and_project_id(self.fake_context,
-                                               fakes.IP_NETWORK_INTERFACE_2))
-        self.nova.fixed_ips.get.assert_called_with(
-                fakes.IP_NETWORK_INTERFACE_2)
-        self.nova.servers.list.assert_called_with(
-                search_opts={'hostname': 'fake_name',
-                             'all_tenants': True})
-
-        def check_raise():
-            self.assertRaises(exception.EC2MetadataNotFound,
-                              api.get_os_instance_and_project_id,
-                              self.fake_context,
-                              fakes.IP_NETWORK_INTERFACE_2)
-
-        self.nova.servers.list.return_value = [
-            fakes.OSInstance(fakes.OS_INSTANCE_2)]
-        check_raise()
-
-        self.nova.fixed_ips.get.side_effect = nova_exception.NotFound('fake')
-        self.nova.servers.list.return_value = [
-            fakes.OSInstance(fakes.OS_INSTANCE_1),
-            fakes.OSInstance(fakes.OS_INSTANCE_2)]
-        check_raise()
-
     def test_get_instance_and_project_id_by_provider_id(self):
         self.neutron.list_subnets.return_value = {
             'subnets': [fakes.OS_SUBNET_1, fakes.OS_SUBNET_2]}

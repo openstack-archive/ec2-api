@@ -19,7 +19,6 @@ try:
     from neutronclient.common import exceptions as neutron_exception
 except ImportError:
     pass  # clients will log absense of neutronclient in this case
-from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 
@@ -52,10 +51,7 @@ DEFAULT_GROUP_NAME = 'default'
 
 
 def get_security_group_engine():
-    if CONF.full_vpc_support:
-        return SecurityGroupEngineNeutron()
-    else:
-        return SecurityGroupEngineNova()
+    return SecurityGroupEngineNeutron()
 
 
 def create_security_group(context, group_name, group_description,
@@ -88,19 +84,22 @@ def create_security_group(context, group_name, group_description,
 
 def _create_security_group(context, group_name, group_description,
                            vpc_id=None, default=False):
-    nova = clients.nova(context)
+    neutron = clients.neutron(context)
     with common.OnCrashCleaner() as cleaner:
         try:
-            os_security_group = nova.security_groups.create(group_name,
-                                                            group_description)
-        except nova_exception.OverLimit:
+            secgroup_body = (
+                {'security_group': {'name': group_name,
+                                    'description': group_description}})
+            os_security_group = neutron.create_security_group(
+                secgroup_body)['security_group']
+        except neutron_exception.OverQuotaClient:
             raise exception.ResourceLimitExceeded(resource='security groups')
-        cleaner.addCleanup(nova.security_groups.delete,
-                           os_security_group.id)
+        cleaner.addCleanup(neutron.delete_security_group,
+                           os_security_group['id'])
         if vpc_id:
             # NOTE(Alex) Check if such vpc exists
             ec2utils.get_db_item(context, vpc_id)
-        item = {'vpc_id': vpc_id, 'os_id': os_security_group.id}
+        item = {'vpc_id': vpc_id, 'os_id': os_security_group['id']}
         if not default:
             security_group = db_api.add_item(context, 'sg', item)
         else:
@@ -494,16 +493,13 @@ class SecurityGroupEngineNeutron(object):
     def delete_group(self, context, group_name=None, group_id=None,
                      delete_default=False):
         neutron = clients.neutron(context)
-        if CONF.disable_ec2_classic and group_name:
+        if group_name:
             sg = describe_security_groups(
                 context,
                 group_name=[group_name])['securityGroupInfo'][0]
             group_id = sg['groupId']
             group_name = None
-        if group_id is None or not group_id.startswith('sg-'):
-            return SecurityGroupEngineNova().delete_group(context,
-                                                          group_name,
-                                                          group_id)
+
         security_group = ec2utils.get_db_item(context, group_id)
         try:
             if not delete_default:
@@ -553,123 +549,22 @@ class SecurityGroupEngineNeutron(object):
         neutron.delete_security_group_rule(os_id)
 
     def get_group_os_id(self, context, group_id, group_name):
-        if group_name:
-            return SecurityGroupEngineNova().get_group_os_id(context,
-                                                             group_id,
-                                                             group_name)
+        if group_name and not group_id:
+            os_group = self.get_os_group_by_name(context, group_name)
+            return str(os_group['id'])
         return ec2utils.get_db_item(context, group_id, 'sg')['os_id']
 
-
-class SecurityGroupEngineNova(object):
-
-    def delete_group(self, context, group_name=None, group_id=None,
-                     delete_default=False):
-        nova = clients.nova(context)
-        os_id = self.get_group_os_id(context, group_id, group_name)
-        try:
-            nova.security_groups.delete(os_id)
-        except Exception as ex:
-            # TODO(Alex): do log error
-            # nova doesn't differentiate Conflict exception like neutron does
-            pass
-
-    def get_os_groups(self, context):
-        # Note(tikitavi): Using neutron engine in describing security groups.
-        # Security-group-list in nova cannot be filtered by tenant,
-        # listing all secgroups in case of big amount of groups can be slow
-        # and may have limitations in number.
-        try:
-            groups = SecurityGroupEngineNeutron().get_os_groups(context)
-        except Exception as ex:
-            groups = []
-            LOG.warning(_("Failed to get os groups."))
-        return groups
-
-    def authorize_security_group(self, context, rule_body):
-        nova = clients.nova(context)
-        try:
-            os_security_group_rule = nova.security_group_rules.create(
-                rule_body['security_group_id'],
-                rule_body.get('protocol'),
-                rule_body.get('port_range_min', -1),
-                rule_body.get('port_range_max', -1),
-                rule_body.get('remote_ip_prefix'),
-                rule_body.get('remote_group_id'))
-        except nova_exception.Conflict:
-            raise exception.InvalidPermissionDuplicate()
-        except nova_exception.OverLimit:
-            raise exception.RulesPerSecurityGroupLimitExceeded()
-
-    def get_os_group_rules(self, context, os_id):
-        nova = clients.nova(context)
-        os_security_group = nova.security_groups.get(os_id)
-        os_rules = os_security_group.rules
-        neutron_rules = []
-        for os_rule in os_rules:
-            neutron_rules.append(
-                self.convert_rule_to_neutron(context,
-                                             os_rule,
-                                             nova.security_groups.list()))
-        return neutron_rules
-
-    def delete_os_group_rule(self, context, os_id):
-        nova = clients.nova(context)
-        nova.security_group_rules.delete(os_id)
-
-    def convert_groups_to_neutron_format(self, context, nova_security_groups):
-        neutron_security_groups = []
-        for nova_group in nova_security_groups:
-            neutron_group = {'id': str(nova_group.id),
-                             'name': nova_group.name,
-                             'description': nova_group.description,
-                             'tenant_id': nova_group.tenant_id}
-            neutron_rules = []
-            for rule in nova_group.rules:
-                neutron_rules.append(
-                    self.convert_rule_to_neutron(context,
-                                                 rule, nova_security_groups))
-            if neutron_rules:
-                neutron_group['security_group_rules'] = neutron_rules
-            neutron_security_groups.append(neutron_group)
-        return neutron_security_groups
-
-    def convert_rule_to_neutron(self, context, nova_rule,
-                                nova_security_groups=None):
-        neutron_rule = {'id': str(nova_rule['id']),
-                        'protocol': nova_rule['ip_protocol'],
-                        'port_range_min': nova_rule['from_port'],
-                        'port_range_max': nova_rule['to_port'],
-                        'remote_ip_prefix': (
-                            nova_rule.get('ip_range') or {}).get('cidr'),
-                        'remote_group_id': None,
-                        'direction': 'ingress',
-                        'ethertype': 'IPv4',
-                        'security_group_id': str(nova_rule['parent_group_id'])}
-        if (nova_rule.get('group') or {}).get('name'):
-            neutron_rule['remote_group_id'] = (
-                self.get_group_os_id(context, None,
-                                     nova_rule['group']['name'],
-                                     nova_security_groups))
-        return neutron_rule
-
-    def get_group_os_id(self, context, group_id, group_name,
-                        nova_security_groups=None):
-        if group_id:
-            return ec2utils.get_db_item(context, group_id, 'sg')['os_id']
-        nova_group = self.get_nova_group_by_name(context, group_name,
-                                                 nova_security_groups)
-        return str(nova_group.id)
-
-    def get_nova_group_by_name(self, context, group_name,
-                               nova_security_groups=None):
-        if nova_security_groups is None:
-            nova = clients.nova(context)
-            nova_security_groups = nova.security_groups.list()
-        nova_group = next((g for g in nova_security_groups
-                           if g.name == group_name), None)
-        if nova_group is None:
+    def get_os_group_by_name(self, context, group_name,
+                               os_security_groups=None):
+        if os_security_groups is None:
+            neutron = clients.neutron(context)
+            os_security_groups = (
+                neutron.list_security_groups()['security_groups'])
+        os_group = next((g for g in os_security_groups
+                           if g['name'] == group_name), None)
+        if os_group is None:
             raise exception.InvalidGroupNotFound(id=group_name)
-        return nova_group
+        return os_group
 
 
 security_group_engine = get_security_group_engine()
