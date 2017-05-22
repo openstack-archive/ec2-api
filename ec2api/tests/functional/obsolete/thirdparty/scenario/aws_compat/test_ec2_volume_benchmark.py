@@ -20,7 +20,7 @@ import tempest.cloudscaling.base as base
 import tempest.cloudscaling.thirdparty.scenario.aws_compat.base as aws_base
 import tempest.cloudscaling.utils as utils
 from tempest.lib.common.utils.linux import remote_client
-from tempest import test
+from tempest.lib import decorators
 from tempest.thirdparty.boto.utils import wait as boto_wait
 
 import logging
@@ -113,7 +113,7 @@ class VolumeBenchmarkTest(base.BaseBenchmarkTest, aws_base.BaseAWSTest):
                 str(self.test_time) + "s (current) > " +
                 reference_time[1] + "s (AWS)")
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_001_attach_volume(self):
         """Attach volume"""
 
@@ -155,7 +155,7 @@ class VolumeBenchmarkTest(base.BaseBenchmarkTest, aws_base.BaseAWSTest):
 
         self._check_test()
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_002_fill_volume(self):
         """Fill volume with data"""
 
@@ -181,7 +181,7 @@ class VolumeBenchmarkTest(base.BaseBenchmarkTest, aws_base.BaseAWSTest):
 
         self._check_test()
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_003_snapshot_volume(self):
         """Snapshot volume"""
 
@@ -202,7 +202,7 @@ class VolumeBenchmarkTest(base.BaseBenchmarkTest, aws_base.BaseAWSTest):
 
         self._check_test()
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_004_clone_volume_snapshot(self):
         """Clone volume"""
 
@@ -224,7 +224,7 @@ class VolumeBenchmarkTest(base.BaseBenchmarkTest, aws_base.BaseAWSTest):
 
         self._check_test()
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_005_detach_volume(self):
         """Detach volume"""
 

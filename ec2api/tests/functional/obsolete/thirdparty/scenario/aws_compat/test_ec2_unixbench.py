@@ -17,7 +17,7 @@ from testtools import content as test_content
 import tempest.cloudscaling.base as base
 import tempest.cloudscaling.thirdparty.scenario.aws_compat.base as aws_base
 from tempest.lib.common.utils.linux import remote_client
-from tempest import test
+from tempest.lib import decorators
 
 import logging
 logging.getLogger('boto').setLevel(logging.CRITICAL)
@@ -60,7 +60,7 @@ class UnixBenchTest(base.BaseBenchmarkTest, aws_base.BaseAWSTest):
                                              cls.ssh_user,
                                              pkey=cls.keypair.material)
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_run_benchmark(self):
         """Run UnixBench test on prepared instance"""
         if self.ssh is None:
