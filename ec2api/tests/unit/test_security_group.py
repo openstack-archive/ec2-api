@@ -163,7 +163,6 @@ class SecurityGroupTestCase(base.ApiTestCase):
         self.neutron.create_security_group.assert_called_once_with(
             secgroup_body)
 
-    # TODO(tikitavi): Rework test to exclude nova-network
     @tools.screen_unexpected_exception_logs
     def test_create_security_group_rollback(self):
         self.set_mock_db_items(fakes.DB_VPC_1)
