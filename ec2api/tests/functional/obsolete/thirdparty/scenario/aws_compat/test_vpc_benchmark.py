@@ -20,7 +20,7 @@ from tempest.cloudscaling import base
 import tempest.cloudscaling.thirdparty.scenario.aws_compat.base as aws_base
 from tempest import exceptions
 from tempest.lib.common.utils.linux import remote_client
-from tempest import test
+from tempest.lib import decorators
 
 import logging
 logging.getLogger('boto').setLevel(logging.CRITICAL)
@@ -154,7 +154,7 @@ class VPC_Benchmark(aws_base.BaseVPCTest, base.BaseBenchmarkTest):
                 "%sMbits/sec (current) < %sMbits/sec (AWS)" %
                 (rate, reference[0]))
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_001_internal_vpc_tcp_150MB_throughput(self):
         """Measure internal VPC network throughput for 150 MBytes transmit."""
         if self.keypair is None:
@@ -170,7 +170,7 @@ class VPC_Benchmark(aws_base.BaseVPCTest, base.BaseBenchmarkTest):
             "150 MBytes throughput: %s Mbits/sec" % rate))
         self._check_test(rate)
 
-    @test.attr(type='benchmark')
+    @decorators.attr(type='benchmark')
     def test_002_internal_vpc_tcp_2mins_throughput(self):
         """Measure internal VPC network throughput for 2 mins transmit."""
         if self.keypair is None:
