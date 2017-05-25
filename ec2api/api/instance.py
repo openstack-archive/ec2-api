@@ -33,7 +33,7 @@ from ec2api import clients
 from ec2api import context as ec2_context
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _, _LE
+from ec2api.i18n import _
 
 LOG = logging.getLogger(__name__)
 
@@ -94,12 +94,11 @@ def run_instances(context, image_id, min_count, max_count,
                                                    'value': [client_token]}])
         if reservations['reservationSet']:
             if len(reservations['reservationSet']) > 1:
-                LOG.error(_LE('describe_instances has returned %s '
-                              'reservations, but 1 is expected.') %
+                LOG.error('describe_instances has returned %s '
+                          'reservations, but 1 is expected.',
                           len(reservations['reservationSet']))
-                LOG.error(_LE('Requested instances client token: %s') %
-                          client_token)
-                LOG.error(_LE('Result: %s') % reservations)
+                LOG.error('Requested instances client token: %s', client_token)
+                LOG.error('Result: %s', reservations)
             return reservations['reservationSet'][0]
 
     os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
@@ -173,10 +172,10 @@ def run_instances(context, image_id, min_count, max_count,
     ec2_reservations = describe_instances(context, instance_ids)
     reservation_count = len(ec2_reservations['reservationSet'])
     if reservation_count != 1:
-        LOG.error(_LE('describe_instances has returned %s reservations, '
-                      'but 1 is expected.') % reservation_count)
-        LOG.error(_LE('Requested instances IDs: %s') % instance_ids)
-        LOG.error(_LE('Result: %s') % ec2_reservations)
+        LOG.error('describe_instances has returned %s reservations, '
+                  'but 1 is expected.', reservation_count)
+        LOG.error('Requested instances IDs: %s', instance_ids)
+        LOG.error('Result: %s', ec2_reservations)
     return (ec2_reservations['reservationSet'][0]
             if reservation_count else None)
 

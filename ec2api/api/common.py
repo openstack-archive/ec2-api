@@ -26,7 +26,7 @@ from ec2api.api import ec2utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
-from ec2api.i18n import _, _LI, _LW
+from ec2api.i18n import _
 
 
 ec2_opts = [
@@ -92,7 +92,7 @@ class OnCrashCleaner(object):
                         formatted_args += ', '
                     formatted_args += kwargs_string
                 LOG.warning(
-                    _LW('Error cleaning up %(name)s(%(args)s)') %
+                    'Error cleaning up %(name)s(%(args)s)' %
                     {'name': name, 'args': formatted_args},
                     exc_info=True)
                 pass
@@ -308,7 +308,7 @@ class UniversalDescriber(object):
             item = ec2utils.auto_create_db_item(self.context, self.KIND,
                                                 self.get_id(os_item))
             LOG.info(
-                _LI('Item %(item)s was updated to %(os_item)s.') %
+                'Item %(item)s was updated to %(os_item)s.',
                 {'item': str(item), 'os_item': str(os_item)})
         return item
 
@@ -319,7 +319,7 @@ class UniversalDescriber(object):
         return os_item['name']
 
     def delete_obsolete_item(self, item):
-        LOG.info(_LI('Deleting obsolete item %(item)s') % {'item': str(item)})
+        LOG.info('Deleting obsolete item %(item)s', {'item': str(item)})
         db_api.delete_item(self.context, item['id'])
 
     def is_filtering_value_found(self, filter_value, value):

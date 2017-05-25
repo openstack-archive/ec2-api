@@ -25,7 +25,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 import oslo_messaging as messaging
 
-from ec2api.i18n import _, _LI, _LW
+from ec2api.i18n import _
 
 logger = logging.getLogger(__name__)
 
@@ -151,32 +151,31 @@ def _get_nova_api_version(context):
     current = client.versions.get_current()
     if not current:
         logger.warning(
-            _LW('Could not check Nova API version because no version '
-                'was found in Nova version list for url %(url)s of service '
-                'type "%(service_type)s". '
-                'Use v%(required_api_version)s Nova API.'),
+            'Could not check Nova API version because no version '
+            'was found in Nova version list for url %(url)s of service '
+            'type "%(service_type)s". '
+            'Use v%(required_api_version)s Nova API.',
             {'url': client.client.get_endpoint(),
              'service_type': CONF.nova_service_type,
              'required_api_version': REQUIRED_NOVA_API_MICROVERSION})
         return REQUIRED_NOVA_API_MICROVERSION
     if current.id != REQUIRED_NOVA_API_VERSION_ID:
         logger.warning(
-            _LW('Specified "%s" Nova service type does not support v2.1 API. '
-                'A lot of useful EC2 compliant instance properties '
-                'will be unavailable.'),
-            CONF.nova_service_type)
+            'Specified "%s" Nova service type does not support v2.1 API. '
+            'A lot of useful EC2 compliant instance properties '
+            'will be unavailable.', CONF.nova_service_type)
         return LEGACY_NOVA_API_VERSION
     if (nova_api_versions.APIVersion(current.version) < required):
         logger.warning(
-            _LW('Nova support v%(nova_api_version)s, '
-                'but v%(required_api_version)s is required. '
-                'A lot of useful EC2 compliant instance properties '
-                'will be unavailable.'),
+            'Nova support v%(nova_api_version)s, '
+            'but v%(required_api_version)s is required. '
+            'A lot of useful EC2 compliant instance properties '
+            'will be unavailable.',
             {'nova_api_version': current.version,
              'required_api_version': REQUIRED_NOVA_API_MICROVERSION})
         return current.version
-    logger.info(_LI('Provided Nova API version is  v%(nova_api_version)s, '
-                    'used one is v%(required_api_version)s'),
+    logger.info('Provided Nova API version is  v%(nova_api_version)s, '
+                'used one is v%(required_api_version)s',
                 {'nova_api_version': current.version,
                  'required_api_version': (
                         REQUIRED_NOVA_API_MICROVERSION)})

@@ -25,7 +25,7 @@ import webob
 
 from ec2api import context as ec2_context
 from ec2api import exception
-from ec2api.i18n import _, _LE, _LW
+from ec2api.i18n import _
 from ec2api.metadata import api
 from ec2api import utils
 from ec2api import wsgi
@@ -97,7 +97,7 @@ class MetadataRequestHandler(wsgi.Application):
         except exception.EC2MetadataNotFound:
             return webob.exc.HTTPNotFound()
         except Exception:
-            LOG.exception(_LE("Unexpected error."))
+            LOG.exception("Unexpected error.")
             msg = _('An unknown error has occurred. '
                     'Please try your request again.')
             return webob.exc.HTTPInternalServerError(
@@ -133,10 +133,10 @@ class MetadataRequestHandler(wsgi.Application):
             req.response.body = content
             return req.response
         elif resp.status == 403:
-            LOG.warning(_LW(
+            LOG.warning(
                 'The remote metadata server responded with Forbidden. This '
                 'response usually occurs when shared secrets do not match.'
-            ))
+            )
             return webob.exc.HTTPForbidden()
         elif resp.status == 400:
             return webob.exc.HTTPBadRequest()
@@ -234,12 +234,11 @@ class MetadataRequestHandler(wsgi.Application):
 
         if not (signature and
                 utils.constant_time_compare(expected_signature, signature)):
-            LOG.warning(_LW(
-                            'X-Instance-ID-Signature: %(signature)s does '
-                            'not match the expected value: '
-                            '%(expected_signature)s for id: '
-                            '%(requester_id)s. Request From: '
-                            '%(requester_ip)s'),
+            LOG.warning('X-Instance-ID-Signature: %(signature)s does '
+                        'not match the expected value: '
+                        '%(expected_signature)s for id: '
+                        '%(requester_id)s. Request From: '
+                        '%(requester_ip)s',
                         {'signature': signature,
                          'expected_signature': expected_signature,
                          'requester_id': requester_id,
