@@ -145,6 +145,7 @@ class ProxyTestCase(test_base.BaseTestCase):
                      'project_id': mock.sentinel.project_id,
                      'private_ip': mock.sentinel.private_ip}
         get_metadata_item.return_value = 'fake_item'
+        self.handler.cache_region = 'fake_region'
 
         retval = self.handler._get_metadata(['fake_ver', 'fake_attr'],
                                             requester)
@@ -152,7 +153,8 @@ class ProxyTestCase(test_base.BaseTestCase):
         get_context.assert_called_with()
         get_metadata_item.assert_called_with(
             get_context.return_value, ['fake_ver', 'fake_attr'],
-            mock.sentinel.os_instance_id, mock.sentinel.private_ip)
+            mock.sentinel.os_instance_id, mock.sentinel.private_ip,
+            'fake_region')
         self.assertEqual(mock.sentinel.project_id,
                          get_context.return_value.project_id)
 

@@ -44,6 +44,8 @@ EC2API_ADMIN_USER=${EC2API_ADMIN_USER:-ec2api}
 
 EC2API_KEYSTONE_SIGNING_DIR=${EC2API_KEYSTONE_SIGNING_DIR:-/tmp/keystone-signing-ec2api}
 
+CACHE_BACKEND="oslo_cache.dict"
+
 # Support entry points installation of console scripts
 if [[ -d $EC2API_DIR/bin ]]; then
     EC2API_BIN_DIR=$EC2API_DIR/bin
@@ -215,6 +217,9 @@ function configure_ec2api {
         iniset $NOVA_CONF DEFAULT metadata_port 8789
         iniset $NOVA_CONF neutron service_metadata_proxy True
     fi
+    iniset $EC2API_CONF_FILE cache enabled True
+    iniset $EC2API_CONF_FILE cache backend "$CACHE_BACKEND"
+
 }
 
 

@@ -17,6 +17,7 @@ import hmac
 import posixpath
 
 import httplib2
+from oslo_cache import core as cache_core
 from oslo_config import cfg
 from oslo_log import log as logging
 import six
@@ -62,13 +63,29 @@ metadata_opts = [
                default='',
                help=_('Shared secret to sign instance-id request'),
                secret=True),
+    cfg.IntOpt("cache_expiration",
+        default=15,
+        min=0,
+        help=_('This option is the time (in seconds) to cache metadata. '
+               'Increasing this setting should improve response times of the '
+               'metadata API when under heavy load. Higher values may '
+               'increase memory usage, and result in longer times for host '
+               'metadata changes to take effect.'))
 ]
 
 CONF.register_opts(metadata_opts, group='metadata')
+cache_core.configure(CONF)
 
 
 class MetadataRequestHandler(wsgi.Application):
     """Serve metadata."""
+
+    def __init__(self):
+        if not CONF.cache.enabled:
+            LOG.warning("Metadata doesn't use cache. "
+                        "Configure cache options to use cache.")
+        self.cache_region = cache_core.create_region()
+        cache_core.configure_cache_region(CONF, self.cache_region)
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
@@ -256,7 +273,8 @@ class MetadataRequestHandler(wsgi.Application):
         context.project_id = requester['project_id']
         return api.get_metadata_item(context, path_tokens,
                                      requester['os_instance_id'],
-                                     requester['private_ip'])
+                                     requester['private_ip'],
+                                     self.cache_region)
 
     def _add_response_data(self, response, data):
         if isinstance(data, six.text_type):

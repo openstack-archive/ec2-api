@@ -17,6 +17,8 @@ APIPASTE_FILE=$CONF_DIR/api-paste.ini
 
 AUTH_CACHE_DIR=${AUTH_CACHE_DIR:-/var/cache/ec2api}
 
+CACHE_BACKEND='oslo_cache.dict'
+
 #Check for environment
 if [[ -z "$OS_AUTH_URL" || -z "$OS_USERNAME" || -z "$OS_PASSWORD" ]]; then
     echo "Please set OS_AUTH_URL, OS_USERNAME, OS_PASSWORD"
@@ -288,6 +290,9 @@ iniset $CONF_FILE $GROUP_AUTHTOKEN project_domain_name $SERVICE_DOMAIN_NAME
 iniset $CONF_FILE $GROUP_AUTHTOKEN user_domain_name $SERVICE_DOMAIN_NAME
 iniset $CONF_FILE $GROUP_AUTHTOKEN auth_type password
 
+GROUP_CACHE="cache"
+iniset $CONF_FILE $GROUP_CACHE enabled True
+iniset $CONF_FILE $GROUP_CACHE backend "$CACHE_BACKEND"
 
 if [[ -f "$NOVA_CONF" ]]; then
     # NOTE(ft): use swift instead internal s3 server if enabled
