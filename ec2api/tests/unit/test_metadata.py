@@ -92,7 +92,7 @@ class ProxyTestCase(test_base.BaseTestCase):
             self.assertEqual(500, response.status_int)
             self.assertEqual(len(log.mock_calls), 2)
 
-    def _test_get_requester(self):
+    def test_get_requester(self):
         expected = {'os_instance_id': mock.sentinel.os_instance_id,
                     'project_id': mock.sentinel.project_id,
                     'private_ip': mock.sentinel.private_ip}

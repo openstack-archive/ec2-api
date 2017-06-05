@@ -54,7 +54,6 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.assertTrue(resp['regionInfo'][0].get('regionEndpoint')
                         is not None)
 
-    # TODO(tikitavi): Rework test to exclude nova-network
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_describe_account_attributes(self, check_and_create):
         self.nova.quotas.get.return_value = mock.Mock(instances=77)

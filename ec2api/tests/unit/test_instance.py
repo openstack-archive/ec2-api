@@ -848,10 +848,7 @@ class InstanceTestCase(base.ApiTestCase):
             'DescribeInstances', ['reservationSet', 'instancesSet'],
             fakes.ID_EC2_INSTANCE_1, 'instanceId')
 
-    # TODO(tikitavi): Rework test to exclude nova-network
-    def _test_describe_instances_ec2_classic(self):
-        instance_api.instance_engine = (
-            instance_api.InstanceEngineNova())
+    def test_describe_instances_ec2_classic(self):
         self.set_mock_db_items(
             fakes.DB_INSTANCE_2, fakes.DB_IMAGE_1, fakes.DB_IMAGE_2,
             fakes.DB_VOLUME_1, fakes.DB_VOLUME_2, fakes.DB_VOLUME_3)

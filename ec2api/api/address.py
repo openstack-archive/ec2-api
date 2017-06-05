@@ -195,15 +195,14 @@ def _disassociate_address_item(context, address):
     db_api.update_item(context, address)
 
 
-def _get_os_instance_id(context, os_floating_ip,
-                                       os_ports=[]):
+def _get_os_instance_id(context, os_floating_ip, os_ports=[]):
     port_id = os_floating_ip.get('port_id')
     os_instance_id = None
     if port_id:
         port = next((port for port in os_ports
                      if port['id'] == port_id), None)
-        if port and port.get('device_id'):
-            os_instance_id = port['device_id']
+        if port:
+            os_instance_id = port.get('device_id')
     return os_instance_id
 
 
@@ -402,11 +401,10 @@ class AddressEngineNeutron(object):
                 # NOTE(tikitavi): check the public IP exists to raise AWS
                 # exception otherwise
                 os_floating_ip = self.get_os_floating_ip_by_public_ip(
-                    context,
-                    public_ip)
+                    context, public_ip)
                 os_ports = self.get_os_ports(context)
                 os_instance_id = _get_os_instance_id(context, os_floating_ip,
-                                                    os_ports)
+                                                     os_ports)
                 if os_instance_id:
                     nova = clients.nova(context)
                     nova.servers.remove_floating_ip(os_instance_id, public_ip)
