@@ -16,6 +16,8 @@ import base64
 import itertools
 
 from novaclient import exceptions as nova_exception
+from oslo_cache import core as cache_core
+from oslo_config import cfg
 from oslo_log import log as logging
 import six
 
@@ -25,6 +27,7 @@ from ec2api.api import instance as instance_api
 from ec2api import exception
 from ec2api.i18n import _
 
+CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
 
 VERSIONS = [
@@ -89,27 +92,35 @@ def get_os_instance_and_project_id_by_provider_id(context, provider_id,
     return os_instance_id, project_id
 
 
-def get_metadata_item(context, path_tokens, os_instance_id, remote_ip):
+def get_metadata_item(context, path_tokens, os_instance_id, remote_ip,
+                      cache_region):
     version = path_tokens[0]
     if version == "latest":
         version = VERSIONS[-1]
     elif version not in VERSIONS:
         raise exception.EC2MetadataNotFound()
 
-    ec2_instance, ec2_reservation = (
-        _get_ec2_instance_and_reservation(context, os_instance_id))
-    # NOTE(ft): check for case of Neutron metadata proxy.
-    # It sends project_id as X-Tenant-ID HTTP header. We make sure it's correct
-    if context.project_id != ec2_reservation['ownerId']:
-        LOG.warning(_('Tenant_id %(tenant_id)s does not match tenant_id '
-                      'of instance %(instance_id)s.'),
-                    {'tenant_id': context.project_id,
-                     'instance_id': os_instance_id})
-        raise exception.EC2MetadataNotFound()
+    cache_key = 'metadata-%s' % os_instance_id
+    cache = cache_region.get(
+        cache_key, expiration_time=CONF.metadata.cache_expiration)
+    if cache and cache != cache_core.NO_VALUE:
+        _check_instance_owner(context, os_instance_id, cache['owner_id'])
+        LOG.debug("Using cached metadata for instance %s", os_instance_id)
+    else:
+        ec2_instance, ec2_reservation = (
+            _get_ec2_instance_and_reservation(context, os_instance_id))
 
-    metadata = _build_metadata(context, ec2_instance, ec2_reservation,
-                               os_instance_id, remote_ip)
-    # TODO(ft): cache built metadata
+        _check_instance_owner(context, os_instance_id,
+                              ec2_reservation['ownerId'])
+
+        metadata = _build_metadata(context, ec2_instance, ec2_reservation,
+                                   os_instance_id, remote_ip)
+        cache = {'metadata': metadata,
+                 'owner_id': ec2_reservation['ownerId']}
+
+        cache_region.set(cache_key, cache)
+
+    metadata = cache['metadata']
     metadata = _cut_down_to_version(metadata, version)
     metadata_item = _find_path_in_tree(metadata, path_tokens[1:])
     return _format_metadata_item(metadata_item)
@@ -134,6 +145,18 @@ def _get_ec2_instance_and_reservation(context, os_instance_id):
     ec2_instance = ec2_reservation['instancesSet'][0]
 
     return ec2_instance, ec2_reservation
+
+
+def _check_instance_owner(context, os_instance_id, owner_id):
+    # NOTE(ft): check for case of Neutron metadata proxy.
+    # It sends project_id as X-Tenant-ID HTTP header.
+    # We make sure it's correct
+    if context.project_id != owner_id:
+        LOG.warning(_('Tenant_id %(tenant_id)s does not match tenant_id '
+                      'of instance %(instance_id)s.'),
+                    {'tenant_id': context.project_id,
+                     'instance_id': os_instance_id})
+        raise exception.EC2MetadataNotFound()
 
 
 def _build_metadata(context, ec2_instance, ec2_reservation,

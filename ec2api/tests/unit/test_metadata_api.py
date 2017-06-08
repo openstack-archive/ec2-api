@@ -17,6 +17,8 @@ import copy
 
 import mock
 from novaclient import exceptions as nova_exception
+from oslo_cache import core as cache_core
+from oslo_config import cfg
 import six
 
 from ec2api import exception
@@ -26,7 +28,7 @@ from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
 
-
+CONF = cfg.CONF
 FAKE_USER_DATA = u'fake_user_data-' + six.unichr(1071)
 
 
@@ -46,8 +48,14 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.instance_api.describe_instance_attribute.return_value = {
                 'instanceId': fakes.ID_EC2_INSTANCE_1,
                 'userData': {'value': userDataValue}}
+        self.configure(enabled=False, group='cache')
+        self._init_cache_region()
 
         self.fake_context = base.create_context()
+
+    def _init_cache_region(self):
+        self.cache_region = cache_core.create_region()
+        cache_core.configure_cache_region(CONF, self.cache_region)
 
     def test_get_version_list(self):
         retval = api.get_version_list()
@@ -86,13 +94,15 @@ class MetadataApiTestCase(base.ApiTestCase):
     def test_get_version_root(self):
         retval = api.get_metadata_item(self.fake_context, ['2009-04-04'],
                                        fakes.ID_OS_INSTANCE_1,
-                                       fakes.IP_NETWORK_INTERFACE_2)
+                                       fakes.IP_NETWORK_INTERFACE_2,
+                                       self.cache_region)
         self.assertEqual('meta-data/\nuser-data', retval)
 
         self.assertRaises(
               exception.EC2MetadataNotFound,
               api.get_metadata_item, self.fake_context, ['9999-99-99'],
-              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+              self.cache_region)
 
         self.db_api.get_items_ids.assert_called_with(
             self.fake_context, 'i', item_ids=None,
@@ -106,14 +116,16 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.assertRaises(exception.EC2MetadataNotFound,
                           api.get_metadata_item, self.fake_context,
                           ['9999-99-99', 'user-data-invalid'],
-                          fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+                          fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+                          self.cache_region)
 
     def test_mismatch_project_id(self):
         self.fake_context.project_id = fakes.random_os_id()
         self.assertRaises(
               exception.EC2MetadataNotFound,
               api.get_metadata_item, self.fake_context, ['2009-04-04'],
-              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+              self.cache_region)
 
     def test_non_existing_instance(self):
         self.instance_api.describe_instances.return_value = {
@@ -121,12 +133,14 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.assertRaises(
               exception.EC2MetadataNotFound,
               api.get_metadata_item, self.fake_context, ['2009-04-04'],
-              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+              self.cache_region)
 
     def test_user_data(self):
         retval = api.get_metadata_item(
                self.fake_context, ['2009-04-04', 'user-data'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertEqual(FAKE_USER_DATA, retval)
 
     def test_no_user_data(self):
@@ -136,7 +150,8 @@ class MetadataApiTestCase(base.ApiTestCase):
               exception.EC2MetadataNotFound,
               api.get_metadata_item, self.fake_context,
               ['2009-04-04', 'user-data'],
-              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+              self.cache_region)
 
     def test_security_groups(self):
         self.instance_api.describe_instances.return_value = {
@@ -144,7 +159,8 @@ class MetadataApiTestCase(base.ApiTestCase):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'security-groups'],
-               fakes.ID_OS_INSTANCE_2, fakes.IP_NETWORK_INTERFACE_1)
+               fakes.ID_OS_INSTANCE_2, fakes.IP_NETWORK_INTERFACE_1,
+               self.cache_region)
         self.assertEqual('\n'.join(['groupname3']),
                          retval)
 
@@ -152,14 +168,16 @@ class MetadataApiTestCase(base.ApiTestCase):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'local-hostname'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertEqual(fakes.EC2_INSTANCE_1['privateDnsName'], retval)
 
     def test_local_ipv4(self):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'local-ipv4'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertEqual(fakes.IP_NETWORK_INTERFACE_2, retval)
 
     def test_local_ipv4_from_address(self):
@@ -168,14 +186,16 @@ class MetadataApiTestCase(base.ApiTestCase):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'local-ipv4'],
-               fakes.ID_OS_INSTANCE_2, fakes.IP_NETWORK_INTERFACE_1)
+               fakes.ID_OS_INSTANCE_2, fakes.IP_NETWORK_INTERFACE_1,
+               self.cache_region)
         self.assertEqual(fakes.IP_NETWORK_INTERFACE_1, retval)
 
     def test_pubkey_name(self):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'public-keys'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertEqual('0=%s' % fakes.NAME_KEY_PAIR, retval)
 
     def test_pubkey(self):
@@ -187,7 +207,8 @@ class MetadataApiTestCase(base.ApiTestCase):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'public-keys', '0', 'openssh-key'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertEqual(fakes.PUBLIC_KEY_KEY_PAIR, retval)
         self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_1)
         self.nova.keypairs._get.assert_called_once_with(
@@ -201,34 +222,39 @@ class MetadataApiTestCase(base.ApiTestCase):
                 api.get_metadata_item,
                 self.fake_context,
                 ['2009-04-04', 'meta-data', 'public-keys', '0', 'openssh-key'],
-                fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+                fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+                self.cache_region)
 
     def test_image_type_ramdisk(self):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'ramdisk-id'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertEqual(fakes.ID_EC2_IMAGE_ARI_1, retval)
 
     def test_image_type_kernel(self):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'kernel-id'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertEqual(fakes.ID_EC2_IMAGE_AKI_1, retval)
 
     def test_check_version(self):
         retval = api.get_metadata_item(
                self.fake_context,
                ['2009-04-04', 'meta-data', 'block-device-mapping'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
         self.assertIsNotNone(retval)
 
         self.assertRaises(
               exception.EC2MetadataNotFound,
               api.get_metadata_item, self.fake_context,
               ['2007-08-29', 'meta-data', 'block-device-mapping'],
-              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+              fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+              self.cache_region)
 
     def test_format_instance_mapping(self):
         retval = api._build_block_device_mappings(
@@ -246,16 +272,38 @@ class MetadataApiTestCase(base.ApiTestCase):
         self.assertThat(retval,
                         matchers.DictMatches(expected))
 
+    def test_metadata_cache(self):
+        self.configure(enabled=True, group='cache')
+        self.configure(backend='oslo_cache.dict', group='cache')
+        self._init_cache_region()
+        retval = api.get_metadata_item(
+               self.fake_context,
+               ['2009-04-04', 'meta-data', 'local-ipv4'],
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
+        self.assertEqual(fakes.IP_NETWORK_INTERFACE_2, retval)
+        self.nova.servers.get.assert_called_once_with(fakes.ID_OS_INSTANCE_1)
+        self.nova.servers.get.reset_mock()
+
+        retval = api.get_metadata_item(
+               self.fake_context,
+               ['2009-04-04', 'meta-data', 'instance-id'],
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               self.cache_region)
+        self.assertEqual(fakes.ID_EC2_INSTANCE_1, retval)
+        self.nova.servers.get.assert_not_called()
+
 
 class MetadataApiIntegralTestCase(base.ApiTestCase):
     # TODO(ft): 'execute' feature isn't used here, but some mocks and
     # fake context are. ApiTestCase should be split to some classes to use
     # its feature optimally
 
+    @mock.patch('ec2api.metadata.api.cache_core.create_region')
     @mock.patch('ec2api.api.instance.security_group_api')
     @mock.patch('ec2api.api.instance.network_interface_api')
     def test_get_metadata_integral(self, network_interface_api,
-                                   security_group_api):
+                                   security_group_api, create_region):
         fake_context = base.create_context(is_os_admin=True)
 
         self.set_mock_db_items(
@@ -284,13 +332,16 @@ class MetadataApiIntegralTestCase(base.ApiTestCase):
         security_group_api.describe_security_groups.return_value = {
             'securityGroupInfo': [fakes.EC2_SECURITY_GROUP_1,
                                   fakes.EC2_SECURITY_GROUP_3]}
+        create_region.get.return_value = cache_core.NO_VALUE
 
         retval = api.get_metadata_item(
                fake_context, ['latest', 'meta-data', 'instance-id'],
-               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2)
+               fakes.ID_OS_INSTANCE_1, fakes.IP_NETWORK_INTERFACE_2,
+               create_region)
         self.assertEqual(fakes.ID_EC2_INSTANCE_1, retval)
 
         retval = api.get_metadata_item(
                fake_context, ['latest', 'meta-data', 'instance-id'],
-               fakes.ID_OS_INSTANCE_2, '10.200.1.15')
+               fakes.ID_OS_INSTANCE_2, '10.200.1.15',
+               create_region)
         self.assertEqual(fakes.ID_EC2_INSTANCE_2, retval)
