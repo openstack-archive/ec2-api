@@ -1030,7 +1030,7 @@ def _populate_parsed_bdm_parameter(bdm, short_root_device_name):
 
 def _format_group_set(context, os_security_groups, groups):
     if not os_security_groups:
-        return None
+        return []
     return [{'groupName': sg['name'],
              'groupId': groups[sg['name']]}
             for sg in os_security_groups
