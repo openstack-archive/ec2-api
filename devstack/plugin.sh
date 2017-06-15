@@ -151,6 +151,7 @@ function configure_ec2api_networking {
     if [[ -n "$ext_net" ]]; then
         iniset $EC2API_CONF_FILE DEFAULT external_network $ext_net
     fi
+    iniset $EC2API_CONF_FILE DEFAULT disable_ec2_classic True
 }
 
 # Entry points

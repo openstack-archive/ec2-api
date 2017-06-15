@@ -164,7 +164,7 @@ def _create_vpc(context, cidr_block, is_default=False):
 
 
 def _check_and_create_default_vpc(context):
-    if CONF.disable_ec2_classic:
+    if CONF.disable_ec2_classic and not context.is_os_admin:
         for vpc in db_api.get_items(context, 'vpc'):
             if vpc.get('is_default'):
                 return vpc
