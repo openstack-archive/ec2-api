@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
 import binascii
 import json
 import os
@@ -23,6 +22,9 @@ import time
 
 import boto.s3.connection
 from cinderclient import exceptions as cinder_exception
+from cryptography.hazmat import backends
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization
 import eventlet
 from glanceclient.common import exceptions as glance_exception
 from lxml import etree
@@ -60,6 +62,8 @@ s3_opts = [
                 default=False,
                 help='Whether to affix the tenant id to the access key '
                      'when downloading from S3'),
+    cfg.StrOpt('x509_root_private_key',
+               help='Path to ca private key file'),
 ]
 
 CONF = cfg.CONF
@@ -969,14 +973,13 @@ def _s3_decrypt_image(context, encrypted_filename, encrypted_key,
                       encrypted_iv, decrypted_filename):
     encrypted_key = binascii.a2b_hex(encrypted_key)
     encrypted_iv = binascii.a2b_hex(encrypted_iv)
-    cert_client = clients.nova_cert(context)
     try:
-        key = cert_client.decrypt_text(base64.b64encode(encrypted_key))
+        key = _decrypt_text(encrypted_key)
     except Exception as exc:
         msg = _('Failed to decrypt private key: %s') % exc
         raise exception.EC2Exception(msg)
     try:
-        iv = cert_client.decrypt_text(base64.b64encode(encrypted_iv))
+        iv = _decrypt_text(encrypted_iv)
     except Exception as exc:
         msg = _('Failed to decrypt initialization vector: %s') % exc
         raise exception.EC2Exception(msg)
@@ -1030,3 +1033,15 @@ def _s3_conn(context):
                                            calling_format=calling,
                                            port=CONF.s3_port,
                                            host=CONF.s3_host)
+
+
+def _decrypt_text(text):
+    private_key_file = CONF.x509_root_private_key
+    if not private_key_file:
+        msg = _("Path to ca private key isn't configured")
+        raise exception.EC2Exception(msg)
+    with open(private_key_file, 'rb') as f:
+        data = f.read()
+    priv_key = serialization.load_pem_private_key(
+        data, None, backends.default_backend())
+    return priv_key.decrypt(text, padding.PKCS1v15())

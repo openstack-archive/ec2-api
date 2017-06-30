@@ -14,11 +14,13 @@
 
 import json
 import os
+import six
 import tempfile
 
 from cinderclient import exceptions as cinder_exception
 import eventlet
 import mock
+from oslo_concurrency import processutils
 
 from ec2api.api import image as image_api
 from ec2api import exception
@@ -908,3 +910,31 @@ class S3TestCase(base.BaseTestCase):
             exception.EC2InvalidException,
             image_api._s3_test_for_malicious_tarball,
             "/unused", os.path.join(os.path.dirname(__file__), 'rel.tar.gz'))
+
+    def test_decrypt_text(self):
+        public_key = os.path.join(os.path.dirname(__file__), 'test_cert.pem')
+        private_key = os.path.join(os.path.dirname(__file__),
+                                   'test_private_key.pem')
+        subject = "/C=RU/ST=Moscow/L=Moscow/O=Progmatic/CN=RootCA"
+        certificate_file = processutils.execute('openssl',
+                                                'req', '-x509', '-new',
+                                                '-key', private_key,
+                                                '-days', '365',
+                                                '-out', public_key,
+                                                '-subj', subject)
+        text = "some @#!%^* test text"
+        process_input = text.encode("ascii") if six.PY3 else text
+        enc, _err = processutils.execute('openssl',
+                                         'rsautl',
+                                         '-certin',
+                                         '-encrypt',
+                                         '-inkey', public_key,
+                                         process_input=process_input,
+                                         binary=True)
+        self.assertRaises(exception.EC2Exception, image_api._decrypt_text, enc)
+        self.configure(x509_root_private_key=private_key)
+        dec = image_api._decrypt_text(enc)
+        self.assertIsInstance(dec, bytes)
+        if six.PY3:
+            dec = dec.decode('ascii')
+        self.assertEqual(text, dec)
