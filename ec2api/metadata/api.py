@@ -25,7 +25,7 @@ from ec2api.api import clients
 from ec2api.api import ec2utils
 from ec2api.api import instance as instance_api
 from ec2api import exception
-from ec2api.i18n import _
+
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ def _get_ec2_instance_and_reservation(context, os_instance_id):
                                   'value': [instance_id]}])
     if (len(ec2_reservations['reservationSet']) != 1 or
             len(ec2_reservations['reservationSet'][0]['instancesSet']) != 1):
-        LOG.error(_('Failed to get metadata for instance id: %s'),
+        LOG.error('Failed to get metadata for instance id: %s',
                   os_instance_id)
         raise exception.EC2MetadataNotFound()
 
@@ -152,8 +152,8 @@ def _check_instance_owner(context, os_instance_id, owner_id):
     # It sends project_id as X-Tenant-ID HTTP header.
     # We make sure it's correct
     if context.project_id != owner_id:
-        LOG.warning(_('Tenant_id %(tenant_id)s does not match tenant_id '
-                      'of instance %(instance_id)s.'),
+        LOG.warning('Tenant_id %(tenant_id)s does not match tenant_id '
+                    'of instance %(instance_id)s.',
                     {'tenant_id': context.project_id,
                      'instance_id': os_instance_id})
         raise exception.EC2MetadataNotFound()

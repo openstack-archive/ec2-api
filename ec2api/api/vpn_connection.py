@@ -165,20 +165,19 @@ def delete_vpn_connection(context, vpn_connection_id):
         try:
             neutron.delete_ipsecpolicy(vpn_connection['os_ipsecpolicy_id'])
         except neutron_exception.Conflict as ex:
-            LOG.warning(
-                _('Failed to delete ipsecoplicy %(os_id)s during deleting '
-                  'VPN connection %(id)s. Reason: %(reason)s'),
-                {'id': vpn_connection['id'],
-                 'os_id': vpn_connection['os_ipsecpolicy_id'],
-                 'reason': ex.message})
+            LOG.warning('Failed to delete ipsecoplicy %(os_id)s during '
+                        'deleting VPN connection %(id)s. Reason: %(reason)s',
+                        {'id': vpn_connection['id'],
+                         'os_id': vpn_connection['os_ipsecpolicy_id'],
+                         'reason': ex.message})
         except neutron_exception.NotFound:
             pass
         try:
             neutron.delete_ikepolicy(vpn_connection['os_ikepolicy_id'])
         except neutron_exception.Conflict as ex:
             LOG.warning(
-                _('Failed to delete ikepolicy %(os_id)s during deleting '
-                  'VPN connection %(id)s. Reason: %(reason)s'),
+                'Failed to delete ikepolicy %(os_id)s during deleting '
+                'VPN connection %(id)s. Reason: %(reason)s',
                 {'id': vpn_connection['id'],
                  'os_id': vpn_connection['os_ikepolicy_id'],
                  'reason': ex.message})

@@ -59,8 +59,8 @@ class EC2APIException(Exception):
                 exc_info = sys.exc_info()
                 # kwargs doesn't match a variable in the message
                 # log the issue and the kwargs
-                LOG.exception(_('Exception in string format operation for '
-                                '%s exception'), self.__class__.__name__)
+                LOG.exception('Exception in string format operation for '
+                              '%s exception', self.__class__.__name__)
                 for name, value in kwargs.items():
                     LOG.error('%s: %s' % (name, value))
 
@@ -70,8 +70,8 @@ class EC2APIException(Exception):
                     # at least get the core message out if something happened
                     message = self.msg_fmt
         elif not isinstance(message, six.string_types):
-            LOG.error(_("Message '%(msg)s' for %(ex)s exception is not "
-                        "a string"),
+            LOG.error("Message '%(msg)s' for %(ex)s exception is not "
+                      "a string",
                       {'msg': message, 'ex': self.__class__.__name__})
             if CONF.fatal_exception_format_errors:
                 raise TypeError(_('Invalid exception message format'))

@@ -75,7 +75,7 @@ class FaultWrapper(wsgi.Middleware):
         try:
             return req.get_response(self.application)
         except Exception:
-            LOG.exception(_("FaultWrapper catches error"))
+            LOG.exception("FaultWrapper catches error")
             return faults.Fault(webob.exc.HTTPInternalServerError())
 
 
@@ -226,7 +226,7 @@ class EC2KeystoneAuth(wsgi.Middleware):
             auth_ref = keystone_access.AccessInfo.factory(resp=response,
                                                           body=response.json())
         except (NotImplementedError, KeyError):
-            LOG.exception(_("Keystone failure"))
+            LOG.exception("Keystone failure")
             msg = _("Failure communicating with keystone")
             return faults.ec2_error_response(request_id, "AuthFailure", msg,
                                              status=400)

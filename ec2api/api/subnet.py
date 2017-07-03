@@ -127,8 +127,8 @@ def delete_subnet(context, subnet_id):
             try:
                 neutron.delete_network(os_subnet['network_id'])
             except neutron_exception.NetworkInUseClient as ex:
-                LOG.warning(_('Failed to delete network %(os_id)s during '
-                              'deleting Subnet %(id)s. Reason: %(reason)s'),
+                LOG.warning('Failed to delete network %(os_id)s during '
+                            'deleting Subnet %(id)s. Reason: %(reason)s',
                             {'id': subnet['id'],
                              'os_id': os_subnet['network_id'],
                              'reason': ex.message})

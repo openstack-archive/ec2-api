@@ -198,8 +198,8 @@ def _safe_delete_vpnservice(neutron, os_vpnservice_id, subnet_id):
         pass
     except neutron_exception.Conflict as ex:
         LOG.warning(
-            _('Failed to delete vpnservice %(os_id)s for subnet %(id)s. '
-              'Reason: %(reason)s'),
+            'Failed to delete vpnservice %(os_id)s for subnet %(id)s. '
+            'Reason: %(reason)s',
             {'id': subnet_id,
              'os_id': os_vpnservice_id,
              'reason': ex.message})

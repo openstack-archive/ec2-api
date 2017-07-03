@@ -25,7 +25,6 @@ from xml.sax import saxutils
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from ec2api.i18n import _
 
 utils_opts = [
     cfg.StrOpt('tempdir',
@@ -49,7 +48,7 @@ def tempdir(**kwargs):
         try:
             shutil.rmtree(tmpdir)
         except OSError as e:
-            LOG.error(_('Could not remove tmpdir: %s'), str(e))
+            LOG.error('Could not remove tmpdir: %s', str(e))
 
 
 def get_hash_str(base_str):
