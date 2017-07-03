@@ -203,7 +203,7 @@ def is_ec2_timestamp_expired(request, expires=None):
                         timeutils.is_newer_than(query_time, expires))
         return False
     except ValueError:
-        LOG.exception(_("Timestamp is invalid: "))
+        LOG.exception("Timestamp is invalid: ")
         return True
 
 

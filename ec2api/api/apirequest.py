@@ -24,7 +24,7 @@ import six
 from ec2api.api import cloud
 from ec2api.api import ec2utils
 from ec2api import exception
-from ec2api.i18n import _
+
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class APIRequest(object):
             method = getattr(self.controller,
                              ec2utils.camelcase_to_underscore(self.action))
         except AttributeError:
-            LOG.exception(_('Unsupported API request: action = %(action)s'),
+            LOG.exception('Unsupported API request: action = %(action)s',
                           {'action': self.action})
             raise exception.InvalidRequest()
 

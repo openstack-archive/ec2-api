@@ -89,8 +89,8 @@ def delete_vpc(context, vpc_id):
         try:
             neutron.delete_router(vpc['os_id'])
         except neutron_exception.Conflict as ex:
-            LOG.warning(_('Failed to delete router %(os_id)s during deleting '
-                          'VPC %(id)s. Reason: %(reason)s'),
+            LOG.warning('Failed to delete router %(os_id)s during deleting '
+                        'VPC %(id)s. Reason: %(reason)s',
                         {'id': vpc['id'],
                          'os_id': vpc['os_id'],
                          'reason': ex.message})

@@ -12,10 +12,10 @@ General
 -------
 - Do not use locals(). Example::
 
-    LOG.debug(_("volume %(vol_name)s: creating size %(vol_size)sG") %
+    LOG.debug("volume %(vol_name)s: creating size %(vol_size)sG" %
               locals()) # BAD
 
-    LOG.debug(_("volume %(vol_name)s: creating size %(vol_size)sG") %
+    LOG.debug("volume %(vol_name)s: creating size %(vol_size)sG" %
               {'vol_name': vol_name,
                'vol_size': vol_size}) # OKAY
 

@@ -68,7 +68,7 @@ def attach_volume(context, volume_id, instance_id, device):
                                           device)
     except (nova_exception.Conflict, nova_exception.BadRequest):
         # TODO(andrey-mp): raise correct errors for different cases
-        LOG.exception(_('Attach has failed.'))
+        LOG.exception('Attach has failed.')
         raise exception.UnsupportedOperation()
     cinder = clients.cinder(context)
     os_volume = cinder.volumes.get(volume['os_id'])
