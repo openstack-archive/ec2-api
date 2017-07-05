@@ -240,7 +240,7 @@ fi
 #create keystone user with admin privileges
 ADMIN_ROLE=$(openstack role show admin -c id -f value)
 die_if_not_set $LINENO ADMIN_ROLE "Fail to get ADMIN_ROLE by 'openstack role show' "
-SERVICE_TENANT_ID=$(openstack project show service -c id -f value)
+SERVICE_TENANT_ID=$(openstack project show $SERVICE_TENANT -c id -f value)
 die_if_not_set $LINENO SERVICE_TENANT_ID "Fail to get service tenant 'openstack project show' "
 
 echo ADMIN_ROLE $ADMIN_ROLE
