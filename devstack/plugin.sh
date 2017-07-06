@@ -154,6 +154,17 @@ function configure_ec2api_networking {
     iniset $EC2API_CONF_FILE DEFAULT disable_ec2_classic True
 }
 
+function create_x509_server_key() {
+  export CA_KEY="$EC2API_STATE_PATH/private/ca_key.pem"
+  export CA_CERT="$EC2API_STATE_PATH/cacert.pem"
+
+  mkdir -p "$EC2API_STATE_PATH/private/"
+
+  # generate root certificate
+  openssl genrsa -out "$CA_KEY" 2048
+  openssl req -x509 -new -key "$CA_KEY" -days 365 -out "$CA_CERT" -subj "/C=RU/ST=Moscow/L=Moscow/O=Progmatic/CN=ec2api-devstack"
+}
+
 # Entry points
 # ------------
 
@@ -221,6 +232,9 @@ function configure_ec2api {
     iniset $EC2API_CONF_FILE cache enabled True
     iniset $EC2API_CONF_FILE cache backend "$CACHE_BACKEND"
 
+    if create_x509_server_key; then
+      iniset $EC2API_CONF_FILE DEFAULT x509_root_private_key "$CA_KEY"
+    fi
 }
 
 
