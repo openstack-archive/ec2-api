@@ -18,3 +18,5 @@ dist
 .coverage*
 !.coveragerc
 cover/
+.idea
+
