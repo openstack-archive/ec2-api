@@ -23,7 +23,6 @@ from novaclient import api_versions as nova_api_versions
 from novaclient import client as novaclient
 from oslo_config import cfg
 from oslo_log import log as logging
-import oslo_messaging as messaging
 
 from ec2api.i18n import _
 
@@ -137,11 +136,6 @@ def keystone(context):
                                  session=context.session)
 
 
-def nova_cert(context):
-    _cert_api = _rpcapi_CertAPI(context)
-    return _cert_api
-
-
 def _get_nova_api_version(context):
     client = novaclient.Client(REQUIRED_NOVA_API_VERSION,
                                session=context.session,
@@ -180,48 +174,6 @@ def _get_nova_api_version(context):
                  'required_api_version': (
                         REQUIRED_NOVA_API_MICROVERSION)})
     return REQUIRED_NOVA_API_MICROVERSION
-
-
-class _rpcapi_CertAPI(object):
-    '''Client side of the cert rpc API.'''
-
-    def __init__(self, context):
-        super(_rpcapi_CertAPI, self).__init__()
-        target = messaging.Target(topic=CONF.cert_topic, version='2.0')
-        self.client = _rpc_get_client(target)
-        self.context = context
-
-    def decrypt_text(self, text):
-        cctxt = self.client.prepare()
-        return cctxt.call(self.context, 'decrypt_text',
-                          project_id=self.context.project_id,
-                          text=text)
-
-
-_rpc_TRANSPORT = None
-
-
-def _rpc_init(conf):
-    global _rpc_TRANSPORT
-    # NOTE(ft): set control_exchange parameter to use Nova cert topic
-    messaging.set_transport_defaults('nova')
-    _rpc_TRANSPORT = messaging.get_transport(conf)
-
-
-def _rpc_get_client(target):
-    if not _rpc_TRANSPORT:
-        _rpc_init(CONF)
-    assert _rpc_TRANSPORT is not None
-    serializer = _rpc_RequestContextSerializer()
-    return messaging.RPCClient(_rpc_TRANSPORT,
-                               target,
-                               serializer=serializer)
-
-
-class _rpc_RequestContextSerializer(messaging.NoOpSerializer):
-
-    def serialize_context(self, context):
-        return context.to_dict()
 
 
 _admin_session = None

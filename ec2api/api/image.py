@@ -72,6 +72,8 @@ CONF.register_opts(s3_opts)
 rpcapi_opts = [
     cfg.StrOpt('cert_topic',
                default='cert',
+               deprecated_for_removal=True,
+               deprecated_reason='"nova_cert" service is removed',
                help='The topic cert nodes listen on'),
 ]
 

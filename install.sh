@@ -303,11 +303,6 @@ if [[ -f "$NOVA_CONF" ]]; then
         copynovaopt s3_affix_tenant DEFAULT
         copynovaopt s3_use_ssl DEFAULT
     fi
-    copynovaopt cert_topic DEFAULT
-    copynovaopt rabbit_hosts oslo_messaging_rabbit
-    copynovaopt rabbit_password oslo_messaging_rabbit
-    copynovaopt rabbit_userid oslo_messaging_rabbit
-    # TODO(ft): it's necessary to support other available messaging implementations
 
     nova_state_path=$(iniget $NOVA_CONF DEFAULT state_path)
     root_state_path=$(dirname $nova_state_path)
