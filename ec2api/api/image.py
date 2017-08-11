@@ -20,7 +20,9 @@ import tarfile
 import tempfile
 import time
 
-import boto.s3.connection
+import botocore.client
+import botocore.config
+import botocore.session
 from cinderclient import exceptions as cinder_exception
 from cryptography.hazmat import backends
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -32,6 +34,7 @@ from oslo_concurrency import processutils
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import timeutils
+import six
 
 from ec2api.api import common
 from ec2api.api import ec2utils
@@ -48,20 +51,13 @@ s3_opts = [
     cfg.StrOpt('image_decryption_dir',
                default='/tmp',
                help='Parent directory for tempdir used for image decryption'),
-    cfg.StrOpt('s3_host',
-               default='$my_ip',
-               help='Hostname or IP for OpenStack to use when accessing '
-                    'the S3 api'),
-    cfg.IntOpt('s3_port',
-               default=3334,
-               help='Port used when accessing the S3 api'),
-    cfg.BoolOpt('s3_use_ssl',
-                default=False,
-                help='Whether to use SSL when talking to S3'),
-    cfg.BoolOpt('s3_affix_tenant',
-                default=False,
-                help='Whether to affix the tenant id to the access key '
-                     'when downloading from S3'),
+    cfg.StrOpt('s3_url',
+               default='http://$my_ip:3334',
+               help='URL to S3 server'),
+    # TODO(andrey-mp): this should be reworked with all region`s logic
+    cfg.StrOpt('s3_region',
+               default='RegionOne',
+               help='Region of S3 server'),
     cfg.StrOpt('x509_root_private_key',
                help='Path to ca private key file'),
 ]
@@ -820,9 +816,14 @@ def _s3_create(context, metadata):
     image_location = metadata['image_location'].lstrip('/')
     bucket_name = image_location.split('/')[0]
     manifest_path = image_location[len(bucket_name) + 1:]
-    bucket = _s3_conn(context).get_bucket(bucket_name)
-    key = bucket.get_key(manifest_path)
-    manifest = key.get_contents_as_string()
+    s3_client = _s3_conn(context)
+    key = s3_client.get_object(Bucket=bucket_name, Key=manifest_path)
+    body = key['Body']
+    if isinstance(body, six.string_types):
+        manifest = body
+    else:
+        # TODO(andrey-mp): check big objects
+        manifest = body.read()
 
     (image_metadata, image_parts,
      encrypted_key, encrypted_iv) = _s3_parse_manifest(context, manifest)
@@ -852,7 +853,8 @@ def _s3_create(context, metadata):
             try:
                 parts = []
                 for part_name in image_parts:
-                    part = _s3_download_file(bucket, part_name, image_path)
+                    part = _s3_download_file(s3_client, bucket_name,
+                                             part_name, image_path)
                     parts.append(part)
 
                 # NOTE(vish): this may be suboptimal, should we use cat?
@@ -964,10 +966,17 @@ def _s3_parse_manifest(context, manifest):
     return metadata, image_parts, encrypted_key, encrypted_iv
 
 
-def _s3_download_file(bucket, filename, local_dir):
-    key = bucket.get_key(filename)
+def _s3_download_file(s3_client, bucket_name, filename, local_dir):
+    s3_object = s3_client.get_object(Bucket=bucket_name, Key=filename)
     local_filename = os.path.join(local_dir, os.path.basename(filename))
-    key.get_contents_to_filename(local_filename)
+    body = s3_object['Body']
+    with open(local_filename, 'w') as f:
+        if isinstance(body, six.string_types):
+            f.write(body)
+        else:
+            # TODO(andrey-mp): check big objects
+            f.write(body.read())
+        f.close()
     return local_filename
 
 
@@ -1021,20 +1030,24 @@ def _s3_test_for_malicious_tarball(path, filename):
 
 
 def _s3_conn(context):
-    # NOTE(vish): access and secret keys for s3 server are not
-    #             checked in nova-objectstore
+    region = CONF.s3_region
     ec2_creds = clients.keystone(context).ec2.list(context.user_id)
-    access = ec2_creds[0].access
-    if CONF.s3_affix_tenant:
-        access = '%s:%s' % (access, context.project_id)
-    secret = ec2_creds[0].secret
-    calling = boto.s3.connection.OrdinaryCallingFormat()
-    return boto.s3.connection.S3Connection(aws_access_key_id=access,
-                                           aws_secret_access_key=secret,
-                                           is_secure=CONF.s3_use_ssl,
-                                           calling_format=calling,
-                                           port=CONF.s3_port,
-                                           host=CONF.s3_host)
+
+    # Here we a) disable user's default config to let ec2api works independetly
+    # of user's local settings;
+    # b) specify region to be used by botocore;
+    # c) do not change standard botocore keys to get these settings
+    # from environment
+    connection_data = {
+        'config_file': (None, 'AWS_CONFIG_FILE', None, None),
+        'region': ('region', 'AWS_DEFAULT_REGION', region, None),
+    }
+    session = botocore.session.get_session(connection_data)
+    return session.create_client(
+        's3', region_name=region, endpoint_url=CONF.s3_url,
+        aws_access_key_id=ec2_creds[0].access,
+        aws_secret_access_key=ec2_creds[0].secret,
+        config=botocore.config.Config(signature_version='s3v4'))
 
 
 def _decrypt_text(text):

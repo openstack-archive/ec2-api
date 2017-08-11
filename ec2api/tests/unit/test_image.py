@@ -828,9 +828,7 @@ class S3TestCase(base.BaseTestCase):
         def do_test(s3_conn, s3_download_file, s3_decrypt_image,
                     s3_untarzip_image):
             (s3_conn.return_value.
-             get_bucket.return_value.
-             get_key.return_value.
-             get_contents_as_string.return_value) = FILE_MANIFEST_XML
+             get_object.return_value) = {'Body': FILE_MANIFEST_XML}
             s3_download_file.return_value = tempf
             s3_untarzip_image.return_value = tempf
             os_image_id = fakes.random_os_id()
@@ -850,15 +848,10 @@ class S3TestCase(base.BaseTestCase):
                     os_image_id, image_state='available')
                 self.glance.images.upload.assert_any_call(
                     os_image_id, mock.ANY)
-                s3_conn.return_value.get_bucket.assert_called_with(bucket)
-                (s3_conn.return_value.get_bucket.return_value.
-                 get_key.assert_called_with(manifest))
-                (s3_conn.return_value.get_bucket.return_value.
-                 get_key.return_value.
-                 get_contents_as_string.assert_called_with())
+                s3_conn.return_value.get_object.assert_called_with(
+                    Bucket=bucket, Key=manifest)
                 s3_download_file.assert_called_with(
-                    s3_conn.return_value.get_bucket.return_value,
-                    'foo', mock.ANY)
+                    mock.ANY, bucket, 'foo', mock.ANY)
                 s3_decrypt_image.assert_called_with(
                     fake_context, mock.ANY, 'foo', 'foo', mock.ANY)
                 s3_untarzip_image.assert_called_with(mock.ANY, mock.ANY)
@@ -882,9 +875,7 @@ class S3TestCase(base.BaseTestCase):
         with mock.patch('ec2api.api.image._s3_conn') as s3_conn:
 
             (s3_conn.return_value.
-             get_bucket.return_value.
-             get_key.return_value.
-             get_contents_as_string.return_value) = FILE_MANIFEST_XML
+             get_object.return_value) = {'Body': FILE_MANIFEST_XML}
 
             image_api._s3_create(fake_context, metadata)
 

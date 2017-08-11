@@ -298,10 +298,24 @@ if [[ -f "$NOVA_CONF" ]]; then
     # NOTE(ft): use swift instead internal s3 server if enabled
     if [[ -n $(openstack catalog show object-store 2>/dev/null) ]] &&
             [[ -n $(openstack catalog show s3 2>/dev/null) ]]; then
-        copynovaopt s3_host DEFAULT
-        copynovaopt s3_port DEFAULT
-        copynovaopt s3_affix_tenant DEFAULT
-        copynovaopt s3_use_ssl DEFAULT
+        s3_host="127.0.0.1"
+        if ini_has_option "$NOVA_CONF" DEFAULT "s3_host"; then
+            s3_host=$(iniget $NOVA_CONF DEFAULT $option_name)
+        fi
+        s3_port="3334"
+        if ini_has_option "$NOVA_CONF" DEFAULT "s3_port"; then
+            s3_port=$(iniget $NOVA_CONF DEFAULT $option_name)
+        fi
+        s3_proto="http"
+        if ini_has_option "$NOVA_CONF" DEFAULT "s3_use_ssl"; then
+            s3_use_ssl=$(iniget $NOVA_CONF DEFAULT $option_name)
+            s3_use_ssl=`echo $s3_use_ssl | awk '{print toupper($0)}'`
+            if [[ $s3_use_ssl == "TRUE" ]]; then
+                s3_proto="https"
+            fi
+        fi
+        iniset $CONF_FILE DEFAULT s3_url "$s3_proto://$s3_host:$s3_port"
+
     fi
 
     nova_state_path=$(iniget $NOVA_CONF DEFAULT state_path)

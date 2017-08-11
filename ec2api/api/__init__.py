@@ -18,6 +18,7 @@ Starting point for routing EC2 requests.
 import hashlib
 import sys
 
+import botocore
 from keystoneclient import access as keystone_access
 from keystoneclient.auth.identity import access as keystone_identity_access
 from keystoneclient import session as keystone_session
@@ -381,6 +382,18 @@ class Executor(wsgi.Application):
         api_request = req.environ['ec2.request']
         try:
             result = api_request.invoke(context)
+        except botocore.exceptions.ClientError as ex:
+            error = ex.response.get('Error', {})
+            code = ex.response.get('Code', error.get('Code'))
+            message = ex.response.get('Message', error.get('Message'))
+            # the early versions of botocore didn't provide HTTPStatusCode
+            # for 400 errors
+            status = ex.response.get('ResponseMetadata', {}).get(
+                'HTTPStatusCode', 400)
+            if status < 400 or status > 499:
+                LOG.exception("Exception from remote server")
+            return faults.ec2_error_response(
+                context.request_id, code, message, status=status)
         except Exception as ex:
             return ec2_error_ex(
                 ex, req, unexpected=not isinstance(ex, exception.EC2Exception))
