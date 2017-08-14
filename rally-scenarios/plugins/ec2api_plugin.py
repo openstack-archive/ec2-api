@@ -64,57 +64,16 @@ class EC2APIPlugin(scenario.OpenStackScenario):
             args['url'], args['region'], args['access'], args['secret'])
         return client
 
-    @scenario.configure()
-    def describe_images(self):
-        self.describe_images_ec2api()
-        self.describe_images_nova()
-
     def describe_images_ec2api(self):
         client = self.get_ec2_client()
         with atomic.ActionTimer(self, 'describe_images_ec2api'):
             data = client.describe_images()
 
-    def describe_images_nova(self):
+    def describe_images_glance(self):
         client = osclients.Clients(
-            self.context['user']['credential']).nova().images
-        with atomic.ActionTimer(self, 'describe_images_nova'):
-            client.list()
-
-    @scenario.configure()
-    def describe_regions(self):
-        client = self.get_ec2_client()
-        with atomic.ActionTimer(self, 'describe_regions_ec2api'):
-            data = client.describe_regions()
-
-    @scenario.configure()
-    def describe_all_in_one(self):
-        self.describe_addresses_ec2api()
-        self.describe_floatingips_neutron()
-        self.describe_instances_ec2api()
-        self.describe_one_instance_ec2api()
-        self.describe_instances_nova()
-        self.describe_one_instance_nova()
-        self.describe_vpcs_ec2api()
-        self.describe_subnets_ec2api()
-        self.describe_network_interfaces_ec2api()
-        self.describe_route_tables_ec2api()
-        self.describe_security_groups_ec2api()
-        self.describe_networks_neutron()
-        self.describe_subnets_neutron()
-        self.describe_ports_neutron()
-        self.describe_security_groups_neutron()
-
-    @scenario.configure()
-    def describe_networks(self):
-        self.describe_vpcs_ec2api()
-        self.describe_subnets_ec2api()
-        self.describe_network_interfaces_ec2api()
-        self.describe_route_tables_ec2api()
-        self.describe_security_groups_ec2api()
-        self.describe_networks_neutron()
-        self.describe_subnets_neutron()
-        self.describe_ports_neutron()
-        self.describe_security_groups_neutron()
+            self.context['user']['credential']).glance().images
+        with atomic.ActionTimer(self, 'describe_images_glance'):
+            data = list(client.list())
 
     def describe_addresses_ec2api(self):
         client = self.get_ec2_client()
@@ -207,3 +166,58 @@ class EC2APIPlugin(scenario.OpenStackScenario):
         project_id = self.context["tenant"]["id"]
         with atomic.ActionTimer(self, 'describe_security_groups_neutron'):
             neutron.list_security_groups(tenant_id=project_id)
+
+
+@scenario.configure(name="EC2APIPlugin.describe_images", platform="openstack")
+class DescribeImages(EC2APIPlugin):
+
+    def run(self):
+        self.describe_images_ec2api()
+        self.describe_images_glance()
+
+
+@scenario.configure(name="EC2APIPlugin.describe_regions", platform="openstack")
+class DescribeRegions(EC2APIPlugin):
+
+    def run(self):
+        client = self.get_ec2_client()
+        with atomic.ActionTimer(self, 'describe_regions_ec2api'):
+            data = client.describe_regions()
+
+
+@scenario.configure(name="EC2APIPlugin.describe_all_in_one",
+                    platform="openstack")
+class DescribeAllInOne(EC2APIPlugin):
+
+    def run(self):
+        self.describe_addresses_ec2api()
+        self.describe_floatingips_neutron()
+        self.describe_instances_ec2api()
+        self.describe_one_instance_ec2api()
+        self.describe_instances_nova()
+        self.describe_one_instance_nova()
+        self.describe_vpcs_ec2api()
+        self.describe_subnets_ec2api()
+        self.describe_network_interfaces_ec2api()
+        self.describe_route_tables_ec2api()
+        self.describe_security_groups_ec2api()
+        self.describe_networks_neutron()
+        self.describe_subnets_neutron()
+        self.describe_ports_neutron()
+        self.describe_security_groups_neutron()
+
+
+@scenario.configure(name="EC2APIPlugin.describe_networks",
+                    platform="openstack")
+class DescribeNetworks(EC2APIPlugin):
+
+    def run(self):
+        self.describe_vpcs_ec2api()
+        self.describe_subnets_ec2api()
+        self.describe_network_interfaces_ec2api()
+        self.describe_route_tables_ec2api()
+        self.describe_security_groups_ec2api()
+        self.describe_networks_neutron()
+        self.describe_subnets_neutron()
+        self.describe_ports_neutron()
+        self.describe_security_groups_neutron()

@@ -222,7 +222,7 @@ class EC2Objects(context.Context):
                     LOG.exception('')
 
 
-@context.configure(name="ec2api_networks", order=451)
+@context.configure(name="ec2api_networks", platform="openstack", order=451)
 class FakeNetworkGenerator(EC2Objects):
     """Context class for adding temporary networks for benchmarks.
 
@@ -277,7 +277,7 @@ class FakeNetworkGenerator(EC2Objects):
             self.cleanup_networks(tenant_id, client)
 
 
-@context.configure(name="ec2api_servers", order=450)
+@context.configure(name="ec2api_servers", platform="openstack", order=450)
 class FakeServerGenerator(EC2Objects):
     """Context class for adding temporary servers for benchmarks.
 
