@@ -139,20 +139,30 @@ add_role() {
     local tenant=$2
     local role_id=$3
     local username=$4
+    local domain=$5
 
-    user_roles=$(openstack user role list -f value -c ID \
-                                          $user_id \
-                                          --project $tenant 2>/dev/null)
-    die_if_not_set $LINENO user_roles "Fail to get user_roles for tenant($tenant) and user_id($user_id)"
-    existing_role=$(echo "$user_roles" | grep $role_id || true)
+    if [[ -n $domain ]]
+    then
+        domain_args="--project-domain $domain --user-domain $domain"
+    fi
+
+    # Gets user role id
+    existing_role=$(openstack role assignment list -f value -c User \
+        --role $role_id \
+        --user $user_id \
+        --project $tenant \
+        $domain_args)
     if [ -n "$existing_role" ]
     then
         echo "User $username already has role $role_id" >&2
         return
     fi
+
+    # Adds role to user
     openstack role add $role_id \
                        --user $user_id \
-                       --project $tenant
+                       --project $tenant \
+                       $domain_args
 }
 
 
@@ -237,19 +247,24 @@ if [[ "$VPC_SUPPORT" == "True" && -z "$EXTERNAL_NETWORK" ]]; then
     die_if_not_set $LINENO EXTERNAL_NETWORK "$reason. Please set EXTERNAL_NETWORK environment variable to the external network dedicated to EC2 elastic IP operations"
 fi
 
-#create keystone user with admin privileges
+#create keystone user with admin and service privileges
 ADMIN_ROLE=$(openstack role show admin -c id -f value)
 die_if_not_set $LINENO ADMIN_ROLE "Fail to get ADMIN_ROLE by 'openstack role show' "
+SERVICE_ROLE=$(openstack role show service -c id -f value)
+die_if_not_set $LINENO ADMIN_ROLE "Fail to get SERVICE_ROLE by 'openstack role show' "
 SERVICE_TENANT_ID=$(openstack project show service -c id -f value)
 die_if_not_set $LINENO SERVICE_TENANT_ID "Fail to get service tenant 'openstack project show' "
 
 echo ADMIN_ROLE $ADMIN_ROLE
+echo SERVICE_ROLE $SERVICE_ROLE
 echo SERVICE_TENANT $SERVICE_TENANT
 
 SERVICE_USERID=$(get_user $SERVICE_USERNAME)
 die_if_not_set $LINENO SERVICE_USERID "Fail to get user for $SERVICE_USERNAME"
 echo SERVICE_USERID $SERVICE_USERID
+SERVICE_DOMAIN_NAME=${SERVICE_DOMAIN_NAME:-Default}
 add_role $SERVICE_USERID $SERVICE_TENANT $ADMIN_ROLE $SERVICE_USERNAME
+add_role $SERVICE_USERID $SERVICE_TENANT $SERVICE_ROLE $SERVICE_USERNAME $SERVICE_DOMAIN_NAME
 
 #create log dir
 echo Creating log dir
@@ -267,14 +282,13 @@ fi
 
 
 #update default config with some values
-OS_AUTH_URL_WO_PATH=`echo $OS_AUTH_URL | cut -f 1-3 -d /`
 iniset $CONF_FILE DEFAULT ec2api_listen_port "$EC2API_PORT"
 iniset $CONF_FILE DEFAULT ec2_port "$EC2API_PORT"
 iniset $CONF_FILE DEFAULT api_paste_config $APIPASTE_FILE
 iniset $CONF_FILE DEFAULT logging_context_format_string "%(asctime)s.%(msecs)03d %(levelname)s %(name)s [%(request_id)s %(user_name)s %(project_name)s] %(instance)s%(message)s"
 iniset $CONF_FILE DEFAULT log_dir "$LOG_DIR"
 iniset $CONF_FILE DEFAULT verbose True
-iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL_WO_PATH/v3/ec2tokens"
+iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL/v3/ec2tokens"
 iniset $CONF_FILE database connection "$CONNECTION"
 iniset $CONF_FILE DEFAULT disable_ec2_classic "$DISABLE_EC2_CLASSIC"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
