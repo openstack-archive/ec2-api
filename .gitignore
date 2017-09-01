@@ -18,3 +18,4 @@ dist
 .coverage*
 !.coveragerc
 cover/
+ec2api/tests/unit/test_cert.pem
