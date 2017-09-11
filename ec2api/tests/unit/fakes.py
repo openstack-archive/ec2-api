@@ -20,8 +20,7 @@ import uuid
 
 from lxml import etree
 
-from oslo_utils import timeutils
-
+from ec2api.api import ec2utils
 from ec2api.tests.unit import tools
 
 
@@ -49,7 +48,7 @@ def random_ec2_id(kind):
 # common constants
 ID_OS_USER = random_os_id()
 ID_OS_PROJECT = random_os_id()
-TIME_ATTACH_NETWORK_INTERFACE = timeutils.isotime(None, True)
+TIME_ATTACH_NETWORK_INTERFACE = ec2utils.isotime(None, True)
 MAC_ADDRESS = 'fb:10:2e:b2:ba:b7'
 
 # vpc constants
@@ -688,8 +687,8 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
 
 
 # instance objects
-TIME_CREATE_INSTANCE_1 = timeutils.isotime(None, True)
-TIME_CREATE_INSTANCE_2 = timeutils.isotime(None, True)
+TIME_CREATE_INSTANCE_1 = ec2utils.isotime(None, True)
+TIME_CREATE_INSTANCE_2 = ec2utils.isotime(None, True)
 
 DB_INSTANCE_DEFAULT = {
     'id': ID_EC2_INSTANCE_DEFAULT,
@@ -1595,7 +1594,7 @@ class OSImage(object):
     def __getitem__(self, key):
         return self._image_dict.get(key)
 
-TIME_CREATE_IMAGE = timeutils.isotime(None, True)
+TIME_CREATE_IMAGE = ec2utils.isotime(None, True)
 
 EC2_IMAGE_1 = {
     'imageId': ID_EC2_IMAGE_1,
@@ -1765,8 +1764,8 @@ class OSSnapshot(object):
     def update(self, *args, **kwargs):
         pass
 
-TIME_CREATE_SNAPSHOT_1 = timeutils.isotime(None, True)
-TIME_CREATE_SNAPSHOT_2 = timeutils.isotime(None, True)
+TIME_CREATE_SNAPSHOT_1 = ec2utils.isotime(None, True)
+TIME_CREATE_SNAPSHOT_2 = ec2utils.isotime(None, True)
 
 EC2_SNAPSHOT_1 = {
     'description': None,
@@ -1844,9 +1843,9 @@ class OSVolume(object):
         pass
 
 
-TIME_CREATE_VOLUME_1 = timeutils.isotime(None, True)
-TIME_CREATE_VOLUME_2 = timeutils.isotime(None, True)
-TIME_CREATE_VOLUME_3 = timeutils.isotime(None, True)
+TIME_CREATE_VOLUME_1 = ec2utils.isotime(None, True)
+TIME_CREATE_VOLUME_2 = ec2utils.isotime(None, True)
+TIME_CREATE_VOLUME_3 = ec2utils.isotime(None, True)
 
 EC2_VOLUME_1 = {
     'volumeId': ID_EC2_VOLUME_1,

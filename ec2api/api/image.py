@@ -33,7 +33,6 @@ from lxml import etree
 from oslo_concurrency import processutils
 from oslo_config import cfg
 from oslo_log import log as logging
-from oslo_utils import timeutils
 import six
 
 from ec2api.api import common
@@ -131,7 +130,7 @@ def create_image(context, instance_id, name=None, description=None,
         restart_instance = True
 
     # meaningful image name
-    name_map = dict(instance=instance['os_id'], now=timeutils.isotime())
+    name_map = dict(instance=instance['os_id'], now=ec2utils.isotime())
     name = name or _('image of %(instance)s at %(now)s') % name_map
 
     def delayed_create(context, image, name, os_instance):

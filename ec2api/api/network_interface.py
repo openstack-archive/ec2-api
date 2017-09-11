@@ -19,7 +19,6 @@ import netaddr
 from neutronclient.common import exceptions as neutron_exception
 from oslo_config import cfg
 from oslo_log import log as logging
-from oslo_utils import timeutils
 
 from ec2api.api import address as address_api
 from ec2api.api import common
@@ -554,7 +553,7 @@ def _attach_network_interface_item(context, network_interface, instance_id,
                                    device_index, attach_time=None,
                                    delete_on_termination=False):
     if not attach_time:
-        attach_time = timeutils.isotime(None, True)
+        attach_time = ec2utils.isotime(None, True)
     network_interface.update({
         'instance_id': instance_id,
         'device_index': device_index,

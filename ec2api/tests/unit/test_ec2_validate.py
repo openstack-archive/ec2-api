@@ -234,7 +234,7 @@ class EC2TimestampValidationTestCase(testtools.TestCase):
         self.assertTrue(expired)
 
     def test_validate_ec2_req_timestamp_not_expired(self):
-        params = {'Timestamp': timeutils.isotime()}
+        params = {'Timestamp': ec2utils.isotime()}
         expired = ec2utils.is_ec2_timestamp_expired(params, expires=15)
         self.assertFalse(expired)
 
@@ -246,7 +246,7 @@ class EC2TimestampValidationTestCase(testtools.TestCase):
 
     @tools.screen_all_logs
     def test_validate_ec2_req_expired(self):
-        params = {'Expires': timeutils.isotime()}
+        params = {'Expires': ec2utils.isotime()}
         expired = ec2utils.is_ec2_timestamp_expired(params)
         self.assertTrue(expired)
 
@@ -269,7 +269,7 @@ class EC2TimestampValidationTestCase(testtools.TestCase):
 
         # EC2 request with both Timestamp and Expires
         params = {'Timestamp': '2011-04-22T11:29:49Z',
-                  'Expires': timeutils.isotime()}
+                  'Expires': ec2utils.isotime()}
         self.assertRaises(exception.InvalidRequest,
                           ec2utils.is_ec2_timestamp_expired,
                           params)

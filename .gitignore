@@ -5,6 +5,7 @@ etc/ec2api/ec2api.conf.sample
 .pydevproject
 ec2_api.egg-info
 .tox
+.stestr
 *.log
 *.egg
 *.swp
