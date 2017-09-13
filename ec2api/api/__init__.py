@@ -19,9 +19,9 @@ import hashlib
 import sys
 
 import botocore
+from keystoneauth1 import session as keystone_session
 from keystoneclient import access as keystone_access
 from keystoneclient.auth.identity import access as keystone_identity_access
-from keystoneclient import session as keystone_session
 from oslo_config import cfg
 from oslo_context import context as common_context
 from oslo_log import log as logging
