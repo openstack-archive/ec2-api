@@ -19,4 +19,5 @@ dist
 !.coveragerc
 cover/
 .idea
+ec2api/tests/unit/test_cert.pem
 
