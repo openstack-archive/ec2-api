@@ -1,0 +1,7 @@
+clients OpenStack Clients
+common Common Service
+database additional Database Client
+ec2 EC2API
+metadata Metadata
+service EC2API Service
+s3 S3 Client

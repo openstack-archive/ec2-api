@@ -21,8 +21,16 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'openstack_dashboard.settings'
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.todo',
-              'sphinx.ext.viewcode']
+extensions = ['sphinx.ext.autodoc',
+              'sphinx.ext.doctest',
+              'sphinx.ext.todo',
+              'sphinx.ext.viewcode',
+              'openstackdocstheme']
+
+# openstackdocstheme options
+repository_name = 'openstack/ec2-api'
+bug_project = 'ec2-api'
+bug_tag = ''
 
 # autodoc generation is a bit aggressive and a nuisance when doing heavy
 # text edit cycles.
@@ -58,9 +66,17 @@ pygments_style = 'sphinx'
 #html_theme_path = ["."]
 #html_theme = '_theme'
 #html_static_path = ['static']
+html_theme = 'openstackdocs'
+
+html_last_updated_fmt = '%Y-%m-%d %H:%M'
+# Theme options are theme-specific and customize the look and feel of a theme
+# further.  For a list of options available for each theme, see the
+# documentation.
+html_theme_options = {"sidebar_mode": "toc"}
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = '%sdoc' % project
+
 
 git_cmd = ["git", "log", "--pretty=format:'%ad, commit %h'", "--date=local",
     "-n1"]
