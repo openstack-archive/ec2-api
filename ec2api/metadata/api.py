@@ -100,7 +100,7 @@ def get_metadata_item(context, path_tokens, os_instance_id, remote_ip,
     elif version not in VERSIONS:
         raise exception.EC2MetadataNotFound()
 
-    cache_key = 'metadata-%s' % os_instance_id
+    cache_key = 'ec2api-metadata-%s' % os_instance_id
     cache = cache_region.get(
         cache_key, expiration_time=CONF.metadata.cache_expiration)
     if cache and cache != cache_core.NO_VALUE:
