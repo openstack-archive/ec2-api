@@ -1,5 +1,5 @@
 =====================
-EC2-API service
+Installing EC2-API
 =====================
 
 .. toctree::

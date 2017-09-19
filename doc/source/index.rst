@@ -11,7 +11,29 @@ well.
 It doesn't replace existing nova EC2 API service in deployment, it gets
 installed to a different port (8788 by default).
 
-Contents:
+Installing EC2API
+=================
+
+.. toctree::
+    :maxdepth: 1
+
+    install/index
+
+Configuring EC2API
+==================
+
+.. toctree::
+    :maxdepth: 1
+
+    configuration/index
+
+EC2API Reference
+==================
+
+-  `EC2-API Reference`_
+
+   .. _`EC2-API Reference`: https://developer.openstack.org/api-ref/ec2-api/
+
 
 .. toctree::
    :maxdepth: 1
