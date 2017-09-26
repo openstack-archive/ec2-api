@@ -15,40 +15,14 @@
 
 """Utilities and helper functions."""
 
-import contextlib
 import hashlib
 import hmac
-import shutil
-import tempfile
 from xml.sax import saxutils
 
-from oslo_config import cfg
 from oslo_log import log as logging
 
 
-utils_opts = [
-    cfg.StrOpt('tempdir',
-               help='Explicitly specify the temporary working directory'),
-]
-CONF = cfg.CONF
-CONF.register_opts(utils_opts)
-
 LOG = logging.getLogger(__name__)
-
-
-@contextlib.contextmanager
-def tempdir(**kwargs):
-    argdict = kwargs.copy()
-    if 'dir' not in argdict:
-        argdict['dir'] = CONF.tempdir
-    tmpdir = tempfile.mkdtemp(**argdict)
-    try:
-        yield tmpdir
-    finally:
-        try:
-            shutil.rmtree(tmpdir)
-        except OSError as e:
-            LOG.error('Could not remove tmpdir: %s', str(e))
 
 
 def get_hash_str(base_str):
