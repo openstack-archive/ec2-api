@@ -1,64 +1,19 @@
 .. _install-ubuntu:
 
-Installation on existing OpenStack deployment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This section describes how to install and configure the ec2-api
-service for Ubuntu (LTS).
+Install and configure
+~~~~~~~~~~~~~~~~~~~~~
 
-Install and configure components
---------------------------------
+This section describes how to install and configure the ec2-api service on the
+controller node for Ubuntu (LTS).
 
-Install the packages:
+It assumes that you already have a working OpenStack environment with
+at least the following components installed: Compute, Networking, Block Storage,
+Identity, Image.
 
-.. code-block:: console
+.. toctree::
+   :maxdepth: 1
 
-   # apt-get update
-   # git clone https://github.com/openstack/ec2-api.git
-   # cd ec2-api
-
-Run install.sh
-
-The EC2 API service gets installed on port 8788 by default. It can be changed
-before the installation in install.sh script.
-
-The services afterwards can be started as binaries:
-
-::
-
-   /usr/local/bin/ec2-api
-   /usr/local/bin/ec2-api-metadata
-
-or set up as Linux services.
-
-.. include:: endpoints-creation.rst
-
-Configuring OpenStack for EC2 API metadata service
---------------------------------------------------
-
-To configure OpenStack for EC2 API metadata service:
-
-for Nova-network add:
-
-.. code-block:: console
-
-    # [DEFAULT]
-    # metadata_port = 8789
-    # [neutron]
-    # service_metadata_proxy = True
-
-to ``/etc/nova.conf``
-
-then restart nova-metadata (can be run as part of nova-api service) and
-nova-network services.
-
-for Neutron add:
-
-.. code-block:: console
-
-    # [DEFAULT]
-    # nova_metadata_port = 8789
-
-to ``/etc/neutron/metadata_agent.ini``
-
-then restart neutron-metadata service.
+   install-sh.rst
+   install-manual.rst
+   install-devstack.rst

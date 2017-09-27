@@ -14,7 +14,7 @@ Verify operation of the ec2-api service.
 
    .. code-block:: console
 
-      $ . admin-openrc
+      $ . openrc admin admin
 
 #. List service components to verify successful launch and registration
    of each process:
@@ -24,8 +24,14 @@ Verify operation of the ec2-api service.
       $ openstack service list
 
 
-#. Download aws cli from Amazon. Create configuration file for aws cli in your
-   home directory ``~/.aws/config``:
+#. Install aws cli.
+
+   .. code-block:: console
+
+      # pip install awscli --upgrade --user
+
+#. Create configuration file for aws cli in your home directory
+   ``~/.aws/config`` or by "**aws configure**" command:
 
    .. code-block:: console
 
@@ -36,7 +42,7 @@ Verify operation of the ec2-api service.
 
    Change the aws_access_key_id and aws_secret_acces_key above to the values
    appropriate for your cloud (can be obtained by
-   **"openstack ec2 credentials list"** command).
+   "**openstack ec2 credentials list**" command).
 
 #. Run aws cli commands using new EC2 API endpoint URL (can be obtained from
    keystone with the new port 8788) like this:

@@ -1,3 +1,5 @@
+.. _configuring:
+
 ===================
 Configuring EC2-API
 ===================
@@ -11,7 +13,7 @@ To configure your EC2API installation, you must define configuration options in 
 A list of config options based on different topics can be found below:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    api.rst
    metadata.rst

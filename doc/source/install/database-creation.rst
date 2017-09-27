@@ -1,12 +1,5 @@
 .. _database-creation:
 
-Creating the database
-~~~~~~~~~~~~~~~~~~~~~
-
-The database is created automatically by the install.sh.
-
-To create the database manually, complete these steps:
-
 * Use the database access client to connect to the database
   server as the ``root`` user:
 
@@ -22,7 +15,7 @@ To create the database manually, complete these steps:
 
 * Grant proper access to the ``ec2api`` database:
 
-  .. code-block:: console
+  .. code-block:: ini
 
      GRANT ALL PRIVILEGES ON ec2api.* TO 'ec2api'@'localhost' \
       IDENTIFIED BY 'EC2-API_DBPASS';
