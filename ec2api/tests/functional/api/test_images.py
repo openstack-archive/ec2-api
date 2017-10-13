@@ -212,17 +212,26 @@ class ImageTest(base.EC2TestCase):
     @decorators.idempotent_id('b9aba1f7-0a7e-4717-b879-efe3bbea74e2')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_check_simple_image_attributes(self):
+        data = self.client.describe_images(ImageIds=[CONF.aws.ebs_image_id])
+        base_image = data['Images'][0]
+
         name = data_utils.rand_name('image')
         desc = data_utils.rand_name('desc for image')
         image_id, image_clean = self._create_image(name, desc)
 
         data = self.client.describe_image_attribute(
             ImageId=image_id, Attribute='kernel')
-        self.assertNotIn('KernelId', data)
+        if 'KernelId' in base_image:
+            self.assertIn('KernelId', data)
+        else:
+            self.assertNotIn('KernelId', data)
 
         data = self.client.describe_image_attribute(
             ImageId=image_id, Attribute='ramdisk')
-        self.assertNotIn('RamdiskId', data)
+        if 'RamdiskId' in base_image:
+            self.assertIn('RamdiskId', data)
+        else:
+            self.assertNotIn('RamdiskId', data)
 
         # description
         data = self.client.describe_image_attribute(
