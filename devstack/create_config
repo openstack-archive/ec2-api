@@ -139,7 +139,7 @@ auth="--os-project-name $project_name --os-username $user_name --os-password pas
 volume_status() { cinder $auth show $1|awk '/ status / {print $4}'; }
 instance_status() { nova $auth show $1|awk '/ status / {print $4}'; }
 
-openstack_image_id=$(openstack $auth image list --long | grep "cirros" | grep " bare " | head -1 | awk '{print $2}')
+openstack_image_id=$(openstack $auth image list --long | grep "cirros" | grep " ami " | head -1 | awk '{print $2}')
 if [[ -n "$openstack_image_id" ]]; then
   volume_id=$(cinder $auth create --image-id $openstack_image_id 1 | awk '/ id / {print $4}')
   [[ -n "$volume_id" ]] || { echo "can't create volume for EBS image creation"; exit 1; }
