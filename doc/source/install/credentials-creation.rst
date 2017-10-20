@@ -1,17 +1,7 @@
 .. _credentials-creation:
 
-Creating the service credentials
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The service credentials are created automatically by the install.sh. To create
-them manually, complete these steps:
-
 #. Source the ``admin`` credentials to gain access to
    admin-only CLI commands:
-
-   .. code-block:: console
-
-      $ . admin-openrc
 
 #. To create the service credentials, complete these steps:
 

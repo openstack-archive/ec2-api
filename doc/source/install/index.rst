@@ -2,11 +2,24 @@
 Installing EC2-API
 =====================
 
-.. toctree::
-   :maxdepth: 2
+This section describes how to install and configure the ec2-api service on the
+controller node for Ubuntu (LTS).
 
-   get-started.rst
-   install.rst
+It assumes that you already have a working OpenStack environment with
+at least the following components installed: Compute, Networking, Block Storage,
+Identity, Image.
+
+.. toctree::
+   :maxdepth: 1
+
+   install-sh.rst
+   install-manual.rst
+   install-devstack.rst
+
+
+.. toctree::
+   :maxdepth: 1
+
    verify.rst
    next-steps.rst
 

@@ -46,7 +46,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'ec2-api'
+project = 'EC2API Service'
 copyright = '2015, OpenStack Foundation'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
