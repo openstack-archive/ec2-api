@@ -13,4 +13,4 @@ To configure Metadata Service for ec2api, EC2 API configuration_ common sections
 
 The additional configuration options for EC2 Metadata:
 
-.. include:: ./tables/ec2api-metadata.rst
+.. include:: ./tables/ec2api-metadata.inc
