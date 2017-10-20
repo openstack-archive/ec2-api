@@ -25,7 +25,7 @@ from ec2api.tests.functional import botocoreclient
 LOG = logging.getLogger(__name__)
 
 
-@context.configure(name="fake_images", order=411)
+@context.configure(name="fake_images", platform="openstack", order=411)
 class FakeImageGenerator(context.Context):
     """Context class for adding images to each user for benchmarks."""
 
