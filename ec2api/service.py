@@ -51,9 +51,6 @@ service_opts = [
     cfg.IntOpt('metadata_workers',
                help='Number of workers for metadata service. The default will '
                     'be the number of CPUs available.'),
-    cfg.IntOpt('service_down_time',
-               default=60,
-               help='Maximum time since last check-in for up service'),
 ]
 
 CONF = cfg.CONF

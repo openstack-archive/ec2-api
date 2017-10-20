@@ -22,9 +22,6 @@ from oslo_log import log as logging
 
 
 auth_opts = [
-    cfg.BoolOpt('api_rate_limit',
-                default=False,
-                help='whether to use per-user rate limiting for the api.'),
     cfg.BoolOpt('use_forwarded_for',
                 default=False,
                 help='Treat X-Forwarded-For as the canonical remote address. '
@@ -41,9 +38,6 @@ def pipeline_factory(loader, global_conf, **local_conf):
     """A paste pipeline replica that keys off of auth_strategy."""
     auth_strategy = "keystone"
     pipeline = local_conf[auth_strategy]
-    if not CONF.api_rate_limit:
-        limit_name = auth_strategy + '_nolimit'
-        pipeline = local_conf.get(limit_name, pipeline)
     pipeline = pipeline.split()
     filters = [loader.get_filter(n) for n in pipeline[:-1]]
     app = loader.get_app(pipeline[-1])
