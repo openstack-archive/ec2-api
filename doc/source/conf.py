@@ -1,11 +1,9 @@
 
 from __future__ import print_function
 
+import os
 import subprocess
 import sys
-import os
-import fileinput
-import fnmatch
 import warnings
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,8 +17,8 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'openstack_dashboard.settings'
 
 # -- General configuration ----------------------------------------------------
 
-# Add any Sphinx extension module names here, as strings. They can be extensions
-# coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
+# Add any Sphinx extension module names here, as strings. They can be
+# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.doctest',
               'sphinx.ext.todo',
@@ -63,9 +61,9 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  Major themes that come with
 # Sphinx are currently 'default' and 'sphinxdoc'.
-#html_theme_path = ["."]
-#html_theme = '_theme'
-#html_static_path = ['static']
+# html_theme_path = ["."]
+# html_theme = '_theme'
+# html_static_path = ['static']
 html_theme = 'openstackdocs'
 
 html_last_updated_fmt = '%Y-%m-%d %H:%M'
