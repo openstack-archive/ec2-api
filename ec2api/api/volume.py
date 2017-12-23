@@ -178,6 +178,7 @@ def describe_volumes(context, volume_id=None, filter=None,
 def _format_volume(context, volume, os_volume, instances={}, os_instances={},
                    snapshots={}, snapshot_id=None):
     valid_ec2_api_volume_status_map = {
+        'reserved': 'in-use',
         'attaching': 'in-use',
         'detaching': 'in-use'}
 
@@ -214,11 +215,14 @@ def _format_attachment(context, volume, os_volume, instances={},
         instance = ec2utils.get_db_item_by_os_id(
                 context, 'i', os_instance_id, instances)
         instance_id = instance['id']
+    status = os_volume.status
+    if status == 'reserved':
+        status = 'attaching'
     ec2_attachment = {
             'device': os_attachment.get('device'),
             'instanceId': instance_id,
-            'status': (os_volume.status
-                       if os_volume.status in ('attaching', 'detaching') else
+            'status': (status
+                       if status in ('attaching', 'detaching') else
                        'attached' if os_attachment else 'detached'),
             'volumeId': volume['id']}
     if os_instance_id in os_instances:

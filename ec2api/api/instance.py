@@ -1579,6 +1579,9 @@ def _cloud_format_instance_bdm(context, os_instance, result,
 
 
 def _cloud_get_volume_attach_status(volume):
+    if volume.status == 'reserved':
+        # 'reserved' state means that volume will be attached later
+        return 'attaching'
     if volume.status in ('attaching', 'detaching'):
         return volume.status
     elif volume.attachments:

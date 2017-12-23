@@ -222,17 +222,17 @@ class VolumeTest(base.EC2TestCase):
     @decorators.idempotent_id('c4b470b7-0825-418f-bc76-533f84247878')
     @testtools.skipUnless(CONF.aws.ebs_image_id, "EBS image id is not defined")
     def test_attaching_stage(self):
-        clean_dict = {}
-        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id,
-                                        clean_dict=clean_dict)
-        clean_i = clean_dict['instance']
-
         data = self.client.create_volume(
             AvailabilityZone=CONF.aws.aws_zone, Size=1)
         volume_id = data['VolumeId']
         clean_v = self.addResourceCleanUp(self.client.delete_volume,
                                           VolumeId=volume_id)
         self.get_volume_waiter().wait_available(volume_id)
+
+        clean_dict = {}
+        instance_id = self.run_instance(ImageId=CONF.aws.ebs_image_id,
+                                        clean_dict=clean_dict)
+        clean_i = clean_dict['instance']
 
         device_name = '/dev/xvdh'
         kwargs = {
@@ -241,8 +241,6 @@ class VolumeTest(base.EC2TestCase):
             'VolumeId': volume_id,
         }
         data = self.client.attach_volume(*[], **kwargs)
-        clean_vi = self.addResourceCleanUp(self.client.detach_volume,
-                                           VolumeId=volume_id)
         self.assertEqual('attaching', data['State'])
 
         if CONF.aws.run_incompatible_tests:
@@ -253,19 +251,12 @@ class VolumeTest(base.EC2TestCase):
         self.get_volume_attachment_waiter().wait_available(
             volume_id, final_set=('attached'))
 
-        # reorder cleanups to avoid error on volume delete
-        self.cancelResourceCleanUp(clean_i)
-        clean_i = self.addResourceCleanUp(self.client.terminate_instances,
-                                          InstanceIds=[instance_id])
-
         # stop instance to prevent 'busy' state of detached volume
         data = self.client.stop_instances(InstanceIds=[instance_id])
         self.get_instance_waiter().wait_available(instance_id,
                                                   final_set=('stopped'))
-
         self.client.detach_volume(VolumeId=volume_id)
         self.get_volume_attachment_waiter().wait_delete(volume_id)
-        self.cancelResourceCleanUp(clean_vi)
 
         self.client.delete_volume(VolumeId=volume_id)
         self.cancelResourceCleanUp(clean_v)
