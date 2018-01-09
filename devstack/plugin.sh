@@ -242,7 +242,7 @@ function configure_ec2api {
 # init_ec2api() - Initialize databases, etc.
 function init_ec2api() {
     # (re)create ec2api database
-    recreate_database ec2api utf8
+    recreate_database ec2api
 
     $EC2API_BIN_DIR/ec2-api-manage --config-file $EC2API_CONF_FILE db_sync
 }
