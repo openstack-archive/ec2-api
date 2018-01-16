@@ -15,34 +15,16 @@
 from cinderclient import client as cinderclient
 from glanceclient import client as glanceclient
 from keystoneauth1 import loading as ks_loading
-from keystoneclient.auth.identity.generic import password as keystone_auth
 from keystoneclient import client as keystoneclient
-from keystoneclient import session as keystone_session
 from neutronclient.v2_0 import client as neutronclient
 from novaclient import api_versions as nova_api_versions
 from novaclient import client as novaclient
 from oslo_config import cfg
 from oslo_log import log as logging
 
-from ec2api.i18n import _
-
 logger = logging.getLogger(__name__)
 
 ec2_opts = [
-    cfg.BoolOpt('ssl_insecure',
-                default=False,
-                deprecated_for_removal=True,
-                deprecated_reason='code was switched to common section '
-                                  '"keystone_authtoken"',
-                deprecated_since='Newton',
-                help="Verify HTTPS connections."),
-    cfg.StrOpt('ssl_ca_file',
-               deprecated_for_removal=True,
-               deprecated_reason='code was switched to common section '
-                                 '"keystone_authtoken"',
-               deprecated_since='Newton',
-               help="CA certificate file to use to verify "
-                    "connecting clients"),
     cfg.StrOpt('nova_service_type',
                default='compute',
                help='Service type of Compute API, registered in Keystone '
@@ -53,25 +35,6 @@ ec2_opts = [
                default='volumev2',
                help='Service type of Volume API, registered in Keystone '
                     'catalog.'),
-    cfg.StrOpt('admin_user',
-               deprecated_for_removal=True,
-               deprecated_reason='code was switched to common section '
-                                 '"keystone_authtoken"',
-               deprecated_since='Newton',
-               help=_("Admin user to access specific cloud resourses")),
-    cfg.StrOpt('admin_password',
-               deprecated_for_removal=True,
-               deprecated_reason='code was switched to common section '
-                                 '"keystone_authtoken"',
-               deprecated_since='Newton',
-               help=_("Admin password"),
-               secret=True),
-    cfg.StrOpt('admin_tenant_name',
-               deprecated_for_removal=True,
-               deprecated_reason='code was switched to common section '
-                                 '"keystone_authtoken"',
-               deprecated_since='Newton',
-               help=_("Admin tenant name")),
 ]
 
 CONF = cfg.CONF
@@ -179,41 +142,22 @@ def _get_nova_api_version(context):
 _admin_session = None
 
 
-def get_session_from_deprecated():
-    auth = keystone_auth.Password(
-        username=CONF.admin_user,
-        password=CONF.admin_password,
-        project_name=CONF.admin_tenant_name,
-        tenant_name=CONF.admin_tenant_name,
-        auth_url=CONF.keystone_url,
-    )
-    params = {'auth': auth}
-    update_request_params_with_ssl(params)
-    return keystone_session.Session(**params)
-
-
 def get_os_admin_session():
     """Create a context to interact with OpenStack as an administrator."""
     # NOTE(ft): this is a singletone because keystone's session looks thread
     # safe for both regular and token renewal requests
     global _admin_session
     if not _admin_session:
-        if not CONF[GROUP_AUTHTOKEN].auth_type:
-            _admin_session = get_session_from_deprecated()
-        else:
-            auth_plugin = ks_loading.load_auth_from_conf_options(
-                CONF, GROUP_AUTHTOKEN)
-            _admin_session = ks_loading.load_session_from_conf_options(
-                CONF, GROUP_AUTHTOKEN, auth=auth_plugin)
+        auth_plugin = ks_loading.load_auth_from_conf_options(
+            CONF, GROUP_AUTHTOKEN)
+        _admin_session = ks_loading.load_session_from_conf_options(
+            CONF, GROUP_AUTHTOKEN, auth=auth_plugin)
 
     return _admin_session
 
 
 def update_request_params_with_ssl(params):
-    if not CONF[GROUP_AUTHTOKEN].auth_type:
-        verify = CONF.ssl_ca_file or not CONF.ssl_insecure
-    else:
-        verify = (CONF[GROUP_AUTHTOKEN].cafile or
-                  not CONF[GROUP_AUTHTOKEN].insecure)
+    verify = (CONF[GROUP_AUTHTOKEN].cafile or
+              not CONF[GROUP_AUTHTOKEN].insecure)
     if verify is not True:
         params['verify'] = verify
