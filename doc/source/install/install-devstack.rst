@@ -8,8 +8,3 @@ In order to install ec2-api with devstack the following should be added to the l
 .. code-block:: ini
 
     enable_plugin ec2-api https://git.openstack.org/openstack/ec2-api
-
-Configuring OpenStack for EC2 API metadata service
----------------------------------------------------
-
-.. include:: metadata-configuration.rst

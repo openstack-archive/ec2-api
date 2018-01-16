@@ -12,3 +12,17 @@ To configure OpenStack for EC2 API metadata service for Neutron add:
 to ``/etc/neutron/metadata_agent.ini``
 
 then restart neutron-metadata service.
+
+If you want to obtain metadata via SSL you need to configure neutron:
+
+.. code-block:: ini
+
+    [DEFAULT]
+    nova_metadata_protocol = https
+    # in case of self-signed certs you may need to specify CA
+    auth_ca_cert = /path/to/root/cert/if/self/signed
+    # or skip certs checking
+    nova_metadata_insecure = True
+
+And then you'll be able to get EC2-API/Nova metadata from neutron via SSL.
+Anyway metadata URL inside the server still be http://169.254.169.254
