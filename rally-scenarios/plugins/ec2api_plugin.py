@@ -15,7 +15,8 @@ from rally import osclients
 from rally.plugins.openstack import scenario
 from rally.task import atomic
 
-from ec2api.tests.functional import botocoreclient
+from ec2api.tests import botocoreclient
+
 
 LOG = logging.getLogger(__name__)
 

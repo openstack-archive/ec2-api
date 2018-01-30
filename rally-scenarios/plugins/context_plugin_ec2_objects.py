@@ -20,7 +20,7 @@ from rally.common import utils as rutils
 from rally import consts
 from rally.task import context
 
-from ec2api.tests.functional import botocoreclient
+from ec2api.tests import botocoreclient
 
 
 LOG = logging.getLogger(__name__)
