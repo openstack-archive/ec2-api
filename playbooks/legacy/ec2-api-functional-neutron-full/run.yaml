@@ -31,6 +31,8 @@
           cat << 'EOF' >>"/tmp/dg-local.conf"
           [[local|localrc]]
           enable_plugin ec2-api git://git.openstack.org/openstack/ec2-api
+          enable_plugin neutron-tempest-plugin git://git.openstack.org/openstack/neutron-tempest-plugin
+          TEMPEST_PLUGINS='/opt/stack/new/ec2api-tempest-plugin'
           RUN_LONG_TESTS=1
 
           EOF
@@ -43,18 +45,16 @@
           set -e
           set -x
           export PYTHONUNBUFFERED=true
+          export DEVSTACK_GATE_TEMPEST=1
+          export TEMPEST_CONCURRENCY=2
           export DEVSTACK_GATE_NEUTRON=1
 
           export PROJECTS="openstack/ec2-api $PROJECTS"
           export PROJECTS="openstack/swift3 $PROJECTS"
+          export PROJECTS="openstack/neutron-tempest-plugin $PROJECTS"
           export ENABLED_SERVICES+=,swift3
-
-          function post_test_hook {
-              source $BASE/new/devstack/accrc/admin/admin
-              cd /opt/stack/new/ec2-api/
-              ./ec2api/tests/contrib/post_test_hook.sh
-          }
-          export -f post_test_hook
+          export PROJECTS="openstack/ec2api-tempest-plugin $PROJECTS"
+          export DEVSTACK_GATE_TEMPEST_REGEX="ec2api_tempest_plugin"
 
           cp devstack-gate/devstack-vm-gate-wrap.sh ./safe-devstack-vm-gate-wrap.sh
           ./safe-devstack-vm-gate-wrap.sh
