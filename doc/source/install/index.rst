@@ -24,4 +24,4 @@ Identity, Image.
    next-steps.rst
 
 This chapter assumes a working setup of OpenStack following the 
-`OpenStack Installation Tutorial <http://docs.openstack.org/#install-guides>`_.
+`OpenStack Installation Tutorial <https://docs.openstack.org/latest/install/>`_.
