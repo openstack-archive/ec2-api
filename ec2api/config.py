@@ -25,7 +25,7 @@ CONF = cfg.CONF
 _DEFAULT_SQL_CONNECTION = 'sqlite:///' + paths.state_path_def('ec2api.sqlite')
 
 _DEFAULT_LOG_LEVELS = ['amqp=WARN', 'amqplib=WARN', 'boto=WARN',
-                       'qpid=WARN', 'sqlalchemy=WARN', 'suds=INFO',
+                       'sqlalchemy=WARN', 'suds=INFO',
                        'iso8601=WARN',
                        'requests.packages.urllib3.connectionpool=WARN',
                        'urllib3.connectionpool=WARN', 'websocket=WARN',
