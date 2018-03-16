@@ -16,9 +16,11 @@ import copy
 import itertools
 
 from cinderclient import client as cinderclient
+import fixtures
 from glanceclient import client as glanceclient
 import mock
 from novaclient import client as novaclient
+from oslo_concurrency import lockutils
 from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
 
@@ -160,6 +162,11 @@ class BaseTestCase(MockOSMixin, MockDBMixin, test_base.BaseTestCase):
         super(BaseTestCase, self).setUp()
         self._conf = self.useFixture(config_fixture.Config())
         self.configure(fatal_exception_format_errors=True)
+        lock_path = self.useFixture(fixtures.TempDir()).path
+        self.fixture = self.useFixture(
+            config_fixture.Config(lockutils.CONF))
+        self.fixture.config(lock_path=lock_path,
+                            group='oslo_concurrency')
 
     def configure(self, **kwargs):
         self._conf.config(**kwargs)
