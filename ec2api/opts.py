@@ -37,7 +37,6 @@ def list_opts():
              ec2api.exception.exc_log_opts,
              ec2api.paths.path_opts,
              ec2api.service.service_opts,
-             ec2api.utils.utils_opts,
              ec2api.wsgi.wsgi_opts,
          )),
     ]
