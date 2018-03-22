@@ -52,9 +52,11 @@
             voting: false
         - tripleo-ci-centos-7-scenario002-multinode-oooq-container:
             voting: false
+        - openstack-tox-lower-constraints
     gate:
       jobs:
         - ec2-api-functional-neutron
+        - openstack-tox-lower-constraints
     experimental:
       jobs:
         - ec2-api-functional-neutron-full
