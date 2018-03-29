@@ -11,10 +11,10 @@ CONNECTION="mysql://ec2api:ec2api@127.0.0.1/ec2api?charset=utf8"
 LOG_DIR=/var/log/ec2api
 CONF_DIR=/etc/ec2api
 NOVA_CONF=/etc/nova/nova.conf
-SIGNING_DIR=/var/cache/ec2api
 CONF_FILE=$CONF_DIR/ec2api.conf
 APIPASTE_FILE=$CONF_DIR/api-paste.ini
 
+DATA_DIR=${DATA_DIR:-/var/lib/ec2api}
 AUTH_CACHE_DIR=${AUTH_CACHE_DIR:-/var/cache/ec2api}
 
 CACHE_BACKEND='oslo_cache.dict'
@@ -289,6 +289,8 @@ iniset $CONF_FILE DEFAULT keystone_ec2_tokens_url "$OS_AUTH_URL/v3/ec2tokens"
 iniset $CONF_FILE database connection "$CONNECTION"
 iniset $CONF_FILE DEFAULT disable_ec2_classic "$DISABLE_EC2_CLASSIC"
 iniset $CONF_FILE DEFAULT external_network "$EXTERNAL_NETWORK"
+iniset $CONF_FILE oslo_concurrency lock_path "$EC2API_STATE_PATH"
+iniset $CONF_FILE DEFAULT state_path "$DATA_DIR"
 
 GROUP_AUTHTOKEN="keystone_authtoken"
 iniset $CONF_FILE $GROUP_AUTHTOKEN signing_dir "$AUTH_CACHE_DIR"
@@ -328,10 +330,6 @@ if [[ -f "$NOVA_CONF" ]]; then
         iniset $CONF_FILE DEFAULT s3_url "$s3_proto://$s3_host:$s3_port"
 
     fi
-
-    nova_state_path=$(iniget $NOVA_CONF DEFAULT state_path)
-    root_state_path=$(dirname $nova_state_path)
-    iniset $CONF_FILE DEFAULT state_path ${root_state_path}/ec2api
 fi
 
 #init cache dir
@@ -339,6 +337,12 @@ echo Creating signing dir
 sudo mkdir -p $AUTH_CACHE_DIR
 sudo chown $USER $AUTH_CACHE_DIR
 sudo rm -f $AUTH_CACHE_DIR/*
+
+#init data dir
+echo Creating data dir
+sudo mkdir -p $DATA_DIR
+sudo chown $USER $DATA_DIR
+sudo rm -f $DATA_DIR/*
 
 #install it
 echo Installing package

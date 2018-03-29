@@ -215,6 +215,8 @@ function configure_ec2api {
         iniset $NOVA_CONF DEFAULT metadata_use_ssl "True"
     fi
 
+    iniset $EC2API_CONF_FILE oslo_concurrency lock_path $EC2API_STATE_PATH
+
     # configure the database.
     iniset $EC2API_CONF_FILE database connection `database_connection_url ec2api`
 

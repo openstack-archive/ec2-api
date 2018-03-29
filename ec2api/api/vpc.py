@@ -14,6 +14,7 @@
 
 
 from neutronclient.common import exceptions as neutron_exception
+from oslo_concurrency import lockutils
 from oslo_config import cfg
 from oslo_log import log as logging
 
@@ -32,6 +33,8 @@ from ec2api.i18n import _
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
+
+synchronized = lockutils.synchronized_with_prefix('ec2api-')
 
 
 """VPC-object related API implementation
@@ -164,7 +167,13 @@ def _create_vpc(context, cidr_block, is_default=False):
 
 
 def _check_and_create_default_vpc(context):
-    if CONF.disable_ec2_classic and not context.is_os_admin:
+    if not CONF.disable_ec2_classic or context.is_os_admin:
+        return
+
+    lock_name = 'default-vpc-lock-{}-'.format(context.project_id)
+
+    @synchronized(lock_name, external=True)
+    def _check():
         for vpc in db_api.get_items(context, 'vpc'):
             if vpc.get('is_default'):
                 return vpc
@@ -175,6 +184,8 @@ def _check_and_create_default_vpc(context):
         except Exception:
             LOG.exception('Failed to create default vpc')
         return None
+
+    return _check()
 
 
 ec2utils.set_check_and_create_default_vpc(_check_and_create_default_vpc)
