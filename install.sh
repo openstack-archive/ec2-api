@@ -294,7 +294,7 @@ iniset $CONF_FILE DEFAULT state_path "$DATA_DIR"
 
 GROUP_AUTHTOKEN="keystone_authtoken"
 iniset $CONF_FILE $GROUP_AUTHTOKEN signing_dir "$AUTH_CACHE_DIR"
-iniset $CONF_FILE $GROUP_AUTHTOKEN auth_uri "$OS_AUTH_URL"
+iniset $CONF_FILE $GROUP_AUTHTOKEN www_authenticate_uri "$OS_AUTH_URL"
 iniset $CONF_FILE $GROUP_AUTHTOKEN auth_url "$OS_AUTH_URL"
 iniset $CONF_FILE $GROUP_AUTHTOKEN username $SERVICE_USERNAME
 iniset $CONF_FILE $GROUP_AUTHTOKEN password $SERVICE_PASSWORD
