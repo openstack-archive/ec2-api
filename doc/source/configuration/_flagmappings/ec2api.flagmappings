@@ -118,7 +118,7 @@ keystone_authtoken/auth_port disable
 keystone_authtoken/auth_protocol disable
 keystone_authtoken/auth_section disable
 keystone_authtoken/auth_type disable
-keystone_authtoken/auth_uri disable
+keystone_authtoken/www_authenticate_uri disable
 keystone_authtoken/auth_version disable
 keystone_authtoken/cache disable
 keystone_authtoken/cafile disable
