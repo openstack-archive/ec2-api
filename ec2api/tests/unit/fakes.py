@@ -210,6 +210,8 @@ ID_OS_IMAGE_ARI_1 = random_os_id()
 ROOT_DEVICE_NAME_IMAGE_1 = '/dev/sda1'
 ROOT_DEVICE_NAME_IMAGE_2 = '/dev/sdb1'
 LOCATION_IMAGE_1 = 'fake_bucket/fake.img.manifest.xml'
+LOCATION_IMAGE_2 = 'https://download.cirros-cloud.net/0.4.0/' \
+                   + 'cirros-0.4.0-aarch64-disk.img'
 
 # volumes constants
 ID_EC2_VOLUME_1 = random_ec2_id('vol')
