@@ -16,10 +16,10 @@
 from rally.common.i18n import _
 from rally.common import logging
 from rally.common import utils as rutils
-from rally import consts
-from rally import osclients
-from rally.plugins.openstack.wrappers import network as network_wrapper
 from rally.task import context
+from rally_openstack import consts
+from rally_openstack import osclients
+from rally_openstack.wrappers import network as network_wrapper
 
 
 LOG = logging.getLogger(__name__)

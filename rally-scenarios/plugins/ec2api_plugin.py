@@ -11,9 +11,9 @@
 #    under the License.
 
 from rally.common import logging
-from rally import osclients
-from rally.plugins.openstack import scenario
 from rally.task import atomic
+from rally_openstack import osclients
+from rally_openstack import scenario
 
 from ec2api.tests import botocoreclient
 
