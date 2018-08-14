@@ -43,7 +43,6 @@ from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
 
-
 LOG = logging.getLogger(__name__)
 
 s3_opts = [
@@ -201,6 +200,12 @@ def register_image(context, name=None, image_location=None,
                    root_device_name=None, block_device_mapping=None,
                    virtualization_type=None, kernel_id=None,
                    ramdisk_id=None, sriov_net_support=None):
+
+    # Setup default flags
+    is_s3_import = False
+    is_url_import = False
+
+    # Process the input arguments
     if not image_location and not root_device_name:
         # NOTE(ft): for backward compatibility with a hypothetical code
         # which uses name as image_location
@@ -218,7 +223,14 @@ def register_image(context, name=None, image_location=None,
         # TODO(ft): check the name is unique (at least for EBS image case)
         metadata['name'] = name
     if image_location:
+
+        # Resolve the import type
         metadata['image_location'] = image_location
+        parsed_url = six.moves.urllib.parse.urlparse(image_location)
+        is_s3_import = (parsed_url.scheme == '') or (parsed_url.scheme == 's3')
+        is_url_import = not is_s3_import
+
+        # Check if the name is in the metadata
         if 'name' not in metadata:
             # NOTE(ft): it's needed for backward compatibility
             metadata['name'] = image_location
@@ -256,21 +268,42 @@ def register_image(context, name=None, image_location=None,
         metadata['ramdisk_id'] = ec2utils.get_os_image(context,
                                                          ramdisk_id).id
 
+    # Begin the import/registration process
     with common.OnCrashCleaner() as cleaner:
+
+        # Setup the glance client
         glance = clients.glance(context)
-        if 'image_location' in metadata:
+
+        # Check if this is an S3 import
+        if is_s3_import:
             os_image = _s3_create(context, metadata)
+
+        # Condition for all non-S3 imports
         else:
+
+            # Create the image in glance
             metadata.update({'visibility': 'private',
                              'container_format': 'bare',
                              'disk_format': 'raw'})
             os_image = glance.images.create(**metadata)
-            glance.images.upload(os_image.id, '', image_size=0)
+
+            # Kick-off the URL image import if from URL
+            if is_url_import:
+                glance.images.image_import(os_image.id, method='web-download',
+                                           uri=metadata['image_location'])
+
+            # Otherwise, use the default method
+            else:
+                glance.images.upload(os_image.id, '', image_size=0)
+
+        # Add cleanups and complete the registration process
         cleaner.addCleanup(glance.images.delete, os_image.id)
         kind = _get_os_image_kind(os_image)
         image = db_api.add_item(context, kind, {'os_id': os_image.id,
                                                 'is_public': False,
                                                 'description': description})
+
+    # Return the image ID for the registration process
     return {'imageId': image['id']}
 
 
@@ -812,10 +845,21 @@ _s3_image_state_map = {'downloading': 'pending',
 
 def _s3_create(context, metadata):
     """Gets a manifest from s3 and makes an image."""
-    image_location = metadata['image_location'].lstrip('/')
-    bucket_name = image_location.split('/')[0]
-    manifest_path = image_location[len(bucket_name) + 1:]
+
+    # Parse the metadata into bucket and manifest path
+    parsed_url = six.moves.urllib.parse.urlparse(metadata['image_location'])
+    if parsed_url.hostname is not None:
+        # Handle s3://<BUCKET_NAME>/<KEY_PATH> case
+        bucket_name = parsed_url.hostname
+        manifest_path = parsed_url.path[1:]
+    else:
+        # Handle <BUCKET_NAME>/<KEY_PATH> case
+        bucket_name = parsed_url.path.split('/')[0]
+        manifest_path = '/'.join(parsed_url.path.split('/')[1:])
+
+    # Continue with S3 import
     s3_client = _s3_conn(context)
+    image_location = '/'.join([bucket_name, manifest_path])
     key = s3_client.get_object(Bucket=bucket_name, Key=manifest_path)
     body = key['Body']
     if isinstance(body, six.string_types):

@@ -29,7 +29,6 @@ from ec2api.tests.unit import fakes
 from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
 
-
 AMI_MANIFEST_XML = """<?xml version="1.0" ?>
 <manifest>
         <version>2011-06-17</version>
@@ -155,6 +154,62 @@ class ImageTestCase(base.ApiTestCase):
     def test_create_image(self):
         self._test_create_image('ACTIVE', False)
         self._test_create_image('SHUTOFF', True)
+
+    @mock.patch('ec2api.api.instance._is_ebs_instance')
+    def test_register_image_by_url(self, is_ebs_instance):
+        self.set_mock_db_items(fakes.DB_INSTANCE_2)
+        is_ebs_instance.return_value = True
+
+        # Setup the mock parameters
+        image_id = fakes.random_ec2_id('ami')
+        os_image_id = fakes.random_os_id()
+        self.glance.images.create.return_value = fakes.OSImage(
+            {'id': os_image_id},
+            from_get=True)
+        self.db_api.add_item.side_effect = tools.get_db_api_add_item(image_id)
+
+        # Setup Import Command
+        import_command = 'RegisterImage'
+
+        # Setup the import arguments
+        args = {
+            'Name': 'TestImage123',
+            'ImageLocation':
+                fakes.LOCATION_IMAGE_2,
+            'Architecture': 'x86_64'
+        }
+
+        # Execute the import image process
+        resp = self.execute(import_command, args)
+
+        # Assert that the image returned is equal to what was expected
+        self.assertEqual({'imageId': image_id}, resp)
+
+        # Assert that Glance Image Create was called
+        self.glance.images.create.assert_called_once_with(
+            name='TestImage123',
+            disk_format='raw',
+            container_format='bare',
+            visibility='private',
+            architecture='x86_64',
+            image_location=fakes.LOCATION_IMAGE_2)
+
+        # Assert that Glance Image Import was called
+        self.glance.images.image_import.assert_called_once_with(
+            os_image_id,
+            method='web-download',
+            uri=fakes.LOCATION_IMAGE_2)
+
+        # Assert that the image was created
+        expected_image = {'is_public': False,
+                          'os_id': mock.ANY,
+                          'description': None}
+        self.db_api.add_item.assert_called_once_with(
+            mock.ANY, 'ami', expected_image)
+
+        # Reset all test settings/state
+        self.db_api.reset_mock()
+        self.glance.reset_mock()
 
     @mock.patch('ec2api.api.instance._is_ebs_instance')
     def test_create_image_invalid_parameters(self, is_ebs_instance):
