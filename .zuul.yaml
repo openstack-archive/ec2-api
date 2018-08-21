@@ -40,6 +40,7 @@
     templates:
       - openstack-python-jobs
       - openstack-python35-jobs
+      - openstack-python36-jobs
       - check-requirements
       - publish-openstack-docs-pti
       - install-guide-jobs
