@@ -37,6 +37,12 @@
       - openstack/rally
 
 - project:
+    templates:
+      - openstack-python-jobs
+      - openstack-python35-jobs
+      - check-requirements
+      - publish-openstack-sphinx-docs
+      - install-guide-jobs
     check:
       jobs:
         - ec2-api-functional-neutron
@@ -53,6 +59,7 @@
         - tripleo-ci-centos-7-scenario002-multinode-oooq-container:
             voting: false
     gate:
+      queue: ec2-api
       jobs:
         - ec2-api-functional-neutron
     experimental:
