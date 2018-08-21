@@ -44,7 +44,7 @@
       - check-requirements
       - publish-openstack-docs-pti
       - install-guide-jobs
-      - publish-openstack-sphinx-docs
+      - publish-openstack-docs-pti
     check:
       jobs:
         - ec2-api-functional-neutron
