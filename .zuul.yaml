@@ -37,6 +37,12 @@
       - openstack/rally
 
 - project:
+    templates:
+      - openstack-python-jobs
+      - openstack-python35-jobs
+      - check-requirements
+      - publish-openstack-sphinx-docs
+      - install-guide-jobs
     check:
       jobs:
         - ec2-api-functional-neutron
@@ -54,6 +60,7 @@
             voting: false
         - openstack-tox-lower-constraints
     gate:
+      queue: ec2-api
       jobs:
         - ec2-api-functional-neutron
         - openstack-tox-lower-constraints
