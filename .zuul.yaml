@@ -43,8 +43,6 @@
       - openstack-python36-jobs
       - check-requirements
       - publish-openstack-docs-pti
-      - install-guide-jobs
-      - publish-openstack-docs-pti
     check:
       jobs:
         - ec2-api-functional-neutron
