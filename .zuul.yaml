@@ -42,7 +42,6 @@
       - openstack-python35-jobs
       - check-requirements
       - publish-openstack-sphinx-docs
-      - install-guide-jobs
     check:
       jobs:
         - ec2-api-functional-neutron
