@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+from six.moves import range
 import time
 
 from rally.common.i18n import _
@@ -82,7 +83,7 @@ class EC2Objects(context.Context):
         result["subnet_id"] = subnet_id
 
         result["ni_ids"] = list()
-        for dummy in xrange(0, ni_count):
+        for dummy in range(0, ni_count):
             data = client.create_network_interface(SubnetId=subnet_id)
             ni_id = data['NetworkInterface']['NetworkInterfaceId']
             result["ni_ids"].append(ni_id)
@@ -145,7 +146,7 @@ class EC2Objects(context.Context):
         ids = self.context["tenants"][tenant_id].get("servers", [])
         servers_per_run = self.config["servers_per_run"]
         mod = len(ids) / servers_per_run
-        for i in xrange(0, mod):
+        for i in range(0, mod):
             part_ids = ids[i * servers_per_run:(i + 1) * servers_per_run]
             data = client.terminate_instances(InstanceIds=part_ids)
         part_ids = ids[mod * servers_per_run:]
@@ -264,7 +265,7 @@ class FakeNetworkGenerator(EC2Objects):
             self.context["tenants"][tenant_id]["networks"] = list()
             subnets_count = self.config["subnets_per_tenant"]
             nis_count = self.config["nis_per_subnet"]
-            for dummy in xrange(0, subnets_count):
+            for dummy in range(0, subnets_count):
                 self.prepare_network(tenant_id, client, nis_count)
 
     @logging.log_task_wrapper(LOG.info, _("Exit context: `EC2 Networks`"))
