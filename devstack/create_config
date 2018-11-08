@@ -125,17 +125,18 @@ role_id=$(openstack role show  Member -c id -f value)
 openstack role add --project $project_id --user $user_id $role_id
 # create network
 if [[ -n "$neutron_item" ]]; then
-  net_id=$(neutron net-create --tenant-id $project_id "private" | grep ' id ' | awk '{print $4}')
+  net_id=$(openstack network create --project $project_id private | grep ' id ' | awk '{print $4}')
   [[ -n "$net_id" ]] || { echo "net-create failed"; exit 1; }
-  subnet_id=$(neutron subnet-create --tenant-id $project_id --ip_version 4 --gateway 10.0.0.1 --name "private_subnet" $net_id 10.0.0.0/24 | grep ' id ' | awk '{print $4}')
+  subnet_id=$(openstack subnet create --project $project_id --ip-version 4 --gateway 10.0.0.1 --network $net_id --subnet-range 10.0.0.0/24 private_subnet | grep ' id ' | awk '{print $4}')
   [[ -n "$subnet_id" ]] || { echo "subnet-create failed"; exit 1; }
-  router_id=$(neutron router-create --tenant-id $project_id "private_router" | grep ' id ' | awk '{print $4}')
+  router_id=$(openstack router create --project $project_id private_router | grep ' id ' | awk '{print $4}')
   [[ -n "$router_id" ]] || { echo "router-create failed"; exit 1; }
-  neutron router-interface-add $router_id $subnet_id
+  sleep 2
+  openstack router add subnet $router_id $subnet_id
   [[ "$?" -eq 0 ]] || { echo "router-interface-add failed"; exit 1; }
-  public_net_id=$(neutron net-list | grep public | awk '{print $2}')
+  public_net_id=$(openstack network list | awk '/public/{print $2}')
   [[ -n "$public_net_id" ]] || { echo "can't find public network"; exit 1; }
-  neutron router-gateway-set $router_id $public_net_id
+  openstack router set --external-gateway $public_net_id $router_id
   [[ "$?" -eq 0 ]] || { echo "router-gateway-set failed"; exit 1; }
 fi
 # populate credentials
