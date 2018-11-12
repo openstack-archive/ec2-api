@@ -275,7 +275,7 @@ class Requestify(wsgi.Middleware):
         except KeyError:
             raise webob.exc.HTTPBadRequest()
         except exception.InvalidRequest as err:
-            raise webob.exc.HTTPBadRequest(explanation=unicode(err))
+            raise webob.exc.HTTPBadRequest(explanation=err.format_message())
 
         LOG.debug('action: %s', action)
         for key, value in args.items():
