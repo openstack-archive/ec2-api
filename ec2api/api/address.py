@@ -201,7 +201,7 @@ def _get_os_instance_id(context, os_floating_ip, os_ports=[]):
     if port_id:
         port = next((port for port in os_ports
                      if port['id'] == port_id), None)
-        if port:
+        if port and port.get('device_owner').startswith('compute:'):
             os_instance_id = port.get('device_id')
     return os_instance_id
 

@@ -669,7 +669,7 @@ OS_PORT_1 = {'id': ID_OS_PORT_1,
              'fixed_ips': [{'ip_address': IP_NETWORK_INTERFACE_1,
                             'subnet_id': ID_OS_SUBNET_1}],
              'device_id': None,
-             'device_owner': '',
+             'device_owner': "compute:{}".format(NAME_AVAILABILITY_ZONE),
              'security_groups': [ID_OS_SECURITY_GROUP_1]}
 OS_PORT_2 = {'id': ID_OS_PORT_2,
              'network_id': ID_OS_SUBNET_2,
@@ -683,7 +683,7 @@ OS_PORT_2 = {'id': ID_OS_PORT_2,
                            {'ip_address': IP_NETWORK_INTERFACE_2_EXT_2,
                             'subnet_id': ID_OS_SUBNET_2}],
              'device_id': ID_OS_INSTANCE_1,
-             'device_owner': '',
+             'device_owner': "compute:{}".format(NAME_AVAILABILITY_ZONE),
              'security_groups': [ID_OS_SECURITY_GROUP_1],
              'tenant_id': ID_OS_PROJECT}
 
