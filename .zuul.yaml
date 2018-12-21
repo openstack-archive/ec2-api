@@ -38,20 +38,19 @@
 
 - project:
     templates:
+      - check-requirements
+      - openstack-lower-constraints-jobs
       - openstack-python-jobs
       - openstack-python35-jobs
       - openstack-python36-jobs
-      - check-requirements
       - publish-openstack-docs-pti
     check:
       jobs:
         - ec2-api-functional-neutron
-        - openstack-tox-lower-constraints
     gate:
       queue: ec2-api
       jobs:
         - ec2-api-functional-neutron
-        - openstack-tox-lower-constraints
     experimental:
       jobs:
         - ec2-api-functional-neutron-full
