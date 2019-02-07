@@ -66,8 +66,8 @@ AWS_PARAMS="--region $REGION_NAME --endpoint-url $EC2_URL"
 neutron_item=$(openstack service list | grep neutron)
 
 # prepare flavors
-nova flavor-create --is-public True $FLAVOR_NAME 16 512 0 1
-nova flavor-create --is-public True $FLAVOR_NAME_ALT 17 256 0 1
+nova flavor-create --is-public True $FLAVOR_NAME 16 512 1 1
+nova flavor-create --is-public True $FLAVOR_NAME_ALT 17 256 1 1
 
 # prepare cirros image for register_image test. uploading it to S3.
 sudo rm /tmp/$CIRROS_IMAGE_FNAME
