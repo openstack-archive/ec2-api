@@ -14,11 +14,11 @@
 
 import base64
 import copy
-import json
 import random
 import uuid
 
 from lxml import etree
+from oslo_serialization import jsonutils
 
 from ec2api.api import ec2utils
 from ec2api.tests.unit import tools
@@ -1581,7 +1581,7 @@ class OSImage(object):
                                  for k in attrs})
         for complex_attr in ('mappings', 'block_device_mapping'):
             if complex_attr in self._image_dict:
-                self._image_dict[complex_attr] = json.dumps(
+                self._image_dict[complex_attr] = jsonutils.dumps(
                     self._image_dict[complex_attr])
         for k in self._image_dict:
             setattr(self, k, self._image_dict[k])

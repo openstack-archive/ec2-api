@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import datetime
-import json
 import re
 
 from glanceclient.common import exceptions as glance_exception
 from lxml import etree
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 import six
 
@@ -373,7 +373,7 @@ def get_os_image(context, ec2_image_id):
 def deserialize_os_image_properties(os_image):
     def prepare_property(property_name):
         if property_name in os_image_dict:
-            os_image_dict[property_name] = json.loads(
+            os_image_dict[property_name] = jsonutils.loads(
                 os_image_dict[property_name])
 
     os_image_dict = dict(os_image)
