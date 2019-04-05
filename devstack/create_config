@@ -66,8 +66,8 @@ AWS_PARAMS="--region $REGION_NAME --endpoint-url $EC2_URL"
 neutron_item=$(openstack service list | grep neutron)
 
 # prepare flavors
-nova flavor-create --is-public True $FLAVOR_NAME 16 512 1 1
-nova flavor-create --is-public True $FLAVOR_NAME_ALT 17 256 1 1
+openstack flavor create --public --id 16 --ram 512 --disk 1 --vcpus 1 $FLAVOR_NAME
+openstack flavor create --public --id 17 --ram 256 --disk 1 --vcpus 1 $FLAVOR_NAME_ALT
 
 # prepare cirros image for register_image test. uploading it to S3.
 sudo rm /tmp/$CIRROS_IMAGE_FNAME
@@ -151,12 +151,13 @@ deactivate
 auth="--os-project-name $project_name --os-username $user_name --os-password password"
 
 # create EBS image
-volume_status() { cinder $auth show $1|awk '/ status / {print $4}'; }
-instance_status() { nova $auth show $1|awk '/ status / {print $4}'; }
+volume_status() { openstack $auth volume show $1 | awk '/ status / {print $4}'; }
+instance_status() { openstack $auth server show $1 | awk '/ status / {print $4}'; }
 
 openstack_image_id=$(openstack $auth image list --long | grep "cirros" | grep " bare " | head -1 | awk '{print $2}')
 if [[ -n "$openstack_image_id" ]]; then
-  volume_id=$(cinder $auth create --image-id $openstack_image_id 1 | awk '/ id / {print $4}')
+  volume_name="vol-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
+  volume_id=$(openstack $auth volume create --image $openstack_image_id --size 1 $volume_name | awk '/ id / {print $4}')
   [[ -n "$volume_id" ]] || { echo "can't create volume for EBS image creation"; exit 1; }
   fail=0
   while [[ true ]] ; do
@@ -169,7 +170,7 @@ if [[ -n "$openstack_image_id" ]]; then
       break
     fi
     if [[ $status == "error" || -z "$status" ]]; then
-      cinder $auth show $volume_id
+      openstack $auth volume show $volume_id
       die $LINENO 'Volume creation error'
     fi
     sleep 10
@@ -179,8 +180,15 @@ if [[ -n "$openstack_image_id" ]]; then
   instance_name="i-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
   instance_id=$(nova $auth boot \
     --flavor "$FLAVOR_NAME" \
+    --nic net-id=$net_id \
     --block-device "device=/dev/vda,id=$volume_id,shutdown=remove,source=volume,dest=volume,bootindex=0" \
     "$instance_name" | awk '/ id / {print $4}')
+# TODO: find a way how to run with delete-on-terminate or set it after run with openstack client
+#  instance_id=$(openstack $auth server create \
+#    --flavor "$FLAVOR_NAME" \
+#    --volume $volume_id \
+#    --nic net-id=$net_id \
+#    "$instance_name" | awk '/ id / {print $4}')
   [[ -n "$instance_id" ]] || { echo "can't boot EBS instance"; exit 1; }
   fail=0
   while [[ true ]] ; do
@@ -193,7 +201,7 @@ if [[ -n "$openstack_image_id" ]]; then
       break
     fi
     if [[ "$status" == "ERROR" || -z "$status" ]]; then
-      nova $auth show $instance_id
+      openstack $auth server show $instance_id
       die $LINENO 'Instance booting error'
     fi
     sleep 10
@@ -201,14 +209,14 @@ if [[ -n "$openstack_image_id" ]]; then
   done
 
   image_name="image-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
-  nova $auth image-create $instance_name $image_name
+  openstack $auth server image create --name $image_name --wait $instance_name
   if [[ "$?" -ne "0" ]]; then
     die $LINENO "Image creation from instance fails"
   fi
   source "$venv_dir/bin/activate"
   ebs_image_id=`aws $AWS_PARAMS --profile user ec2 describe-images --filters Name=image-type,Values=machine Name=name,Values=$image_name --query 'Images[0].ImageId' --output text`
   deactivate
-  nova $auth delete $instance_id
+  openstack $auth server delete $instance_id
 fi
 
 timeout="180"

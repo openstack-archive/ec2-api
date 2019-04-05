@@ -93,7 +93,7 @@ class ApiInitTestCase(base.BaseTestCase):
         do_check(nova_exception.BadRequest(400, message='fake_msg'),
                  400, 'BadRequest', 'fake_msg')
         do_check(glance_exception.HTTPBadRequest(),
-                 400, 'HTTPBadRequest', 'HTTPBadRequest (HTTP 400)')
+                 400, 'HTTPBadRequest', 'HTTP HTTPBadRequest')
         do_check(cinder_exception.BadRequest(400, message='fake_msg'),
                  400, 'BadRequest', 'fake_msg')
         do_check(neutron_exception.BadRequest(message='fake_msg'),
