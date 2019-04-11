@@ -66,8 +66,8 @@ AWS_PARAMS="--region $REGION_NAME --endpoint-url $EC2_URL"
 neutron_item=$(openstack service list | grep neutron)
 
 # prepare flavors
-nova flavor-create --is-public True $FLAVOR_NAME 16 512 0 1
-nova flavor-create --is-public True $FLAVOR_NAME_ALT 17 256 0 1
+openstack flavor create --public --id 16 --ram 512 --disk 1 --vcpus 1 $FLAVOR_NAME
+openstack flavor create --public --id 17 --ram 256 --disk 1 --vcpus 1 $FLAVOR_NAME_ALT
 
 # prepare cirros image for register_image test. uploading it to S3.
 sudo rm /tmp/$CIRROS_IMAGE_FNAME
@@ -179,6 +179,7 @@ if [[ -n "$openstack_image_id" ]]; then
   instance_name="i-$(cat /dev/urandom | tr -cd 'a-f0-9' | head -c 8)"
   instance_id=$(nova $auth boot \
     --flavor "$FLAVOR_NAME" \
+    --nic net-id=$net_id \
     --block-device "device=/dev/vda,id=$volume_id,shutdown=remove,source=volume,dest=volume,bootindex=0" \
     "$instance_name" | awk '/ id / {print $4}')
   [[ -n "$instance_id" ]] || { echo "can't boot EBS instance"; exit 1; }
