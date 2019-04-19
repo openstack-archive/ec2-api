@@ -5,7 +5,7 @@
     post-run: playbooks/legacy/ec2-api-functional-neutron/post.yaml
     timeout: 7800
     required-projects:
-      - openstack-infra/devstack-gate
+      - openstack/devstack-gate
       - openstack/ec2-api
       - openstack/neutron
       - openstack/neutron-tempest-plugin
@@ -18,10 +18,10 @@
     post-run: playbooks/legacy/ec2-api-functional-neutron-full/post.yaml
     timeout: 10800
     required-projects:
-      - openstack-infra/devstack-gate
+      - openstack/devstack-gate
       - openstack/ec2-api
       - openstack/neutron
-      - openstack/swift3
+      - x/swift3
       - openstack/neutron-tempest-plugin
       - openstack/ec2api-tempest-plugin
 
@@ -32,7 +32,7 @@
     post-run: playbooks/legacy/ec2-api-rally-fakevirt/post.yaml
     timeout: 7800
     required-projects:
-      - openstack-infra/devstack-gate
+      - openstack/devstack-gate
       - openstack/ec2-api
       - openstack/rally
 
