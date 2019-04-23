@@ -254,7 +254,7 @@ function init_ec2api() {
 function install_ec2api() {
     # TODO(ruhe): use setup_develop once ec2api requirements match with global-requirement.txt
     # both functions (setup_develop and setup_package) are defined at:
-    # http://git.openstack.org/cgit/openstack-dev/devstack/tree/functions-common
+    # https://opendev.org/openstack/devstack/src/branch/master/functions-common
     setup_package $EC2API_DIR -e
 }
 

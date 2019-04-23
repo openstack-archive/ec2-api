@@ -41,7 +41,7 @@ the local.conf or localrc the following line:
 
 ::
 
- enable_plugin ec2-api https://git.openstack.org/openstack/ec2-api
+ enable_plugin ec2-api https://opendev.org/openstack/ec2-api
 
 To configure OpenStack for EC2 API metadata service:
 
@@ -607,4 +607,4 @@ Blueprint:
 https://blueprints.launchpad.net/nova/+spec/ec2-api
 
 Spec:
-https://review.openstack.org/#/c/147882/
+https://review.opendev.org/#/c/147882/
