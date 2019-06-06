@@ -19,7 +19,6 @@ import mock
 from neutronclient.common import exceptions as neutron_exception
 
 from ec2api.api import common
-from ec2api.api import vpn_connection as vpn_connection_api
 from ec2api.api import vpn_gateway as vpn_gateway_api
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes
@@ -47,19 +46,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
         self.assertEqual({'vpnGateway': fakes.EC2_VPN_GATEWAY_2}, resp)
         self.db_api.add_item.assert_called_once_with(mock.ANY, 'vgw', {})
 
-    @mock.patch('ec2api.api.vpn_connection._reset_vpn_connections',
-                wraps=vpn_connection_api._reset_vpn_connections)
-    @mock.patch('ec2api.api.vpn_gateway._create_subnet_vpnservice',
-                wraps=vpn_gateway_api._create_subnet_vpnservice)
-    def test_attach_vpn_gateway(self, create_vpnservice,
-                                reset_vpn_connections):
-        create_vpnservice_calls = []
-        create_vpnservice.side_effect = (
-            tools.deepcopy_call_args_saver(create_vpnservice_calls))
-        mock_manager = mock.Mock()
-        mock_manager.attach_mock(create_vpnservice, 'create_vpnservice')
-        mock_manager.attach_mock(reset_vpn_connections,
-                                 'reset_vpn_connections')
+    def test_attach_vpn_gateway(self):
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         subnet_2 = tools.patch_dict(fakes.DB_SUBNET_2,
                                     {'vpc_id': fakes.ID_EC2_VPC_2},
@@ -91,23 +78,6 @@ class VpnGatewayTestCase(base.ApiTestCase):
                  mock.call(mock.ANY, subnet_2_updated)])
             self.neutron.create_vpnservice.assert_called_once_with(
                 {'vpnservice': os_vpnservice_2})
-            self.assertEqual(1, len(create_vpnservice_calls))
-            self.assertEqual(
-                mock.call(mock.ANY, self.neutron, mock.ANY, subnet_2,
-                          fakes.DB_VPC_2),
-                create_vpnservice_calls[0])
-            self.assertIsInstance(create_vpnservice_calls[0][1][2],
-                                  common.OnCrashCleaner)
-            reset_vpn_connections.assert_called_once_with(
-                mock.ANY, self.neutron, mock.ANY,
-                self.DB_VPN_GATEWAY_2_ATTACHED, subnets=[subnet_2_updated])
-            self.assertIsInstance(reset_vpn_connections.call_args[0][2],
-                                  common.OnCrashCleaner)
-            mock_manager.assert_has_calls([
-                mock.call.create_vpnservice(
-                    *(mock.ANY for _x in range(5))),
-                mock.call.reset_vpn_connections(
-                    subnets=mock.ANY, *(mock.ANY for _x in range(4)))])
 
         do_check()
         self.neutron.add_gateway_router.assert_called_once_with(
@@ -120,14 +90,12 @@ class VpnGatewayTestCase(base.ApiTestCase):
         # Internet gateway is already attached
         self.db_api.reset_mock()
         self.neutron.reset_mock()
-        del create_vpnservice_calls[:]
-        reset_vpn_connections.reset_mock()
-        mock_manager.reset_mock()
         igw_2 = tools.update_dict(fakes.DB_IGW_2,
                                   {'vpc_id': fakes.ID_EC2_VPC_2})
         self.add_mock_db_items(igw_2)
+
         do_check()
-        self.assertFalse(self.neutron.add_gateway_router.called)
+        self.neutron.add_gateway_router.assert_not_called()
 
     def test_attach_vpn_gateway_idempotent(self):
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
@@ -193,19 +161,7 @@ class VpnGatewayTestCase(base.ApiTestCase):
         self.neutron.remove_gateway_router.assert_called_once_with(
             fakes.ID_OS_ROUTER_2)
 
-    @mock.patch('ec2api.api.vpn_connection._stop_gateway_vpn_connections',
-                wraps=vpn_connection_api._stop_gateway_vpn_connections)
-    @mock.patch('ec2api.api.vpn_gateway._delete_subnet_vpnservice',
-                wraps=vpn_gateway_api._delete_subnet_vpnservice)
-    def test_detach_vpn_gateway(self, delete_vpnservice,
-                                stop_gateway_vpn_connections):
-        delete_vpnservice_calls = []
-        delete_vpnservice.side_effect = (
-            tools.deepcopy_call_args_saver(delete_vpnservice_calls))
-        mock_manager = mock.Mock()
-        mock_manager.attach_mock(delete_vpnservice, 'delete_vpnservice')
-        mock_manager.attach_mock(stop_gateway_vpn_connections,
-                                 'stop_gateway_vpn_connections')
+    def test_detach_vpn_gateway(self):
         self.set_mock_db_items(
             fakes.DB_VPN_GATEWAY_1, fakes.DB_VPC_1, fakes.DB_VPN_CONNECTION_1,
             fakes.DB_SUBNET_1,
@@ -228,24 +184,8 @@ class VpnGatewayTestCase(base.ApiTestCase):
                  mock.call(mock.ANY, self.DB_SUBNET_1_NO_VPN)])
             self.neutron.delete_vpnservice.assert_called_once_with(
                 fakes.ID_OS_VPNSERVICE_1)
-            self.assertEqual(1, len(delete_vpnservice_calls))
-            self.assertEqual(
-                mock.call(mock.ANY, self.neutron, mock.ANY, fakes.DB_SUBNET_1),
-                delete_vpnservice_calls[0])
-            self.assertIsInstance(delete_vpnservice_calls[0][1][2],
-                                  common.OnCrashCleaner)
-            stop_gateway_vpn_connections.assert_called_once_with(
-                mock.ANY, self.neutron, mock.ANY,
-                self.DB_VPN_GATEWAY_1_DETACHED)
-            self.assertIsInstance(stop_gateway_vpn_connections.call_args[0][2],
-                                  common.OnCrashCleaner)
             self.neutron.delete_ipsec_site_connection.assert_called_once_with(
                 fakes.ID_OS_IPSEC_SITE_CONNECTION_2)
-            mock_manager.assert_has_calls([
-                mock.call.stop_gateway_vpn_connections(
-                    *(mock.ANY for _x in range(4))),
-                mock.call.delete_vpnservice(
-                    *(mock.ANY for _x in range(4)))])
 
         do_check()
         self.neutron.remove_gateway_router.assert_called_once_with(
@@ -254,12 +194,10 @@ class VpnGatewayTestCase(base.ApiTestCase):
         # Internet gateway is still attached
         self.db_api.reset_mock()
         self.neutron.reset_mock()
-        del delete_vpnservice_calls[:]
-        stop_gateway_vpn_connections.reset_mock()
-        mock_manager.reset_mock()
         self.add_mock_db_items(fakes.DB_IGW_1)
+
         do_check()
-        self.assertFalse(self.neutron.remove_gateway_router.called)
+        self.neutron.remove_gateway_router.assert_not_called()
 
     def test_detach_vpn_gateway_invalid_parameters(self):
         def do_check(error_code):
