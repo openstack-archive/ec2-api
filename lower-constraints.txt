@@ -36,7 +36,7 @@ jmespath==0.9.3
 jsonpatch==1.21
 jsonpointer==2.0
 jsonschema==2.6.0
-keystoneauth1==3.4.0
+keystoneauth1==3.14.0
 linecache2==1.0.0
 logilab-common==1.4.1
 lxml==4.1.1
@@ -62,7 +62,7 @@ oslo.cache==1.29.0
 oslo.concurrency==3.26.0
 oslo.config==5.2.0
 oslo.context==2.20.0
-oslo.db==4.35.0
+oslo.db==4.40.0
 oslo.i18n==3.20.0
 oslo.log==3.37.0
 oslo.serialization==2.25.0
@@ -86,7 +86,7 @@ pyperclip==1.6.0
 python-cinderclient==3.5.0
 python-dateutil==2.7.0
 python-editor==1.0.3
-python-glanceclient==2.9.1
+python-glanceclient==2.16.0
 python-keystoneclient==3.15.0
 python-mimeparse==1.6.0
 python-neutronclient==6.7.0
@@ -103,7 +103,7 @@ Routes==2.4.1
 simplejson==3.13.2
 six==1.11.0
 snowballstemmer==1.2.1
-Sphinx==1.6.5
+Sphinx==1.7.0
 sphinxcontrib-websupport==1.0.1
 SQLAlchemy==1.2.5
 sqlalchemy-migrate==0.11.0
