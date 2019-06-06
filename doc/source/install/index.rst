@@ -15,7 +15,7 @@ Identity, Image.
    install-sh.rst
    install-manual.rst
    install-devstack.rst
-
+   install-ubuntu.rst
 
 .. toctree::
    :maxdepth: 1
