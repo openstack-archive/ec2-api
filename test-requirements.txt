@@ -11,9 +11,5 @@ oslotest>=3.3.0 # Apache-2.0
 os-testr>=1.0.0 # Apache-2.0
 pylint==1.4.5 # GPLv2
 python-subunit>=1.2.0 # Apache-2.0/BSD
-sphinx>=1.7.0,<2.0.0;python_version=='2.7' # BSD
-sphinx>=1.7.0;python_version>='3.4' # BSD
 testrepository>=0.0.20 # Apache-2.0/BSD
 testtools>=2.3.0 # MIT
-openstackdocstheme>=1.20.0 # Apache-2.0
-os-api-ref>=1.5.0 # Apache-2.0
