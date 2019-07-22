@@ -44,7 +44,7 @@ EC2API Reference
 
 -  `EC2-API Reference`_
 
-   .. _`EC2-API Reference`: https://developer.openstack.org/api-ref/ec2-api/
+   .. _`EC2-API Reference`: https://docs.openstack.org/api-ref/ec2-api/
 
 
 .. toctree::
