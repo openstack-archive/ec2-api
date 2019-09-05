@@ -52,7 +52,6 @@ and cache if you want to use it.
 .. code-block:: ini
 
      [cache]
-     backend = oslo_cache.dict
      enabled = True
 
 You can look for other configuration options in the `Configuration Reference`_
