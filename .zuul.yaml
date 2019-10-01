@@ -43,13 +43,13 @@
       - openstack-python-jobs
       - openstack-python3-train-jobs
       - publish-openstack-docs-pti
-#    check:
-#      jobs:
-#        - ec2-api-functional-neutron
-#    gate:
-#      queue: ec2-api
-#      jobs:
-#        - ec2-api-functional-neutron
+    check:
+      jobs:
+        - ec2-api-functional-neutron
+    gate:
+      queue: ec2-api
+      jobs:
+        - ec2-api-functional-neutron
     experimental:
       jobs:
         - ec2-api-functional-neutron-full
