@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import binascii
-import json
 import os
 import shutil
 import tarfile
@@ -33,6 +32,7 @@ from lxml import etree
 from oslo_concurrency import processutils
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_serialization import jsonutils
 import six
 
 from ec2api.api import common
@@ -258,7 +258,7 @@ def register_image(context, name=None, image_location=None,
             except cinder_exception.NotFound:
                 pass
         metadata['bdm_v2'] = 'True'
-        metadata['block_device_mapping'] = json.dumps(mappings)
+        metadata['block_device_mapping'] = jsonutils.dumps(mappings)
     if architecture is not None:
         metadata['architecture'] = architecture
     if kernel_id:

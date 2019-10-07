@@ -16,13 +16,13 @@
 
 import copy
 import functools
-import json
 import random
 import sys
 
 from oslo_config import cfg
 from oslo_db import exception as db_exception
 from oslo_db.sqlalchemy import session as db_session
+from oslo_serialization import jsonutils
 from sqlalchemy import and_
 from sqlalchemy import or_
 from sqlalchemy.sql import bindparam
@@ -318,7 +318,7 @@ def _pack_item_data(item_data):
     return {
         "os_id": data.pop("os_id", None),
         "vpc_id": data.pop("vpc_id", None),
-        "data": json.dumps(data),
+        "data": jsonutils.dumps(data),
     }
 
 
@@ -326,7 +326,7 @@ def _unpack_item_data(item_ref):
     if item_ref is None:
         return None
     data = item_ref.data
-    data = json.loads(data) if data is not None else {}
+    data = jsonutils.loads(data) if data is not None else {}
     data["id"] = item_ref.id
     data["os_id"] = item_ref.os_id
     data["vpc_id"] = item_ref.vpc_id

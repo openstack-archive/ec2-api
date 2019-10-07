@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import six
 import tempfile
@@ -21,6 +20,7 @@ from cinderclient import exceptions as cinder_exception
 import eventlet
 import mock
 from oslo_concurrency import processutils
+from oslo_serialization import jsonutils
 
 from ec2api.api import image as image_api
 from ec2api import exception
@@ -333,7 +333,7 @@ class ImageTestCase(base.ApiTestCase):
                            'device_name': '/dev/vdh',
                            'source_type': 'snapshot',
                            'snapshot_id': fakes.ID_OS_SNAPSHOT_2}],
-                         json.loads(bdm))
+                         jsonutils.loads(bdm))
         get_os_image.assert_has_calls(
             [mock.call(mock.ANY, fakes.ID_EC2_IMAGE_AKI_1),
              mock.call(mock.ANY, fakes.ID_EC2_IMAGE_ARI_1)])
