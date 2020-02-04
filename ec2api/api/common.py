@@ -375,11 +375,12 @@ class UniversalDescriber(object):
 
         next_item = 0
         if next_token:
-            next_item = int(base64.b64decode(next_token))
+            next_item = int(base64.b64decode(next_token).decode())
         if next_item:
             formatted_items = formatted_items[next_item:]
         if max_results and max_results < len(formatted_items):
-            self.next_token = base64.b64encode(str(next_item + max_results))
+            self.next_token = base64.b64encode(
+                str(next_item + max_results).encode())
             formatted_items = formatted_items[:max_results]
 
         return formatted_items
