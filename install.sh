@@ -230,14 +230,14 @@ else
     DISABLE_EC2_CLASSIC="False"
 fi
 if [[ "$VPC_SUPPORT" == "True" && -z "$EXTERNAL_NETWORK" ]]; then
-    declare -a newtron_output
-    readarray -s 3 -t newtron_output < <(openstack network list --external)
-    if ((${#newtron_output[@]} < 2)); then
+    declare -a neutron_output
+    readarray -s 3 -t neutron_output < <(openstack network list --external)
+    if ((${#neutron_output[@]} < 2)); then
         reason="No external network is declared in Neutron."
-    elif ((${#newtron_output[@]} > 2)); then
+    elif ((${#neutron_output[@]} > 2)); then
         reason="More than one external networks are declared in Neutron."
     else
-        EXTERNAL_NETWORK=$(echo $newtron_output | awk -F '|' '{ print $3 }')
+        EXTERNAL_NETWORK=$(echo $neutron_output | awk -F '|' '{ print $3 }')
     fi
     die_if_not_set $LINENO EXTERNAL_NETWORK "$reason. Please set EXTERNAL_NETWORK environment variable to the external network dedicated to EC2 elastic IP operations"
 fi
