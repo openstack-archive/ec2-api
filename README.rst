@@ -603,6 +603,15 @@ General:
 References
 ==========
 
+Wiki:
+https://wiki.openstack.org/wiki/EC2API
+
+Bugs:
+https://launchpad.net/ec2-api
+
+Source:
+https://opendev.org/openstack/ec2-api
+
 Blueprint:
 https://blueprints.launchpad.net/nova/+spec/ec2-api
 
