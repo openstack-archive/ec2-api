@@ -311,7 +311,15 @@ def _build_rules(context, group_id, group_name, ip_permissions, direction):
             os_security_group_rule_body['port_range_min'] = rule['from_port']
         if to_port != -1:
             os_security_group_rule_body['port_range_max'] = rule['to_port']
-
+        # NOTE(Dmitry_Eremeev): Neutron behaviour changed.
+        # If rule with full port range is created (1 - 65535), then Neutron
+        # creates rule without ports specified.
+        # If a rule with full port range must be deleted, then Neutron cannot
+        # find a rule with this range in order to delete it, but it can find
+        # a rule which has not ports in its properties.
+        if ((from_port == 1) and (to_port in [255, 65535])):
+            for item in ['port_range_min', 'port_range_max']:
+                del os_security_group_rule_body[item]
         # TODO(Alex) AWS protocol claims support of multiple groups and cidrs,
         # however, neutron doesn't support it at the moment.
         # It's possible in the future to convert list values incoming from
@@ -442,11 +450,22 @@ def _format_security_group(security_group, os_security_group,
         # them.
         if os_rule.get('ethertype', 'IPv4') == 'IPv6':
             continue
+        # NOTE(Dmitry_Eremeev): Neutron behaviour changed.
+        # If rule with full port range (except icmp protocol) is created
+        # (1 - 65535), then Neutron creates rule without ports specified.
+        # Ports passed for rule creation don't match ports in created rule.
+        # That's why default values were changed to match full port
+        # range (1 - 65535)
+        if os_rule.get('protocol') in ["icmp", 1]:
+            min_port = max_port = -1
+        else:
+            min_port = 1
+            max_port = 65535
         ec2_rule = {'ipProtocol': -1 if os_rule['protocol'] is None
                     else os_rule['protocol'],
-                    'fromPort': -1 if os_rule['port_range_min'] is None
+                    'fromPort': min_port if os_rule['port_range_min'] is None
                     else os_rule['port_range_min'],
-                    'toPort': -1 if os_rule['port_range_max'] is None
+                    'toPort': max_port if os_rule['port_range_max'] is None
                     else os_rule['port_range_max']}
         remote_group_id = os_rule['remote_group_id']
         if remote_group_id is not None:

@@ -43,6 +43,71 @@ the local.conf or localrc the following line:
 
  enable_plugin ec2-api https://opendev.org/openstack/ec2-api
 
+Devstack installation with ec2-api and ec2api-tempest-plugin for tests running:
+1. install packages: awscli, git, python3, python3-devel
+2. clone devstack repository
+
+::
+
+ git clone https://opendev.org/openstack/devstack
+
+3. grant all permissions for your user for directory: "/opt"
+4. create folder "/opt/stack/logs/"
+5. clone repository "ec2api-tempest-plugin" to stack folder:
+
+::
+
+ git clone https://github.com/openstack/ec2api-tempest-plugin /opt/stack/ec2api-tempest-plugin
+
+6. create local.conf:
+
+::
+
+ [[local|localrc]]
+ ADMIN_PASSWORD=secret
+ DATABASE_PASSWORD=$ADMIN_PASSWORD
+ RABBIT_PASSWORD=$ADMIN_PASSWORD
+ SERVICE_PASSWORD=$ADMIN_PASSWORD
+ enable_plugin ec2-api https://opendev.org/openstack/ec2-api
+ enable_plugin neutron-tempest-plugin https://github.com/openstack/neutron-tempest-plugin
+ TEMPEST_PLUGINS='/opt/stack/ec2api-tempest-plugin'
+
+7. go to devstack folder and start installation
+
+::
+
+ cd ~/devstack/
+ ./stack.sh
+ sudo systemctl enable httpd
+
+8. check installed devstack
+
+::
+
+ source ~/devstack/accrc/admin/admin
+ tempest list-plugins
+ ps -aux | grep "ec2"
+ aws --endpoint-url http://<IP-ADDRESS> --region <REGION> --profile admin ec2 describe-images
+ openstack catalog list
+ openstack flavor list
+ openstack image list
+ sudo journalctl -u devstack@ec2-api.service
+
+9. run integration tests (ec2 tempest test)
+
+::
+
+ cd /opt/stack/tempest
+ tox -eall -- ec2api_tempest_plugin --concurrency 1
+ tox -eall ec2api_tempest_plugin.api.test_network_interfaces.NetworkInterfaceTest.test_create_max_network_interface
+
+10. run ec2-api unit tests
+
+::
+
+ cd /opt/stack/ec2-api
+ tox -epy36 ec2api.tests.unit.test_security_group.SecurityGroupTestCase.test_describe_security_groups_no_default_vpc
+
 To configure OpenStack for EC2 API metadata service:
 
 for Nova-network

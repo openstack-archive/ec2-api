@@ -1277,9 +1277,9 @@ EC2_SECURITY_GROUP_DEFAULT = {
     'ipPermissions': None,
     'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
     'ipPermissionsEgress':
-    [{'toPort': -1,
+    [{'toPort': 65535,
       'ipProtocol': -1,
-      'fromPort': -1}],
+      'fromPort': 1}],
     'ownerId': ID_OS_PROJECT,
     'groupId': ID_EC2_SECURITY_GROUP_DEFAULT
 }
@@ -1289,9 +1289,9 @@ EC2_SECURITY_GROUP_1 = {
     'ipPermissions': None,
     'groupName': NAME_DEFAULT_OS_SECURITY_GROUP,
     'ipPermissionsEgress':
-    [{'toPort': -1,
+    [{'toPort': 65535,
       'ipProtocol': -1,
-      'fromPort': -1}],
+      'fromPort': 1}],
     'ownerId': ID_OS_PROJECT,
     'groupId': ID_EC2_SECURITY_GROUP_1
 }
@@ -1307,7 +1307,7 @@ EC2_SECURITY_GROUP_2 = {
       }],
     'groupName': 'groupname2',
     'ipPermissionsEgress':
-    [{'toPort': -1,
+    [{'toPort': 65535,
       'ipProtocol': 100,
       'fromPort': 10,
       'groups':
@@ -1337,7 +1337,7 @@ EC2_SECURITY_GROUP_4 = {
       }],
     'groupName': 'groupname2',
     'ipPermissionsEgress':
-    [{'toPort': -1,
+    [{'toPort': 65535,
       'ipProtocol': 100,
       'fromPort': 10,
       'groups':
@@ -1353,9 +1353,9 @@ EC2_SECURITY_GROUP_5 = {
     'groupDescription': 'Group description',
     'ipPermissions': None,
     'ipPermissionsEgress':
-    [{'toPort': -1,
+    [{'toPort': 65535,
       'ipProtocol': -1,
-      'fromPort': -1}],
+      'fromPort': 1}],
     'groupName': 'groupname2',
     'ownerId': ID_OS_PROJECT,
     'groupId': ID_EC2_SECURITY_GROUP_5
