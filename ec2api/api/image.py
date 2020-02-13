@@ -902,10 +902,10 @@ def _s3_create(context, metadata):
 
                 # NOTE(vish): this may be suboptimal, should we use cat?
                 enc_filename = os.path.join(image_path, 'image.encrypted')
-                with open(enc_filename, 'w') as combined:
+                with open(enc_filename, 'wb') as combined:
                     for filename in parts:
-                        with open(filename) as part:
-                            shutil.copyfileobj(part, combined)
+                        with open(filename, "rb") as part:
+                            combined.write(part.read())
 
             except Exception:
                 LOG.exception('Failed to download %(image_location)s '
@@ -935,7 +935,7 @@ def _s3_create(context, metadata):
 
             _update_image_state('uploading')
             try:
-                with open(unz_filename) as image_file:
+                with open(unz_filename, "rb") as image_file:
                     glance.images.upload(image.id, image_file)
             except Exception:
                 LOG.exception('Failed to upload %(image_location)s '
@@ -1013,13 +1013,8 @@ def _s3_download_file(s3_client, bucket_name, filename, local_dir):
     s3_object = s3_client.get_object(Bucket=bucket_name, Key=filename)
     local_filename = os.path.join(local_dir, os.path.basename(filename))
     body = s3_object['Body']
-    with open(local_filename, 'w') as f:
-        if isinstance(body, six.string_types):
-            f.write(body)
-        else:
-            # TODO(andrey-mp): check big objects
-            f.write(body.read())
-        f.close()
+    with open(local_filename, 'wb') as f:
+        f.write(body.read())
     return local_filename
 
 
@@ -1028,12 +1023,12 @@ def _s3_decrypt_image(context, encrypted_filename, encrypted_key,
     encrypted_key = binascii.a2b_hex(encrypted_key)
     encrypted_iv = binascii.a2b_hex(encrypted_iv)
     try:
-        key = _decrypt_text(encrypted_key)
+        key = _decrypt_text(encrypted_key).decode()
     except Exception as exc:
         msg = _('Failed to decrypt private key: %s') % exc
         raise exception.EC2Exception(msg)
     try:
-        iv = _decrypt_text(encrypted_iv)
+        iv = _decrypt_text(encrypted_iv).decode()
     except Exception as exc:
         msg = _('Failed to decrypt initialization vector: %s') % exc
         raise exception.EC2Exception(msg)
