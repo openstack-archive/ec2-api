@@ -43,8 +43,8 @@ the local.conf or localrc the following line:
 
  enable_plugin ec2-api https://opendev.org/openstack/ec2-api
 
-Devstack installation with ec2-api and ec2api-tempest-plugin for tests running:
-1. install packages: awscli, git, python3, python3-devel
+Devstack installation with ec2-api and ec2api-tempest-plugin for development:
+1. install packages: awscli, git, python3, python3-devel, ruby
 2. clone devstack repository
 
 ::
@@ -78,7 +78,6 @@ Devstack installation with ec2-api and ec2api-tempest-plugin for tests running:
 
  cd ~/devstack/
  ./stack.sh
- sudo systemctl enable httpd
 
 8. check installed devstack
 
