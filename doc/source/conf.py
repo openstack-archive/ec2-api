@@ -2,9 +2,7 @@
 from __future__ import print_function
 
 import os
-import subprocess
 import sys
-import warnings
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
@@ -19,8 +17,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'openstack_dashboard.settings'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc',
-              'sphinx.ext.doctest',
+extensions = ['sphinx.ext.doctest',
               'sphinx.ext.todo',
               'sphinx.ext.viewcode',
               'openstackdocstheme']
@@ -66,7 +63,6 @@ pygments_style = 'sphinx'
 # html_static_path = ['static']
 html_theme = 'openstackdocs'
 
-html_last_updated_fmt = '%Y-%m-%d %H:%M'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
@@ -75,14 +71,6 @@ html_theme_options = {"sidebar_mode": "toc"}
 # Output file base name for HTML help builder.
 htmlhelp_basename = '%sdoc' % project
 
-
-git_cmd = ["git", "log", "--pretty=format:'%ad, commit %h'", "--date=local",
-    "-n1"]
-try:
-    html_last_updated_fmt = subprocess.check_output(git_cmd).decode('utf-8')
-except Exception:
-    warnings.warn('Cannot get last updated time from git repository. '
-                  'Not setting "html_last_updated_fmt".')
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass
