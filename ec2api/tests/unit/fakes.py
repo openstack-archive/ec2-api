@@ -45,6 +45,7 @@ def random_ec2_id(kind):
 #        OS - object is stored in OpenStack
 #    object_name - identifies the object
 
+
 # common constants
 ID_OS_USER = random_os_id()
 ID_OS_PROJECT = random_os_id()
@@ -949,6 +950,7 @@ class OSInstance_full(OSInstance):
         setattr(self, 'OS-EXT-SRV-ATTR:hostname',
                 instance_dict.get('hostname'))
 
+
 OS_INSTANCE_1 = {
     'id': ID_OS_INSTANCE_1,
     'flavor': {'id': 'fakeFlavorId'},
@@ -1415,7 +1417,6 @@ NOVA_SECURITY_GROUP_2 = {
 }
 EC2_NOVA_SECURITY_GROUP_1 = {
     'groupDescription': 'Group description',
-    'ipPermissions': None,
     'groupName': 'groupname',
     'ipPermissionsEgress': None,
     'ipPermissions':
@@ -1596,6 +1597,7 @@ class OSImage(object):
     def __getitem__(self, key):
         return self._image_dict.get(key)
 
+
 TIME_CREATE_IMAGE = ec2utils.isotime(None, True)
 
 EC2_IMAGE_1 = {
@@ -1645,7 +1647,6 @@ EC2_IMAGE_2 = {
     'name': None,
     'description': 'fake desc',
     'imageLocation': 'None (None)',
-    'architecture': None,
     'rootDeviceType': 'ebs',
     'rootDeviceName': ROOT_DEVICE_NAME_IMAGE_2,
     'architecture': 'x86_64',
@@ -1765,6 +1766,7 @@ class OSSnapshot(object):
 
     def update(self, *args, **kwargs):
         pass
+
 
 TIME_CREATE_SNAPSHOT_1 = ec2utils.isotime(None, True)
 TIME_CREATE_SNAPSHOT_2 = ec2utils.isotime(None, True)
@@ -1945,6 +1947,7 @@ class NovaAvailabilityZone(object):
         self.zoneState = {'available': (
             nova_availability_zone_dict['zoneState'] == 'available')}
         self.hosts = nova_availability_zone_dict['hosts']
+
 
 OS_AVAILABILITY_ZONE = {'zoneName': NAME_AVAILABILITY_ZONE,
                         'zoneState': 'available',

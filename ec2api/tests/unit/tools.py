@@ -172,7 +172,7 @@ def deepcopy_call_args_saver(destination):
     return side_effect
 
 
-_xml_scheme = re.compile('\sxmlns=".*"')
+_xml_scheme = re.compile(r'\sxmlns=".*"')
 
 
 def parse_xml(xml_string):

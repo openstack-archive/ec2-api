@@ -27,5 +27,5 @@ setattr(builtins, '_', lambda x: x)
 
 # NOTE(ft): this is required by test_s3.S3APITestCase to switch execution
 # between test and server threads
-import eventlet
+import eventlet  # noqa: E402
 eventlet.monkey_patch(socket=True)

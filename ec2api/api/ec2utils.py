@@ -163,7 +163,7 @@ def dict_to_xml(data_dict, root_tag):
     return root
 
 
-_ms_time_regex = re.compile('^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3,6}Z$')
+_ms_time_regex = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3,6}Z$')
 
 
 def is_ec2_timestamp_expired(request, expires=None):
@@ -218,6 +218,7 @@ def get_ec2_id_kind(obj_id):
 def change_ec2_id_kind(obj_id, new_kind):
     return '%(kind)s-%(id)s' % {'kind': new_kind,
                                 'id': obj_id.split('-')[-1]}
+
 
 NOT_FOUND_EXCEPTION_MAP = {
     'vpc': exception.InvalidVpcIDNotFound,
@@ -502,9 +503,9 @@ def get_default_vpc(context):
 
 # NOTE(ft): following functions are copied from various parts of Nova
 
-_ephemeral = re.compile('^ephemeral(\d|[1-9]\d+)$')
+_ephemeral = re.compile(r'^ephemeral(\d|[1-9]\d+)$')
 
-_dev = re.compile('^/dev/')
+_dev = re.compile(r'^/dev/')
 
 
 def block_device_strip_dev(device_name):

@@ -94,7 +94,7 @@ def validate_cidr_with_ipv6(cidr, parameter_name, **kwargs):
     return True
 
 
-_cidr_re = re.compile("^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")
+_cidr_re = re.compile(r"^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$")
 
 
 def validate_cidr(cidr, parameter_name):
@@ -199,7 +199,7 @@ def validate_security_group_str(value, parameter_name, vpc_id=None):
     # NOTE(Alex) Amazon accepts any ASCII for EC2 classic;
     # for EC2-VPC: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=&;{}!$*
     if vpc_id:
-        allowed = '^[a-zA-Z0-9\._\-:/\(\)#,@\[\]\+=&;\{\}!\$\*\ ]+$'
+        allowed = r'^[a-zA-Z0-9\._\-:/\(\)#,@\[\]\+=&;\{\}!\$\*\ ]+$'
     else:
         allowed = r'^[\x20-\x7E]+$'
     msg = ''

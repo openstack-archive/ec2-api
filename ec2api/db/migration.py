@@ -56,6 +56,7 @@ class LazyPluggable(object):
         backend = self.__get_backend()
         return getattr(backend, key)
 
+
 IMPL = LazyPluggable('backend',
                      config_group='database',
                      sqlalchemy='ec2api.db.sqlalchemy.migration')

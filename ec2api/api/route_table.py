@@ -613,7 +613,7 @@ def _get_subnet_host_routes_and_gateway_ip(context, route_table, cidr_block,
         if 'gateway_id' in route:
             gateway_id = route['gateway_id']
             if gateway_id and gateway_id not in destinations:
-                    return '127.0.0.1'
+                return '127.0.0.1'
             return gateway_ip
         network_interface = destinations.get(route['network_interface_id'])
         if not network_interface:

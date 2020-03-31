@@ -16,4 +16,4 @@
 DB abstraction for EC2api
 """
 
-from ec2api.db.api import *
+from ec2api.db.api import *  # noqa: F401

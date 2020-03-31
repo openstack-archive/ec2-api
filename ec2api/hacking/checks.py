@@ -14,6 +14,8 @@
 
 import re
 
+from hacking import core
+
 
 _all_log_levels = {'critical', 'error', 'exception', 'info',
                    'warning', 'debug'}
@@ -28,6 +30,7 @@ _log_translation_hint = re.compile(
     })
 
 
+@core.flake8ext
 def no_translate_logs(logical_line, filename):
     """N537 - Don't translate logs.
 
@@ -46,7 +49,3 @@ def no_translate_logs(logical_line, filename):
     """
     if _log_translation_hint.match(logical_line):
         yield (0, "N537: Log messages should not be translated!")
-
-
-def factory(register):
-    register(no_translate_logs)
