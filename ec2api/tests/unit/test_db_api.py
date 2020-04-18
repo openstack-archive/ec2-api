@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
 from sqlalchemy.orm import exc as orm_exception
+from unittest import mock
 
 from ec2api.api import validator
 from ec2api.db import api as db_api

@@ -16,10 +16,10 @@
 import copy
 import logging
 import re
+from unittest import mock
 
 import fixtures
 from lxml import etree
-import mock
 
 from ec2api.api import ec2utils
 

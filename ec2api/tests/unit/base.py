@@ -14,11 +14,11 @@
 
 import copy
 import itertools
+from unittest import mock
 
 from cinderclient import client as cinderclient
 import fixtures
 from glanceclient import client as glanceclient
-import mock
 from novaclient import client as novaclient
 from oslo_concurrency import lockutils
 from oslo_config import fixture as config_fixture

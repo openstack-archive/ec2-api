@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import os
+from unittest import mock
+
 import six
 import tempfile
 
 from cinderclient import exceptions as cinder_exception
 import eventlet
-import mock
 from oslo_concurrency import processutils
 from oslo_serialization import jsonutils
 

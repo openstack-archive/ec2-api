@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import copy
+from unittest import mock
 
 import fixtures
-import mock
 from neutronclient.common import exceptions as neutron_exception
 
 from ec2api.api import common

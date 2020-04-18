@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import imp
+from unittest import mock
 
-import mock
 from oslo_config import cfg
 from oslo_config import fixture as config_fixture
 from oslo_context import context

@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import imp
+from unittest import mock
 
 import fixtures
-import mock
 
 from ec2api.api import clients
 from ec2api.tests.unit import base

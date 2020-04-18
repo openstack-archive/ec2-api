@@ -13,8 +13,8 @@
 # limitations under the License.
 
 
-import mock
 from neutronclient.common import exceptions as neutron_exception
+from unittest import mock
 
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes

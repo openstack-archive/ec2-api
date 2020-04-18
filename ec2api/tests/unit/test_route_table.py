@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import copy
+from unittest import mock
 
-import mock
 from oslotest import base as test_base
 
 from ec2api.api import common

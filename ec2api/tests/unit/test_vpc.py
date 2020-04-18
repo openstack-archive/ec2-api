@@ -14,9 +14,9 @@
 
 
 import copy
+from unittest import mock
 
 import fixtures
-import mock
 from neutronclient.common import exceptions as neutron_exception
 
 from ec2api.api import vpc as vpc_api

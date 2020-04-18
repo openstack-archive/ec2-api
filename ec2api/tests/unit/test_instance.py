@@ -17,8 +17,8 @@ import copy
 import datetime
 import itertools
 import random
+from unittest import mock
 
-import mock
 from novaclient import exceptions as nova_exception
 import six
 

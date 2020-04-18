@@ -14,8 +14,8 @@
 
 import base64
 import copy
+from unittest import mock
 
-import mock
 from novaclient import exceptions as nova_exception
 from oslo_cache import core as cache_core
 from oslo_config import cfg

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
+from unittest import mock
 
 from ec2api.api import image as image_api
 from ec2api.api import instance as instance_api

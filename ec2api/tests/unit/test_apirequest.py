@@ -13,7 +13,8 @@
 # limitations under the License.
 
 from lxml import etree
-import mock
+from unittest import mock
+
 from oslo_context import context
 from oslo_utils import timeutils
 import six

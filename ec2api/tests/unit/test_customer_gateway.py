@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-import mock
+from unittest import mock
 
 from ec2api.tests.unit import base
 from ec2api.tests.unit import fakes

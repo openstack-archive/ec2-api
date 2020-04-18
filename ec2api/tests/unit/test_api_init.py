@@ -13,10 +13,11 @@
 # limitations under the License.
 
 from botocore import exceptions as botocore_exceptions
+from unittest import mock
+
 from cinderclient import exceptions as cinder_exception
 from glanceclient.common import exceptions as glance_exception
 from keystoneclient import exceptions as keystone_exception
-import mock
 from neutronclient.common import exceptions as neutron_exception
 from novaclient import exceptions as nova_exception
 from oslo_context import context
