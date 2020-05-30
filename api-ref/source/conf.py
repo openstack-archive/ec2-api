@@ -39,9 +39,10 @@ html_theme_options = {
     "sidebar_mode": "toc",
 }
 # openstackdocstheme options
-repository_name = 'openstack/ec2-api'
-bug_project = 'ec2-api'
-bug_tag = ''
+openstackdocs_repo_name = 'openstack/ec2-api'
+openstackdocs_auto_name = False
+openstackdocs_bug_project = 'ec2-api'
+openstackdocs_bug_tag = ''
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -107,7 +108,7 @@ add_module_names = False
 show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'native'
 
 # -- Options for man page output ----------------------------------------------
 

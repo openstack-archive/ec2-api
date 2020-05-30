@@ -23,9 +23,10 @@ extensions = ['sphinx.ext.doctest',
               'openstackdocstheme']
 
 # openstackdocstheme options
-repository_name = 'openstack/ec2-api'
-bug_project = 'ec2-api'
-bug_tag = ''
+openstackdocs_repo_name = 'openstack/ec2-api'
+openstackdocs_auto_name = False
+openstackdocs_bug_project = 'ec2-api'
+openstackdocs_bug_tag = ''
 
 # autodoc generation is a bit aggressive and a nuisance when doing heavy
 # text edit cycles.
@@ -52,7 +53,7 @@ add_function_parentheses = True
 add_module_names = True
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'native'
 
 # -- Options for HTML output --------------------------------------------------
 
