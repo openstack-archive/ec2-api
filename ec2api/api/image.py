@@ -1002,7 +1002,7 @@ def _s3_parse_manifest(context, manifest):
                      'container_format': image_format})
     image_parts = [
            fn_element.text
-           for fn_element in manifest.find('image').getiterator('filename')]
+           for fn_element in manifest.find('image').iter('filename')]
     encrypted_key = manifest.find('image/ec2_encrypted_key').text
     encrypted_iv = manifest.find('image/ec2_encrypted_iv').text
 
