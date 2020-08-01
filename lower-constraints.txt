@@ -39,7 +39,7 @@ linecache2==1.0.0
 logilab-common==1.4.1
 lxml==4.1.1
 Mako==1.0.7
-MarkupSafe==1.0
+MarkupSafe==1.1.1
 mccabe==0.2.1
 monotonic==1.4
 mox3==0.25.0
@@ -86,7 +86,7 @@ python-novaclient==10.1.0
 python-openstackclient==3.14.0
 python-subunit==1.2.0
 pytz==2018.3
-PyYAML==3.12
+PyYAML==3.13
 repoze.lru==0.7
 requests==2.18.4
 requestsexceptions==1.4.0
