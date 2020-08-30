@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import imp
+import importlib
 from unittest import mock
 
 import fixtures
@@ -24,7 +24,7 @@ from ec2api.tests.unit import base
 class ClientsTestCase(base.BaseTestCase):
 
     def setUp(self):
-        imp.reload(clients)
+        importlib.reload(clients)
         super(ClientsTestCase, self).setUp()
 
     @mock.patch.object(clients, '_get_nova_api_version', return_value='2.3')

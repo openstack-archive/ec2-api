@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import imp
+import importlib
 from unittest import mock
 
 from oslo_config import cfg
@@ -36,7 +36,7 @@ class ContextTestCase(test_base.BaseTestCase):
         clients._admin_session = None
         conf.config(auth_type='fake', group=GROUP_AUTHTOKEN)
 
-        imp.reload(ec2_context)
+        importlib.reload(ec2_context)
         # NOTE(ft): initialize a regular context to populate oslo_context's
         # local storage to prevent admin context to populate it.
         # Used to implicitly validate overwrite=False argument of the call
