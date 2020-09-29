@@ -18,7 +18,6 @@ from unittest import mock
 from oslo_config import cfg
 from oslo_config import fixture as config_fixture
 from oslotest import base as test_base
-import six
 import testtools
 import webob
 
@@ -366,7 +365,7 @@ class ProxyTestCase(test_base.BaseTestCase):
     @mock.patch('ec2api.metadata.api.instance_api')
     @mock.patch('ec2api.metadata.MetadataRequestHandler._validate_signature')
     def test_get_metadata_items(self, validate, instance_api, db_api, nova):
-        FAKE_USER_DATA = u'fake_user_data-' + six.unichr(1071)
+        FAKE_USER_DATA = u'fake_user_data-' + chr(1071)
         nova.return_value.servers.list.return_value = [
             fakes.OSInstance(fakes.OS_INSTANCE_1)]
         keypair = mock.Mock(public_key=fakes.PUBLIC_KEY_KEY_PAIR)

@@ -40,8 +40,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import fileutils
 import routes
-import six
-from six.moves.urllib import parse
+from urllib import parse
 import webob
 
 from ec2api import paths
@@ -176,7 +175,7 @@ class BaseRequestHandler(object):
         self.set_status(404)
 
     def finish(self, body=''):
-        if isinstance(body, six.binary_type):
+        if isinstance(body, bytes):
             self.response.body = body
         else:
             self.response.body = body.encode("utf-8")
@@ -187,11 +186,11 @@ class BaseRequestHandler(object):
     def render_xml(self, value):
         assert isinstance(value, dict) and len(value) == 1
         self.set_header("Content-Type", "application/xml; charset=UTF-8")
-        name = next(six.iterkeys(value))
+        name = next(iter(value.keys()))
         parts = []
         parts.append('<' + name +
                      ' xmlns="http://s3.amazonaws.com/doc/2006-03-01/">')
-        self._render_parts(next(six.itervalues(value)), parts)
+        self._render_parts(next(iter(value.values())), parts)
         parts.append('</' + name + '>')
         self.finish('<?xml version="1.0" encoding="UTF-8"?>\n' +
                     ''.join(parts))
@@ -200,9 +199,9 @@ class BaseRequestHandler(object):
         if not parts:
             parts = []
 
-        if isinstance(value, six.string_types):
+        if isinstance(value, str):
             parts.append(utils.xhtml_escape(value))
-        elif isinstance(value, six.integer_types):
+        elif isinstance(value, int):
             parts.append(str(value))
         elif isinstance(value, datetime.datetime):
             parts.append(value.strftime("%Y-%m-%dT%H:%M:%S.000Z"))

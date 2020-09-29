@@ -20,7 +20,6 @@ import random
 from unittest import mock
 
 from novaclient import exceptions as nova_exception
-import six
 
 from ec2api.api import instance as instance_api
 import ec2api.clients
@@ -703,7 +702,8 @@ class InstanceTestCase(base.ApiTestCase):
         utcnow.return_value = datetime.datetime(2015, 1, 19, 23, 34, 45, 123)
         resp = self.execute(operation,
                             {'InstanceId': fakes.ID_EC2_INSTANCE_2})
-        expected_data = (base64.b64encode(six.b(getter.return_value))
+        expected_data = (base64.b64encode(getter.return_value.
+                                          encode("latin-1"))
                                .decode("utf-8"))
         self.assertEqual({'instanceId': fakes.ID_EC2_INSTANCE_2,
                           'timestamp': '2015-01-19T23:34:45.000Z',

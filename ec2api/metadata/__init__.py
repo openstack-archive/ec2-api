@@ -20,8 +20,7 @@ import httplib2
 from oslo_cache import core as cache_core
 from oslo_config import cfg
 from oslo_log import log as logging
-import six
-import six.moves.urllib.parse as urlparse
+import urllib.parse as urlparse
 import webob
 
 from ec2api import context as ec2_context
@@ -118,7 +117,7 @@ class MetadataRequestHandler(wsgi.Application):
             msg = _('An unknown error has occurred. '
                     'Please try your request again.')
             return webob.exc.HTTPInternalServerError(
-                explanation=six.text_type(msg))
+                explanation=str(msg))
 
     def _proxy_request(self, req, requester):
         headers = self._build_proxy_request_headers(requester)
@@ -167,7 +166,7 @@ class MetadataRequestHandler(wsgi.Application):
             )
             LOG.warning(msg)
             return webob.exc.HTTPInternalServerError(
-                explanation=six.text_type(msg))
+                explanation=str(msg))
         else:
             raise Exception(_('Unexpected response code: %s') % resp.status)
 
@@ -213,9 +212,9 @@ class MetadataRequestHandler(wsgi.Application):
             msg = _('X-Instance-ID header is missing from request.')
         elif project_id is None:
             msg = _('X-Tenant-ID header is missing from request.')
-        elif not isinstance(os_instance_id, six.string_types):
+        elif not isinstance(os_instance_id, str):
             msg = _('Multiple X-Instance-ID headers found within request.')
-        elif not isinstance(project_id, six.string_types):
+        elif not isinstance(project_id, str):
             msg = _('Multiple X-Tenant-ID headers found within request.')
         else:
             msg = None
@@ -277,7 +276,7 @@ class MetadataRequestHandler(wsgi.Application):
                                      self.cache_region)
 
     def _add_response_data(self, response, data):
-        if isinstance(data, six.text_type):
+        if isinstance(data, str):
             response.text = data
         else:
             response.body = data

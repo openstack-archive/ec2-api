@@ -18,7 +18,6 @@ from oslo_config import cfg
 from oslo_context import context
 from oslo_log import log as logging
 from oslo_utils import timeutils
-import six
 
 from ec2api import clients
 from ec2api import exception
@@ -71,7 +70,7 @@ class RequestContext(context.RequestContext):
         self.project_id = project_id
         self.remote_address = remote_address
         timestamp = timeutils.utcnow()
-        if isinstance(timestamp, six.string_types):
+        if isinstance(timestamp, str):
             timestamp = timeutils.parse_strtime(timestamp)
         self.timestamp = timestamp
 

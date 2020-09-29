@@ -23,8 +23,6 @@ import collections
 
 from oslo_config import cfg
 from oslo_log import log as logging
-import six
-import six.moves
 
 from ec2api.api import address
 from ec2api.api import availability_zone
@@ -60,7 +58,7 @@ def module_and_param_types(module, *args, **kwargs):
         def func_wrapped(*args, **kwargs):
             impl_func = getattr(module, func.__name__)
             context = args[1]
-            params = collections.OrderedDict(six.moves.zip(
+            params = collections.OrderedDict(zip(
                 func.__code__.co_varnames[2:], param_types))
             param_num = 0
             mandatory_params_num = (func.__code__.co_argcount - 2 -

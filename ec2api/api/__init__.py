@@ -28,7 +28,6 @@ from oslo_log import log as logging
 from oslo_serialization import jsonutils
 from oslo_utils import timeutils
 import requests
-import six
 import webob
 import webob.dec
 import webob.exc
@@ -345,16 +344,16 @@ def ec2_error_ex(ex, req, unexpected=False):
     if unexpected and status >= 500:
         message = _('Unknown error occurred.')
     elif getattr(ex, 'message', None):
-        message = six.text_type(ex.message)
+        message = str(ex.message)
     elif ex.args and any(arg for arg in ex.args):
-        message = " ".join(map(six.text_type, ex.args))
+        message = " ".join(map(str, ex.args))
     else:
-        message = six.text_type(ex)
+        message = str(ex)
     if unexpected:
         # Log filtered environment for unexpected errors.
         env = req.environ.copy()
         for k in list(env.keys()):
-            if not isinstance(env[k], six.string_types):
+            if not isinstance(env[k], str):
                 env.pop(k)
         log_fun(_('Environment: %s') % jsonutils.dumps(env))
     return faults.ec2_error_response(request_id, code, message, status=status)
@@ -394,6 +393,6 @@ class Executor(wsgi.Application):
             resp = webob.Response()
             resp.status = 200
             resp.headers['Content-Type'] = 'text/xml'
-            resp.body = six.binary_type(result)
+            resp.body = bytes(result)
 
             return resp

@@ -23,7 +23,6 @@ from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_utils import timeutils
-import six
 
 from ec2api.api import common
 from ec2api.api import ec2utils
@@ -1047,7 +1046,7 @@ def _get_groups_name_to_id(context):
 
 
 def _get_ip_info_for_instance(os_instance):
-    addresses = list(itertools.chain(*six.itervalues(os_instance.addresses)))
+    addresses = list(itertools.chain(*os_instance.addresses.values()))
     fixed_ip = next((addr['addr'] for addr in addresses
                      if (addr['version'] == 4 and
                          addr['OS-EXT-IPS:type'] == 'fixed')), None)
@@ -1688,7 +1687,7 @@ _NAME_TO_CODE = {
 }
 _CODE_TO_NAMES = {code: [item[0] for item in _NAME_TO_CODE.items()
                          if item[1] == code]
-                  for code in set(six.itervalues(_NAME_TO_CODE))}
+                  for code in set(_NAME_TO_CODE.values())}
 
 
 def inst_state_name_to_code(name):

@@ -20,11 +20,8 @@ SHOULD include dedicated exception logging.
 
 """
 
-import sys
-
 from oslo_config import cfg
 from oslo_log import log as logging
-import six
 
 from ec2api.i18n import _
 
@@ -55,8 +52,7 @@ class EC2APIException(Exception):
         if not message:
             try:
                 message = self.msg_fmt % kwargs
-            except Exception:
-                exc_info = sys.exc_info()
+            except Exception as e:
                 # kwargs doesn't match a variable in the message
                 # log the issue and the kwargs
                 LOG.exception('Exception in string format operation for '
@@ -65,11 +61,11 @@ class EC2APIException(Exception):
                     LOG.error('%s: %s' % (name, value))
 
                 if CONF.fatal_exception_format_errors:
-                    six.reraise(*exc_info)
+                    raise e
                 else:
                     # at least get the core message out if something happened
                     message = self.msg_fmt
-        elif not isinstance(message, six.string_types):
+        elif not isinstance(message, str):
             LOG.error("Message '%(msg)s' for %(ex)s exception is not "
                       "a string",
                       {'msg': message, 'ex': self.__class__.__name__})

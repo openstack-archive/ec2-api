@@ -33,7 +33,6 @@ from oslo_concurrency import processutils
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
-import six
 
 from ec2api.api import common
 from ec2api.api import ec2utils
@@ -42,6 +41,7 @@ from ec2api import clients
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
+import urllib.parse as parse
 
 LOG = logging.getLogger(__name__)
 
@@ -226,7 +226,7 @@ def register_image(context, name=None, image_location=None,
 
         # Resolve the import type
         metadata['image_location'] = image_location
-        parsed_url = six.moves.urllib.parse.urlparse(image_location)
+        parsed_url = parse.urlparse(image_location)
         is_s3_import = (parsed_url.scheme == '') or (parsed_url.scheme == 's3')
         is_url_import = not is_s3_import
 
@@ -847,7 +847,7 @@ def _s3_create(context, metadata):
     """Gets a manifest from s3 and makes an image."""
 
     # Parse the metadata into bucket and manifest path
-    parsed_url = six.moves.urllib.parse.urlparse(metadata['image_location'])
+    parsed_url = parse.urlparse(metadata['image_location'])
     if parsed_url.hostname is not None:
         # Handle s3://<BUCKET_NAME>/<KEY_PATH> case
         bucket_name = parsed_url.hostname
@@ -862,7 +862,7 @@ def _s3_create(context, metadata):
     image_location = '/'.join([bucket_name, manifest_path])
     key = s3_client.get_object(Bucket=bucket_name, Key=manifest_path)
     body = key['Body']
-    if isinstance(body, six.string_types):
+    if isinstance(body, str):
         manifest = body
     else:
         # TODO(andrey-mp): check big objects

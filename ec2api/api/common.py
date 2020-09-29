@@ -18,15 +18,13 @@ import fnmatch
 import inspect
 import operator
 
-from oslo_config import cfg
-from oslo_log import log as logging
-import six
-
 from ec2api.api import ec2utils
 from ec2api.api import validator
 from ec2api.db import api as db_api
 from ec2api import exception
 from ec2api.i18n import _
+from oslo_config import cfg
+from oslo_log import log as logging
 
 
 ec2_opts = [
@@ -68,12 +66,8 @@ class OnCrashCleaner(object):
                 function(*args, **kwargs)
             except Exception:
                 if inspect.ismethod(function):
-                    if six.PY2:
-                        cmodule = function.im_class.__module__
-                        cname = function.im_class.__name__
-                    else:
-                        cmodule = function.__self__.__class__.__module__
-                        cname = function.__self__.__class__.__name__
+                    cmodule = function.__self__.__class__.__module__
+                    cname = function.__self__.__class__.__name__
                     name = '%s.%s.%s' % (cmodule, cname, function.__name__)
                 elif inspect.isfunction(function):
                     name = '%s.%s' % (function.__module__, function.__name__)
