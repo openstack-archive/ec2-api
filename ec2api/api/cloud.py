@@ -56,8 +56,19 @@ def module_and_param_types(module, *args, **kwargs):
     param_types = args
 
     def wrapped(func):
+        """
+        Decorator for validates arguments and kwargs.
+
+        Args:
+            func: (callable): write your description
+        """
 
         def func_wrapped(*args, **kwargs):
+            """
+            Decorator toil.
+
+            Args:
+            """
             impl_func = getattr(module, func.__name__)
             context = args[1]
             params = collections.OrderedDict(six.moves.zip(
@@ -91,9 +102,21 @@ class CloudController(object):
     """
 
     def __init__(self):
+        """
+        Initialize the object
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def __str__(self):
+        """
+        Return a string representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         return 'CloudController'
 
     @module_and_param_types(address, 'str255')

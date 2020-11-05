@@ -24,6 +24,12 @@ from ec2api.tests.unit import matchers
 class TagTestCase(base.ApiTestCase):
 
     def test_create_tags(self):
+        """
+        Creates a dictionary.
+
+        Args:
+            self: (todo): write your description
+        """
         self.db_api.get_item_by_id.return_value = {'id': 'fake'}
 
         # NOTE(ft): check create several tags for several resources
@@ -78,6 +84,12 @@ class TagTestCase(base.ApiTestCase):
         self.assertEqual({'return': True}, resp)
 
     def test_create_tags_invalid_parameters(self):
+        """
+        Create tags :
+
+        Args:
+            self: (todo): write your description
+        """
         # NOTE(ft): check tag validity checks
         self.assert_execution_error('InvalidParameterValue', 'CreateTags',
                                     {'ResourceId.1': fakes.ID_EC2_VPC_1,
@@ -120,6 +132,12 @@ class TagTestCase(base.ApiTestCase):
                  'Tag.1.Value': 'fake-value'})
 
     def test_delete_tag(self):
+        """
+        Delete the test tag.
+
+        Args:
+            self: (todo): write your description
+        """
         resp = self.execute('DeleteTags',
                             {'ResourceId.1': fakes.ID_EC2_VPC_1,
                              'ResourceId.2': fakes.ID_EC2_SUBNET_1,
@@ -142,6 +160,12 @@ class TagTestCase(base.ApiTestCase):
             mock.ANY, [fakes.ID_EC2_VPC_1], None)
 
     def test_describe_tags(self):
+        """
+        Describe the tags.
+
+        Args:
+            self: (todo): write your description
+        """
         self.db_api.get_tags.return_value = [{'item_id': fakes.ID_EC2_VPC_1,
                                               'key': 'key1',
                                               'value': ''},

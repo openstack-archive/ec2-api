@@ -39,6 +39,13 @@ _DEFAULT_LOGGING_CONTEXT_FORMAT = ('%(asctime)s.%(msecs)03d %(process)d '
 
 
 def parse_args(argv, default_config_files=None):
+    """
+    Parse command line arguments.
+
+    Args:
+        argv: (list): write your description
+        default_config_files: (str): write your description
+    """
     log.set_defaults(_DEFAULT_LOGGING_CONTEXT_FORMAT, _DEFAULT_LOG_LEVELS)
     log.register_options(CONF)
     options.set_defaults(CONF, connection=_DEFAULT_SQL_CONNECTION)

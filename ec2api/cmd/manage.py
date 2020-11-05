@@ -43,6 +43,12 @@ def do_db_sync():
 
 
 def add_command_parsers(subparsers):
+    """
+    Add command line arguments for the given subcommand.
+
+    Args:
+        subparsers: (todo): write your description
+    """
     parser = subparsers.add_parser('db_version')
     parser.set_defaults(func=do_db_version)
 
@@ -59,6 +65,11 @@ command_opt = cfg.SubCommandOpt('command',
 
 
 def main():
+    """
+    Main entry point.
+
+    Args:
+    """
     CONF.register_cli_opt(command_opt)
     config.parse_args(sys.argv)
     log.setup(CONF, "ec2api")

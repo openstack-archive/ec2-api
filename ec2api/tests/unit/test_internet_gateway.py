@@ -25,12 +25,24 @@ from ec2api.tests.unit import tools
 class IgwTestCase(base.ApiTestCase):
 
     def setUp(self):
+        """
+        Sets a set of the i / o ( i.
+
+        Args:
+            self: (todo): write your description
+        """
         super(IgwTestCase, self).setUp()
         self.DB_IGW_1_DETACHED = fakes.gen_db_igw(fakes.ID_EC2_IGW_1)
         self.DB_IGW_2_ATTACHED = fakes.gen_db_igw(fakes.ID_EC2_IGW_2,
                                                   fakes.ID_EC2_VPC_2)
 
     def test_create_igw(self):
+        """
+        Create a sigww object.
+
+        Args:
+            self: (todo): write your description
+        """
         self.db_api.add_item.return_value = fakes.DB_IGW_2
 
         resp = self.execute('CreateInternetGateway', {})
@@ -42,6 +54,12 @@ class IgwTestCase(base.ApiTestCase):
                 mock.ANY, 'igw', {})
 
     def test_attach_igw(self):
+        """
+        Configure offline offline.
+
+        Args:
+            self: (todo): write your description
+        """
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2,
                                fakes.DB_VPN_GATEWAY_1, fakes.DB_VPN_GATEWAY_2)
@@ -49,6 +67,11 @@ class IgwTestCase(base.ApiTestCase):
                 {'networks': [{'id': fakes.ID_OS_PUBLIC_NETWORK}]})
 
         def do_check():
+            """
+            Checks status check.
+
+            Args:
+            """
             resp = self.execute(
                     'AttachInternetGateway',
                     {'VpcId': fakes.ID_EC2_VPC_2,
@@ -76,7 +99,19 @@ class IgwTestCase(base.ApiTestCase):
         self.assertFalse(self.neutron.add_gateway_router.called)
 
     def test_attach_igw_invalid_parameters(self):
+        """
+        : return : : return :
+
+        Args:
+            self: (todo): write your description
+        """
         def do_check(error_code):
+            """
+            Check if the http post request.
+
+            Args:
+                error_code: (str): write your description
+            """
             self.assert_execution_error(
                 error_code, 'AttachInternetGateway',
                 {'VpcId': fakes.ID_EC2_VPC_2,
@@ -104,6 +139,12 @@ class IgwTestCase(base.ApiTestCase):
 
     @tools.screen_unexpected_exception_logs
     def test_attach_igw_rollback(self):
+        """
+        Configure rollback backback
+
+        Args:
+            self: (todo): write your description
+        """
         self.configure(external_network=fakes.NAME_OS_PUBLIC_NETWORK)
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2, fakes.DB_VPC_2)
         self.neutron.list_networks.return_value = (
@@ -119,9 +160,20 @@ class IgwTestCase(base.ApiTestCase):
                 mock.ANY, fakes.DB_IGW_2)
 
     def test_detach_igw(self):
+        """
+        Detach the db from the db.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
 
         def do_check():
+            """
+            Checks if the database.
+
+            Args:
+            """
             resp = self.execute(
                     'DetachInternetGateway',
                     {'VpcId': fakes.ID_EC2_VPC_1,
@@ -142,7 +194,19 @@ class IgwTestCase(base.ApiTestCase):
         self.assertFalse(self.neutron.remove_gateway_router.called)
 
     def test_detach_igw_invalid_parameters(self):
+        """
+        Detach the database connection parameters.
+
+        Args:
+            self: (todo): write your description
+        """
         def do_check(error_code):
+            """
+            Check for errors and execute request.
+
+            Args:
+                error_code: (str): write your description
+            """
             self.assert_execution_error(
                 error_code, 'DetachInternetGateway',
                 {'VpcId': fakes.ID_EC2_VPC_1,
@@ -164,6 +228,12 @@ class IgwTestCase(base.ApiTestCase):
         do_check('Gateway.NotAttached')
 
     def test_detach_igw_no_router(self):
+        """
+        Detach router from router.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
         self.neutron.remove_gateway_router.side_effect = (
                 neutron_exception.NotFound)
@@ -179,6 +249,12 @@ class IgwTestCase(base.ApiTestCase):
 
     @tools.screen_unexpected_exception_logs
     def test_detach_igw_rollback(self):
+        """
+        Detach rollback to rollback
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_VPC_1)
         self.neutron.remove_gateway_router.side_effect = Exception()
 
@@ -191,6 +267,12 @@ class IgwTestCase(base.ApiTestCase):
                 mock.ANY, fakes.DB_IGW_1)
 
     def test_delete_igw(self):
+        """
+        Removes the database.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_IGW_2)
 
         resp = self.execute(
@@ -204,7 +286,19 @@ class IgwTestCase(base.ApiTestCase):
                                                         fakes.ID_EC2_IGW_2)
 
     def test_delete_igw_invalid_parameters(self):
+        """
+        Reversew database
+
+        Args:
+            self: (todo): write your description
+        """
         def do_check(error_code):
+            """
+            Check for errors and raise an error.
+
+            Args:
+                error_code: (str): write your description
+            """
             self.assert_execution_error(
                 error_code, 'DeleteInternetGateway',
                 {'InternetGatewayId': fakes.ID_EC2_IGW_1})
@@ -221,6 +315,12 @@ class IgwTestCase(base.ApiTestCase):
         do_check('DependencyViolation')
 
     def test_describe_igw(self):
+        """
+        Describe the repo.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_IGW_1, fakes.DB_IGW_2)
 
         resp = self.execute('DescribeInternetGateways', {})
@@ -246,9 +346,22 @@ class IgwTestCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_describe_internet_gateways_no_default_vpc(self, check_and_create):
+        """
+        Describe the vpc gateway.
+
+        Args:
+            self: (todo): write your description
+            check_and_create: (todo): write your description
+        """
         self.configure(disable_ec2_classic=True)
 
         def mock_check_and_create(context):
+            """
+            Creates a mock.
+
+            Args:
+                context: (todo): write your description
+            """
             self.set_mock_db_items(fakes.DB_VPC_DEFAULT,
                                    fakes.DB_IGW_DEFAULT)
         check_and_create.side_effect = mock_check_and_create

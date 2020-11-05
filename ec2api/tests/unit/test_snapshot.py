@@ -23,6 +23,12 @@ from ec2api.tests.unit import tools
 class SnapshotTestCase(base.ApiTestCase):
 
     def test_describe_snapshots(self):
+        """
+        Describes snapshot of all snapshots
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volume_snapshots.list.return_value = [
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1),
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_2)]
@@ -66,6 +72,12 @@ class SnapshotTestCase(base.ApiTestCase):
             fakes.ID_EC2_SNAPSHOT_1, 'snapshotId')
 
     def test_describe_snapshots_auto_remove(self):
+        """
+        Remove snapshot snapshot from snapshot
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volume_snapshots.list.return_value = []
 
         self.set_mock_db_items(fakes.DB_SNAPSHOT_1, fakes.DB_VOLUME_2)
@@ -81,6 +93,12 @@ class SnapshotTestCase(base.ApiTestCase):
                                                 fakes.ID_EC2_SNAPSHOT_1)
 
     def test_describe_snapshots_invalid_parameters(self):
+        """
+        Test if the snapshot of the volume.
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volume_snapshots.list.return_value = [
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1),
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_2)]
@@ -96,6 +114,12 @@ class SnapshotTestCase(base.ApiTestCase):
             {'SnapshotId.1': fakes.ID_EC2_SNAPSHOT_1})
 
     def test_create_snapshot_from_volume(self):
+        """
+        Create snapshot snapshot from snapshot snapshot.
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volume_snapshots.create.return_value = (
             fakes.OSSnapshot(fakes.OS_SNAPSHOT_1))
         self.db_api.add_item.side_effect = (
@@ -119,6 +143,12 @@ class SnapshotTestCase(base.ApiTestCase):
             fakes.ID_OS_VOLUME_2, force=True)
 
     def test_format_snapshot_maps_status(self):
+        """
+        Format the snapshot of the snapshot.
+
+        Args:
+            self: (todo): write your description
+        """
         fake_snapshot = fakes.OSSnapshot(fakes.OS_SNAPSHOT_1)
         self.cinder.volume_snapshots.list.return_value = [fake_snapshot]
         self.set_mock_db_items(fakes.DB_SNAPSHOT_1, fakes.DB_VOLUME_2)

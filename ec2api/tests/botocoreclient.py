@@ -18,6 +18,17 @@ from oslo_config import types
 
 
 def _get_client(client_name, url, region, access, secret, ca_bundle):
+    """
+    Create a client.
+
+    Args:
+        client_name: (str): write your description
+        url: (str): write your description
+        region: (str): write your description
+        access: (str): write your description
+        secret: (str): write your description
+        ca_bundle: (str): write your description
+    """
     connection_data = {
         'config_file': (None, 'AWS_CONFIG_FILE', None, None),
         'region': ('region', 'AWS_DEFAULT_REGION', region, None),
@@ -38,8 +49,28 @@ def _get_client(client_name, url, region, access, secret, ca_bundle):
 
 
 def get_ec2_client(url, region, access, secret, ca_bundle=None):
+    """
+    Get ec2 client
+
+    Args:
+        url: (str): write your description
+        region: (str): write your description
+        access: (str): write your description
+        secret: (str): write your description
+        ca_bundle: (str): write your description
+    """
     return _get_client('ec2', url, region, access, secret, ca_bundle)
 
 
 def get_s3_client(url, region, access, secret, ca_bundle=None):
+    """
+    Get s3 client
+
+    Args:
+        url: (str): write your description
+        region: (str): write your description
+        access: (str): write your description
+        secret: (str): write your description
+        ca_bundle: (str): write your description
+    """
     return _get_client('s3', url, region, access, secret, ca_bundle)

@@ -31,6 +31,12 @@ get_engine = db_session.get_engine
 
 
 def db_sync(version=None):
+    """
+    Sync the current versioning to the database.
+
+    Args:
+        version: (str): write your description
+    """
     if version is not None:
         try:
             version = int(version)
@@ -47,6 +53,11 @@ def db_sync(version=None):
 
 
 def db_version():
+    """
+    Return the database version.
+
+    Args:
+    """
     repository = _find_migrate_repo()
     try:
         return versioning_api.db_version(get_engine(), repository)
@@ -66,10 +77,21 @@ def db_version():
 
 
 def db_initial_version():
+    """
+    Return the database version.
+
+    Args:
+    """
     return INIT_VERSION
 
 
 def db_version_control(version=None):
+    """
+    Return the version control control control.
+
+    Args:
+        version: (str): write your description
+    """
     repository = _find_migrate_repo()
     versioning_api.version_control(get_engine(), repository, version)
     return version

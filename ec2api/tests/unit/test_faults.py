@@ -23,9 +23,22 @@ class FakeResponse(object):
     reason = "Test Reason"
 
     def __init__(self, status_code=400):
+        """
+        Initialize status code.
+
+        Args:
+            self: (todo): write your description
+            status_code: (int): write your description
+        """
         self.status_code = status_code
 
     def json(self):
+        """
+        Returns the json representation of - serializable object.
+
+        Args:
+            self: (todo): write your description
+        """
         return {}
 
 
@@ -33,12 +46,24 @@ class TestFaults(test_base.BaseTestCase):
     """Tests covering ec2 Fault class."""
 
     def test_fault_exception(self):
+        """
+        Called when an exception was raised.
+
+        Args:
+            self: (todo): write your description
+        """
         # Ensure the status_int is set correctly on faults.
         fault = faults.Fault(webob.exc.HTTPBadRequest(
                              explanation='test'))
         self.assertIsInstance(fault.wrapped_exc, webob.exc.HTTPBadRequest)
 
     def test_fault_exception_status_int(self):
+        """
+        Takes an exception that was raised the statuserror.
+
+        Args:
+            self: (todo): write your description
+        """
         # Ensure the status_int is set correctly on faults.
         fault = faults.Fault(webob.exc.HTTPNotFound(explanation='test'))
         self.assertEqual(fault.wrapped_exc.status_int, 404)
@@ -46,6 +71,13 @@ class TestFaults(test_base.BaseTestCase):
     @mock.patch.object(faults, 'ec2_error_response',
                        return_value=FakeResponse())
     def test_fault_call(self, mock_request):
+        """
+        Makes a fault_request was called.
+
+        Args:
+            self: (todo): write your description
+            mock_request: (todo): write your description
+        """
         # Ensure proper EC2 response on faults.
         message = 'test message'
         ex = webob.exc.HTTPNotFound(explanation=message)

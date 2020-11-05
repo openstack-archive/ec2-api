@@ -38,6 +38,11 @@ _MASTER_FACADE = None
 
 
 def _create_facade_lazily():
+    """
+    Creates an instance of the global database.
+
+    Args:
+    """
     global _MASTER_FACADE
 
     if _MASTER_FACADE is None:
@@ -46,11 +51,21 @@ def _create_facade_lazily():
 
 
 def get_engine():
+    """
+    Return an engine object.
+
+    Args:
+    """
     facade = _create_facade_lazily()
     return facade.get_engine()
 
 
 def get_session(**kwargs):
+    """
+    Return a session object.
+
+    Args:
+    """
     facade = _create_facade_lazily()
     return facade.get_session(**kwargs)
 
@@ -68,6 +83,11 @@ def require_context(f):
 
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
+        """
+        Decorator to ensure a custom context manager
+
+        Args:
+        """
         ec2api.context.require_context(args[0])
         return f(*args, **kwargs)
     return wrapper
@@ -85,6 +105,12 @@ def model_query(context, model, *args, **kwargs):
 
 
 def _new_id(kind):
+    """
+    Generate a random id.
+
+    Args:
+        kind: (todo): write your description
+    """
     obj_id = "%(kind)s-%(id)08x" % {"kind": kind,
                                     "id": random.randint(1, 0xffffffff)}
     return obj_id
@@ -92,6 +118,14 @@ def _new_id(kind):
 
 @require_context
 def add_item(context, kind, data):
+    """
+    Add a new item to the data store.
+
+    Args:
+        context: (todo): write your description
+        kind: (str): write your description
+        data: (todo): write your description
+    """
     item_ref = models.Item()
     item_ref.update({
         "project_id": context.project_id,
@@ -120,6 +154,15 @@ def add_item(context, kind, data):
 
 @require_context
 def add_item_id(context, kind, os_id, project_id=None):
+    """
+    Add a new item to the database.
+
+    Args:
+        context: (todo): write your description
+        kind: (todo): write your description
+        os_id: (str): write your description
+        project_id: (str): write your description
+    """
     item_ref = models.Item()
     item_ref.update({
         "id": _new_id(kind),
@@ -141,6 +184,13 @@ def add_item_id(context, kind, os_id, project_id=None):
 
 @require_context
 def update_item(context, item):
+    """
+    Update a single item.
+
+    Args:
+        context: (todo): write your description
+        item: (todo): write your description
+    """
     item_ref = (model_query(context, models.Item).
                 filter_by(project_id=context.project_id,
                           id=item['id']).
@@ -156,6 +206,13 @@ def update_item(context, item):
 
 @require_context
 def delete_item(context, item_id):
+    """
+    Delete item.
+
+    Args:
+        context: (dict): write your description
+        item_id: (str): write your description
+    """
     session = get_session()
     deleted_count = (model_query(context, models.Item, session=session).
                      filter_by(project_id=context.project_id,
@@ -176,6 +233,14 @@ def delete_item(context, item_id):
 
 @require_context
 def restore_item(context, kind, data):
+    """
+    Restore the given item from the database.
+
+    Args:
+        context: (todo): write your description
+        kind: (str): write your description
+        data: (str): write your description
+    """
     try:
         item_ref = models.Item()
         item_ref.update({
@@ -191,6 +256,13 @@ def restore_item(context, kind, data):
 
 @require_context
 def get_items(context, kind):
+    """
+    Get all items in the context.
+
+    Args:
+        context: (dict): write your description
+        kind: (int): write your description
+    """
     return [_unpack_item_data(item)
             for item in (model_query(context, models.Item).
                          filter_by(project_id=context.project_id).
@@ -200,6 +272,13 @@ def get_items(context, kind):
 
 @require_context
 def get_item_by_id(context, item_id):
+    """
+    Get item item by id.
+
+    Args:
+        context: (str): write your description
+        item_id: (str): write your description
+    """
     return (_unpack_item_data(model_query(context, models.Item).
             filter_by(project_id=context.project_id,
                       id=item_id).
@@ -208,6 +287,13 @@ def get_item_by_id(context, item_id):
 
 @require_context
 def get_items_by_ids(context, item_ids):
+    """
+    Get all items from the context.
+
+    Args:
+        context: (todo): write your description
+        item_ids: (str): write your description
+    """
     if not item_ids:
         return []
     return [_unpack_item_data(item)
@@ -219,6 +305,14 @@ def get_items_by_ids(context, item_ids):
 
 @require_context
 def get_public_items(context, kind, item_ids=None):
+    """
+    Get public ids.
+
+    Args:
+        context: (todo): write your description
+        kind: (str): write your description
+        item_ids: (str): write your description
+    """
     query = (model_query(context, models.Item).
              filter(models.Item.id.like('%s-%%' % kind)).
              filter(models.Item.data.like('%"is_public": True%')))
@@ -230,6 +324,15 @@ def get_public_items(context, kind, item_ids=None):
 
 @require_context
 def get_items_ids(context, kind, item_ids=None, item_os_ids=None):
+    """
+    Get ids
+
+    Args:
+        context: (todo): write your description
+        kind: (str): write your description
+        item_ids: (str): write your description
+        item_os_ids: (str): write your description
+    """
     query = (model_query(context, models.Item).
              filter(models.Item.id.like('%s-%%' % kind)))
     if item_ids:
@@ -242,6 +345,13 @@ def get_items_ids(context, kind, item_ids=None, item_os_ids=None):
 
 @require_context
 def add_tags(context, tags):
+    """
+    Add tags to the given tag
+
+    Args:
+        context: (todo): write your description
+        tags: (list): write your description
+    """
     session = get_session()
     get_query = (model_query(context, models.Tag, session=session).
                  filter_by(project_id=context.project_id,
@@ -269,6 +379,14 @@ def add_tags(context, tags):
 
 @require_context
 def delete_tags(context, item_ids, tag_pairs=None):
+    """
+    Delete tags.
+
+    Args:
+        context: (dict): write your description
+        item_ids: (str): write your description
+        tag_pairs: (str): write your description
+    """
     if not item_ids:
         return
 
@@ -296,6 +414,14 @@ def delete_tags(context, item_ids, tag_pairs=None):
 
 @require_context
 def get_tags(context, kinds=None, item_ids=None):
+    """
+    Get all tags.
+
+    Args:
+        context: (todo): write your description
+        kinds: (str): write your description
+        item_ids: (str): write your description
+    """
     query = (model_query(context, models.Tag).
              filter_by(project_id=context.project_id))
     if kinds:
@@ -313,6 +439,12 @@ def get_tags(context, kinds=None, item_ids=None):
 
 
 def _pack_item_data(item_data):
+    """
+    Pack item data into a dict.
+
+    Args:
+        item_data: (todo): write your description
+    """
     data = copy.deepcopy(item_data)
     data.pop("id", None)
     return {
@@ -323,6 +455,12 @@ def _pack_item_data(item_data):
 
 
 def _unpack_item_data(item_ref):
+    """
+    Unpack a single item id into a dictionary.
+
+    Args:
+        item_ref: (todo): write your description
+    """
     if item_ref is None:
         return None
     data = item_ref.data

@@ -28,6 +28,11 @@ CONF = cfg.CONF
 
 
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     config.parse_args(sys.argv)
     logging.setup(CONF, "ec2api")
 

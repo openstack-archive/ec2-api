@@ -50,6 +50,13 @@ class EC2APIException(Exception):
     msg_fmt = _('An unknown exception occurred.')
 
     def __init__(self, message=None, **kwargs):
+        """
+        Initialize a message.
+
+        Args:
+            self: (todo): write your description
+            message: (str): write your description
+        """
         self.kwargs = kwargs
 
         if not message:
@@ -81,6 +88,12 @@ class EC2APIException(Exception):
         super(EC2APIException, self).__init__(message)
 
     def format_message(self):
+        """
+        Return the message.
+
+        Args:
+            self: (todo): write your description
+        """
         # NOTE(mrodden): use the first argument to the python Exception object
         # which should be our full EC2APIException message, (see __init__)
         return self.args[0]

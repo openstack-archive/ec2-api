@@ -25,6 +25,12 @@ from ec2api.tests.unit import tools
 class TestToolsTestCase(testtools.TestCase):
 
     def test_update_dict(self):
+        """
+        Update test test dictionary has a dictionary.
+
+        Args:
+            self: (todo): write your description
+        """
         d1 = {'a': 1, 'b': 2}
         d2 = {'b': 22, 'c': 33}
         res = tools.update_dict(d1, {})
@@ -34,6 +40,12 @@ class TestToolsTestCase(testtools.TestCase):
         self.assertEqual({'a': 1, 'b': 2}, d1)
 
     def test_purge_dict(self):
+        """
+        Purge test test test case.
+
+        Args:
+            self: (todo): write your description
+        """
         d1 = {'a': 1, 'b': 2, 'c': 3}
         res = tools.purge_dict(d1, ())
         self.assertEqual({'a': 1, 'b': 2, 'c': 3}, res)
@@ -42,6 +54,12 @@ class TestToolsTestCase(testtools.TestCase):
         self.assertEqual({'a': 1, 'b': 2, 'c': 3}, d1)
 
     def test_patch_dict(self):
+        """
+        Patch test test test test test.
+
+        Args:
+            self: (todo): write your description
+        """
         d1 = {'a': 1, 'b': 2, 'c': 3}
         d2 = {'c': 33, 'd': 44, 'e': 55}
         res = tools.patch_dict(d1, d2, ('b', 'e'))
@@ -52,6 +70,12 @@ class TestToolsTestCase(testtools.TestCase):
 class TestBaseTestCase(base.ApiTestCase):
 
     def test_validate_exception_format_is_enabled_for_tests(self):
+        """
+        Assert that the test is valid.
+
+        Args:
+            self: (todo): write your description
+        """
         with tools.ScreeningLogger():
             self.assertRaises(KeyError, exception.InvalidVpcRange,
                               fake='value')
@@ -62,6 +86,12 @@ class TestBaseTestCase(base.ApiTestCase):
 class LoggingTestCase(test_base.BaseTestCase):
 
     def test_hide_logs(self):
+        """
+        Test if the test logs.
+
+        Args:
+            self: (todo): write your description
+        """
         with fixtures.FakeLogger() as logger:
             with tools.ScreeningLogger():
                 LOG = logging.getLogger('ec2api.api')
@@ -71,6 +101,12 @@ class LoggingTestCase(test_base.BaseTestCase):
             self.assertEqual(0, len(logger.output))
 
     def test_screen_logs(self):
+        """
+        Configure test logs.
+
+        Args:
+            self: (todo): write your description
+        """
         with fixtures.FakeLogger() as logger:
             with tools.ScreeningLogger(log_name='ec2api.api'):
                 LOG1 = logging.getLogger('ec2api.api')
@@ -81,6 +117,12 @@ class LoggingTestCase(test_base.BaseTestCase):
             self.assertNotIn('error message', logger.output)
 
     def test_show_logs_on_unhandled_exception(self):
+        """
+        Show test logs on_logs_on_exception.
+
+        Args:
+            self: (todo): write your description
+        """
         with fixtures.FakeLogger() as logger:
             try:
                 with tools.ScreeningLogger():

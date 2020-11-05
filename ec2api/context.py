@@ -88,6 +88,12 @@ class RequestContext(context.RequestContext):
         self.api_version = api_version
 
     def to_dict(self):
+        """
+        Convert the object as a dict.
+
+        Args:
+            self: (todo): write your description
+        """
         values = super(RequestContext, self).to_dict()
         # FIXME(dims): defensive hasattr() checks need to be
         # removed once we figure out why we are seeing stack
@@ -112,6 +118,13 @@ class RequestContext(context.RequestContext):
 
     @classmethod
     def from_dict(cls, values):
+        """
+        Create a new instance from_dict.
+
+        Args:
+            cls: (todo): write your description
+            values: (str): write your description
+        """
         return cls(**values)
 
 

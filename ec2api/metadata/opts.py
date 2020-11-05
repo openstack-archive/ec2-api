@@ -16,6 +16,11 @@ import ec2api.metadata
 
 
 def list_opts():
+    """
+    List ec2 opts
+
+    Args:
+    """
     return [
         ('metadata',
          itertools.chain(

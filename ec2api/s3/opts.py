@@ -16,6 +16,11 @@ import ec2api.s3.s3server
 
 
 def list_opts():
+    """
+    List ec2 ec2 ec2 ec2 ec2 instances
+
+    Args:
+    """
     return [
         ('DEFAULT',
          itertools.chain(

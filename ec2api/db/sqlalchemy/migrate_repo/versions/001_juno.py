@@ -18,6 +18,12 @@ from sqlalchemy import UniqueConstraint
 
 
 def upgrade(migrate_engine):
+    """
+    Upgrade database.
+
+    Args:
+        migrate_engine: (todo): write your description
+    """
     meta = MetaData()
     meta.bind = migrate_engine
 
@@ -56,4 +62,10 @@ def upgrade(migrate_engine):
 
 
 def downgrade(migrate_engine):
+    """
+    Downgrade the database.
+
+    Args:
+        migrate_engine: (todo): write your description
+    """
     raise NotImplementedError("Downgrade from Juno is unsupported.")

@@ -24,12 +24,26 @@ from ec2api.tests.unit import base
 class ClientsTestCase(base.BaseTestCase):
 
     def setUp(self):
+        """
+        Reloads the libvirt library.
+
+        Args:
+            self: (todo): write your description
+        """
         importlib.reload(clients)
         super(ClientsTestCase, self).setUp()
 
     @mock.patch.object(clients, '_get_nova_api_version', return_value='2.3')
     @mock.patch('novaclient.client.Client')
     def test_nova(self, nova, get_api_version):
+        """
+        Returns a test test.
+
+        Args:
+            self: (todo): write your description
+            nova: (todo): write your description
+            get_api_version: (todo): write your description
+        """
         context = mock.NonCallableMock(session=mock.sentinel.session)
 
         # test normal flow with get_api_version call
@@ -47,6 +61,13 @@ class ClientsTestCase(base.BaseTestCase):
 
     @mock.patch('novaclient.client.Client')
     def test_get_api_version(self, nova):
+        """
+        Returns a test version.
+
+        Args:
+            self: (todo): write your description
+            nova: (todo): write your description
+        """
         context = mock.NonCallableMock(session=mock.sentinel.session)
         v2 = mock.NonCallableMock()
         v2.configure_mock(id='v2',
@@ -96,6 +117,13 @@ class ClientsTestCase(base.BaseTestCase):
 
     @mock.patch('neutronclient.v2_0.client.Client')
     def test_neutron(self, neutron):
+        """
+        Get the given neighbor for a given neighbor.
+
+        Args:
+            self: (todo): write your description
+            neutron: (todo): write your description
+        """
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.neutron(context)
         self.assertEqual(neutron.return_value, res)
@@ -104,6 +132,13 @@ class ClientsTestCase(base.BaseTestCase):
 
     @mock.patch('glanceclient.client.Client')
     def test_glance(self, glance):
+        """
+        Returns a glance of glance.
+
+        Args:
+            self: (todo): write your description
+            glance: (todo): write your description
+        """
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.glance(context)
         self.assertEqual(glance.return_value, res)
@@ -112,6 +147,13 @@ class ClientsTestCase(base.BaseTestCase):
 
     @mock.patch('cinderclient.client.Client')
     def test_cinder(self, cinder):
+        """
+        Return the test cinder.
+
+        Args:
+            self: (todo): write your description
+            cinder: (todo): write your description
+        """
         # test normal flow
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.cinder(context)
@@ -121,6 +163,13 @@ class ClientsTestCase(base.BaseTestCase):
 
     @mock.patch('keystoneclient.client.Client')
     def test_keystone(self, keystone):
+        """
+        Return an ssh keystone keystone keystone keystone keystone.
+
+        Args:
+            self: (todo): write your description
+            keystone: (todo): write your description
+        """
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.keystone(context)
         self.assertEqual(keystone.return_value, res)

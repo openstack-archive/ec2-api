@@ -30,6 +30,15 @@ DEFAULT_BGP_ASN = 65000
 
 
 def create_customer_gateway(context, ip_address, type, bgp_asn=None):
+    """
+    Create gatewaygateway gateway.
+
+    Args:
+        context: (todo): write your description
+        ip_address: (str): write your description
+        type: (str): write your description
+        bgp_asn: (todo): write your description
+    """
     if bgp_asn and bgp_asn != DEFAULT_BGP_ASN:
         raise exception.Unsupported("BGP dynamic routing is unsupported")
     customer_gateway = next((cgw for cgw in db_api.get_items(context, 'cgw')
@@ -41,6 +50,13 @@ def create_customer_gateway(context, ip_address, type, bgp_asn=None):
 
 
 def delete_customer_gateway(context, customer_gateway_id):
+    """
+    Delete gateway gateway.
+
+    Args:
+        context: (todo): write your description
+        customer_gateway_id: (str): write your description
+    """
     customer_gateway = ec2utils.get_db_item(context, customer_gateway_id)
     vpn_connections = db_api.get_items(context, 'vpn')
     if any(vpn['customer_gateway_id'] == customer_gateway['id']
@@ -53,6 +69,14 @@ def delete_customer_gateway(context, customer_gateway_id):
 
 def describe_customer_gateways(context, customer_gateway_id=None,
                                filter=None):
+    """
+    Describes a customergateways.
+
+    Args:
+        context: (todo): write your description
+        customer_gateway_id: (todo): write your description
+        filter: (todo): write your description
+    """
     formatted_cgws = CustomerGatewayDescriber().describe(
         context, ids=customer_gateway_id, filter=filter)
     return {'customerGatewaySet': formatted_cgws}
@@ -69,10 +93,23 @@ class CustomerGatewayDescriber(common.TaggableItemsDescriber,
                   'type': 'type'}
 
     def format(self, customer_gateway):
+        """
+        Formats a gatewaygateway.
+
+        Args:
+            self: (todo): write your description
+            customer_gateway: (todo): write your description
+        """
         return _format_customer_gateway(customer_gateway)
 
 
 def _format_customer_gateway(customer_gateway):
+    """
+    Formats a customergateway node that is a customer gateway gateway
+
+    Args:
+        customer_gateway: (todo): write your description
+    """
     return {'customerGatewayId': customer_gateway['id'],
             'ipAddress': customer_gateway['ip_address'],
             'state': 'available',

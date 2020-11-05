@@ -31,6 +31,12 @@ LOG = logging.getLogger(__name__)
 
 
 def _underscore_to_camelcase(st):
+    """
+    Convert a camelcase name to camelcase.
+
+    Args:
+        st: (str): write your description
+    """
     return ''.join([x[:1].upper() + x[1:] for x in st.split('_')])
 
 
@@ -42,12 +48,27 @@ def _database_to_isoformat(datetimeobj):
 class APIRequest(object):
 
     def __init__(self, action, version, args):
+        """
+        Initialize a new instance.
+
+        Args:
+            self: (todo): write your description
+            action: (todo): write your description
+            version: (todo): write your description
+        """
         self.action = action
         self.version = version
         self.args = args
         self.controller = cloud.VpcCloudController()
 
     def invoke(self, context):
+        """
+        Invoke the method.
+
+        Args:
+            self: (todo): write your description
+            context: (todo): write your description
+        """
         try:
             method = getattr(self.controller,
                              ec2utils.camelcase_to_underscore(self.action))
@@ -59,6 +80,11 @@ class APIRequest(object):
         args = ec2utils.dict_from_dotted_str(self.args.items())
 
         def convert_dicts_to_lists(args):
+            """
+            Convert a list of dictionaries into a list of dictionaries.
+
+            Args:
+            """
             if not isinstance(args, dict):
                 return args
             for key in args.keys():
@@ -82,6 +108,14 @@ class APIRequest(object):
         return self._render_response(result, context.request_id)
 
     def _render_response(self, response_data, request_id):
+        """
+        Render the xml element.
+
+        Args:
+            self: (todo): write your description
+            response_data: (todo): write your description
+            request_id: (str): write your description
+        """
         response_el = ec2utils.dict_to_xml(
             {'return': 'true'} if response_data is True else response_data,
             self.action + 'Response')

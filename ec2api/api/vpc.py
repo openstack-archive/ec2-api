@@ -48,11 +48,26 @@ DEFAULT_SUBNET_CIDR_BLOCK = '172.31.0.0/20'
 
 
 def create_vpc(context, cidr_block, instance_tenancy='default'):
+    """
+    Create a new vpc.
+
+    Args:
+        context: (str): write your description
+        cidr_block: (str): write your description
+        instance_tenancy: (str): write your description
+    """
     vpc = _create_vpc(context, cidr_block)
     return {'vpc': _format_vpc(vpc)}
 
 
 def delete_vpc(context, vpc_id):
+    """
+    Delete a vpc.
+
+    Args:
+        context: (dict): write your description
+        vpc_id: (str): write your description
+    """
     vpc = ec2utils.get_db_item(context, vpc_id)
     subnets = subnet_api.describe_subnets(
         context,
@@ -114,10 +129,26 @@ class VpcDescriber(common.TaggableItemsDescriber,
                   'vpc-id': 'vpcId'}
 
     def format(self, item=None, os_item=None):
+        """
+        Formats the vpc as a string.
+
+        Args:
+            self: (todo): write your description
+            item: (array): write your description
+            os_item: (int): write your description
+        """
         return _format_vpc(item)
 
 
 def describe_vpcs(context, vpc_id=None, filter=None):
+    """
+    Describes vpc.
+
+    Args:
+        context: (todo): write your description
+        vpc_id: (str): write your description
+        filter: (todo): write your description
+    """
     _check_and_create_default_vpc(context)
     formatted_vpcs = VpcDescriber().describe(
         context, ids=vpc_id, filter=filter)
@@ -125,6 +156,14 @@ def describe_vpcs(context, vpc_id=None, filter=None):
 
 
 def _create_vpc(context, cidr_block, is_default=False):
+    """
+    Create a new vpc group.
+
+    Args:
+        context: (str): write your description
+        cidr_block: (str): write your description
+        is_default: (bool): write your description
+    """
     neutron = clients.neutron(context)
     with common.OnCrashCleaner() as cleaner:
         os_router_body = {'router': {}}
@@ -167,6 +206,12 @@ def _create_vpc(context, cidr_block, is_default=False):
 
 
 def _check_and_create_default_vpc(context):
+    """
+    Checks if vpc.
+
+    Args:
+        context: (todo): write your description
+    """
     if not CONF.disable_ec2_classic or context.is_os_admin:
         return
 
@@ -174,6 +219,11 @@ def _check_and_create_default_vpc(context):
 
     @synchronized(lock_name, external=True)
     def _check():
+        """
+        Checks if the vpc.
+
+        Args:
+        """
         for vpc in db_api.get_items(context, 'vpc'):
             if vpc.get('is_default'):
                 return vpc
@@ -192,6 +242,12 @@ ec2utils.set_check_and_create_default_vpc(_check_and_create_default_vpc)
 
 
 def _format_vpc(vpc):
+    """
+    Convert vpc name.
+
+    Args:
+        vpc: (dict): write your description
+    """
     return {'vpcId': vpc['id'],
             'state': "available",
             'cidrBlock': vpc['cidr_block'],
