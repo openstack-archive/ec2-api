@@ -29,6 +29,11 @@ CONF = cfg.CONF
 
 
 def list_opts():
+    """
+    List ec2 ec2 ec2 ec2 providers.
+
+    Args:
+    """
     return [
         ('DEFAULT',
          itertools.chain(
@@ -46,6 +51,11 @@ GROUP_AUTHTOKEN = 'keystone_authtoken'
 
 
 def list_auth_opts():
+    """
+    List registered plugins list plugins.
+
+    Args:
+    """
     opt_list = ks_loading.register_session_conf_options(CONF, GROUP_AUTHTOKEN)
     opt_list.insert(0, ks_loading.get_auth_common_conf_options()[0])
     # NOTE(mhickey): There are a lot of auth plugins, we just generate

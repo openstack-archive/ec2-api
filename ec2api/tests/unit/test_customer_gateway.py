@@ -24,6 +24,12 @@ from ec2api.tests.unit import tools
 class CustomerGatewayTestCase(base.ApiTestCase):
 
     def test_create_customer_gateway(self):
+        """
+        Create gateway gateway gateway.
+
+        Args:
+            self: (todo): write your description
+        """
         self.db_api.add_item.side_effect = (
             tools.get_db_api_add_item(fakes.ID_EC2_CUSTOMER_GATEWAY_2))
 
@@ -44,6 +50,12 @@ class CustomerGatewayTestCase(base.ApiTestCase):
                          resp)
 
     def test_create_customer_gateway_idempotent(self):
+        """
+        Create gateway gateway gateway.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_CUSTOMER_GATEWAY_1)
 
         resp = self.execute('CreateCustomerGateway',
@@ -62,6 +74,12 @@ class CustomerGatewayTestCase(base.ApiTestCase):
         self.assertFalse(self.db_api.add_item.called)
 
     def test_create_customer_gateway_invalid_parameters(self):
+        """
+        Create gateway gateway gateway gateway gateway.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assert_execution_error(
             'Unsupported',
             'CreateCustomerGateway',
@@ -70,6 +88,12 @@ class CustomerGatewayTestCase(base.ApiTestCase):
              'BgpAsn': '456'})
 
     def test_delete_customer_gateway(self):
+        """
+        Delete gateway gateway.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_CUSTOMER_GATEWAY_2)
 
         resp = self.execute(
@@ -81,6 +105,12 @@ class CustomerGatewayTestCase(base.ApiTestCase):
             mock.ANY, fakes.ID_EC2_CUSTOMER_GATEWAY_2)
 
     def test_delete_customer_gateway_invalid_parameters(self):
+        """
+        Delete gateway gateway gateway gateway.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items()
         self.assert_execution_error(
             'InvalidCustomerGatewayID.NotFound',
@@ -97,6 +127,12 @@ class CustomerGatewayTestCase(base.ApiTestCase):
         self.assertFalse(self.db_api.delete_item.called)
 
     def test_describe_customer_gateways(self):
+        """
+        Describe gateways.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_CUSTOMER_GATEWAY_1,
                                fakes.DB_CUSTOMER_GATEWAY_2)
 

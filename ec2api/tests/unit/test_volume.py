@@ -23,6 +23,12 @@ from ec2api.tests.unit import tools
 class VolumeTestCase(base.ApiTestCase):
 
     def test_describe_volumes(self):
+        """
+        Describe volumes of volumes
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2),
@@ -76,6 +82,12 @@ class VolumeTestCase(base.ApiTestCase):
             fakes.ID_EC2_VOLUME_1, 'volumeId')
 
     def test_describe_volumes_auto_remove(self):
+        """
+        Remove volumes from the volume storage
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volumes.list.return_value = []
         self.nova.servers.list.return_value = []
         self.set_mock_db_items(fakes.DB_VOLUME_1, fakes.DB_VOLUME_2)
@@ -89,6 +101,12 @@ class VolumeTestCase(base.ApiTestCase):
             mock.ANY, fakes.ID_EC2_VOLUME_2)
 
     def test_describe_volumes_invalid_parameters(self):
+        """
+        Generate volumes volume volumes.
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volumes.list.return_value = [
             fakes.OSVolume(fakes.OS_VOLUME_1),
             fakes.OSVolume(fakes.OS_VOLUME_2)]
@@ -106,6 +124,12 @@ class VolumeTestCase(base.ApiTestCase):
             {'VolumeId.1': fakes.ID_EC2_VOLUME_1})
 
     def test_create_volume(self):
+        """
+        Create a new volume.
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volumes.create.return_value = (
             fakes.OSVolume(fakes.OS_VOLUME_1))
         self.db_api.add_item.side_effect = (
@@ -124,6 +148,12 @@ class VolumeTestCase(base.ApiTestCase):
             availability_zone=fakes.NAME_AVAILABILITY_ZONE)
 
     def test_create_volume_from_snapshot(self):
+        """
+        Create a new volume from a snapshot.
+
+        Args:
+            self: (todo): write your description
+        """
         self.cinder.volumes.create.return_value = (
             fakes.OSVolume(fakes.OS_VOLUME_3))
         self.db_api.add_item.side_effect = (
@@ -144,6 +174,12 @@ class VolumeTestCase(base.ApiTestCase):
             availability_zone=fakes.NAME_AVAILABILITY_ZONE)
 
     def test_delete_volume(self):
+        """
+        Delete the volume.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_VOLUME_1)
         resp = self.execute('DeleteVolume',
                             {'VolumeId': fakes.ID_EC2_VOLUME_1})
@@ -153,6 +189,12 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertFalse(self.db_api.delete_item.called)
 
     def test_format_volume_maps_status(self):
+        """
+        Format the volume status.
+
+        Args:
+            self: (todo): write your description
+        """
         fake_volume = fakes.OSVolume(fakes.OS_VOLUME_1)
         self.cinder.volumes.list.return_value = [fake_volume]
         self.nova.servers.list.return_value = []
@@ -175,6 +217,12 @@ class VolumeTestCase(base.ApiTestCase):
         self.assertEqual('banana', resp['volumeSet'][0]['status'])
 
     def test_attach_volume(self):
+        """
+        Attach volume volume
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_INSTANCE_2, fakes.DB_VOLUME_3)
         os_volume = fakes.OSVolume(fakes.OS_VOLUME_3)
         os_volume.attachments.append({'device': '/dev/vdf',
@@ -197,6 +245,13 @@ class VolumeTestCase(base.ApiTestCase):
 
     @mock.patch.object(fakes.OSVolume, 'get', autospec=True)
     def test_detach_volume(self, os_volume_get):
+        """
+        Detachs volumes volume.
+
+        Args:
+            self: (todo): write your description
+            os_volume_get: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_INSTANCE_1, fakes.DB_INSTANCE_2,
                                fakes.DB_VOLUME_2)
         os_volume = fakes.OSVolume(fakes.OS_VOLUME_2)
@@ -216,6 +271,12 @@ class VolumeTestCase(base.ApiTestCase):
         self.cinder.volumes.get.assert_called_once_with(fakes.ID_OS_VOLUME_2)
 
     def test_detach_volume_invalid_parameters(self):
+        """
+        Detach volume volume volume volume volume.
+
+        Args:
+            self: (todo): write your description
+        """
         self.set_mock_db_items(fakes.DB_VOLUME_1)
         self.cinder.volumes.get.return_value = (
             fakes.OSVolume(fakes.OS_VOLUME_1))

@@ -22,9 +22,21 @@ from ec2api.tests.unit import matchers
 class AvailabilityZoneCase(base.ApiTestCase):
 
     def setUp(self):
+        """
+        Sets the set of tasks.
+
+        Args:
+            self: (todo): write your description
+        """
         super(AvailabilityZoneCase, self).setUp()
 
     def test_describe_availability_zones(self):
+        """
+        Retrieve availability availability.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.availability_zones.list.return_value = [
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE_INTERNAL)]
@@ -40,6 +52,12 @@ class AvailabilityZoneCase(base.ApiTestCase):
              ('zone-name', fakes.NAME_AVAILABILITY_ZONE)])
 
     def test_describe_availability_zones_verbose(self):
+        """
+        Describe availability availability
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.availability_zones.list.return_value = [
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE),
             fakes.NovaAvailabilityZone(fakes.OS_AVAILABILITY_ZONE_INTERNAL)]
@@ -49,6 +67,12 @@ class AvailabilityZoneCase(base.ApiTestCase):
         self.nova.availability_zones.list.assert_called_once_with()
 
     def test_regions(self):
+        """
+        Test for regions
+
+        Args:
+            self: (todo): write your description
+        """
         resp = self.execute('DescribeRegions', {})
         self.assertEqual(resp['regionInfo'][0]['regionName'], 'RegionOne')
         self.assertTrue(resp['regionInfo'][0].get('regionEndpoint')
@@ -56,6 +80,13 @@ class AvailabilityZoneCase(base.ApiTestCase):
 
     @mock.patch('ec2api.api.ec2utils.check_and_create_default_vpc')
     def test_describe_account_attributes(self, check_and_create):
+        """
+        Describes attributes.
+
+        Args:
+            self: (todo): write your description
+            check_and_create: (todo): write your description
+        """
         self.nova.quotas.get.return_value = mock.Mock(instances=77)
 
         resp = self.execute('DescribeAccountAttributes', {})

@@ -18,6 +18,12 @@ from ec2api.tests.unit import base
 
 class HackingTestCase(base.BaseTestCase):
     def test_no_log_translations(self):
+        """
+        Test for all log translations.
+
+        Args:
+            self: (todo): write your description
+        """
         for log in checks._all_log_levels:
             for hint in checks._all_hints:
                 bad = 'LOG.%s(%s("Bad"))' % (log, hint)

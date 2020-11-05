@@ -30,6 +30,13 @@ class EC2Base(models.ModelBase):
     metadata = None
 
     def save(self, session=None):
+        """
+        Saves the session
+
+        Args:
+            self: (todo): write your description
+            session: (todo): write your description
+        """
         from ec2api.db.sqlalchemy import api
 
         if session is None:

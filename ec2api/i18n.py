@@ -29,8 +29,20 @@ _ = _translators.primary
 
 
 def translate(value, user_locale):
+    """
+    Translate locale to locale.
+
+    Args:
+        value: (todo): write your description
+        user_locale: (todo): write your description
+    """
     return oslo_i18n.translate(value, user_locale)
 
 
 def get_available_languages():
+    """
+    Return available languages.
+
+    Args:
+    """
     return oslo_i18n.get_available_languages(DOMAIN)

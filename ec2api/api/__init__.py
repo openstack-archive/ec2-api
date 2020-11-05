@@ -66,6 +66,13 @@ class FaultWrapper(wsgi.Middleware):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
+        """
+        Calls the http call.
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+        """
         try:
             return req.get_response(self.application)
         except Exception:
@@ -79,12 +86,28 @@ class RequestLogging(wsgi.Middleware):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
+        """
+        Make a request.
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+        """
         start = timeutils.utcnow()
         rv = req.get_response(self.application)
         self.log_request_completion(rv, req, start)
         return rv
 
     def log_request_completion(self, response, request, start):
+        """
+        Log a completion request.
+
+        Args:
+            self: (todo): write your description
+            response: (todo): write your description
+            request: (todo): write your description
+            start: (todo): write your description
+        """
         apireq = request.environ.get('ec2.request', None)
         if apireq:
             action = apireq.action
@@ -162,6 +185,13 @@ class EC2KeystoneAuth(wsgi.Middleware):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
+        """
+        Make a call to the api.
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+        """
         request_id = common_context.generate_request_id()
 
         # NOTE(alevine) We need to calculate the hash here because
@@ -250,6 +280,13 @@ class Requestify(wsgi.Middleware):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
+        """
+        Make a request.
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+        """
         non_args = ['Action', 'Signature', 'AWSAccessKeyId', 'SignatureMethod',
                     'SignatureVersion', 'Version', 'Timestamp']
         args = dict(req.params)
@@ -371,6 +408,13 @@ class Executor(wsgi.Application):
 
     @webob.dec.wsgify(RequestClass=wsgi.Request)
     def __call__(self, req):
+        """
+        Make a request to the api.
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+        """
         context = req.environ['ec2api.context']
         api_request = req.environ['ec2.request']
         try:

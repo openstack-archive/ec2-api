@@ -354,10 +354,23 @@ class Middleware(Application):
 
         """
         def _factory(app):
+            """
+            Create a new factory.
+
+            Args:
+                app: (todo): write your description
+            """
             return cls(app, **local_config)
         return _factory
 
     def __init__(self, application):
+        """
+        Initialize the application.
+
+        Args:
+            self: (todo): write your description
+            application: (todo): write your description
+        """
         self.application = application
 
     def process_request(self, req):
@@ -376,6 +389,13 @@ class Middleware(Application):
 
     @webob.dec.wsgify(RequestClass=Request)
     def __call__(self, req):
+        """
+        Calls the call
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+        """
         response = self.process_request(req)
         if response:
             return response
@@ -393,6 +413,13 @@ class Debug(Middleware):
 
     @webob.dec.wsgify(RequestClass=Request)
     def __call__(self, req):
+        """
+        Calls the http call.
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+        """
         print(('*' * 40) + ' REQUEST ENVIRON')
         for key, value in req.environ.items():
             print(key, '=', value)

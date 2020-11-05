@@ -25,6 +25,12 @@ from ec2api.tests.unit import tools
 class KeyPairCase(base.ApiTestCase):
 
     def test_create_key_pair(self):
+        """
+        Create a new key pair.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.keypairs.create.return_value = (
             fakes.NovaKeyPair(fakes.OS_KEY_PAIR))
         resp = self.execute('CreateKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
@@ -32,6 +38,12 @@ class KeyPairCase(base.ApiTestCase):
         self.nova.keypairs.create.assert_called_once_with(fakes.NAME_KEY_PAIR)
 
     def test_create_key_pair_invalid(self):
+        """
+        Create a new key pair in the key pair.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.keypairs.create.side_effect = (
             nova_exception.Conflict(409))
         self.assert_execution_error(
@@ -46,6 +58,12 @@ class KeyPairCase(base.ApiTestCase):
             {'KeyName': fakes.NAME_KEY_PAIR})
 
     def test_import_key_pair(self):
+        """
+        Purpose a key pair.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.keypairs.create.return_value = (
             fakes.NovaKeyPair(fakes.OS_KEY_PAIR))
         resp = self.execute('ImportKeyPair',
@@ -60,6 +78,12 @@ class KeyPairCase(base.ApiTestCase):
             fakes.NAME_KEY_PAIR, fakes.PUBLIC_KEY_KEY_PAIR)
 
     def test_import_key_pair_invalid(self):
+        """
+        Test if the pair of the pair is valid.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.keypairs.create.side_effect = (
             nova_exception.OverLimit(413))
         self.assert_execution_error(
@@ -70,6 +94,12 @@ class KeyPairCase(base.ApiTestCase):
              ).decode("ascii")})
 
     def test_delete_key_pair(self):
+        """
+        Removes a key pair.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.keypairs.delete.return_value = True
         self.execute('DeleteKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
         self.nova.keypairs.delete.assert_called_once_with(fakes.NAME_KEY_PAIR)
@@ -78,6 +108,12 @@ class KeyPairCase(base.ApiTestCase):
         self.nova.keypairs.delete.assert_any_call('keyname1')
 
     def test_describe_key_pairs(self):
+        """
+        Lists key pairs.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.keypairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
         resp = self.execute('DescribeKeyPairs', {})
@@ -93,6 +129,12 @@ class KeyPairCase(base.ApiTestCase):
              ('key-name', fakes.NAME_KEY_PAIR)])
 
     def test_describe_key_pairs_invalid(self):
+        """
+        A list of keypairs.
+
+        Args:
+            self: (todo): write your description
+        """
         self.nova.keypairs.list.return_value = [fakes.NovaKeyPair(
                                                     fakes.OS_KEY_PAIR)]
         self.assert_execution_error(

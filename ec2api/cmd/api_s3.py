@@ -27,6 +27,11 @@ from ec2api import service
 
 
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     config.parse_args(sys.argv)
     logging.setup(config.CONF, "ec2api")
 

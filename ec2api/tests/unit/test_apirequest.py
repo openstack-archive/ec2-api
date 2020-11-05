@@ -29,6 +29,12 @@ from ec2api.tests.unit import tools
 class EC2RequesterTestCase(base.BaseTestCase):
 
     def setUp(self):
+        """
+        Sets the context to use.
+
+        Args:
+            self: (todo): write your description
+        """
         super(EC2RequesterTestCase, self).setUp()
         self.controller = self.mock(
             'ec2api.api.cloud.VpcCloudController').return_value
@@ -36,6 +42,12 @@ class EC2RequesterTestCase(base.BaseTestCase):
             request_id=context.generate_request_id())
 
     def test_invoke_returns_data(self):
+        """
+        Invoke the request.
+
+        Args:
+            self: (todo): write your description
+        """
         self.controller.fake_action.return_value = fakes.DICT_FAKE_RESULT_DATA
 
         api_request = apirequest.APIRequest('FakeAction', 'fake_v1',
@@ -51,6 +63,12 @@ class EC2RequesterTestCase(base.BaseTestCase):
                 self.fake_context, param='fake')
 
     def test_invoke_returns_true(self):
+        """
+        The test handler for the api calls.
+
+        Args:
+            self: (todo): write your description
+        """
         self.controller.fake_action.return_value = True
 
         api_request = apirequest.APIRequest('FakeAction', 'fake_v1',
@@ -66,6 +84,12 @@ class EC2RequesterTestCase(base.BaseTestCase):
                 self.fake_context, param='fake')
 
     def test_invoke_prepare_params(self):
+        """
+        This method to execute the method.
+
+        Args:
+            self: (todo): write your description
+        """
         api_request = apirequest.APIRequest('FakeAction', 'fake_v1',
                                             fakes.DOTTED_FAKE_PARAMS)
         api_request.invoke(self.fake_context)
@@ -75,6 +99,17 @@ class EC2RequesterTestCase(base.BaseTestCase):
 
     def _compare_aws_xml(self, root_tag, xmlns, request_id, dict_data,
                          observed):
+        """
+        Validate the xml.
+
+        Args:
+            self: (todo): write your description
+            root_tag: (todo): write your description
+            xmlns: (todo): write your description
+            request_id: (str): write your description
+            dict_data: (dict): write your description
+            observed: (todo): write your description
+        """
         # NOTE(ft): we cann't use matchers.XMLMatches since it makes comparison
         # based on the order of tags
         xml = etree.fromstring(observed)
@@ -86,6 +121,12 @@ class EC2RequesterTestCase(base.BaseTestCase):
         self.assertThat(observed_data, matchers.DictMatches(expected))
 
     def test_render_response_ascii(self):
+        """
+        This is acii test
+
+        Args:
+            self: (todo): write your description
+        """
         req = apirequest.APIRequest("FakeAction", "FakeVersion", {})
         resp = {
             'string': 'foo',
@@ -98,6 +139,12 @@ class EC2RequesterTestCase(base.BaseTestCase):
         self.assertIn('<string>foo</string>', data)
 
     def test_render_response_utf8(self):
+        """
+        Test for the response.
+
+        Args:
+            self: (todo): write your description
+        """
         req = apirequest.APIRequest("FakeAction", "FakeVersion", {})
         resp = {
             'utf8': six.unichr(40960) + u'abcd' + six.unichr(1972)
@@ -124,6 +171,12 @@ class EC2RequesterTestCase(base.BaseTestCase):
         self.assertEqual(conv(time_to_convert), '2011-02-21T19:56:18.000Z')
 
     def test_xmlns_version_matches_request_version(self):
+        """
+        Return the versionns api versionns version.
+
+        Args:
+            self: (todo): write your description
+        """
         self.controller.fake_action.return_value = {}
 
         api_request = apirequest.APIRequest('FakeAction', '2010-10-30', {})

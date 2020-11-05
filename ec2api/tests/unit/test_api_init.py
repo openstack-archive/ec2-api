@@ -35,6 +35,12 @@ from ec2api import wsgi
 class ApiInitTestCase(base.BaseTestCase):
 
     def setUp(self):
+        """
+        Initiate the context.
+
+        Args:
+            self: (todo): write your description
+        """
         super(ApiInitTestCase, self).setUp()
         self.controller = self.mock(
             'ec2api.api.cloud.VpcCloudController').return_value
@@ -50,6 +56,12 @@ class ApiInitTestCase(base.BaseTestCase):
         self.application = api.Executor()
 
     def test_execute(self):
+        """
+        Executes the test.
+
+        Args:
+            self: (todo): write your description
+        """
         self.controller.fake_action.return_value = {'fakeTag': 'fake_data'}
 
         res = self.request.send(self.application)
@@ -67,8 +79,23 @@ class ApiInitTestCase(base.BaseTestCase):
                                                             param='fake_param')
 
     def test_execute_error(self):
+        """
+        Executes the test test.
+
+        Args:
+            self: (todo): write your description
+        """
         @tools.screen_all_logs
         def do_check(ex, status, code, message):
+            """
+            Handles a request.
+
+            Args:
+                ex: (todo): write your description
+                status: (str): write your description
+                code: (str): write your description
+                message: (str): write your description
+            """
             self.controller.reset_mock()
             self.controller.fake_action.side_effect = ex
 

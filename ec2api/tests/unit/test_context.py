@@ -32,6 +32,14 @@ class ContextTestCase(test_base.BaseTestCase):
     @mock.patch('keystoneauth1.loading.load_auth_from_conf_options')
     @mock.patch('keystoneauth1.loading.load_session_from_conf_options')
     def test_get_os_admin_context(self, session, auth):
+        """
+        Initialize oauth context.
+
+        Args:
+            self: (todo): write your description
+            session: (todo): write your description
+            auth: (todo): write your description
+        """
         conf = config_fixture.Config()
         clients._admin_session = None
         conf.config(auth_type='fake', group=GROUP_AUTHTOKEN)

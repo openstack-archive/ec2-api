@@ -26,12 +26,27 @@ class LazyPluggable(object):
     """A pluggable backend loaded lazily based on some value."""
 
     def __init__(self, pivot, config_group=None, **backends):
+        """
+        Initialize the backend.
+
+        Args:
+            self: (todo): write your description
+            pivot: (todo): write your description
+            config_group: (todo): write your description
+            backends: (todo): write your description
+        """
         self.__backends = backends
         self.__pivot = pivot
         self.__backend = None
         self.__config_group = config_group
 
     def __get_backend(self):
+        """
+        Get the backend backend
+
+        Args:
+            self: (todo): write your description
+        """
         if not self.__backend:
             if self.__config_group is None:
                 backend_name = CONF[self.__pivot]
@@ -53,6 +68,13 @@ class LazyPluggable(object):
         return self.__backend
 
     def __getattr__(self, key):
+        """
+        Return the value of the backend.
+
+        Args:
+            self: (todo): write your description
+            key: (str): write your description
+        """
         backend = self.__get_backend()
         return getattr(backend, key)
 

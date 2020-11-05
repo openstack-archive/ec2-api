@@ -61,6 +61,12 @@ _nova_api_version = None
 
 
 def nova(context):
+    """
+    Returns an instance of the global context.
+
+    Args:
+        context: (dict): write your description
+    """
     global _nova_api_version
     if not _nova_api_version:
         _nova_api_version = _get_nova_api_version(context)
@@ -74,16 +80,34 @@ def nova(context):
 
 
 def neutron(context):
+    """
+    Returns the current master context for a given service.
+
+    Args:
+        context: (dict): write your description
+    """
     return neutronclient.Client(session=context.session,
                                 service_type='network')
 
 
 def glance(context):
+    """
+    Returns a glance context
+
+    Args:
+        context: (dict): write your description
+    """
     return glanceclient.Client(version='2', service_type='image',
                                session=context.session)
 
 
 def cinder(context):
+    """
+    Return a cinderclient object.
+
+    Args:
+        context: (todo): write your description
+    """
     url = context.session.get_endpoint(service_type=CONF.cinder_service_type)
     # TODO(jamielennox): This should be using proper version discovery from
     # the cinder service rather than just inspecting the URL for certain string
@@ -94,12 +118,24 @@ def cinder(context):
 
 
 def keystone(context):
+    """
+    Return a keystone client context.
+
+    Args:
+        context: (todo): write your description
+    """
     url = context.session.get_endpoint(service_type='identity')
     return keystoneclient.Client(auth_url=url,
                                  session=context.session)
 
 
 def _get_nova_api_version(context):
+    """
+    Returns an api client api client.
+
+    Args:
+        context: (todo): write your description
+    """
     client = novaclient.Client(REQUIRED_NOVA_API_VERSION,
                                session=context.session,
                                service_type=CONF.nova_service_type)
@@ -157,6 +193,12 @@ def get_os_admin_session():
 
 
 def update_request_params_with_ssl(params):
+    """
+    Update request params.
+
+    Args:
+        params: (dict): write your description
+    """
     verify = (CONF[GROUP_AUTHTOKEN].cafile or
               not CONF[GROUP_AUTHTOKEN].insecure)
     if verify is not True:

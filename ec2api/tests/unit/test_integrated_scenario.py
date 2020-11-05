@@ -27,11 +27,25 @@ from ec2api.tests.unit import fakes
 class DBItemsAutoCreationTestCase(base.DbTestCase):
 
     def setUp(self):
+        """
+        Sets the context for the context.
+
+        Args:
+            self: (todo): write your description
+        """
         super(DBItemsAutoCreationTestCase, self).setUp()
         self.mock_all_os()
         self.context = base.create_context()
 
     def assert_image_project(self, expected_project_id, image_id):
+        """
+        Associate an image to project
+
+        Args:
+            self: (todo): write your description
+            expected_project_id: (str): write your description
+            image_id: (str): write your description
+        """
         if expected_project_id:
             context = mock.NonCallableMock(project_id=expected_project_id)
         else:
@@ -43,6 +57,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             self.assertIsNone(image_item)
 
     def test_describe_new_instance_then_its_volume(self):
+        """
+        Test if a new volume instance.
+
+        Args:
+            self: (todo): write your description
+        """
         os_instance_id = fakes.random_os_id()
         os_volume_id = fakes.random_os_id()
         os_instance = {
@@ -69,6 +89,15 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
     def _test_describe_new_images(self, image_project_id=None,
                                   aki_image_project_id=None,
                                   with_id_mapping=False):
+        """
+        Describes image image.
+
+        Args:
+            self: (todo): write your description
+            image_project_id: (str): write your description
+            aki_image_project_id: (str): write your description
+            with_id_mapping: (str): write your description
+        """
         os_image_id = fakes.random_os_id()
         os_aki_image_id = fakes.random_os_id()
         os_image = {
@@ -108,6 +137,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             aki_image['imageId'])
 
     def test_describe_new_alien_images(self):
+        """
+        Describes a new image id.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
             image_project_id=alien_project_id,
@@ -115,12 +150,24 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             with_id_mapping=False)
 
     def test_describe_new_local_images(self):
+        """
+        Test if the local local id.
+
+        Args:
+            self: (todo): write your description
+        """
         self._test_describe_new_images(
             image_project_id=fakes.ID_OS_PROJECT,
             aki_image_project_id=fakes.ID_OS_PROJECT,
             with_id_mapping=False)
 
     def test_describe_new_local_ami_alien_aki_images(self):
+        """
+        Test if the local local local image.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
             image_project_id=fakes.ID_OS_PROJECT,
@@ -128,6 +175,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             with_id_mapping=False)
 
     def test_describe_new_alien_ami_local_aki_images(self):
+        """
+        Test if the local local id.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
             image_project_id=alien_project_id,
@@ -135,6 +188,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             with_id_mapping=False)
 
     def test_describe_new_alien_images_with_mappings(self):
+        """
+        Test for new image id.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
             image_project_id=alien_project_id,
@@ -142,12 +201,24 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             with_id_mapping=True)
 
     def test_describe_new_local_images_with_mappings(self):
+        """
+        Test for local image id.
+
+        Args:
+            self: (todo): write your description
+        """
         self._test_describe_new_images(
             image_project_id=fakes.ID_OS_PROJECT,
             aki_image_project_id=fakes.ID_OS_PROJECT,
             with_id_mapping=True)
 
     def test_describe_new_local_ami_alien_aki_images_with_mappings(self):
+        """
+        Test if the local local images.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
             image_project_id=fakes.ID_OS_PROJECT,
@@ -155,6 +226,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
             with_id_mapping=True)
 
     def test_describe_new_alien_ami_local_aki_images_with_mappings(self):
+        """
+        Describes a local local image.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         self._test_describe_new_images(
             image_project_id=alien_project_id,
@@ -163,6 +240,14 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
 
     def _get_new_ebs_image(self, image_project_id=None,
                            bdm_image_project_id=None):
+        """
+        Create a new obs image.
+
+        Args:
+            self: (todo): write your description
+            image_project_id: (str): write your description
+            bdm_image_project_id: (str): write your description
+        """
         os_image_id = fakes.random_os_id()
         os_snapshot_id = fakes.random_os_id()
         os_bdm_image_id = fakes.random_os_id()
@@ -206,16 +291,36 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
                     if i['blockDeviceMapping'])
 
     def _find_snapshot_id_in_bdm(self, image, device_name):
+        """
+        Find snapshot inversion of a snapshot of a snapshot.
+
+        Args:
+            self: (todo): write your description
+            image: (array): write your description
+            device_name: (str): write your description
+        """
         return next(bdm['ebs']['snapshotId']
                     for bdm in image['blockDeviceMapping']
                     if bdm['deviceName'] == device_name)
 
     def test_describe_new_local_snapshot_from_new_image(self):
+        """
+        Create a new local snapshot of local snapshot.
+
+        Args:
+            self: (todo): write your description
+        """
         image = self._get_new_ebs_image(image_project_id=fakes.ID_OS_PROJECT)
         snapshot_id = self._find_snapshot_id_in_bdm(image, '/dev/vds')
         snapshot_api.describe_snapshots(self.context, [snapshot_id])
 
     def test_describe_new_alien_snapshot_from_new_image(self):
+        """
+        This method to update of the snapshot.
+
+        Args:
+            self: (todo): write your description
+        """
         image = self._get_new_ebs_image(image_project_id=fakes.random_os_id())
         snapshot_id = self._find_snapshot_id_in_bdm(image, '/dev/vds')
         self.assertRaises(exception.InvalidSnapshotNotFound,
@@ -223,6 +328,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
                           self.context, [snapshot_id])
 
     def test_describe_new_local_bdm_image_from_local_image(self):
+        """
+        Create local local local local image.
+
+        Args:
+            self: (todo): write your description
+        """
         image = self._get_new_ebs_image(
             image_project_id=fakes.ID_OS_PROJECT,
             bdm_image_project_id=fakes.ID_OS_PROJECT)
@@ -231,6 +342,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
         self.assert_image_project(fakes.ID_OS_PROJECT, image_id)
 
     def test_describe_new_alien_bdm_image_from_new_local_image(self):
+        """
+        Test for new local image.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         image = self._get_new_ebs_image(
             image_project_id=fakes.ID_OS_PROJECT,
@@ -240,6 +357,12 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
         self.assert_image_project(None, image_id)
 
     def test_describe_new_alien_bdm_image_from_new_alien_image(self):
+        """
+        Create new new new new image with new image id.
+
+        Args:
+            self: (todo): write your description
+        """
         alien_project_id = fakes.random_os_id()
         image = self._get_new_ebs_image(
             image_project_id=alien_project_id,
@@ -249,6 +372,13 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
         self.assert_image_project(None, image_id)
 
     def _test_describe_new_instance_then_its_image(self, image_project_id):
+        """
+        Starts a new image image id.
+
+        Args:
+            self: (todo): write your description
+            image_project_id: (str): write your description
+        """
         os_instance_id = fakes.random_os_id()
         os_image_id = fakes.random_os_id()
         os_instance = {
@@ -278,12 +408,30 @@ class DBItemsAutoCreationTestCase(base.DbTestCase):
         self.assert_image_project(expected_project_id, image['imageId'])
 
     def test_describe_new_instance_then_its_local_image(self):
+        """
+        Create a new image image instance.
+
+        Args:
+            self: (todo): write your description
+        """
         self._test_describe_new_instance_then_its_image(fakes.ID_OS_PROJECT)
 
     def test_describe_new_instance_then_its_alien_image(self):
+        """
+        Test for new image contains new.
+
+        Args:
+            self: (todo): write your description
+        """
         self._test_describe_new_instance_then_its_image(fakes.random_os_id())
 
     def test_describe_new_instance_then_its_alien_image_attribute(self):
+        """
+        Describes a new image image with new instance id.
+
+        Args:
+            self: (todo): write your description
+        """
         os_instance_id = fakes.random_os_id()
         os_image_id = fakes.random_os_id()
         alien_project_id = fakes.random_os_id()

@@ -162,6 +162,13 @@ _launcher = None
 
 
 def serve(server, workers=None):
+    """
+    Starts a wsgi server.
+
+    Args:
+        server: (str): write your description
+        workers: (int): write your description
+    """
     global _launcher
     if _launcher:
         raise RuntimeError(_('serve() can only be called once'))
@@ -170,4 +177,9 @@ def serve(server, workers=None):
 
 
 def wait():
+    """
+    Waits for a command to complete.
+
+    Args:
+    """
     _launcher.wait()

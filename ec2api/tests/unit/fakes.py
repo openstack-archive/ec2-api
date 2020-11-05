@@ -28,10 +28,21 @@ from ec2api.tests.unit import tools
 
 # random identifier generators
 def random_os_id():
+    """
+    Generate a random id.
+
+    Args:
+    """
     return str(uuid.uuid4())
 
 
 def random_ec2_id(kind):
+    """
+    Generate a random kind.
+
+    Args:
+        kind: (todo): write your description
+    """
     return '%s-%08x' % (kind, random.randint(0, 0xffffffff))
 
 # Plain constants section
@@ -895,6 +906,13 @@ EC2_BDM_METADATA_INSTANCE_2 = {
 # support
 class OSInstance(object):
     def __init__(self, instance_dict):
+        """
+        Initialize the instance.
+
+        Args:
+            self: (todo): write your description
+            instance_dict: (dict): write your description
+        """
         self.id = instance_dict['id']
         self.flavor = instance_dict.get('flavor')
         self.image = instance_dict.get('image')
@@ -913,24 +931,66 @@ class OSInstance(object):
                 copy.deepcopy(instance_dict.get('volumes_attached', [])))
 
     def get(self):
+        """
+        Get a list of the document
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def delete(self):
+        """
+        Deletes the document.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def start(self):
+        """
+        Start the thread.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def stop(self):
+        """
+        Stops.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def reboot(self):
+        """
+        Reboot the device.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def get_password(self):
+        """
+        Get the password of the server.
+
+        Args:
+            self: (todo): write your description
+        """
         return None
 
     def get_console_output(self):
+        """
+        Return the console output.
+
+        Args:
+            self: (todo): write your description
+        """
         return None
 
 
@@ -938,6 +998,13 @@ class OSInstance(object):
 # with v2.3 microversion support
 class OSInstance_full(OSInstance):
     def __init__(self, instance_dict):
+        """
+        Initialize the instance
+
+        Args:
+            self: (todo): write your description
+            instance_dict: (dict): write your description
+        """
         super(OSInstance_full, self).__init__(instance_dict)
         setattr(self, 'OS-EXT-SRV-ATTR:root_device_name',
                 instance_dict.get('root_device_name'))
@@ -1568,6 +1635,14 @@ EC2_ROUTE_TABLE_3 = {
 class OSImage(object):
 
     def __init__(self, image_dict, from_get=False):
+        """
+        Initialize image from a dictionary.
+
+        Args:
+            self: (todo): write your description
+            image_dict: (dict): write your description
+            from_get: (int): write your description
+        """
 
         if from_get:
             attrs = [k for k in image_dict.keys()
@@ -1588,13 +1663,33 @@ class OSImage(object):
             setattr(self, k, self._image_dict[k])
 
     def __eq__(self, other):
+        """
+        Determine if two types.
+
+        Args:
+            self: (todo): write your description
+            other: (todo): write your description
+        """
         return type(self) == type(other) and self.__dict__ == other.__dict__
 
     def __iter__(self):
+        """
+        Iterate over all the keys.
+
+        Args:
+            self: (todo): write your description
+        """
         for key in self._image_dict.items():
             yield key
 
     def __getitem__(self, key):
+        """
+        Get an item from the cache.
+
+        Args:
+            self: (todo): write your description
+            key: (str): write your description
+        """
         return self._image_dict.get(key)
 
 
@@ -1749,6 +1844,13 @@ OS_IMAGE_ARI_1 = {
 class OSSnapshot(object):
 
     def __init__(self, snapshot):
+        """
+        Initialize a snapshot.
+
+        Args:
+            self: (todo): write your description
+            snapshot: (dict): write your description
+        """
         self.id = snapshot['id']
         self.status = snapshot.get('status')
         self.volume_id = snapshot.get('volume_id')
@@ -1759,12 +1861,30 @@ class OSSnapshot(object):
         self.display_description = snapshot.get('description')
 
     def get(self):
+        """
+        Get a list of the document
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def delete(self):
+        """
+        Deletes the document.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def update(self, *args, **kwargs):
+        """
+        Updates the object.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
 
@@ -1825,6 +1945,13 @@ OS_SNAPSHOT_2 = {
 class OSVolume(object):
 
     def __init__(self, volume):
+        """
+        Make a new volume
+
+        Args:
+            self: (todo): write your description
+            volume: (dict): write your description
+        """
         self.id = volume['id']
         self.status = volume['status']
         self.availability_zone = volume.get('availability_zone')
@@ -1838,12 +1965,30 @@ class OSVolume(object):
         self.encrypted = False
 
     def get(self):
+        """
+        Get a list of the document
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def delete(self):
+        """
+        Deletes the document.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def update(self, *args, **kwargs):
+        """
+        Updates the object.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
 
@@ -1943,6 +2088,13 @@ OS_VOLUME_3 = {
 class NovaAvailabilityZone(object):
 
     def __init__(self, nova_availability_zone_dict):
+        """
+        Initialize the zone
+
+        Args:
+            self: (todo): write your description
+            nova_availability_zone_dict: (dict): write your description
+        """
         self.zoneName = nova_availability_zone_dict['zoneName']
         self.zoneState = {'available': (
             nova_availability_zone_dict['zoneState'] == 'available')}
@@ -1976,6 +2128,13 @@ EC2_AVAILABILITY_ZONE = {'zoneName': NAME_AVAILABILITY_ZONE,
 class NovaKeyPair(object):
 
     def __init__(self, nova_keypair_dict):
+        """
+        Initialize a private keypair.
+
+        Args:
+            self: (todo): write your description
+            nova_keypair_dict: (dict): write your description
+        """
         self.name = nova_keypair_dict['name']
         self.fingerprint = nova_keypair_dict['fingerprint']
         self.private_key = nova_keypair_dict['private_key']
@@ -2162,6 +2321,13 @@ OS_IPSECPOLICY_2 = {
 
 # internet gateway generator functions
 def gen_db_igw(ec2_id, ec2_vpc_id=None):
+    """
+    Return ec2 - formated by name.
+
+    Args:
+        ec2_id: (str): write your description
+        ec2_vpc_id: (str): write your description
+    """
     return {'id': ec2_id,
             'os_id': None,
             'vpc_id': ec2_vpc_id}
@@ -2172,6 +2338,20 @@ def gen_db_network_interface(ec2_id, os_id, vpc_ec2_id, subnet_ec2_id,
                              private_ip_address, description=None,
                              instance_id=None, device_index=None,
                              delete_on_termination=False):
+    """
+    Generate a network interface.
+
+    Args:
+        ec2_id: (str): write your description
+        os_id: (str): write your description
+        vpc_ec2_id: (str): write your description
+        subnet_ec2_id: (str): write your description
+        private_ip_address: (bool): write your description
+        description: (str): write your description
+        instance_id: (str): write your description
+        device_index: (int): write your description
+        delete_on_termination: (bool): write your description
+    """
     eni = {'id': ec2_id,
            'os_id': os_id,
            'vpc_id': vpc_ec2_id,
@@ -2235,6 +2415,16 @@ def gen_ec2_network_interface(ec2_network_interface_id, ec2_subnet, ips,
 
 def gen_os_port(os_id, ec2_network_interface, os_subnet_id, fixed_ips,
                 os_instance_id=None):
+    """
+    Return os port id.
+
+    Args:
+        os_id: (str): write your description
+        ec2_network_interface: (str): write your description
+        os_subnet_id: (str): write your description
+        fixed_ips: (str): write your description
+        os_instance_id: (int): write your description
+    """
     return {'id': os_id,
             'network_id': os_subnet_id,
             'name': ec2_network_interface['networkInterfaceId'],

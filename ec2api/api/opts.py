@@ -23,6 +23,11 @@ import ec2api.api.instance
 
 
 def list_opts():
+    """
+    List ec2 opts
+
+    Args:
+    """
     return [
         ('DEFAULT',
          itertools.chain(

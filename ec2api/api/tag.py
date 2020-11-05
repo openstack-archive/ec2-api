@@ -47,6 +47,14 @@ RESOURCE_TYPES = {
 
 
 def create_tags(context, resource_id, tag):
+    """
+    Create tags on a given tag
+
+    Args:
+        context: (todo): write your description
+        resource_id: (str): write your description
+        tag: (str): write your description
+    """
     reason = None
     for tag_pair in tag:
         if not tag_pair.get('key'):
@@ -85,6 +93,14 @@ def create_tags(context, resource_id, tag):
 
 
 def delete_tags(context, resource_id, tag=None):
+    """
+    Delete tags on the tags
+
+    Args:
+        context: (dict): write your description
+        resource_id: (str): write your description
+        tag: (str): write your description
+    """
     db_api.delete_tags(context, resource_id, tag)
     return True
 
@@ -100,13 +116,35 @@ class TagDescriber(common.NonOpenstackItemsDescriber):
                   'tag-value': 'value'}
 
     def get_db_items(self):
+        """
+        Return the database items
+
+        Args:
+            self: (todo): write your description
+        """
         return db_api.get_tags(self.context)
 
     def format(self, item):
+        """
+        Format the formatted tag.
+
+        Args:
+            self: (todo): write your description
+            item: (array): write your description
+        """
         return _format_tag(item)
 
 
 def describe_tags(context, filter=None, max_results=None, next_token=None):
+    """
+    Returns the tags of tags.
+
+    Args:
+        context: (todo): write your description
+        filter: (todo): write your description
+        max_results: (int): write your description
+        next_token: (str): write your description
+    """
     tag_describer = TagDescriber()
     formatted_tags = tag_describer.describe(
         context, filter=filter, max_results=max_results, next_token=next_token)
@@ -117,6 +155,12 @@ def describe_tags(context, filter=None, max_results=None, next_token=None):
 
 
 def _format_tag(tag):
+    """
+    Format the ec2 tag.
+
+    Args:
+        tag: (str): write your description
+    """
     kind = ec2utils.get_ec2_id_kind(tag['item_id'])
     return {
         'resourceType': RESOURCE_TYPES.get(kind, kind),
