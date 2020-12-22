@@ -20,7 +20,7 @@
    * - **[DEFAULT]**
      -
 
-   * - ``cinder_service_type`` = ``volumev2``
+   * - ``cinder_service_type`` = ``volumev3``
 
      - (String) Service type of Volume API, registered in Keystone catalog.
 

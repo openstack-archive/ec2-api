@@ -32,7 +32,7 @@ ec2_opts = [
                     'If it is obsolete v2, a lot of useful EC2 compliant '
                     'instance properties will be unavailable.'),
     cfg.StrOpt('cinder_service_type',
-               default='volumev2',
+               default='volumev3',
                help='Service type of Volume API, registered in Keystone '
                     'catalog.'),
 ]

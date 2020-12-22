@@ -1,0 +1,6 @@
+---
+upgrade:
+  - |
+    Default value of the ``cinder_service_type`` parameter has been changed
+    from ``volumev2`` to ``volume3``, because volume v2 API was already
+    deprecated and v3 API should be used instead.
