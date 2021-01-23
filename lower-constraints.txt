@@ -40,7 +40,7 @@ logilab-common==1.4.1
 lxml==4.1.1
 Mako==1.0.7
 MarkupSafe==1.1.1
-mccabe==0.2.1
+mccabe==0.6.0
 monotonic==1.4
 mox3==0.25.0
 msgpack==0.5.6
