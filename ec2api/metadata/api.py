@@ -230,7 +230,10 @@ def _build_metadata(context, ec2_instance, ec2_reservation,
     if 'userData' in userdata:
         userdata = userdata['userData']['value']
         userdata = base64.b64decode(userdata)
-        userdata = userdata.decode("utf-8")
+        try:
+            userdata = userdata.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
         full_metadata['user-data'] = userdata
 
     return full_metadata
