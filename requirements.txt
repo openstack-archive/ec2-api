@@ -29,6 +29,6 @@ python-novaclient>=10.1.0 # Apache-2.0
 python-openstackclient>=3.14.0 # Apache-2.0
 Routes>=2.4.1 # MIT
 six>=1.11.0 # MIT
-SQLAlchemy>=1.2.5 # MIT
+SQLAlchemy>=1.2.5,<1.4.0 # MIT
 sqlalchemy-migrate>=0.11.0 # Apache-2.0
 WebOb>=1.7.4 # MIT
