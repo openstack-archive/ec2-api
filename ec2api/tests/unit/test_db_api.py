@@ -242,7 +242,7 @@ class DbApiTestCase(base.DbTestCase):
                                         (item_id, other_item_id))
         self.assertEqual(1, len(items))
         items = db_api.get_items_by_ids(self.context,
-                                        (fakes.random_ec2_id('fake')),)
+                                        (fakes.random_ec2_id('fake'),))
         self.assertEqual(0, len(items))
         items = db_api.get_items_by_ids(self.context,
                                         (item_id, fakes.random_ec2_id('fake')))
@@ -294,7 +294,7 @@ class DbApiTestCase(base.DbTestCase):
                                         [public_item_ids[0]])
         self.assertEqual(0, len(items))
         items = db_api.get_public_items(self.context, 'fake',
-                                        fakes.random_ec2_id('fake'))
+                                        [fakes.random_ec2_id('fake')])
         self.assertEqual(0, len(items))
         items = db_api.get_public_items(self.context, 'fake0', [])
         self.assertEqual(0, len(items))
@@ -454,6 +454,6 @@ class DbApiTestCase(base.DbTestCase):
                 'key': 'key',
                 'value': 'val2'}
         db_api.add_tags(self.other_context, [tag2])
-        db_api.delete_tags(self.context, item_id)
+        db_api.delete_tags(self.context, [item_id])
         self.assertThat(db_api.get_tags(self.other_context),
                         matchers.ListMatches([tag2]))
