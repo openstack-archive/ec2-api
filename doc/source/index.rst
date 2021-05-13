@@ -52,6 +52,16 @@ EC2API Reference
 
    hacking
 
+For Contributors
+================
+
+* If you are a new contributor to ec2-api please refer: :doc:`contributor/contributing`
+
+  .. toctree::
+     :hidden:
+
+     contributor/contributing
+
 Indices and tables
 ==================
 
