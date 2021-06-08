@@ -11,7 +11,7 @@ with ec2-api.
 
 Communication
 ~~~~~~~~~~~~~
-* IRC channel #openstack-ec2api at FreeNode
+* IRC channel #openstack-ec2api at OFTC
 * Mailing list (prefix subjects with ``[ec2-api]`` for faster responses)
   http://lists.openstack.org/cgi-bin/mailman/listinfo/openstack-discuss
 
