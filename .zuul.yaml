@@ -39,7 +39,6 @@
 - project:
     templates:
       - check-requirements
-      - openstack-lower-constraints-jobs
       - openstack-python-jobs
       - openstack-python3-train-jobs
       - publish-openstack-docs-pti
@@ -57,8 +56,6 @@
         # TripleO jobs that deploy ec2-api.
         # Note we don't use a project-template here, so it's easier
         # to disable voting on one specific job if things go wrong.
-        # tripleo-ci-centos-7-scenario002-multinode-oooq-container will
-        # run in Pike and beyond.
         # If you need any support to debug these jobs in case of
         # failures, please reach us on #tripleo IRC channel.
-        - tripleo-ci-centos-7-scenario002-standalone
+        - tripleo-ci-centos-8-scenario002-standalone
