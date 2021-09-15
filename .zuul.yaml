@@ -1,7 +1,6 @@
 - project:
     templates:
       - check-requirements
-      - openstack-lower-constraints-jobs
       - openstack-python3-xena-jobs
       - publish-openstack-docs-pti
     check:
