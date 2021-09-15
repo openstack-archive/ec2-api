@@ -116,7 +116,7 @@ class ClientsTestCase(base.BaseTestCase):
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.cinder(context)
         self.assertEqual(cinder.return_value, res)
-        cinder.assert_called_with('2', service_type='volumev3',
+        cinder.assert_called_with('3', service_type='volumev3',
                                   session=mock.sentinel.session)
 
     @mock.patch('keystoneclient.client.Client')
@@ -124,5 +124,5 @@ class ClientsTestCase(base.BaseTestCase):
         context = mock.NonCallableMock(session=mock.sentinel.session)
         res = clients.keystone(context)
         self.assertEqual(keystone.return_value, res)
-        keystone.assert_called_with(auth_url='v2',
+        keystone.assert_called_with(auth_url='v3',
                                     session=mock.sentinel.session)
