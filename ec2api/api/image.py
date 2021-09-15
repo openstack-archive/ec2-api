@@ -156,13 +156,13 @@ def create_image(context, instance_id, name=None, description=None,
             image['os_id'] = os_image_id
             db_api.update_item(context, image)
         except Exception:
-            LOG.exception('Failed to complete image %s creation', image.id)
+            LOG.exception('Failed to complete image %s creation', image['id'])
             try:
                 image['state'] = 'failed'
                 db_api.update_item(context, image)
             except Exception:
                 LOG.warning("Couldn't set 'failed' state for db image %s",
-                            image.id, exc_info=True)
+                            image['id'], exc_info=True)
 
         try:
             os_instance.start()
