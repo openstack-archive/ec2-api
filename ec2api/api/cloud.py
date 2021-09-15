@@ -819,10 +819,10 @@ class CloudController(object):
 
     @module_and_param_types(volume, 'str', 'int',
                             'snap_id', 'str', 'int',
-                            'bool', 'str')
+                            'bool', 'str', 'str')
     def create_volume(self, context, availability_zone=None, size=None,
                       snapshot_id=None, volume_type=None, iops=None,
-                      encrypted=None, kms_key_id=None):
+                      encrypted=None, kms_key_id=None, client_token=None):
         """Creates an EBS volume.
 
         Args:
@@ -846,6 +846,8 @@ class CloudController(object):
             kms_key_id (str): The full ARN of AWS KMS master key to use when
                 creating the encrypted volume.
                 Not used now.
+            client_token (str): Unique, case-sensitive identifier that you
+                provide to ensure the idempotency of the request.
 
         Returns:
             Information about the volume.
@@ -1691,13 +1693,15 @@ class VpcCloudController(CloudController):
                             'dummy',
                             'int',
                             'str',
-                            'sg_ids')
+                            'sg_ids',
+                            'str')
     def create_network_interface(self, context, subnet_id,
                                  private_ip_address=None,
                                  private_ip_addresses=None,
                                  secondary_private_ip_address_count=None,
                                  description=None,
-                                 security_group_id=None):
+                                 security_group_id=None,
+                                 client_token=None):
         """Creates a network interface in the specified subnet.
 
         Args:
@@ -1724,6 +1728,8 @@ class VpcCloudController(CloudController):
             description (str): A description for the network interface.
             security_group_id (list of str): The list of security group IDs
                 for the network interface.
+            client_token (str): Unique, case-sensitive identifier that you
+                provide to ensure the idempotency of the request.
 
         Returns:
             The network interface that was created.
