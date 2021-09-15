@@ -58,7 +58,7 @@ def create_context(is_os_admin=False):
                if is_os_admin else
                mock.sentinel.session)
     session.get_endpoint = mock.Mock(name="get_endpoint")
-    session.get_endpoint.return_value = 'v2'
+    session.get_endpoint.return_value = 'v3'
     return ec2api.context.RequestContext(fakes.ID_OS_USER, fakes.ID_OS_PROJECT,
                                          is_os_admin=is_os_admin,
                                          session=session)
@@ -121,7 +121,7 @@ class MockOSMixin(object):
 
     def mock_cinder(self):
         cinder_patcher = mock.patch('cinderclient.client.Client')
-        cinder = mock.create_autospec(cinderclient.Client('2'))
+        cinder = mock.create_autospec(cinderclient.Client('3'))
         cinder_patcher.start().return_value = cinder
         self.addCleanup(cinder_patcher.stop)
         return cinder

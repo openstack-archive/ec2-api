@@ -37,7 +37,21 @@ Validator = common.Validator
 
 def create_volume(context, availability_zone=None, size=None,
                   snapshot_id=None, volume_type=None, iops=None,
-                  encrypted=None, kms_key_id=None):
+                  encrypted=None, kms_key_id=None, client_token=None):
+
+    if client_token:
+        result = describe_volumes(context,
+                                   filter=[{'name': 'client-token',
+                                            'value': [client_token]}])
+        if result['volumeSet']:
+            if len(result['volumeSet']) > 1:
+                LOG.error('describe_volumes returns %s '
+                          'volumes, but 1 is expected.',
+                          len(result['volumeSet']))
+                LOG.error('Requested client token: %s', client_token)
+                LOG.error('Result: %s', result)
+            return result['volumeSet'][0]
+
     if snapshot_id is not None:
         snapshot = ec2utils.get_db_item(context, snapshot_id)
         os_snapshot_id = snapshot['os_id']
@@ -121,6 +135,7 @@ class VolumeDescriber(common.TaggableItemsDescriber):
     SORT_KEY = 'volumeId'
     FILTER_MAP = {
         'availability-zone': 'availabilityZone',
+        'client-token': 'clientToken',
         'create-time': 'createTime',
         'encrypted': 'encrypted',
         'size': 'size',
