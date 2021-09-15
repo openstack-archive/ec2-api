@@ -223,8 +223,9 @@ function configure_ec2api {
     # metadata configuring
     iniset $EC2API_CONF_FILE DEFAULT metadata_workers "$API_WORKERS"
     if [[ ,${ENABLED_SERVICES} =~ ,"q-" ]]; then
-        # with neutron
+        # with neutron (legacy and OVN)
         iniset $Q_META_CONF_FILE DEFAULT nova_metadata_port 8789
+        iniset $OVN_META_CONF DEFAULT nova_metadata_port 8789
     else
         # with nova-network
         iniset $NOVA_CONF DEFAULT metadata_port 8789

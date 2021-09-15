@@ -115,6 +115,7 @@ def get_metadata_item(context, path_tokens, os_instance_id, remote_ip,
 
         metadata = _build_metadata(context, ec2_instance, ec2_reservation,
                                    os_instance_id, remote_ip)
+        LOG.debug('get_metadata_item: result %s', str(metadata))
         cache = {'metadata': metadata,
                  'owner_id': ec2_reservation['ownerId']}
 
@@ -128,13 +129,18 @@ def get_metadata_item(context, path_tokens, os_instance_id, remote_ip,
 
 def _get_ec2_instance_and_reservation(context, os_instance_id):
     instance_id = ec2utils.os_id_to_ec2_id(context, 'i', os_instance_id)
+    LOG.debug('_get_ec2_instance_and_reservation(%s)', os_instance_id)
     try:
         ec2_reservations = instance_api.describe_instances(
                 context, [instance_id])
+        LOG.debug('_get_ec2_instance_and_reservation: result by id %s',
+                  str(ec2_reservations))
     except exception.InvalidInstanceIDNotFound:
         ec2_reservations = instance_api.describe_instances(
                 context, filter=[{'name': 'instance-id',
                                   'value': [instance_id]}])
+        LOG.debug('_get_ec2_instance_and_reservation: result by name %s',
+                  str(ec2_reservations))
     if (len(ec2_reservations['reservationSet']) != 1 or
             len(ec2_reservations['reservationSet'][0]['instancesSet']) != 1):
         LOG.error('Failed to get metadata for instance id: %s',

@@ -47,7 +47,22 @@ def create_network_interface(context, subnet_id,
                              private_ip_addresses=None,
                              secondary_private_ip_address_count=None,
                              description=None,
-                             security_group_id=None):
+                             security_group_id=None,
+                             client_token=None):
+
+    if client_token:
+        result = describe_network_interfaces(context,
+                                   filter=[{'name': 'client-token',
+                                            'value': [client_token]}])
+        if result['networkInterfaceSet']:
+            if len(result['networkInterfaceSet']) > 1:
+                LOG.error('describe_network_interfaces returns %s '
+                          'network_interfaces, but 1 is expected.',
+                          len(result['networkInterfaceSet']))
+                LOG.error('Requested client token: %s', client_token)
+                LOG.error('Result: %s', result)
+            return result['networkInterfaceSet'][0]
+
     subnet = ec2utils.get_db_item(context, subnet_id)
     if subnet is None:
         raise exception.InvalidSubnetIDNotFound(id=subnet_id)
@@ -206,6 +221,7 @@ class NetworkInterfaceDescriber(common.TaggableItemsDescriber):
                   'attachment.attach.time': ('attachment', 'attachTime'),
                   'attachment.delete-on-termination': ('attachment',
                                                        'deleteOnTermination'),
+                  'client-token': 'clientToken',
                   'description': 'description',
                   'group-id': ['groupSet', 'groupId'],
                   'group-name': ['groupSet', 'groupName'],
