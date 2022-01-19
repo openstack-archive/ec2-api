@@ -188,14 +188,15 @@ def _format_subnet(context, subnet, os_subnet, os_network, os_ports):
     # NOTE(Alex) First and last IP addresses are system ones.
     ip_count = pow(2, 32 - cidr_range) - 2
     # TODO(Alex): Probably performance-killer. Will have to optimize.
-    dhcp_port_accounted = False
+    service_ports = ['network:dhcp', 'network:distributed']
+    service_port_accounted = False
     for port in os_ports:
         for fixed_ip in port.get('fixed_ips', []):
             if fixed_ip['subnet_id'] == os_subnet['id']:
                 ip_count -= 1
-                if port['device_owner'] == 'network:dhcp':
-                    dhcp_port_accounted = True
-    if not dhcp_port_accounted:
+                if port['device_owner'] in service_ports:
+                    service_port_accounted = True
+    if not service_port_accounted:
         ip_count -= 1
     return {
         'subnetId': subnet['id'],

@@ -128,8 +128,9 @@ for Neutron
     [DEFAULT]
     nova_metadata_port = 8789
 
-  to /etc/neutron/metadata_agent.ini
-
+  to /etc/neutron/metadata_agent.ini for legacy neutron or
+  to neutron_ovn_metadata_agent.ini for OVN
+ 
   then restart neutron-metadata service.
 
 S3 server is intended only to support EC2 operations which require S3 server
