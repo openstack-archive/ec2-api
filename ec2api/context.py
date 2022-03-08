@@ -54,7 +54,7 @@ class RequestContext(context.RequestContext):
         super(RequestContext, self).__init__(
             auth_token=auth_token,
             user=user_id or user,
-            tenant=project_id or tenant,
+            project_id=project_id or tenant,
             is_admin=is_admin,
             request_id=request_id,
             resource_uuid=kwargs.pop('resource_uuid', None),
