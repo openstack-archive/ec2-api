@@ -63,11 +63,6 @@ class Fault(webob.exc.HTTPException):
 
         if 'AWSAccessKeyId' not in req.params:
             raise webob.exc.HTTPBadRequest()
-        user_id, _sep, project_id = req.params['AWSAccessKeyId'].partition(':')
-        project_id = project_id or user_id
-        remote_address = getattr(req, 'remote_address', '127.0.0.1')
-        if CONF.use_forwarded_for:
-            remote_address = req.headers.get('X-Forwarded-For', remote_address)
 
         resp = ec2_error_response(common_context.generate_request_id(), code,
                                   message=message, status=status)
