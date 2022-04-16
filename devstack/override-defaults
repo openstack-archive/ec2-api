@@ -1,4 +1,3 @@
 # Enable VPNAAS service and set type of ipsec package
-enable_plugin neutron-vpnaas https://opendev.org/openstack/neutron-vpnaas
 enable_service q-vpnaas
 IPSEC_PACKAGE=strongswan
