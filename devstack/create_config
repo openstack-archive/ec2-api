@@ -25,8 +25,9 @@ FLAVOR_NAME="m1.ec2api"
 FLAVOR_NAME_ALT="m1.ec2api-alt"
 
 if [[ -n "$TOP_DIR" ]]; then
-  source $TOP_DIR/accrc/admin/admin
-  unset OS_AUTH_TYPE
+  source $TOP_DIR/openrc admin admin
+  unset OS_CLOUD
+  #unset OS_AUTH_TYPE
 fi
 
 openstack endpoint list
@@ -148,6 +149,7 @@ aws configure set aws_access_key_id $ec2_access_key --profile user
 aws configure set aws_secret_access_key $ec2_secret_key --profile user
 deactivate
 
+env|sort
 auth="--os-project-name $project_name --os-username $user_name --os-password password"
 
 # create EBS image
@@ -278,6 +280,11 @@ else
   warn $LINENO "Downloading of image $CIRROS_IMAGE_URL failed."
 fi
 
+vpnaas_enabled='False'
+if openstack extension list | grep -q " vpnaas " ; then
+  vpnaas_enabled='True'
+fi
+
 sudo bash -c "cat > $EC2API_DIR/$TEST_CONFIG <<EOF
 [aws]
 ec2_url = $EC2_URL
@@ -293,6 +300,7 @@ instance_type = $FLAVOR_NAME
 instance_type_alt = $FLAVOR_NAME_ALT
 ami_image_location = $cirros_image_manifest
 run_ssh = $run_ssh
+vpnaas_enabled = $vpnaas_enabled
 ca_bundle = $OS_CACERT
 EOF"
 
