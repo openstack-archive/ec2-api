@@ -1978,10 +1978,10 @@ class VpcCloudController(CloudController):
             Information about one or more virtual private gateways.
         """
 
-    @module_and_param_types(customer_gateway, 'ip', 'vpn_connection_type',
-                            'int')
-    def create_customer_gateway(self, context, ip_address, type,
-                                bgp_asn=None):
+    @module_and_param_types(customer_gateway, 'vpn_connection_type',
+                            'int', 'ip', 'ip')
+    def create_customer_gateway(self, context, type,
+                                bgp_asn=None, ip_address=None, public_ip=None):
         """Provides information to EC2 API about VPN customer gateway device.
 
         Args:

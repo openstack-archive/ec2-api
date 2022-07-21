@@ -29,14 +29,22 @@ Validator = common.Validator
 DEFAULT_BGP_ASN = 65000
 
 
-def create_customer_gateway(context, ip_address, type, bgp_asn=None):
+def create_customer_gateway(context, type, bgp_asn=None,
+                        ip_address=None, public_ip=None):
+    if ip_address:
+        ip_addr = ip_address
+    elif (ip_address == None) and public_ip:
+        ip_addr = public_ip
+    elif (ip_address == None) and (public_ip == None):
+        raise exception.Unsupported("GW without ip not supported")
     if bgp_asn and bgp_asn != DEFAULT_BGP_ASN:
         raise exception.Unsupported("BGP dynamic routing is unsupported")
+        # testing output to get ec2 failures
     customer_gateway = next((cgw for cgw in db_api.get_items(context, 'cgw')
-                             if cgw['ip_address'] == ip_address), None)
+                             if cgw['ip_address'] == ip_addr), None)
     if not customer_gateway:
         customer_gateway = db_api.add_item(context, 'cgw',
-                                           {'ip_address': ip_address})
+                                           {'ip_address': ip_addr})
     return {'customerGateway': _format_customer_gateway(customer_gateway)}
 
 
