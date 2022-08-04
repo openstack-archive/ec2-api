@@ -19,7 +19,6 @@ from novaclient import exceptions as nova_exception
 from oslo_cache import core as cache_core
 from oslo_config import cfg
 from oslo_log import log as logging
-import six
 
 from ec2api.api import clients
 from ec2api.api import ec2utils
@@ -293,7 +292,7 @@ def _format_metadata_item(data):
     elif isinstance(data, list):
         return '\n'.join(data)
     else:
-        return six.text_type(data)
+        return str(data)
 
 
 def _find_path_in_tree(data, path_tokens):

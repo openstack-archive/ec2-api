@@ -16,7 +16,6 @@ import re
 
 import netaddr
 from oslo_log import log as logging
-import six
 
 from ec2api import exception
 from ec2api.i18n import _
@@ -26,7 +25,7 @@ LOG = logging.getLogger(__name__)
 
 
 def validate_str(val, parameter_name, max_length=None):
-    if (isinstance(val, six.string_types) and
+    if (isinstance(val, str) and
             (max_length is None or max_length and len(val) <= max_length)):
         return True
     raise exception.ValidationError(

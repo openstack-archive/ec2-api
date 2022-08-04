@@ -21,7 +21,6 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_serialization import jsonutils
 from oslo_utils import timeutils
-import six
 
 from ec2api import clients
 from ec2api.db import api as db_api
@@ -103,7 +102,7 @@ def dict_from_dotted_str(items):
     for key, value in items:
         parts = key.split(".")
         key = str(camelcase_to_underscore(parts[0]))
-        if isinstance(value, six.string_types):
+        if isinstance(value, str):
             # NOTE(vish): Automatically convert strings back
             #             into their respective values
             value = _try_convert(value)
@@ -146,10 +145,10 @@ def _render_data(el, data):
         el.text = str(data).lower()
     elif isinstance(data, datetime.datetime):
         el.text = _database_to_isoformat(data)
-    elif isinstance(data, six.binary_type):
+    elif isinstance(data, bytes):
         el.text = data.decode("utf-8")
     elif data is not None:
-        el.text = six.text_type(data)
+        el.text = str(data)
 
 
 def _database_to_isoformat(datetimeobj):

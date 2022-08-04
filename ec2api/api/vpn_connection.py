@@ -19,7 +19,6 @@ from lxml import etree
 import netaddr
 from neutronclient.common import exceptions as neutron_exception
 from oslo_log import log as logging
-import six
 
 from ec2api.api import common
 from ec2api.api import ec2utils
@@ -322,7 +321,7 @@ def _format_customer_config(vpn_connection, customer_gateways, os_ikepolicies,
 
 def _stop_vpn_connection(neutron, vpn_connection):
     connection_ids = vpn_connection['os_ipsec_site_connections']
-    for os_connection_id in six.itervalues(connection_ids):
+    for os_connection_id in connection_ids.values():
         try:
             neutron.delete_ipsec_site_connection(os_connection_id)
         except neutron_exception.NotFound:

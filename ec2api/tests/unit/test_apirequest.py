@@ -17,7 +17,6 @@ from unittest import mock
 
 from oslo_context import context
 from oslo_utils import timeutils
-import six
 
 from ec2api.api import apirequest
 from ec2api.tests.unit import base
@@ -100,7 +99,7 @@ class EC2RequesterTestCase(base.BaseTestCase):
     def test_render_response_utf8(self):
         req = apirequest.APIRequest("FakeAction", "FakeVersion", {})
         resp = {
-            'utf8': six.unichr(40960) + u'abcd' + six.unichr(1972)
+            'utf8': chr(40960) + u'abcd' + chr(1972)
         }
         data = req._render_response(resp, 'uuid').decode()
         self.assertIn('<utf8>&#40960;abcd&#1972;</utf8>', data)

@@ -22,7 +22,7 @@
 
 # See http://code.google.com/p/python-nose/issues/detail?id=373
 # The code below enables nosetests to work with i18n _() blocks
-from six.moves import builtins
+import builtins
 setattr(builtins, '_', lambda x: x)
 
 # NOTE(ft): this is required by test_s3.S3APITestCase to switch execution

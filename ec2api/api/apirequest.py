@@ -19,7 +19,6 @@ APIRequest class
 from lxml import etree
 from oslo_config import cfg
 from oslo_log import log as logging
-import six
 
 from ec2api.api import cloud
 from ec2api.api import ec2utils
@@ -67,7 +66,7 @@ class APIRequest(object):
                 if isinstance(args[key], dict):
                     if args[key] == {}:
                         continue
-                    first_subkey = next(six.iterkeys(args[key]))
+                    first_subkey = next(iter(args[key].keys()))
                     if first_subkey.isdigit():
                         s = args[key]
                         args[key] = [convert_dicts_to_lists(s[k])

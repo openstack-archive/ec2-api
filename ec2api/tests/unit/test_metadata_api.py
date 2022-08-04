@@ -19,7 +19,6 @@ from unittest import mock
 from novaclient import exceptions as nova_exception
 from oslo_cache import core as cache_core
 from oslo_config import cfg
-import six
 
 from ec2api import exception
 from ec2api.metadata import api
@@ -29,7 +28,7 @@ from ec2api.tests.unit import matchers
 from ec2api.tests.unit import tools
 
 CONF = cfg.CONF
-FAKE_USER_DATA = u'fake_user_data-' + six.unichr(1071)
+FAKE_USER_DATA = u'fake_user_data-' + chr(1071)
 
 
 class MetadataApiTestCase(base.ApiTestCase):

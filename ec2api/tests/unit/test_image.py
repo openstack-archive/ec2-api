@@ -15,7 +15,6 @@
 import os
 from unittest import mock
 
-import six
 import tempfile
 
 from cinderclient import exceptions as cinder_exception
@@ -970,7 +969,7 @@ class S3TestCase(base.BaseTestCase):
                                                 '-out', public_key,
                                                 '-subj', subject)
         text = "some @#!%^* test text"
-        process_input = text.encode("ascii") if six.PY3 else text
+        process_input = text.encode("ascii")
         enc, _err = processutils.execute('openssl',
                                          'rsautl',
                                          '-certin',
@@ -982,6 +981,5 @@ class S3TestCase(base.BaseTestCase):
         self.configure(x509_root_private_key=private_key)
         dec = image_api._decrypt_text(enc)
         self.assertIsInstance(dec, bytes)
-        if six.PY3:
-            dec = dec.decode('ascii')
+        dec = dec.decode('ascii')
         self.assertEqual(text, dec)
