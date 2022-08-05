@@ -32,14 +32,9 @@ _DEFAULT_LOG_LEVELS = ['amqp=WARN', 'amqplib=WARN', 'boto=WARN',
                        'keystonemiddleware=WARN', 'routes.middleware=WARN',
                        'stevedore=WARN', 'keystoneclient.auth=WARN']
 
-_DEFAULT_LOGGING_CONTEXT_FORMAT = ('%(asctime)s.%(msecs)03d %(process)d '
-                                   '%(levelname)s %(name)s [%(request_id)s '
-                                   '%(user_identity)s] %(instance)s'
-                                   '%(message)s')
-
 
 def parse_args(argv, default_config_files=None):
-    log.set_defaults(_DEFAULT_LOGGING_CONTEXT_FORMAT, _DEFAULT_LOG_LEVELS)
+    log.set_defaults(default_log_levels=_DEFAULT_LOG_LEVELS)
     log.register_options(CONF)
     options.set_defaults(CONF, connection=_DEFAULT_SQL_CONNECTION)
 
