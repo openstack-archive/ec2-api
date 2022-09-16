@@ -7,6 +7,5 @@
       jobs:
         - ec2api-tempest-plugin-functional
     gate:
-      queue: ec2-api
       jobs:
         - ec2api-tempest-plugin-functional

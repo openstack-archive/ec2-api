@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import base64
+from unittest import mock
+
 
 from novaclient import exceptions as nova_exception
 
@@ -24,12 +26,15 @@ from ec2api.tests.unit import tools
 
 class KeyPairCase(base.ApiTestCase):
 
-    def test_create_key_pair(self):
+    @mock.patch('ec2api.api.key_pair._generate_key_pair')
+    def test_create_key_pair(self, _generate_key_pair):
+        _generate_key_pair.return_value = (
+            fakes.PRIVATE_KEY_KEY_PAIR, fakes.PUBLIC_KEY_KEY_PAIR)
         self.nova.keypairs.create.return_value = (
             fakes.NovaKeyPair(fakes.OS_KEY_PAIR))
         resp = self.execute('CreateKeyPair', {'KeyName': fakes.NAME_KEY_PAIR})
         self.assertThat(fakes.EC2_KEY_PAIR, matchers.DictMatches(resp))
-        self.nova.keypairs.create.assert_called_once_with(fakes.NAME_KEY_PAIR)
+        _generate_key_pair.assert_called_once_with()
 
     def test_create_key_pair_invalid(self):
         self.nova.keypairs.create.side_effect = (
