@@ -14,6 +14,9 @@
 
 import base64
 
+from cryptography.hazmat import backends
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization as crypt_serialization
 from novaclient import exceptions as nova_exception
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -81,17 +84,38 @@ def _validate_name(name):
             reason='lenght is exceeds maximum of 255')
 
 
+# We may wish to make the algorithm configurable. This would require API
+# changes.
+def _generate_key_pair():
+    key = rsa.generate_private_key(
+        backend=backends.default_backend(),
+        public_exponent=65537,
+        key_size=2048
+    )
+    private_key = key.private_bytes(
+        crypt_serialization.Encoding.PEM,
+        crypt_serialization.PrivateFormat.TraditionalOpenSSL,
+        crypt_serialization.NoEncryption(),
+    ).decode()
+    public_key = key.public_key().public_bytes(
+        crypt_serialization.Encoding.OpenSSH,
+        crypt_serialization.PublicFormat.OpenSSH,
+    ).decode()
+    return private_key, public_key
+
+
 def create_key_pair(context, key_name):
     _validate_name(key_name)
     nova = clients.nova(context)
+    private_key, public_key = _generate_key_pair()
     try:
-        key_pair = nova.keypairs.create(key_name)
+        key_pair = nova.keypairs.create(key_name, public_key)
     except nova_exception.OverLimit:
         raise exception.ResourceLimitExceeded(resource='keypairs')
     except nova_exception.Conflict:
         raise exception.InvalidKeyPairDuplicate(key_name=key_name)
     formatted_key_pair = _format_key_pair(key_pair)
-    formatted_key_pair['keyMaterial'] = key_pair.private_key
+    formatted_key_pair['keyMaterial'] = private_key
     return formatted_key_pair
 
 
