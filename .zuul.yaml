@@ -1,9 +1,8 @@
 - project:
+    queue: ec2-api
     templates:
       - openstack-python-jobs
       - openstack-python35-jobs
       - check-requirements
       - publish-openstack-sphinx-docs
     name: openstack/ec2-api
-    gate:
-      queue: ec2-api
