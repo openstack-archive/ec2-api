@@ -37,6 +37,7 @@
       - openstack/rally
 
 - project:
+    queue: ec2-api
     templates:
       - openstack-python-jobs
       - openstack-python35-jobs
@@ -46,7 +47,6 @@
       jobs:
         - ec2-api-functional-neutron
     gate:
-      queue: ec2-api
       jobs:
         - ec2-api-functional-neutron
     experimental:
