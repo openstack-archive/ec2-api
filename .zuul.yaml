@@ -1,4 +1,5 @@
 - project:
+    queue: ec2-api
     templates:
       - check-requirements
       - openstack-python3-victoria-jobs
@@ -7,7 +8,6 @@
       jobs:
         - ec2api-tempest-plugin-functional
     gate:
-      queue: ec2-api
       jobs:
         - ec2api-tempest-plugin-functional
     experimental:
