@@ -47,6 +47,13 @@ Also you need to configure database connection:
      [database]
      connection = mysql+pymysql://root:password@127.0.0.1/ec2api?charset=utf8
 
+and you need to configure oslo_concurrency lock_path:
+
+.. code-block:: ini
+
+     [oslo_concurrency]
+     lock_path = /path/to/oslo_concurrency_lock_dir
+
 and cache if you want to use it.
 
 .. code-block:: ini
