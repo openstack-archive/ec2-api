@@ -1,14 +1,11 @@
-========================
-Team and repository tags
-========================
+=================
+OpenStack EC2 API
+=================
 
 .. image:: https://governance.openstack.org/tc/badges/ec2-api.svg
     :target: https://governance.openstack.org/tc/reference/tags/index.html
 
 .. Change things from this point on
-
-OpenStack EC2 API README
-------------------------
 
 Support of EC2 API for OpenStack.
 This project provides a standalone EC2 API service which pursues two goals:
@@ -17,7 +14,12 @@ This project provides a standalone EC2 API service which pursues two goals:
  2. Create a standalone service for EC2 API support.
 
 Installation
-============
+------------
+
+For more detailed information, please see the `Installation Guide <https://docs.openstack.org/ec2-api/latest/install/index.html>`_.
+
+Installation by install.sh
+==========================
 
 Run install.sh
 
@@ -34,6 +36,11 @@ The services afterwards can be started as binaries:
 
 or set up as Linux services.
 
+Configuring OpenStack for EC2 API metadata service refering to section "EC2 metadata Configuration".
+
+Installation on devstack
+========================
+
 Installation in devstack:
 
 In order to install ec2-api with devstack the following should be added to
@@ -44,6 +51,7 @@ the local.conf or localrc the following line:
  enable_plugin ec2-api https://opendev.org/openstack/ec2-api
 
 Devstack installation with ec2-api and ec2api-tempest-plugin for development:
+
 1. install packages: awscli, git, python3, python3-devel, ruby
 2. clone devstack repository
 
@@ -107,6 +115,11 @@ Devstack installation with ec2-api and ec2api-tempest-plugin for development:
  cd /opt/stack/ec2-api
  tox -epy36 ec2api.tests.unit.test_security_group.SecurityGroupTestCase.test_describe_security_groups_no_default_vpc
 
+Configuring OpenStack for EC2 API metadata service refering to section "EC2 metadata Configuration".
+
+EC2 metadata Configuration
+==========================
+
 To configure OpenStack for EC2 API metadata service:
 
 for Nova-network
@@ -140,7 +153,7 @@ Do not start it if the deployment has its own object storage or uses a public
 one (e.g. AWS S3).
 
 Usage
-=====
+-----
 
 Download aws cli from Amazon.
 Create configuration file for aws cli in your home directory ~/.aws/config:
@@ -163,7 +176,7 @@ aws --endpoint-url http://10.0.2.15:8788 ec2 describe-instances
 
 
 Supported Features and Limitations
-==================================
+----------------------------------
 
 General:
  * DryRun option is not supported.
@@ -666,7 +679,10 @@ General:
 
 
 References
-==========
+----------
+
+Documentation:
+https://docs.openstack.org/ec2-api/latest/
 
 Wiki:
 https://wiki.openstack.org/wiki/EC2API
