@@ -354,4 +354,16 @@ $SUDO_PREFIX rm -rf build ec2_api.egg-info
 
 #recreate database
 echo Setuping database
-$SUDO_PREFIX tools/db/ec2api-db-setup deb
+PACKAGE_MANAGER_SELECTED=0
+while [ $PACKAGE_MANAGER_SELECTED -eq 0 ]
+do
+    printf "Enter the package manager you use <rpm|deb> "
+    read PACKAGE_MANAGER
+    if [ $PACKAGE_MANAGER = "rpm" ] || [ $PACKAGE_MANAGER = "deb" ] ; then
+        PACKAGE_MANAGER_SELECTED=1
+    else
+        echo "The package manager you entered \"${PACKAGE_MANAGER}\" is not in <rpm|deb>"
+    fi
+done
+
+$SUDO_PREFIX tools/db/ec2api-db-setup $PACKAGE_MANAGER
