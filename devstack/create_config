@@ -221,10 +221,9 @@ if [[ -n "$openstack_image_id" ]]; then
   openstack $auth server delete $instance_id
 fi
 
-timeout="180"
+timeout="600"
 run_long_tests="False"
 if [[ $RUN_LONG_TESTS == "1" ]]; then
-  timeout="600"
   run_long_tests="True"
 fi
 
