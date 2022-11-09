@@ -1,4 +1,5 @@
 - project:
+    queue: ec2-api
     templates:
       - check-requirements
       - openstack-python3-jobs
