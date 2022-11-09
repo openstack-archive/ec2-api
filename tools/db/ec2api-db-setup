@@ -63,6 +63,11 @@ start_mysql_server() {
         $SERVICE_START
 }
 
+check_mysql_credentials() {
+        echo "SELECT 1;" | mysql --protocol=TCP -u root --password=${MYSQL_ROOT_PW} > /dev/null
+        echo $?
+}
+
 MYSQL_EC2API_PW_DEFAULT="ec2api"
 MYSQL_EC2API_PW=${MYSQL_EC2API_PW_DEFAULT}
 EC2API_CONFIG="/etc/ec2api/ec2api.conf"
@@ -211,9 +216,16 @@ then
                 exit 1
         fi
 elif [ ! "${MYSQL_ROOT_PW+defined}" ] ; then
-        printf "Please enter the password for the 'root' MySQL user: "
-        read -s MYSQL_ROOT_PW
-        echo
+        PW_OK=0
+        while ! [ $PW_OK -eq 1 ];
+        do
+                printf "Please enter the password for the 'root' MySQL user: "
+                read -s MYSQL_ROOT_PW
+                echo
+                if [ $(check_mysql_credentials) -eq 0 ]; then
+                        PW_OK=1
+                fi
+        done
 fi
 
 
@@ -224,8 +236,7 @@ if [ "${MYSQL_ROOT_PW+defined}" ]
 then
         MYSQL_ROOT_PW_ARG="--password=${MYSQL_ROOT_PW}"
 fi
-echo "SELECT 1;" | mysql --protocol=TCP -u root ${MYSQL_ROOT_PW_ARG} > /dev/null
-if ! [ $? -eq 0 ]
+if ! [ $(check_mysql_credentials) -eq 0 ]
 then
         echo "Failed to connect to the MySQL server. Please check your root user credentials."
         exit 1
@@ -236,6 +247,17 @@ echo "Verified connectivity to MySQL."
 # Now create the db.
 
 echo "Creating 'ec2api' database."
+MYSQL_VERSION=`echo "select version();" | mysql -u root ${MYSQL_ROOT_PW_ARG} | grep -oP -m1 "^\d+(?=\..*)"`
+if [[ $MYSQL_VERSION -ge 8 ]]; then
+cat << EOF | mysql --protocol=TCP -u root ${MYSQL_ROOT_PW_ARG}
+DROP DATABASE IF EXISTS ec2api;
+CREATE DATABASE IF NOT EXISTS ec2api DEFAULT CHARACTER SET utf8;
+CREATE USER 'ec2api'@'%' IDENTIFIED BY '${MYSQL_EC2API_PW}';
+GRANT ALL ON ec2api.* TO 'ec2api'@'localhost';
+GRANT ALL ON ec2api.* TO 'ec2api'@'%';
+flush privileges;
+EOF
+else
 cat << EOF | mysql --protocol=TCP -u root ${MYSQL_ROOT_PW_ARG}
 DROP DATABASE IF EXISTS ec2api;
 CREATE DATABASE IF NOT EXISTS ec2api DEFAULT CHARACTER SET utf8;
@@ -243,6 +265,7 @@ GRANT ALL ON ec2api.* TO 'ec2api'@'localhost' IDENTIFIED BY '${MYSQL_EC2API_PW}'
 GRANT ALL ON ec2api.* TO 'ec2api'@'%' IDENTIFIED BY '${MYSQL_EC2API_PW}';
 flush privileges;
 EOF
+fi
 
 
 # Make sure ec2api configuration has the right MySQL password.
@@ -277,12 +300,13 @@ args=(sys.stdout,)
 format=%(name)s - %(levelname)s - %(message)s
 EOF
 
-pip install MySQL-python
+pip install mysqlclient
 
 ec2-api-manage --log-config=$log_conf db_sync
 rm $log_conf
 
 # Do a final sanity check on the database.
+echo "Run final sanity check."
 
 echo "SELECT * FROM migrate_version;" | mysql --protocol=TCP -u ec2api --password=${MYSQL_EC2API_PW} ec2api > /dev/null
 if ! [ $? -eq 0 ]
