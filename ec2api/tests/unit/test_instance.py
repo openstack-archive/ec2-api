@@ -55,8 +55,7 @@ class InstanceTestCase(base.ApiTestCase):
                            describe_instances):
         """Run instance with various network interface settings."""
         self.set_mock_db_items(
-            fakes.DB_SUBNET_1, fakes.DB_NETWORK_INTERFACE_1, fakes.DB_IMAGE_1,
-            fakes.DB_IMAGE_ARI_1, fakes.DB_IMAGE_AKI_1)
+            fakes.DB_SUBNET_1, fakes.DB_NETWORK_INTERFACE_1, fakes.DB_IMAGE_1)
         self.glance.images.get.return_value = fakes.OSImage(fakes.OS_IMAGE_1)
         self.network_interface_api.create_network_interface.return_value = (
             {'networkInterface': fakes.EC2_NETWORK_INTERFACE_1})
@@ -114,7 +113,6 @@ class InstanceTestCase(base.ApiTestCase):
                 fakes.EC2_INSTANCE_1['privateDnsName'],
                 fakes.ID_OS_IMAGE_1, self.fake_flavor,
                 min_count=1, max_count=1,
-                kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
                 block_device_mapping_v2=[],
                 security_groups=None,
@@ -240,7 +238,6 @@ class InstanceTestCase(base.ApiTestCase):
                 '%s-%s' % (fakes.ID_EC2_RESERVATION_1, launch_index),
                 fakes.ID_OS_IMAGE_1, self.fake_flavor,
                 min_count=1, max_count=1,
-                kernel_id=None, ramdisk_id=None,
                 availability_zone=None,
                 block_device_mapping_v2=[],
                 security_groups=None,
@@ -270,13 +267,10 @@ class InstanceTestCase(base.ApiTestCase):
     def test_run_instances_other_parameters(self, get_ec2_classic_os_network,
                                             describe_instances,
                                             parse_block_device_mapping):
-        self.set_mock_db_items(
-            fakes.DB_IMAGE_1, fakes.DB_IMAGE_AKI_1, fakes.DB_IMAGE_ARI_1)
+        self.set_mock_db_items(fakes.DB_IMAGE_1)
         self.glance.images.get.side_effect = (
             tools.get_by_1st_arg_getter({
-                fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1),
-                fakes.ID_OS_IMAGE_AKI_1: fakes.OSImage(fakes.OS_IMAGE_AKI_1),
-                fakes.ID_OS_IMAGE_ARI_1: fakes.OSImage(fakes.OS_IMAGE_ARI_1)}))
+                fakes.ID_OS_IMAGE_1: fakes.OSImage(fakes.OS_IMAGE_1)}))
         get_ec2_classic_os_network.return_value = {'id': fakes.random_os_id()}
         user_data = base64.b64decode(fakes.USER_DATA_INSTANCE_2)
         parse_block_device_mapping.return_value = []
@@ -291,8 +285,6 @@ class InstanceTestCase(base.ApiTestCase):
                 {'ImageId': fakes.ID_EC2_IMAGE_1,
                  'InstanceType': 'fake_flavor',
                  'MinCount': '1', 'MaxCount': '1',
-                 'KernelId': fakes.ID_EC2_IMAGE_AKI_1,
-                 'RamdiskId': fakes.ID_EC2_IMAGE_ARI_1,
                  'SecurityGroup.1': 'default',
                  'Placement.AvailabilityZone': 'fake_zone',
                  'ClientToken': 'fake_client_token',
@@ -304,8 +296,7 @@ class InstanceTestCase(base.ApiTestCase):
 
             self.nova.servers.create.assert_called_once_with(
                 mock.ANY, mock.ANY, mock.ANY, min_count=1, max_count=1,
-                userdata=user_data, kernel_id=fakes.ID_OS_IMAGE_AKI_1,
-                ramdisk_id=fakes.ID_OS_IMAGE_ARI_1, key_name=None,
+                userdata=user_data, key_name=None,
                 block_device_mapping_v2=[],
                 availability_zone='fake_zone', security_groups=['default'],
                 **extra_kwargs)
@@ -540,7 +531,6 @@ class InstanceTestCase(base.ApiTestCase):
             fakes.EC2_INSTANCE_DEFAULT['privateDnsName'],
             fakes.ID_OS_IMAGE_2, self.fake_flavor,
             min_count=1, max_count=1,
-            kernel_id=None, ramdisk_id=None,
             availability_zone=None,
             block_device_mapping_v2=[],
             security_groups=None,
@@ -1428,27 +1418,21 @@ class InstancePrivateTestCase(base.BaseTestCase):
 
         # NOTE(ft): check normal flow
         os_image = fakes.OSImage(fakes.OS_IMAGE_1)
-        get_os_image.side_effect = [
-            fakes.OSImage(fakes.OS_IMAGE_AKI_1),
-            fakes.OSImage(fakes.OS_IMAGE_ARI_1),
-            os_image]
+        get_os_image.side_effect = [os_image]
         self.assertEqual(
-            (os_image, fakes.ID_OS_IMAGE_AKI_1, fakes.ID_OS_IMAGE_ARI_1),
+            (os_image),
             instance_api._parse_image_parameters(
-                fake_context, fakes.ID_EC2_IMAGE_1,
-                fakes.ID_EC2_IMAGE_AKI_1, fakes.ID_EC2_IMAGE_ARI_1))
+                fake_context, fakes.ID_EC2_IMAGE_1))
         get_os_image.assert_has_calls(
-            [mock.call(fake_context, fakes.ID_EC2_IMAGE_AKI_1),
-             mock.call(fake_context, fakes.ID_EC2_IMAGE_ARI_1),
-             mock.call(fake_context, fakes.ID_EC2_IMAGE_1)])
+            [mock.call(fake_context, fakes.ID_EC2_IMAGE_1)])
 
         get_os_image.side_effect = None
         get_os_image.return_value = os_image
         get_os_image.reset_mock()
         self.assertEqual(
-            (os_image, None, None),
+            (os_image),
             instance_api._parse_image_parameters(
-                fake_context, fakes.ID_EC2_IMAGE_1, None, None))
+                fake_context, fakes.ID_EC2_IMAGE_1))
         get_os_image.assert_called_once_with(
                 fake_context, fakes.ID_EC2_IMAGE_1)
 
@@ -1461,7 +1445,7 @@ class InstancePrivateTestCase(base.BaseTestCase):
         self.assertRaises(
             exception.InvalidAMIIDUnavailable,
             instance_api._parse_image_parameters,
-            fake_context, fakes.random_ec2_id('ami'), None, None)
+            fake_context, fakes.random_ec2_id('ami'))
 
         os_image.status = 'active'
         os_image.image_state = 'decrypting'
@@ -1469,7 +1453,7 @@ class InstancePrivateTestCase(base.BaseTestCase):
         self.assertRaises(
             exception.InvalidAMIIDUnavailable,
             instance_api._parse_image_parameters,
-            fake_context, fakes.random_ec2_id('ami'), None, None)
+            fake_context, fakes.random_ec2_id('ami'))
 
     @mock.patch('ec2api.db.api.IMPL')
     def test_parse_block_device_mapping(self, db_api):
