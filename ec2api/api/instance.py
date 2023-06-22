@@ -85,6 +85,12 @@ def run_instances(context, image_id, min_count, max_count,
                   network_interface=None, iam_instance_profile=None,
                   ebs_optimized=None):
 
+    if ramdisk_id:
+        raise exception.InvalidAttribute(attr='ramdisk_id')
+
+    if kernel_id:
+        raise exception.InvalidAttribute(attr='kernel_id')
+
     _check_min_max_count(min_count, max_count)
 
     if client_token:
@@ -100,8 +106,7 @@ def run_instances(context, image_id, min_count, max_count,
                 LOG.error('Result: %s', reservations)
             return reservations['reservationSet'][0]
 
-    os_image, os_kernel_id, os_ramdisk_id = _parse_image_parameters(
-        context, image_id, kernel_id, ramdisk_id)
+    os_image = _parse_image_parameters(context, image_id)
 
     nova = clients.nova(context)
     os_flavor = _get_os_flavor(instance_type, nova)
@@ -143,7 +148,6 @@ def run_instances(context, image_id, min_count, max_count,
                 '%s-%s' % (ec2_reservation_id, launch_index),
                 os_image.id, os_flavor,
                 min_count=1, max_count=1,
-                kernel_id=os_kernel_id, ramdisk_id=os_ramdisk_id,
                 availability_zone=availability_zone,
                 block_device_mapping_v2=bdm,
                 key_name=key_name, userdata=user_data,
@@ -872,11 +876,7 @@ def _check_min_max_count(min_count, max_count):
         raise exception.InvalidParameterValue(msg)
 
 
-def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
-    os_kernel_id = (ec2utils.get_os_image(context, kernel_id).id
-                    if kernel_id else None)
-    os_ramdisk_id = (ec2utils.get_os_image(context, ramdisk_id).id
-                     if ramdisk_id else None)
+def _parse_image_parameters(context, image_id):
     os_image = ec2utils.get_os_image(context, image_id)
 
     if _cloud_get_image_state(os_image) != 'available':
@@ -884,7 +884,7 @@ def _parse_image_parameters(context, image_id, kernel_id, ramdisk_id):
         msg = _('Image must be available')
         raise exception.InvalidAMIIDUnavailable(message=msg)
 
-    return os_image, os_kernel_id, os_ramdisk_id
+    return os_image
 
 
 def _parse_block_device_mapping(context, block_device_mapping):
