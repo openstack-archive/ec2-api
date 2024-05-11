@@ -1,2 +1,0 @@
-# Enable VPNAAS service and set type of ipsec package
-IPSEC_PACKAGE=strongswan
